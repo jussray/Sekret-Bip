@@ -1,6 +1,6 @@
 # Circle V1 → V2 Migration Plan
 
-**Status: Phase 0 — migration applied to `tbsevonvegdnlyjgplmm` and verified. `parent_community` circle kind is live. Two pre-existing bugs found and fixed along the way (§10). One larger pre-existing bug found and left unfixed, out of scope (§10.3). No app screens or `sync.ts` changed yet.**
+**Status: Migration applied to `tbsevonvegdnlyjgplmm` and verified. `parent_community` circle kind is live. Reaction vocabulary decided and applied. `sync.ts`'s Circle functions rewritten against the real schema (public API unchanged, screens untouched). `safety_alerts` mismatch scoped in `docs/safety-alerts-schema-mismatch.md` — not fixed, needs a product decision first. Two pre-existing bugs found and fixed along the way (§10).**
 
 Work order, per direction: (1) repo plan locked here first, (2) a real Supabase migration applied only after this plan is signed off, (3) app code (`sync.ts`, `CircleScreen.tsx`, `feed.tsx`) updated last. This document is step 1 only.
 
