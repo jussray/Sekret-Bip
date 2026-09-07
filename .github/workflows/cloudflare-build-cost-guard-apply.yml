@@ -23,27 +23,22 @@ jobs:
     name: Apply and verify Worker build watch-path cost guard
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    environment: production
     env:
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CF_BUILD_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
       CF_FALLBACK_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CF_WORKER_NAME: sekret-backend
     steps:
-      - name: Require bounded provider authority
+      - name: Require founder branch and repository credentials
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${CF_ACCOUNT_ID:-}" || {
-            echo 'CLOUDFLARE_ACCOUNT_ID is not configured.' >&2
-            exit 1
-          }
-          if [ -z "${CF_BUILD_TOKEN:-}" ] && [ -z "${CF_FALLBACK_TOKEN:-}" ]; then
-            echo 'A Cloudflare Workers Builds-capable token is required.' >&2
-            exit 1
-          fi
+          test "$GITHUB_ACTOR" = "jussray"
+          test "$GITHUB_REF" = "refs/heads/fix/cloudflare-build-cost-guard"
+          [[ "${CF_ACCOUNT_ID:-}" =~ ^[0-9a-f]{32}$ ]]
+          test -n "${CF_BUILD_TOKEN:-}${CF_FALLBACK_TOKEN:-}"
 
-      - name: Patch only production build watch paths and verify readback
+      - name: Apply only production build watch paths and verify provider readback
         shell: bash
         run: |
           set -euo pipefail
@@ -52,234 +47,168 @@ jobs:
           import fs from 'node:fs';
 
           const API = 'https://api.cloudflare.com/client/v4';
-          const accountId = (process.env.CF_ACCOUNT_ID || '').trim();
-          const workerName = (process.env.CF_WORKER_NAME || '').trim();
-          const desiredPathIncludes = ['*'];
-          const desiredPathExcludes = [
-            '.agents/**',
-            '.ai-skills/**',
-            '.control-room/**',
-            '.github/**',
-            'artifacts/**',
-            'control-room/**',
-            'docs/**',
-            'e2e/**',
-            'screenshots/**',
-            'test/**',
-            '*.md',
-          ];
+          const accountId = String(process.env.CF_ACCOUNT_ID || '').trim();
+          const workerName = String(process.env.CF_WORKER_NAME || '').trim();
+          const desired = {
+            pathIncludes: ['*'],
+            pathExcludes: [
+              '.agents/**',
+              '.ai-skills/**',
+              '.control-room/**',
+              '.github/**',
+              'artifacts/**',
+              'control-room/**',
+              'docs/**',
+              'e2e/**',
+              'screenshots/**',
+              'test/**',
+              '*.md',
+            ],
+          };
 
-          function cleanList(value) {
-            return [...new Set((Array.isArray(value) ? value : [])
-              .map((item) => String(item || '').trim())
-              .filter(Boolean))];
-          }
-
-          function sameSet(left, right) {
-            const a = [...cleanList(left)].sort();
-            const b = [...cleanList(right)].sort();
+          const cleanList = (value) => [...new Set((Array.isArray(value) ? value : [])
+            .map((item) => String(item || '').trim()).filter(Boolean))];
+          const sameSet = (left, right) => {
+            const a = cleanList(left).sort();
+            const b = cleanList(right).sort();
             return a.length === b.length && a.every((value, index) => value === b[index]);
-          }
-
-          function unwrapToken(value) {
+          };
+          const normalize = (value) => {
             let token = String(value || '').trim().normalize('NFKC');
-            let previous;
-            do {
-              previous = token;
-              token = token.trim();
-              token = token.replace(/^[A-Z_][A-Z0-9_]*[\p{White_Space}\p{Cf}]*=[\p{White_Space}\p{Cf}]*/u, '');
-              const asciiQuoted = token.match(/^(["'])([\s\S]*)\1$/u);
-              if (asciiQuoted) token = asciiQuoted[2].trim();
-              const smartDoubleQuoted = token.match(/^“([\s\S]*)”$/u);
-              if (smartDoubleQuoted) token = smartDoubleQuoted[1].trim();
-              const smartSingleQuoted = token.match(/^‘([\s\S]*)’$/u);
-              if (smartSingleQuoted) token = smartSingleQuoted[1].trim();
-              token = token.replace(/^Bearer[\p{White_Space}\p{Cf}]+/iu, '');
-            } while (token !== previous);
-            return token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
-          }
+            token = token.replace(/^Bearer\s+/iu, '').replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+            return /^[\x21-\x7e]+$/.test(token) ? token : '';
+          };
+          const tokenCandidates = [...new Set([
+            normalize(process.env.CF_BUILD_TOKEN),
+            normalize(process.env.CF_FALLBACK_TOKEN),
+          ].filter(Boolean))];
 
-          function boundedTokenCandidates(value, source) {
-            const token = unwrapToken(value);
-            if (!token) return [];
-            const candidates = [];
-            if (/^[\x21-\x7e]+$/.test(token)) {
-              candidates.push({ source, token });
-            }
-
-            const nonAscii = [...token].filter((char) => char.codePointAt(0) < 0x21 || char.codePointAt(0) > 0x7e);
-            if (nonAscii.length === 1 && nonAscii[0] === '\u0441') {
-              const repaired = token.replace('\u0441', 'c');
-              if (/^[\x21-\x7e]+$/.test(repaired)) {
-                candidates.push({ source: `${source}:bounded-u0441-to-c`, token: repaired });
-              }
-            }
-            return candidates;
-          }
-
-          function errorSummary(payload, status) {
+          function providerError(payload, status) {
             const errors = Array.isArray(payload?.errors) ? payload.errors : [];
-            const compact = errors
-              .map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`)
-              .join('; ');
-            return compact || `HTTP ${status}`;
+            return errors.map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`).join('; ') || `HTTP ${status}`;
           }
 
           async function cf(token, path, options = {}) {
             const response = await fetch(`${API}${path}`, {
               method: options.method || 'GET',
-              headers: {
-                Authorization: `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
               body: options.body === undefined ? undefined : JSON.stringify(options.body),
             });
             const payload = await response.json().catch(() => null);
-            if (!response.ok || payload?.success === false) {
-              throw new Error(errorSummary(payload, response.status));
-            }
+            if (!response.ok || payload?.success === false) throw new Error(providerError(payload, response.status));
             return payload?.result;
-          }
-
-          function selectProductionTrigger(triggers) {
-            const active = (Array.isArray(triggers) ? triggers : []).filter((trigger) => !trigger?.deleted_on);
-            const production = active.filter((trigger) => {
-              const includes = cleanList(trigger?.branch_includes);
-              const excludes = cleanList(trigger?.branch_excludes);
-              return includes.includes('main') && !excludes.includes('main') && !excludes.includes('*');
-            });
-            if (production.length !== 1) {
-              throw new Error(`Expected one active main production trigger, found ${production.length}.`);
-            }
-            return {
-              production: production[0],
-              otherActive: active.filter((trigger) => trigger?.trigger_uuid !== production[0]?.trigger_uuid),
-            };
           }
 
           async function inspect(token) {
             const scripts = await cf(token, `/accounts/${accountId}/workers/scripts?per_page=100`);
-            const workers = (Array.isArray(scripts) ? scripts : []).filter((script) => script?.id === workerName);
-            if (workers.length !== 1 || !workers[0]?.tag) {
-              throw new Error(`Expected one ${workerName} Worker with an immutable script tag.`);
-            }
-            const triggers = await cf(token, `/accounts/${accountId}/builds/workers/${workers[0].tag}/triggers`);
+            const matches = (Array.isArray(scripts) ? scripts : []).filter((row) => row?.id === workerName);
+            if (matches.length !== 1 || !matches[0]?.tag) throw new Error(`Expected one ${workerName} Worker with a script tag.`);
+            const triggers = await cf(token, `/accounts/${accountId}/builds/workers/${matches[0].tag}/triggers`);
+            const active = (Array.isArray(triggers) ? triggers : []).filter((row) => !row?.deleted_on);
+            const production = active.filter((row) => {
+              const includes = cleanList(row?.branch_includes);
+              const excludes = cleanList(row?.branch_excludes);
+              return includes.includes('main') && !excludes.includes('main') && !excludes.includes('*');
+            });
+            if (production.length !== 1) throw new Error(`Expected one active main production trigger, found ${production.length}.`);
             return {
-              workerTag: workers[0].tag,
-              ...selectProductionTrigger(triggers),
+              trigger: production[0],
+              otherActiveCount: active.filter((row) => row?.trigger_uuid !== production[0]?.trigger_uuid).length,
             };
           }
 
-          const tokenCandidates = [
-            ...boundedTokenCandidates(process.env.CF_BUILD_TOKEN, 'dedicated-builds-token'),
-            ...boundedTokenCandidates(process.env.CF_FALLBACK_TOKEN, 'general-cloudflare-token'),
-          ].filter((candidate, index, list) => list.findIndex((other) => other.token === candidate.token) === index);
-
-          let selectedToken = null;
-          let selectedSource = null;
-          let beforeInspection = null;
-          const failures = [];
-          for (const candidate of tokenCandidates) {
+          let readToken = null;
+          let beforeState = null;
+          const readFailures = [];
+          for (const token of tokenCandidates) {
             try {
-              beforeInspection = await inspect(candidate.token);
-              selectedToken = candidate.token;
-              selectedSource = candidate.source;
+              beforeState = await inspect(token);
+              readToken = token;
               break;
             } catch (error) {
-              failures.push(`${candidate.source}:${error instanceof Error ? error.message : String(error)}`);
+              readFailures.push(error instanceof Error ? error.message : String(error));
             }
           }
+          if (!readToken || !beforeState) throw new Error(`No refreshed repository token could read Workers Builds state: ${readFailures.join(' | ')}`);
 
-          if (!selectedToken || !beforeInspection) {
-            throw new Error(`No bounded token candidate could read Workers Builds state: ${failures.join(' | ')}`);
+          const triggerUuid = String(beforeState.trigger?.trigger_uuid || '').trim();
+          if (!triggerUuid) throw new Error('Production trigger UUID is missing.');
+          const before = {
+            pathIncludes: cleanList(beforeState.trigger?.path_includes),
+            pathExcludes: cleanList(beforeState.trigger?.path_excludes),
+          };
+          const changeRequired = !sameSet(before.pathIncludes, desired.pathIncludes)
+            || !sameSet(before.pathExcludes, desired.pathExcludes);
+          const receipt = {
+            schema: 'sekret-bip/cloudflare-build-cost-guard@v2',
+            generatedAt: new Date().toISOString(),
+            worker: workerName,
+            branchPolicy: 'main production trigger only',
+            before,
+            desired,
+            after: null,
+            applied: false,
+            verified: false,
+            otherActiveTriggerCount: beforeState.otherActiveCount,
+            buildRequested: false,
+            deploymentRequested: false,
+          };
+          const persist = () => fs.writeFileSync('artifacts/cloudflare-build-cost-guard.json', `${JSON.stringify(receipt, null, 2)}\n`);
+          persist();
+
+          if (!changeRequired) {
+            receipt.after = before;
+            receipt.verified = true;
+            persist();
+            console.log('COST_GUARD_ALREADY_CORRECT');
+            process.exit(0);
           }
 
-          const trigger = beforeInspection.production;
-          const triggerUuid = String(trigger?.trigger_uuid || '').trim();
-          if (!triggerUuid) throw new Error('Production trigger UUID is missing from provider readback.');
-
-          const before = {
-            pathIncludes: cleanList(trigger?.path_includes),
-            pathExcludes: cleanList(trigger?.path_excludes),
-          };
-          const changeRequired = !sameSet(before.pathIncludes, desiredPathIncludes)
-            || !sameSet(before.pathExcludes, desiredPathExcludes);
-          let mutationStarted = false;
+          let writeToken = null;
+          const writeFailures = [];
+          for (const token of tokenCandidates) {
+            try {
+              await cf(token, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+                method: 'PATCH',
+                body: { path_includes: desired.pathIncludes, path_excludes: desired.pathExcludes },
+              });
+              writeToken = token;
+              break;
+            } catch (error) {
+              writeFailures.push(error instanceof Error ? error.message : String(error));
+            }
+          }
+          if (!writeToken) throw new Error(`No refreshed repository token could write Workers Builds state: ${writeFailures.join(' | ')}`);
 
           try {
-            if (changeRequired) {
-              mutationStarted = true;
-              await cf(selectedToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
-                method: 'PATCH',
-                body: {
-                  path_includes: desiredPathIncludes,
-                  path_excludes: desiredPathExcludes,
-                },
-              });
-            }
-
-            const afterInspection = await inspect(selectedToken);
+            const afterState = await inspect(readToken);
             const after = {
-              pathIncludes: cleanList(afterInspection.production?.path_includes),
-              pathExcludes: cleanList(afterInspection.production?.path_excludes),
+              pathIncludes: cleanList(afterState.trigger?.path_includes),
+              pathExcludes: cleanList(afterState.trigger?.path_excludes),
             };
-            if (!sameSet(after.pathIncludes, desiredPathIncludes)
-              || !sameSet(after.pathExcludes, desiredPathExcludes)) {
-              throw new Error('Cloudflare watch-path readback did not match the approved cost guard.');
+            if (!sameSet(after.pathIncludes, desired.pathIncludes) || !sameSet(after.pathExcludes, desired.pathExcludes)) {
+              throw new Error('Cloudflare watch-path readback mismatch.');
             }
-
-            const receipt = {
-              schema: 'sekret-bip/cloudflare-build-cost-guard@v1',
-              generatedAt: new Date().toISOString(),
-              worker: workerName,
-              credentialSource: selectedSource,
-              branchPolicy: 'main production trigger only',
-              before,
-              desired: {
-                pathIncludes: desiredPathIncludes,
-                pathExcludes: desiredPathExcludes,
-              },
-              after,
-              applied: changeRequired,
-              verified: true,
-              nonProductionTriggerObserved: afterInspection.otherActive.length > 0,
-              buildRequested: false,
-              deploymentRequested: false,
-            };
-            fs.writeFileSync('artifacts/cloudflare-build-cost-guard.json', `${JSON.stringify(receipt, null, 2)}\n`);
-            console.log(`COST_GUARD_VERIFIED applied=${changeRequired} credential_source=${selectedSource} preview_trigger_observed=${receipt.nonProductionTriggerObserved}`);
+            receipt.after = after;
+            receipt.applied = true;
+            receipt.verified = true;
+            receipt.otherActiveTriggerCount = afterState.otherActiveCount;
+            persist();
+            console.log(`COST_GUARD_VERIFIED other_active_triggers=${receipt.otherActiveTriggerCount}`);
           } catch (error) {
-            if (mutationStarted) {
-              try {
-                await cf(selectedToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
-                  method: 'PATCH',
-                  body: {
-                    path_includes: before.pathIncludes,
-                    path_excludes: before.pathExcludes,
-                  },
-                });
-                console.error('COST_GUARD_ROLLBACK_SUCCEEDED');
-              } catch {
-                console.error('COST_GUARD_ROLLBACK_FAILED');
-              }
+            try {
+              await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+                method: 'PATCH',
+                body: { path_includes: before.pathIncludes, path_excludes: before.pathExcludes },
+              });
+              console.error('COST_GUARD_ROLLBACK_SUCCEEDED');
+            } catch {
+              console.error('COST_GUARD_ROLLBACK_FAILED');
             }
+            persist();
             throw error;
           }
           NODE
-
-      - name: Summarize bounded provider mutation
-        if: success()
-        shell: bash
-        run: |
-          {
-            echo '## Cloudflare build cost guard'
-            echo
-            echo '- Worker: `sekret-backend`'
-            echo '- Scope: production Workers Builds watch paths only'
-            echo '- Runtime deployment: not requested'
-            echo '- Build request: not requested'
-            echo '- Readback: verified'
-          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload sanitized cost-guard receipt
         if: always()
@@ -301,24 +230,19 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
-
       - name: Install repository dependencies
         run: npm ci
-
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
-
       - name: Run anonymous production Playwright proof
         env:
           CI: 'true'
         run: npx playwright test e2e/production-public-front-door.spec.ts --config=playwright.production.config.ts --project=chromium
-
       - name: Upload browser proof artifacts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
