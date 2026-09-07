@@ -189,7 +189,7 @@ test('production reconciler binds mutation to the exact approved current-main SH
   assert.match(workflow, /Re-verify exact approved main immediately before provider mutation/);
   assert.match(workflow, /Main advanced after provider preflight; refusing stale Cloudflare mutation authority/);
   assert.match(workflow, /CLOUDFLARE_API_TOKEN/);
-  assert.match(workflow, /run-cloudflare-app-domain-reconcile-with-receipt\.mjs --apply/);
+  assert.match(workflow, /run-cloudflare-app-domain-reconcile-with-receipt\.mjs\s+--apply/);
   assert.match(workflow, /cloudflare-app-domain-routing-evidence/);
   assert.match(workflow, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/);
   assert.match(workflow, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
