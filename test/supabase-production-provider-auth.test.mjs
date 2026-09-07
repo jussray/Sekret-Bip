@@ -88,3 +88,35 @@ for (const scenario of [
     assert.doesNotMatch(evidenceText, /schema-drift/);
   });
 }
+
+test('HTTP 401 is classified before attempting to read a hostile response body', async () => {
+  const { migrationsDir, evidencePath } = fixture('sekret-provider-auth-hostile-body-');
+  let bodyReads = 0;
+
+  await assert.rejects(
+    verifySupabaseProductionSchema({
+      config: {
+        token: 'secret-token-hostile-body',
+        projectRef: PROJECT_REF,
+        migrationsDir,
+        evidencePath,
+      },
+      fetchImpl: async () => ({
+        ok: false,
+        status: 401,
+        async text() {
+          bodyReads += 1;
+          throw new Error('auth response body should not be read');
+        },
+      }),
+    }),
+    /SUPABASE_ACCESS_TOKEN with HTTP 401/,
+  );
+
+  assert.equal(bodyReads, 0);
+  const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
+  assert.equal(evidence.status, 'provider-auth-failed');
+  assert.equal(evidence.error, 'supabase_access_token_rejected');
+  assert.equal(evidence.providerHttpStatus, 401);
+  assert.equal(evidence.schemaComparisonPerformed, false);
+});
