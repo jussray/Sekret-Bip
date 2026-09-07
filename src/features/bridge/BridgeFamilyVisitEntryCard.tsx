@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   copy: { flex: 1, gap: 2 },
   eyebrow: { color: '#bda5ff', fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
-  title: { color: '#fff', fontSize: 15, fontWeight: '850' },
+  title: { color: '#fff', fontSize: 15, fontWeight: '900' },
   body: { color: '#cfc4db', fontSize: 11, lineHeight: 16 },
   arrow: { color: '#d8c6ff', fontSize: 30, lineHeight: 32, fontWeight: '400' },
 });
