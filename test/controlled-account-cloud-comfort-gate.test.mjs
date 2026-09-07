@@ -8,33 +8,55 @@ const workflow = fs.readFileSync(path.join(root, '.github/workflows/controlled-a
 const config = fs.readFileSync(path.join(root, 'playwright.controlled-account.config.ts'), 'utf8');
 const spec = fs.readFileSync(path.join(root, 'e2e/controlled-account-cloud-comfort.spec.ts'), 'utf8');
 
-test('controlled-account workflow validates on PR but keeps live proof dispatch-only', () => {
+test('controlled-account workflow validates on PR but keeps credentialed proof dispatch-only', () => {
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /\n  push:/);
   assert.match(workflow, /target_sha:/);
+  assert.match(workflow, /target_url:/);
   assert.match(workflow, /confirm_controlled_account_use:/);
   assert.match(workflow, /validate:\s*\n\s*if: github\.event_name == 'pull_request'/);
   assert.match(workflow, /proof:\s*\n\s*if: github\.event_name == 'workflow_dispatch'/);
   assert.match(workflow, /EXPECTED_HEAD_SHA: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.target_sha \|\| github\.event\.pull_request\.head\.sha \}\}/);
-  assert.match(workflow, /https:\/\/sekretbip\.net\/\.well-known\/sekret-release\.json/);
-  assert.match(workflow, /body\?\.environment === 'production'/);
-  assert.match(workflow, /body\?\.branch === 'main'/);
+  assert.match(workflow, /SEKRET_CONTROLLED_ACCOUNT_BASE_URL: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.target_url \|\| 'https:\/\/sekretbip\.net' \}\}/);
   assert.match(workflow, /test \"\$actual\" = \"\$EXPECTED_HEAD_SHA\"/);
 });
 
-test('live proof binds requested SHA to GitHub current main before reading controlled account secrets', () => {
+test('live proof binds the requested SHA and owned deployment before reading controlled account secrets', () => {
   const proofStart = workflow.indexOf('  proof:');
   assert.ok(proofStart >= 0);
   const proofJob = workflow.slice(proofStart);
 
-  const currentMainStep = proofJob.indexOf('Require requested head to equal current main');
-  const productionStep = proofJob.indexOf('Verify canonical production serves exact current main');
+  const targetBindStep = proofJob.indexOf('Bind controlled-account target to an owned origin');
+  const currentMainStep = proofJob.indexOf('Require production target to equal current main');
+  const releaseStep = proofJob.indexOf('Verify target origin serves the exact requested release');
   const authorityStep = proofJob.indexOf('Require explicit controlled-account authority');
-  assert.ok(currentMainStep >= 0 && productionStep > currentMainStep && authorityStep > productionStep);
-  assert.match(proofJob, /git ls-remote origin refs\/heads\/main/);
-  assert.match(proofJob, /test \"\$current_main\" = \"\$EXPECTED_HEAD_SHA\"/);
+  assert.ok(targetBindStep >= 0);
+  assert.ok(currentMainStep > targetBindStep);
+  assert.ok(releaseStep > currentMainStep);
+  assert.ok(authorityStep > releaseStep);
+
+  assert.match(proofJob, /url\.origin === 'https:\/\/sekretbip\.net'/);
+  assert.match(proofJob, /url\.hostname\.endsWith\('\.sekret-bip\.pages\.dev'\)/);
+  assert.match(proofJob, /CONTROLLED_TARGET_KIND=/);
+  assert.match(proofJob, /CONTROLLED_TARGET_ORIGIN=/);
   assert.match(proofJob, /String\(body\?\.commitSha \?\? ''\)\.toLowerCase\(\) === expected/);
+  assert.match(proofJob, /body\?\.environment === kind/);
+  assert.match(proofJob, /body\?\.branch === 'main'/);
+  assert.match(proofJob, /body\.branch !== 'main'/);
+});
+
+test('canonical production still requires the requested SHA to equal current main', () => {
+  const proofStart = workflow.indexOf('  proof:');
+  const proofJob = workflow.slice(proofStart);
+  const currentMainStart = proofJob.indexOf('Require production target to equal current main');
+  const releaseStart = proofJob.indexOf('Verify target origin serves the exact requested release');
+  assert.ok(currentMainStart >= 0 && releaseStart > currentMainStart);
+
+  const currentMainStep = proofJob.slice(currentMainStart, releaseStart);
+  assert.match(currentMainStep, /if: env\.CONTROLLED_TARGET_KIND == 'production'/);
+  assert.match(currentMainStep, /git ls-remote origin refs\/heads\/main/);
+  assert.match(currentMainStep, /test \"\$current_main\" = \"\$EXPECTED_HEAD_SHA\"/);
 });
 
 test('PR validation compiles the proof without credentials or live account access', () => {
@@ -65,6 +87,22 @@ test('controlled-account live proof requires masked repository secrets and never
   assert.ok(receiptStart >= 0 && receiptEnd > receiptStart);
   const receiptPayload = spec.slice(receiptStart, receiptEnd);
   assert.doesNotMatch(receiptPayload, /controlledEmail|controlledPassword/);
+});
+
+test('controlled-account browser proof falsifies the verification failure without allowing provider mutation', () => {
+  assert.match(spec, /failVerificationRead = true/);
+  assert.match(spec, /controlled_verification_read_failure/);
+  assert.match(spec, /page\.route\('\*\*\/rest\/v1\/\*\*'/);
+  assert.match(spec, /page\.route\('\*\*\/functions\/v1\/\*\*'/);
+  assert.match(spec, /blockedSupabaseMutationRequests \+= 1/);
+  assert.match(spec, /page\.goto\('\/comfort\?bipDevAudience=teen'\)/);
+  assert.match(spec, /page\.goto\('\/circle\?bipDevAudience=teen'\)/);
+  assert.match(spec, /limited-mode\|parent-link-verify/);
+  assert.match(spec, /failVerificationRead = false/);
+  assert.match(spec, /verificationFailurePreservesAuthenticatedComfort: 'passed'/);
+  assert.match(spec, /verificationFailureKeepsSocialLocked: 'passed'/);
+  assert.match(spec, /verificationRecoveryWithoutRelogin: 'passed'/);
+  assert.match(spec, /productionMutationAllowed: false/);
 });
 
 test('controlled-account browser proof disables sensitive capture surfaces', () => {
