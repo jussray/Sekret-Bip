@@ -127,7 +127,7 @@ jobs:
 
       - name: Upload redacted public front-door evidence
         id: evidence_upload
-        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' }}
+        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' && steps.receipt_guard.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cloudflare-zone-access-coverage-${{ env.EXPECTED_HEAD_SHA }}
