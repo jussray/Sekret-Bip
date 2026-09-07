@@ -30,7 +30,8 @@ Do not optimize trial-only cosmetics.
    - Episode title: **The First Sentence**
    - Use the existing script in `publication-kit.md`.
    - Record the public episode URL and RSS feed URL.
-   - This is the highest-value trial-only media action because the creation tool is premium-gated after trial while an already-published episode can remain available.
+   - The trial-only advantage is beehiiv's AI-from-newsletter creation tool. Existing published AI-created episodes and the RSS feed remain active after trial.
+   - After trial, the Launch plan can still host one recorded podcast episode per month; do not confuse loss of the AI creation tool with loss of podcast hosting.
 
 3. **Run one lightweight welcome automation while the trial is active.**
    - Preserve the logic below in this repository because the provider automation can become inactive after downgrade.
@@ -39,6 +40,7 @@ Do not optimize trial-only cosmetics.
 4. **Collect only low-sensitivity audience preferences through one short survey.**
    - Bind every answer to a custom field.
    - Do not ask for journals, private family situations, mental-health details, safety events, or free-form secrets.
+   - Treat the survey as a temporary collection surface: export the resulting audience fields before the trial ends because the survey itself will be unpublished on Launch.
 
 5. **Export the audience and content twice.**
    - First export: as soon as the live publication path is working.
@@ -57,9 +59,15 @@ Do not optimize trial-only cosmetics.
    - website/signup URL;
    - export filenames and local/private-storage location.
 
+7. **Use trial-only support once.**
+   - Submit the provider confirmation ticket below while ticket support is still available.
+   - Save only the non-sensitive answer or a screenshot reference in the evidence ledger.
+
 ### P1 — Keep because Launch can still use it
 
 - Keep the core newsletter, publication website, custom domain, and ordinary sends healthy.
+- Keep the normal signup flow healthy. A published signup flow can remain active on Launch, but a flow linked to a premium automation can be unlinked or become inactive after downgrade.
+- Keep the existing podcast RSS feed and published episode healthy.
 - Keep all canonical copy in this repository.
 - Keep free recommendation relationships only if they are genuinely relevant; they are not an expiry emergency.
 
@@ -217,6 +225,7 @@ Fill this with aggregate evidence only.
 
 | Evidence | Baseline | Final pre-downgrade | Proof location |
 | --- | ---: | ---: | --- |
+| Exact trial expiry |  |  | beehiiv Billing & Plan screenshot |
 | Total subscribers |  |  | beehiiv analytics screenshot |
 | Issue #001 delivered |  |  | beehiiv post report |
 | Issue #001 opens |  |  | beehiiv post report |
@@ -225,9 +234,85 @@ Fill this with aggregate evidence only.
 | Automation enrolled |  |  | beehiiv automation analytics |
 | Automation completed |  |  | beehiiv automation analytics |
 | Podcast episode published | no/yes |  | public episode URL |
+| Podcast RSS captured | no/yes |  | RSS URL |
 | Website/signup live | no/yes |  | public URL |
 | Full subscriber export | no/yes |  | private-storage filename |
 | All-post export | no/yes |  | private-storage filename |
+| Provider downgrade confirmation | no/yes |  | support-ticket screenshot/reference |
+
+## Provider run card
+
+Use this order so one incomplete premium feature cannot block a durable one.
+
+### Gate 1 — Billing truth
+
+1. Open **Settings → Billing & Plan**.
+2. Record the exact trial-end date shown by beehiiv.
+3. Do not upgrade or add billing merely to preserve an experiment. The default decision is Launch unless measured evidence justifies paying.
+
+### Gate 2 — Public written asset
+
+1. Open the existing Issue #001 draft from `publication-kit.md`.
+2. Preview desktop and mobile.
+3. Verify the public-content boundary footer is present.
+4. Publish or send.
+5. Copy the public post URL into the evidence ledger.
+
+### Gate 3 — Durable trial-only audio
+
+1. Open **Podcasts** and create the Se’kret Bip show if it does not exist.
+2. Use the trial AI-from-newsletter flow on Issue #001.
+3. Title the episode **The First Sentence**.
+4. Compare the generated result to the canonical podcast script in `publication-kit.md`; reject any invented clinical, private-data, or guaranteed-outcome language.
+5. Publish the episode while the trial is active.
+6. Capture the episode URL and the public RSS feed URL.
+
+### Gate 4 — Audience preference evidence
+
+1. Create the three custom fields exactly as named: `reader_role`, `primary_interest`, `preferred_cadence`.
+2. Build the three-question survey above using choice controls only.
+3. Publish the survey.
+4. Do not make the surviving Launch signup path depend on that survey.
+
+### Gate 5 — Automation experiment
+
+1. Create **Se’kret Bip — First 5 Days**.
+2. Trigger on new newsletter subscription.
+3. No re-entry.
+4. Send welcome immediately.
+5. Delay 2 days, then send the useful-idea email.
+6. Delay 3 more days, then send the preference-survey email.
+7. Enroll only through a path you are willing to lose after downgrade.
+
+### Gate 6 — First ownership export
+
+1. Request **Export All Subscribers (Full)**.
+2. Request **Export All Posts**.
+3. Download both completed files immediately.
+4. Store subscriber-level data privately.
+5. Record only filenames and aggregate counts here.
+
+### Gate 7 — Provider statement
+
+Use **Help → submit a support ticket** while the trial still permits ticket access.
+
+Ticket subject:
+
+**Confirm post-trial Launch behavior for Se’kret Bip publication**
+
+Ticket body:
+
+> I am currently using the Max trial and expect to remain on the free Launch plan when it ends. Before the trial closes, please confirm the post-trial behavior for this publication: (1) a published normal signup flow, (2) a signup flow linked to an automation, (3) existing automations and their analytics, (4) a published survey and its collected custom-field data, (5) an existing public podcast RSS feed and a published AI-created episode, and (6) access to Full Subscriber and All Posts exports after downgrade. I am not asking to preserve paid-only functionality; I want to know exactly what remains live, what becomes read-only or inactive, and what should be exported first. Please also confirm the exact trial-end date/time visible for this workspace if support can see it.
+
+Do not include subscriber data, secrets, private family information, or product-account data in the ticket.
+
+### Gate 8 — Final 24-hour sweep
+
+1. Capture the latest aggregate analytics.
+2. Repeat Full Subscribers and All Posts exports.
+3. Confirm the files are downloaded and recoverable.
+4. Capture current public post, signup, podcast episode, and RSS URLs.
+5. Record the provider support answer.
 
 ## Downgrade test
 
@@ -241,3 +326,16 @@ Before calling the harvest complete, verify the public path that must remain aft
 6. subscriber exports are recoverable from private storage.
 
 If any provider feature disappears, keep the promise and replace only the delivery mechanism.
+
+## Pay-or-cancel decision rule
+
+Do not pay for beehiiv because the trial is ending. Pay only if the evidence proves at least one premium capability is already creating value that cannot be replaced cheaply on Launch.
+
+Upgrade evidence must be concrete, such as:
+
+- automation materially improves activation or repeat reading;
+- survey segmentation is producing enough useful audience behavior to justify keeping the live survey surface;
+- AI podcast generation saves enough recurring production effort to justify Max;
+- another premium feature is directly responsible for measurable audience growth or retained operating time.
+
+If that evidence is absent, remain on Launch, keep the exported audience/content, keep the RSS episode, preserve the automation and copy logic in the repository, and revisit paid beehiiv only when demand earns it.
