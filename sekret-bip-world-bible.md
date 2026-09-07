@@ -63,6 +63,30 @@ Companion identity stays locked.
 
 Background inhabitants may be introduced only when an episode explicitly calls for them. They must not be mistaken for Night, Suhana, Sy, Cloud, a parent, or a Bip Jr. character.
 
+## Cloud civilization and birth-bond law
+
+Read `docs/CLOUD_CIVILIZATION_PRODUCTION_CONTRACT.md` with `docs/CLOUD_ORIGIN_CANON.md` before any shot prominently depicts a cloud person.
+
+```text
+Cloud people are a civilization.
+Birth-clouds are relationships.
+Cloud / The Calm is one specific sky-kin individual.
+```
+
+Cloud people have their own identities, families, siblings, lineages, communities, cloud cities, relationships, memories, and lives outside their birth partnerships. Existing named Cloud family/home canon remains authoritative in `docs/CLOUD_ORIGIN_CANON.md`; production must not invent a new named cloud relative, sibling, city, or lineage to fill a frame.
+
+Every Sorian begins life with a birth-cloud bond. The bond is mutual relationship, not pet logic, ownership, servitude, or a replacement for the person's judgment.
+
+Each cloud person may have an individual weather signature. Within that cloud's nature and abilities, color, glow, shape, density, mist, wind, rain, snow, thunder, temperature, or nearby atmosphere may shift around the cloud and its bonded Sorian. Weather expresses broad emotional or magical state without publicly exposing private thought.
+
+Some Sorian magic can route through the birth-cloud relationship. Depending on the pairing, the cloud may act as source, conduit, amplifier, stabilizer, or counterweight. The person still chooses and acts; the cloud retains agency and may warn, question, steady, refuse, redirect, or become a quiet voice of reason. A cloud is never a disposable magical battery.
+
+When two Sorians form a chosen life-pair or family bond, their existing birth-clouds form a linked weather bond too. The cloud-to-cloud bond does not erase either cloud's original family, siblings, lineage, home, personality, or independent relationships.
+
+A child receives a distinct birth-cloud relationship. The child's cloud is its own cloud person and lineage, not automatically a copy, mixture, or inheritance of either parent's cloud.
+
+If an exact birth-cloud or named sky-kin identity has not been approved and fingerprint-bound, production may imply the bond only through non-identifying weather/color/mood-light cues. It must not invent a face, cloud body, sibling, name, or substitute character.
+
 ## Portal rule
 
 A portal is a threshold created by emotional readiness, attention, or shared action. It should look responsive, not mechanical-only and not random.
