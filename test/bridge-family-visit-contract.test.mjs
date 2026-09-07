@@ -8,10 +8,12 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 const migrationsDir = path.join(root, 'supabase', 'migrations');
 const contractPath = path.join(migrationsDir, '20260907223000_bridge_family_visit_mode.sql');
 const hardeningPath = path.join(migrationsDir, '20260907223100_harden_bridge_family_visit_mode.sql');
+const idempotencyPath = path.join(migrationsDir, '20260907223200_idempotent_bridge_family_visit_start.sql');
 
 const contract = fs.readFileSync(contractPath, 'utf8');
 const hardening = fs.readFileSync(hardeningPath, 'utf8');
-const combined = `${contract}\n${hardening}`;
+const idempotency = fs.readFileSync(idempotencyPath, 'utf8');
+const combined = `${contract}\n${hardening}\n${idempotency}`;
 
 function tableBlock(name) {
   const start = contract.indexOf(`create table if not exists public.${name}`);
@@ -32,6 +34,7 @@ function functionBlock(source, name) {
 test('family visit migrations exist at ordered authority paths', () => {
   assert.equal(fs.existsSync(contractPath), true);
   assert.equal(fs.existsSync(hardeningPath), true);
+  assert.equal(fs.existsSync(idempotencyPath), true);
 });
 
 test('Family Visit Mode is structurally no-recording and cannot store passive media or transcripts', () => {
@@ -54,6 +57,15 @@ test('a session cannot activate until teen, parent, and professional each acknow
   assert.match(ack, /professional_acknowledged_at is not null/i);
   assert.match(ack, /state = 'active'/i);
   assert.match(ack, /capture_mode <> 'none'/i);
+});
+
+test('session start is idempotent and cannot fork one assignment into multiple open visits', () => {
+  const start = functionBlock(idempotency, 'start_bridge_family_visit_session');
+  assert.match(idempotency, /create unique index if not exists bridge_family_visit_sessions_one_open_per_assignment/i);
+  assert.match(idempotency, /where state in \('awaiting_ack','active','reflection'\)/i);
+  assert.match(start, /select id into v_session_id[\s\S]*state in \('awaiting_ack','active','reflection'\)/i);
+  assert.match(start, /if v_session_id is not null then[\s\S]*return v_session_id/i);
+  assert.match(start, /on conflict \(assignment_id\)[\s\S]*do nothing/i);
 });
 
 test('professional authority is server-reviewed and cannot be self-selected', () => {
