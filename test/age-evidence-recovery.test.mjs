@@ -110,3 +110,23 @@ test('launch-relevant signal markets do not silently fall back when evidence is 
     assert.equal(unavailable.mayUseSelfDeclaredAgeBand, false);
   }
 });
+
+test('recovery decisions never masquerade as normalized or verified age evidence', async () => {
+  const recovery = await loadRecoveryModule();
+
+  for (const reason of [
+    'not_shared',
+    'verification_required',
+    'provider_unavailable',
+    'invalid_range',
+    'insufficient_precision',
+  ]) {
+    for (const jurisdiction of ['us-general', 'us-texas', 'uk', 'eu', 'australia', 'brazil', 'other']) {
+      const decision = recovery.resolveAgeEvidenceRecovery(reason, jurisdiction);
+      assert.equal('ageBand' in decision, false);
+      assert.equal('evidence' in decision, false);
+      assert.equal('allowed' in decision, false);
+      assert.equal('verified' in decision, false);
+    }
+  }
+});
