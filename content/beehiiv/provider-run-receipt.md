@@ -16,9 +16,19 @@ Purpose: prove the trial harvest actually happened without storing subscriber-le
 
 - Dashboard trial-expiry date/time: `UNKNOWN — record from beehiiv Billing/Plan`
 - Timezone shown by provider: `UNKNOWN`
-- Final 24-hour sweep scheduled for: `UNKNOWN`
+- Provider-email inferred expiry date: `2026-09-15`
+- Confidence: `HIGH for date, UNKNOWN for exact dashboard timestamp`
+- Final 24-hour sweep scheduled for: `2026-09-14 evening America/New_York`
 
-Do not infer the expiry from onboarding email math once the dashboard shows an authoritative value.
+Provider-email countdown evidence:
+
+- 2026-09-02: `13 days left on trial`
+- 2026-09-03: `12 days left on trial`
+- 2026-09-04: `11 days left on trial`
+- 2026-09-05: `10 days left on trial`
+- 2026-09-06: `9 days left on trial`
+
+This sequence consistently points to September 15, 2026. Treat the date as provider-email inferred until beehiiv Billing/Plan shows the authoritative expiry timestamp. Do not overwrite the dashboard truth with email math once the dashboard is available.
 
 ## Live run order
 
