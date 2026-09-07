@@ -29,7 +29,9 @@ test('beehiiv harvest pack preserves owned audience, automation, export, and evi
     '## Automation asset — Welcome → useful idea → preference',
     '## Export protocol',
     '## Evidence ledger',
+    '## Provider run card',
     '## Downgrade test',
+    '## Pay-or-cancel decision rule',
   ]) {
     assert.match(harvest, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
@@ -40,7 +42,11 @@ test('beehiiv harvest pack preserves owned audience, automation, export, and evi
   assert.match(harvest, /primary_interest/);
   assert.match(harvest, /preferred_cadence/);
   assert.match(harvest, /AI-created podcast episode/i);
+  assert.match(harvest, /existing published AI-created episodes and the RSS feed remain active after trial/i);
+  assert.match(harvest, /Launch plan can still host one recorded podcast episode per month/i);
   assert.match(harvest, /aggregate evidence only/i);
+  assert.match(harvest, /Help → submit a support ticket/);
+  assert.match(harvest, /Do not pay for beehiiv because the trial is ending/i);
 });
 
 test('beehiiv remains a distribution layer rather than product or private-data authority', () => {
@@ -50,6 +56,7 @@ test('beehiiv remains a distribution layer rather than product or private-data a
   assert.match(kit, /do not collect journals, voice notes, private family situations, safety events/i);
   assert.match(harvest, /Do not ask for journals, private family situations, mental-health details, safety events, or free-form secrets/i);
   assert.match(harvest, /Never commit subscriber CSVs, email addresses, survey response rows, or other personal data to GitHub/i);
+  assert.match(harvest, /Do not include subscriber data, secrets, private family information, or product-account data in the ticket/i);
 });
 
 test('public publication copy does not invite sensitive disclosure or make clinical promises', () => {
