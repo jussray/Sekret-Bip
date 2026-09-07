@@ -69,7 +69,7 @@ test('failure wrapper persists a safe receipt and never serializes caught except
   assert.doesNotMatch(wrapper, /error\.message|String\(error\)|payload\?\.errors[^\n]*message/);
 });
 
-test('workflow normalizes Cloudflare token transport before the receipt wrapper and fails if evidence is missing', () => {
+test('workflow retains a sanitized receipt on invalid token transport and keeps strict normalization for valid apply', () => {
   const workflow = fs.readFileSync(
     new URL('../.github/workflows/reconcile-cloudflare-app-domain.yml', import.meta.url),
     'utf8',
@@ -77,9 +77,14 @@ test('workflow normalizes Cloudflare token transport before the receipt wrapper 
 
   assert.match(
     workflow,
-    /node scripts\/run-with-normalized-cloudflare-token\.mjs\s+scripts\/run-cloudflare-app-domain-reconcile-with-receipt\.mjs\s+--apply/s,
+    /node scripts\/run-with-normalized-cloudflare-token\.mjs\s+\\\s+scripts\/run-cloudflare-app-domain-reconcile-with-receipt\.mjs\s+\\\s+--apply/s,
   );
-  assert.match(workflow, /scripts\/run-with-normalized-cloudflare-token\.mjs/);
+  assert.match(workflow, /normalizeCloudflareTokenTransport/);
+  assert.match(workflow, /CLOUDFLARE_APP_DOMAIN_TOKEN_TRANSPORT_INVALID_RETAINING_RECEIPT/);
+  assert.match(
+    workflow,
+    /CLOUDFLARE_API_TOKEN=''\s+\\\s+node scripts\/run-cloudflare-app-domain-reconcile-with-receipt\.mjs --apply/s,
+  );
   assert.match(workflow, /cloudflare-app-domain-failure-receipt\.test\.mjs/);
   assert.match(workflow, /if-no-files-found: error/);
 });
