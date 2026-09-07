@@ -30,6 +30,22 @@ Provider-email countdown evidence:
 
 This sequence consistently points to September 15, 2026. Treat the date as provider-email inferred until beehiiv Billing/Plan shows the authoritative expiry timestamp. Do not overwrite the dashboard truth with email math once the dashboard is available.
 
+## External discovery baseline
+
+Public-web verification run: `2026-09-07 America/New_York`
+
+Queries checked included the publication name, Issue #001 title, podcast title, and beehiiv-domain variants.
+
+Result:
+
+- No indexed Se’kret Bip beehiiv publication was found.
+- No indexed copy of **The first sentence is usually the hardest** was found.
+- No indexed **The First Sentence** Se’kret Bip podcast episode was found.
+
+Classification: `OPEN / NOT PUBLICLY VERIFIED`.
+
+This is a discovery baseline, not proof of absence. A beehiiv asset may exist without being indexed or discoverable by public search. Promote a public-asset gate to `VERIFIED` only from its direct public URL/provider state or browser evidence.
+
 ## Live run order
 
 Mark each row only when the provider state is visible and capture the proof location.
@@ -39,9 +55,9 @@ Mark each row only when the provider state is visible and capture the proof loca
 | Trial expiry captured | OPEN | beehiiv Billing/Plan screenshot or note |  |
 | Issue #001 previewed desktop | OPEN | preview screenshot |  |
 | Issue #001 previewed mobile | OPEN | preview screenshot |  |
-| Issue #001 published | OPEN | public URL + post report |  |
+| Issue #001 published | OPEN | public URL + post report; public discovery baseline currently negative |  |
 | AI podcast generated from Issue #001 | OPEN | provider episode editor screenshot |  |
-| `The First Sentence` published | OPEN | public episode URL |  |
+| `The First Sentence` published | OPEN | public episode URL; public discovery baseline currently negative |  |
 | Podcast RSS captured | OPEN | RSS URL |  |
 | Preference survey published | OPEN | public/provider survey URL |  |
 | `reader_role` mapping verified | OPEN | survey/custom-field screenshot |  |
