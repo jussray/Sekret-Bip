@@ -30,6 +30,20 @@ Provider-email countdown evidence:
 
 This sequence consistently points to September 15, 2026. Treat the date as provider-email inferred until beehiiv Billing/Plan shows the authoritative expiry timestamp. Do not overwrite the dashboard truth with email math once the dashboard is available.
 
+## Billing posture baseline
+
+Public beehiiv documentation checked on `2026-09-07` states that the standard Max trial does not require a credit card and remains on the free Launch plan if the user does not upgrade.
+
+Account-email check on `2026-09-07` found no beehiiv billing-style subject indicating a receipt, invoice, charge, payment confirmation, or confirmed paid-plan upgrade in the Se’kret Bip inbox.
+
+Classification: `EXPECTED FREE LAUNCH FALLBACK / DASHBOARD STILL AUTHORITATIVE`.
+
+Cash-protection rule:
+
+- Do not add billing merely to preserve a trial experiment.
+- Do not manually upgrade unless measured evidence justifies the paid plan.
+- If Billing/Plan shows a paid subscription or future charge despite this baseline, treat the dashboard as authoritative and resolve that state before expiry.
+
 ## External discovery baseline
 
 Public-web verification run: `2026-09-07 America/New_York`
@@ -53,6 +67,7 @@ Mark each row only when the provider state is visible and capture the proof loca
 | Gate | State | Provider evidence | Timestamp |
 | --- | --- | --- | --- |
 | Trial expiry captured | OPEN | beehiiv Billing/Plan screenshot or note |  |
+| Billing posture captured | OPEN | beehiiv Billing/Plan current/upcoming plan |  |
 | Issue #001 previewed desktop | OPEN | preview screenshot |  |
 | Issue #001 previewed mobile | OPEN | preview screenshot |  |
 | Issue #001 published | OPEN | public URL + post report; public discovery baseline currently negative |  |
