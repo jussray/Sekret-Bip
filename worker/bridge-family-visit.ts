@@ -53,7 +53,7 @@ Help an assigned CYS/court/CASA/agency professional understand whether the struc
 - Report patterns and uncertainty, not legal findings.
 - Never decide custody, visitation, parental fitness, abuse, neglect, or court outcomes.
 - Never diagnose anyone.
-- `disposition` is only one of: supportive, mixed, needs_human_review, insufficient_evidence. It is a support-review routing label, not a legal/safety adjudication.
+- disposition is only one of: supportive, mixed, needs_human_review, insufficient_evidence. It is a support-review routing label, not a legal/safety adjudication.
 - Every item in humanReview must use classification HUMAN_REVIEW.
 
 FOR BOTH AUDIENCES:
