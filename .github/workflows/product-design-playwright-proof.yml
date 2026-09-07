@@ -19,6 +19,7 @@ on:
       - 'public/sitemap.xml'
       - 'public/what-is-sekret-bip/**'
       - 'public/how-it-works/**'
+      - 'public/privacy-and-safety/**'
       - 'wrangler.toml'
       - '.dev.vars.example'
       - 'scripts/verify-firewall-v10.mjs'
