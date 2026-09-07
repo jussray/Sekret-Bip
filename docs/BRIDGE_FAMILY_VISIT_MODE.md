@@ -57,6 +57,9 @@ awaiting_ack
 active
       ↓
 reflection
+  child reflection ✓
+  parent reflection ✓
+  professional reflection ✓
       ↓
 ready
 ```
@@ -64,6 +67,10 @@ ready
 Any participant may decline/stop the session. Assignment expiry/revocation or professional-authority drift fails closed.
 
 A session cannot become active until all three named participants acknowledge the same visible no-recording notice.
+
+A session cannot become `ready` and freeze audience summaries until the child, parent, and professional have each saved a structured post-visit reflection. `not_sure` and `insufficient_evidence` remain valid inputs, so this rule guarantees participation without forcing certainty.
+
+Each case assignment may have at most one open session in `awaiting_ack`, `active`, or `reflection`. Repeated start requests return the existing open session instead of creating a second consent/reflection timeline.
 
 ## Structured input only
 
@@ -167,6 +174,8 @@ Family Visit Mode uses separate tables for:
 
 Authenticated clients cannot directly insert/update/delete these tables. State-changing participant actions go through constrained SECURITY DEFINER RPCs. Founder/admin professional review and case assignment are server-controlled RPCs and are not exposed in the public client service.
 
+A partial unique index plus idempotent `start_bridge_family_visit_session` RPC prevents one assignment from having multiple simultaneously open visit sessions.
+
 ## Rollout
 
 The summary Worker is gated by `BRIDGE_FAMILY_VISITS_ROLLOUT`:
@@ -188,10 +197,12 @@ Before this feature can be called live, separately prove:
 5. exact deployed `sekret-backend` identity with the Family Visit Worker source;
 6. controlled rollout configured without exposing secret values;
 7. browser/device journey for child, parent, professional, wrong adult, suspended professional, revocation, and expiry;
-8. parent cannot read professional summary or raw child/professional reflection;
-9. professional cannot read parent summary or raw child/parent reflection;
-10. child can inspect both generated summaries;
-11. no microphone/camera/transcription permission is requested by this flow;
-12. rollback disables rollout and revokes assignments without deleting evidence history.
+8. repeated professional start requests resolve to one open session for the assignment;
+9. summary generation stays blocked until all three participants have saved structured reflections;
+10. parent cannot read professional summary or raw child/professional reflection;
+11. professional cannot read parent summary or raw child/parent reflection;
+12. child can inspect both generated summaries;
+13. no microphone/camera/transcription permission is requested by this flow;
+14. rollback disables rollout and revokes assignments without deleting evidence history.
 
 Production migration, provider configuration, professional verification, assignment creation, deployment, and rollout are separate founder gates. Source implementation does not authorize those mutations.
