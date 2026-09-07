@@ -210,21 +210,21 @@ function normalizeLiveMigration(migration) {
   };
 }
 
-function embeddedIdentityMatches(live, required) {
-  return live.embeddedVersion === null || live.embeddedVersion === required.version;
+function embeddedIdentityMatches(live, expectedVersion) {
+  return live.embeddedVersion === null || live.embeddedVersion === expectedVersion;
 }
 
 function matchesCanonicalReceipt(live, required) {
   return live.version === required.version
     && live.name === required.name
-    && embeddedIdentityMatches(live, required);
+    && embeddedIdentityMatches(live, required.version);
 }
 
 function matchesAcceptedAlias(live, required, alias) {
   return Boolean(alias)
     && live.version === alias.liveVersion
     && live.name === required.name
-    && embeddedIdentityMatches(live, required);
+    && embeddedIdentityMatches(live, alias.liveVersion);
 }
 
 function isKnownLiveReceipt(live, requiredMigrations, acceptedAliases) {
