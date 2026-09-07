@@ -26,6 +26,11 @@ export interface AgeOption {
 
 export interface AgeAssuranceDecision {
   ageBucket: AgeBucket;
+  /**
+   * Whether this pre-auth age decision permits account creation to continue.
+   * This is not a VERIFIED_TEEN claim and does not unlock verification-gated
+   * social capabilities. Runtime capability remains owned by account_verification.
+   */
   allowed: boolean;
   status: AgeVerificationStatus;
   method: AgeVerificationMethod;
@@ -73,6 +78,10 @@ export const AGE_ASSURANCE_STORAGE_KEYS = {
  * today's US-general behavior until a separately reviewed jurisdiction resolver
  * is wired. Provider/native integrations should enter through the same policy
  * kernel rather than reimplementing age permissions in UI code.
+ *
+ * This function decides the pre-auth/account-creation path only. After signup,
+ * server-backed account_verification remains authoritative for Limited Mode,
+ * VERIFIED_TEEN, and any verification-gated social capability.
  */
 export function decideAgeAssurance(
   ageBucket: AgeBucket,
