@@ -63,7 +63,7 @@ test('app-domain command binds exact approved main into only its existing bounde
 test('Supabase history command remains founder-bound and separate from app-domain mutation authority', () => {
   const parse = stepBlock('Parse Supabase history founder command');
   const verify = stepBlock('Verify Supabase history SHA is current main');
-  const dispatch = stepBlock('Dispatch exact five-alias Supabase history reconciliation');
+  const dispatch = stepBlock('Dispatch exact six-receipt Supabase history reconciliation');
 
   assert.match(parse, /steps\.route\.outputs\.command == 'supabase-history'/);
   assert.match(parse, /Expected exactly: \/reconcile-supabase-history <40-char-main-sha> <approval-reference>/);
@@ -71,7 +71,7 @@ test('Supabase history command remains founder-bound and separate from app-domai
   assert.match(verify, /test "\$CURRENT_MAIN_SHA" = "\$EXPECTED_HEAD_SHA"/);
   assert.match(dispatch, /reconcile-supabase-production-history\.yml\/dispatches/);
   assert.match(dispatch, /target_sha: \$sha/);
-  assert.match(dispatch, /RECONCILE FIVE MIGRATION ALIASES/);
+  assert.match(dispatch, /RECONCILE SIX SECURITY RECEIPT ALIASES/);
   assert.doesNotMatch(dispatch, /SUPABASE_ACCESS_TOKEN/);
   assert.doesNotMatch(dispatch, /CLOUDFLARE_API_TOKEN/);
 });
