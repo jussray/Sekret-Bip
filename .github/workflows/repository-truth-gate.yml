@@ -75,7 +75,7 @@ jobs:
           node --check scripts/verify-supabase-migration-lineage.mjs
 
       - name: Verify repository-truth gate contracts
-        run: node --test test/repository-truth-gates.test.mjs test/resumable-production-verification.test.mjs test/supabase-migration-lineage.test.mjs test/production-authority-workflow-contracts.test.mjs test/cloudflare-branch-authority-workflow-contract.test.mjs test/consent-permanent-account-boundary.test.mjs
+        run: node --test test/repository-truth-gates.test.mjs test/resumable-production-verification.test.mjs test/supabase-migration-lineage.test.mjs test/supabase-production-receipt-authority.test.mjs test/production-authority-workflow-contracts.test.mjs test/cloudflare-branch-authority-workflow-contract.test.mjs test/consent-permanent-account-boundary.test.mjs
 
       - name: Audit failure truth on current change
         id: failure_truth
