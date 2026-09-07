@@ -81,6 +81,42 @@ jobs:
             return a.length === b.length && a.every((value, index) => value === b[index]);
           }
 
+          function unwrapToken(value) {
+            let token = String(value || '').trim().normalize('NFKC');
+            let previous;
+            do {
+              previous = token;
+              token = token.trim();
+              token = token.replace(/^[A-Z_][A-Z0-9_]*[\p{White_Space}\p{Cf}]*=[\p{White_Space}\p{Cf}]*/u, '');
+              const asciiQuoted = token.match(/^(["'])([\s\S]*)\1$/u);
+              if (asciiQuoted) token = asciiQuoted[2].trim();
+              const smartDoubleQuoted = token.match(/^“([\s\S]*)”$/u);
+              if (smartDoubleQuoted) token = smartDoubleQuoted[1].trim();
+              const smartSingleQuoted = token.match(/^‘([\s\S]*)’$/u);
+              if (smartSingleQuoted) token = smartSingleQuoted[1].trim();
+              token = token.replace(/^Bearer[\p{White_Space}\p{Cf}]+/iu, '');
+            } while (token !== previous);
+            return token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+          }
+
+          function boundedTokenCandidates(value, source) {
+            const token = unwrapToken(value);
+            if (!token) return [];
+            const candidates = [];
+            if (/^[\x21-\x7e]+$/.test(token)) {
+              candidates.push({ source, token });
+            }
+
+            const nonAscii = [...token].filter((char) => char.codePointAt(0) < 0x21 || char.codePointAt(0) > 0x7e);
+            if (nonAscii.length === 1 && nonAscii[0] === '\u0441') {
+              const repaired = token.replace('\u0441', 'c');
+              if (/^[\x21-\x7e]+$/.test(repaired)) {
+                candidates.push({ source: `${source}:bounded-u0441-to-c`, token: repaired });
+              }
+            }
+            return candidates;
+          }
+
           function errorSummary(payload, status) {
             const errors = Array.isArray(payload?.errors) ? payload.errors : [];
             const compact = errors
@@ -134,26 +170,28 @@ jobs:
             };
           }
 
-          const tokens = [...new Set([
-            process.env.CF_BUILD_TOKEN,
-            process.env.CF_FALLBACK_TOKEN,
-          ].map((value) => String(value || '').trim()).filter(Boolean))];
+          const tokenCandidates = [
+            ...boundedTokenCandidates(process.env.CF_BUILD_TOKEN, 'dedicated-builds-token'),
+            ...boundedTokenCandidates(process.env.CF_FALLBACK_TOKEN, 'general-cloudflare-token'),
+          ].filter((candidate, index, list) => list.findIndex((other) => other.token === candidate.token) === index);
 
           let selectedToken = null;
+          let selectedSource = null;
           let beforeInspection = null;
           const failures = [];
-          for (const token of tokens) {
+          for (const candidate of tokenCandidates) {
             try {
-              beforeInspection = await inspect(token);
-              selectedToken = token;
+              beforeInspection = await inspect(candidate.token);
+              selectedToken = candidate.token;
+              selectedSource = candidate.source;
               break;
             } catch (error) {
-              failures.push(error instanceof Error ? error.message : String(error));
+              failures.push(`${candidate.source}:${error instanceof Error ? error.message : String(error)}`);
             }
           }
 
           if (!selectedToken || !beforeInspection) {
-            throw new Error(`No configured token could read Workers Builds state: ${failures.join(' | ')}`);
+            throw new Error(`No bounded token candidate could read Workers Builds state: ${failures.join(' | ')}`);
           }
 
           const trigger = beforeInspection.production;
@@ -194,6 +232,7 @@ jobs:
               schema: 'sekret-bip/cloudflare-build-cost-guard@v1',
               generatedAt: new Date().toISOString(),
               worker: workerName,
+              credentialSource: selectedSource,
               branchPolicy: 'main production trigger only',
               before,
               desired: {
@@ -208,7 +247,7 @@ jobs:
               deploymentRequested: false,
             };
             fs.writeFileSync('artifacts/cloudflare-build-cost-guard.json', `${JSON.stringify(receipt, null, 2)}\n`);
-            console.log(`COST_GUARD_VERIFIED applied=${changeRequired} preview_trigger_observed=${receipt.nonProductionTriggerObserved}`);
+            console.log(`COST_GUARD_VERIFIED applied=${changeRequired} credential_source=${selectedSource} preview_trigger_observed=${receipt.nonProductionTriggerObserved}`);
           } catch (error) {
             if (mutationStarted) {
               try {
