@@ -10,10 +10,12 @@ const workflowUrl = new URL(
 const workflow = await readFile(workflowUrl, 'utf8');
 
 test('Cloudflare credential preflight covers every read credential candidate without mutation', () => {
+  assert.match(workflow, /CF_APP_DOMAIN_TOKEN: \$\{\{ secrets\.CLOUDFLARE_APP_DOMAIN_API_TOKEN \}\}/);
   assert.match(workflow, /CF_ACCESS_TOKEN: \$\{\{ secrets\.CLOUDFLARE_ACCESS_API_TOKEN \}\}/);
   assert.match(workflow, /CF_API_TOKEN: \$\{\{ secrets\.CLOUDFLARE_API_TOKEN \}\}/);
   assert.match(workflow, /CF_BUILD_TOKEN: \$\{\{ secrets\.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN \}\}/);
 
+  assert.match(workflow, /source: 'CLOUDFLARE_APP_DOMAIN_API_TOKEN'/);
   assert.match(workflow, /\/user\/tokens\/verify/);
   assert.match(workflow, /pages\/projects\/sekret-bip\/domains/);
   assert.match(workflow, /workers\/domains\?hostname=app\.sekretbip\.net/);
@@ -31,5 +33,5 @@ test('Cloudflare credential preflight reports shape and provider status without 
   assert.match(workflow, /transport=invalid/);
   assert.match(workflow, /TOKEN_VERIFY source=\$\{candidate\.source\}/);
   assert.match(workflow, /READ_PROBE source=\$\{candidate\.source\}/);
-  assert.doesNotMatch(workflow, /console\.log\([^\n]*(?:candidate\.raw|normalized\.token|CF_ACCESS_TOKEN|CF_API_TOKEN|CF_BUILD_TOKEN)/);
+  assert.doesNotMatch(workflow, /console\.log\([^\n]*(?:candidate\.raw|normalized\.token|CF_APP_DOMAIN_TOKEN|CF_ACCESS_TOKEN|CF_API_TOKEN|CF_BUILD_TOKEN)/);
 });
