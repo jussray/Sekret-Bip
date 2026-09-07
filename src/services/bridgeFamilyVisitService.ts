@@ -62,6 +62,18 @@ function serverError<T>(message: string): BridgeFamilyVisitResult<T> {
   return { ok: false, code: 'server_error', message, retryable: true };
 }
 
+function forwardFailure<T>(
+  result: BridgeFamilyVisitResult<unknown>,
+  fallbackMessage = 'Family Visit Mode could not verify this request.',
+): BridgeFamilyVisitResult<T> {
+  return {
+    ok: false,
+    code: result.code ?? 'server_error',
+    message: result.message ?? fallbackMessage,
+    retryable: result.retryable,
+  };
+}
+
 async function currentPermanentUserId(): Promise<BridgeFamilyVisitResult<string>> {
   const sb = getSupabase();
   if (!sb) return unavailable();
@@ -76,7 +88,7 @@ export async function fetchProfessionalBridgeCapability(): Promise<BridgeFamilyV
   const sb = getSupabase();
   if (!sb) return unavailable();
   const user = await currentPermanentUserId();
-  if (!user.ok || !user.value) return user as BridgeFamilyVisitResult<BridgeProfessionalCapability | null>;
+  if (!user.ok || !user.value) return forwardFailure<BridgeProfessionalCapability | null>(user);
 
   const { data, error } = await sb
     .from('bridge_professional_profiles')
@@ -102,11 +114,11 @@ export async function fetchBridgeFamilyVisitBundle(): Promise<BridgeFamilyVisitR
   const sb = getSupabase();
   if (!sb) return unavailable();
   const user = await currentPermanentUserId();
-  if (!user.ok || !user.value) return user as BridgeFamilyVisitResult<BridgeFamilyVisitBundle>;
+  if (!user.ok || !user.value) return forwardFailure<BridgeFamilyVisitBundle>(user);
   const userId = user.value;
 
   const capabilityResult = await fetchProfessionalBridgeCapability();
-  if (!capabilityResult.ok) return capabilityResult as BridgeFamilyVisitResult<BridgeFamilyVisitBundle>;
+  if (!capabilityResult.ok) return forwardFailure<BridgeFamilyVisitBundle>(capabilityResult);
 
   const { data: assignmentsData, error: assignmentsError } = await sb
     .from('bridge_case_assignments')
@@ -184,7 +196,7 @@ async function rpc<T>(name: string, params: Record<string, unknown>): Promise<Br
   const sb = getSupabase();
   if (!sb) return unavailable();
   const user = await currentPermanentUserId();
-  if (!user.ok) return user as BridgeFamilyVisitResult<T>;
+  if (!user.ok) return forwardFailure<T>(user);
 
   const { data, error } = await sb.rpc(name, params);
   if (error) {
@@ -250,7 +262,7 @@ export function submitBridgeFamilyVisitProfessionalReflection(
 export async function generateBridgeFamilyVisitHumanSummaries(sessionId: string): Promise<BridgeFamilyVisitResult<{ ready: boolean }>> {
   if (!BASE_URL) return unavailable('Family Visit summary generation is not configured.');
   const user = await currentPermanentUserId();
-  if (!user.ok) return user as BridgeFamilyVisitResult<{ ready: boolean }>;
+  if (!user.ok) return forwardFailure<{ ready: boolean }>(user);
 
   try {
     const headers = await backendAuthHeaders();
