@@ -18,6 +18,7 @@ on:
       - 'public/robots.txt'
       - 'public/sitemap.xml'
       - 'public/what-is-sekret-bip/**'
+      - 'public/how-it-works/**'
       - 'wrangler.toml'
       - '.dev.vars.example'
       - 'scripts/verify-firewall-v10.mjs'
