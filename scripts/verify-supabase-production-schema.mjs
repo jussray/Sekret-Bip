@@ -203,14 +203,14 @@ export async function verifySupabaseProductionSchema(options = {}) {
   let response;
   try {
     response = await fetchImpl(
-      `https://api.supabase.com/v1/projects/${encodeURIComponent(config.projectRef)}/database/query/read-only`,
+      `https://api.supabase.com/v1/projects/${encodeURIComponent(config.projectRef)}/database/query`,
       {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${config.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: buildReadOnlyQuery() }),
+        body: JSON.stringify({ query: buildReadOnlyQuery(), read_only: true }),
       },
     );
   } catch (error) {

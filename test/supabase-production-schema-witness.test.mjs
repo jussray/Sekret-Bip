@@ -318,11 +318,13 @@ test('production verifier derives repo head, uses read-only Management API, and 
   assert.equal(evidence.verified, true);
   assert.equal(evidence.expectedVersion, CURRENT_MAIN_SCHEMA_HEAD);
   assert.equal(evidence.liveMaxVersion, CURRENT_MAIN_SCHEMA_HEAD);
-  assert.match(observedUrl, /\/database\/query\/read-only$/);
+  assert.match(observedUrl, /\/database\/query$/);
   assert.equal(observedOptions.method, 'POST');
   assert.match(observedOptions.headers.Authorization, /^Bearer /);
-  assert.match(observedOptions.body, /supabase_migrations\.schema_migrations/);
-  assert.match(observedOptions.body, /jsonb_agg/);
+  const observedBody = JSON.parse(observedOptions.body);
+  assert.equal(observedBody.read_only, true);
+  assert.match(observedBody.query, /supabase_migrations\.schema_migrations/);
+  assert.match(observedBody.query, /jsonb_agg/);
 
   const retained = fs.readFileSync(evidencePath, 'utf8');
   assert.doesNotMatch(retained, /secret-token-for-test/);
