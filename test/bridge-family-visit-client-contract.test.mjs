@@ -66,3 +66,8 @@ test('professional summary generation uses the existing authenticated Bridge end
   assert.match(service, /\/api\/bridge\/summary\/generate/);
   assert.match(service, /JSON\.stringify\(\{ sessionId \}\)/);
 });
+
+test('professional gets a specific wait state until all three reflections exist', () => {
+  assert.match(service, /participant_reflections_required/);
+  assert.match(service, /Waiting for the child, parent, and professional to each save a structured reflection\./);
+});
