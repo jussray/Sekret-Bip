@@ -134,6 +134,11 @@ function hasAllAcknowledgements(session: {
   );
 }
 
+function hasAllParticipantReflections(reflections: BridgeFamilyVisitReflectionRow[]): boolean {
+  const roles = new Set(reflections.map((reflection) => reflection.actor_role));
+  return roles.has('teen') && roles.has('parent') && roles.has('professional');
+}
+
 function hasTeenSelectedInput(markers: BridgeFamilyVisitMarkerRow[], reflections: BridgeFamilyVisitReflectionRow[]): boolean {
   return markers.some((marker) => marker.actor_role === 'teen')
     || reflections.some((reflection) => reflection.actor_role === 'teen');
@@ -278,6 +283,14 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
       store.fetchMarkers(sessionId),
       store.fetchReflections(sessionId),
     ]);
+
+    if (!hasAllParticipantReflections(reflections)) {
+      return json({
+        sessionId,
+        status: 'blocked',
+        failureCode: 'participant_reflections_required',
+      }, 409, cors);
+    }
 
     const generated = await generateSummaries(env, markers, reflections);
     const summaries = generated?.summaries ?? FALLBACK_SUMMARIES;
