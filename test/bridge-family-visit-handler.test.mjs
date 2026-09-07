@@ -26,6 +26,41 @@ function jsonResponse(value, status = 200) {
   });
 }
 
+function completeReflections() {
+  return [
+    {
+      actor_role: 'teen',
+      felt_heard: 'somewhat',
+      felt_comfortable: 'somewhat',
+      could_pause: 'yes',
+      connection_after: 'same',
+      next_support: 'listen',
+      review_signal: null,
+      submitted_at: '2026-09-07T20:20:00Z',
+    },
+    {
+      actor_role: 'parent',
+      felt_heard: 'yes',
+      felt_comfortable: 'yes',
+      could_pause: 'yes',
+      connection_after: 'closer',
+      next_support: 'listen',
+      review_signal: null,
+      submitted_at: '2026-09-07T20:20:30Z',
+    },
+    {
+      actor_role: 'professional',
+      felt_heard: null,
+      felt_comfortable: null,
+      could_pause: null,
+      connection_after: null,
+      next_support: null,
+      review_signal: 'mixed',
+      submitted_at: '2026-09-07T20:21:00Z',
+    },
+  ];
+}
+
 function installSupabaseMock(overrides = {}) {
   const writes = [];
   const original = globalThis.fetch;
@@ -67,28 +102,7 @@ function installSupabaseMock(overrides = {}) {
       ]);
     }
     if (url.includes('/bridge_family_visit_reflections?') && method === 'GET') {
-      return jsonResponse(overrides.reflections ?? [
-        {
-          actor_role: 'teen',
-          felt_heard: 'somewhat',
-          felt_comfortable: 'somewhat',
-          could_pause: 'yes',
-          connection_after: 'same',
-          next_support: 'listen',
-          review_signal: null,
-          submitted_at: '2026-09-07T20:20:00Z',
-        },
-        {
-          actor_role: 'professional',
-          felt_heard: null,
-          felt_comfortable: null,
-          could_pause: null,
-          connection_after: null,
-          next_support: null,
-          review_signal: 'mixed',
-          submitted_at: '2026-09-07T20:21:00Z',
-        },
-      ]);
+      return jsonResponse(overrides.reflections ?? completeReflections());
     }
     if (url.includes('/bridge_family_visit_summaries?') && method === 'POST') {
       const body = JSON.parse(String(init.body ?? '{}'));
@@ -140,6 +154,21 @@ test('authorized professional generation stores separate audience rows but retur
     const sessionWrites = mock.writes.filter((write) => write.kind === 'session');
     assert.equal(sessionWrites.length, 1);
     assert.equal(sessionWrites[0].body.state, 'ready');
+  } finally {
+    mock.restore();
+  }
+});
+
+test('generation waits for teen, parent, and professional reflections before freezing summaries', async () => {
+  const mock = installSupabaseMock({ reflections: completeReflections().filter((row) => row.actor_role !== 'parent') });
+  try {
+    const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
+    const body = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(body.status, 'blocked');
+    assert.equal(body.failureCode, 'participant_reflections_required');
+    assert.equal(mock.writes.length, 0);
   } finally {
     mock.restore();
   }
