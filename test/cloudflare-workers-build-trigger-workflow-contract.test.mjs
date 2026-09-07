@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import {normalizeCloudflareTokenTransport} from '../scripts/run-with-normalized-cloudflare-token.mjs';
+import {
+  normalizeCloudflareTokenTransport,
+  runWithNormalizedCloudflareToken,
+} from '../scripts/run-with-normalized-cloudflare-token.mjs';
 
 const workflow = readFileSync('.github/workflows/cloudflare-workers-build-trigger.yml', 'utf8');
 
@@ -43,7 +46,7 @@ test('Workers Builds trigger workflow is exact-head, credential-minimal, and act
   assert.ok(!workflow.includes('persist-credentials: true'), 'Workers trigger checkout credentials must not persist');
 });
 
-test('Cloudflare token transport canonicalizes common secret wrappers and fails closed on other non-ASCII data', () => {
+test('Cloudflare token transport canonicalizes common secret wrappers and flags other non-ASCII data', () => {
   for (const [input, expected, changed] of [
     ['abc123', 'abc123', false],
     [' Bearer abc123 ', 'abc123', true],
@@ -63,4 +66,43 @@ test('Cloudflare token transport canonicalizes common secret wrappers and fails 
   const invalid = normalizeCloudflareTokenTransport('abc💥');
   assert.equal(invalid.token, 'abc💥');
   assert.equal(invalid.nonAsciiRemaining, true);
+});
+
+test('Cloudflare token transport fails before spawn when normalization leaves an invalid token', () => {
+  let spawnCalls = 0;
+  const spawn = () => {
+    spawnCalls += 1;
+    return { status: 0 };
+  };
+
+  for (const value of ['abc💥', '  ', 'CLOUDFLARE_API_TOKEN=']) {
+    assert.throws(
+      () => runWithNormalizedCloudflareToken({
+        argv: ['target.mjs'],
+        env: { CLOUDFLARE_API_TOKEN: value },
+        spawn,
+      }),
+      /CLOUDFLARE_API_TOKEN_INVALID_TRANSPORT/,
+      value,
+    );
+  }
+
+  assert.equal(spawnCalls, 0);
+});
+
+test('Cloudflare token transport spawns with only the normalized token', () => {
+  let observed = null;
+  const status = runWithNormalizedCloudflareToken({
+    argv: ['target.mjs', '--apply'],
+    env: { CLOUDFLARE_API_TOKEN: ' Bearer abc123 ', KEEP: 'yes' },
+    spawn(command, args, options) {
+      observed = { command, args, options };
+      return { status: 0 };
+    },
+  });
+
+  assert.equal(status, 0);
+  assert.equal(observed.options.env.CLOUDFLARE_API_TOKEN, 'abc123');
+  assert.equal(observed.options.env.KEEP, 'yes');
+  assert.deepEqual(observed.args, ['target.mjs', '--apply']);
 });
