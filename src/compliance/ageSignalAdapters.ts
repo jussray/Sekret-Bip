@@ -55,6 +55,18 @@ export interface GooglePlayAgeSignal {
   significantChangeStatus: GooglePlaySignificantChangeStatus;
 }
 
+export function normalizeSelfDeclaredAgeBand(ageBand: AgeBand): AgeSignalNormalizationResult {
+  return {
+    status: 'normalized',
+    evidence: {
+      source: 'self_declared_age_band',
+      ageBand,
+      guardianApproval: 'unknown',
+      rawEvidenceStored: false,
+    },
+  };
+}
+
 function isValidBound(value: number | null): boolean {
   return value === null || (Number.isInteger(value) && value >= 0);
 }
