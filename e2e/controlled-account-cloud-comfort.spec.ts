@@ -32,11 +32,85 @@ function writeReceipt(value: Record<string, unknown>) {
   );
 }
 
-test('controlled Teen account reaches Cloud and Comfort without retaining private content', async ({ page, context }) => {
-  test.setTimeout(150_000);
-  test.skip(!expectedHeadSha, 'EXPECTED_HEAD_SHA is required for exact-production proof.');
+test('controlled Teen account preserves auth on verification-read failure and reaches Cloud and Comfort without retaining private content', async ({ page, context }) => {
+  test.setTimeout(180_000);
+  test.skip(!expectedHeadSha, 'EXPECTED_HEAD_SHA is required for exact deployed proof.');
 
   await signInTeen(page);
+
+  let failVerificationRead = true;
+  let verificationReadFailures = 0;
+  let blockedSupabaseMutationRequests = 0;
+
+  await page.route('**/rest/v1/**', async route => {
+    const request = route.request();
+    const url = new URL(request.url());
+    const method = request.method().toUpperCase();
+
+    if (
+      failVerificationRead
+      && method === 'GET'
+      && url.pathname.endsWith('/account_verification')
+    ) {
+      verificationReadFailures += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 'controlled_verification_read_failure',
+          message: 'Controlled verification read failure.',
+        }),
+      });
+      return;
+    }
+
+    if (method !== 'GET' && method !== 'HEAD') {
+      blockedSupabaseMutationRequests += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 'controlled_no_mutation',
+          message: 'Controlled-account proof blocks Supabase mutations.',
+        }),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.route('**/functions/v1/**', async route => {
+    const method = route.request().method().toUpperCase();
+    if (method !== 'GET' && method !== 'HEAD') {
+      blockedSupabaseMutationRequests += 1;
+      await route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 'controlled_no_mutation',
+          message: 'Controlled-account proof blocks Supabase function mutations.',
+        }),
+      });
+      return;
+    }
+    await route.continue();
+  });
+
+  await page.goto('/comfort?bipDevAudience=teen');
+  await expect(page).not.toHaveURL(/\/login(?:\?|$)/, { timeout: 45_000 });
+  await expect(page.getByText('Grounding Steps', { exact: true })).toBeVisible({ timeout: 45_000 });
+  expect(verificationReadFailures).toBeGreaterThan(0);
+
+  await page.goto('/circle?bipDevAudience=teen');
+  await expect(page).not.toHaveURL(/\/login(?:\?|$)/, { timeout: 45_000 });
+  await expect(page).toHaveURL(/\/(?:limited-mode|parent-link-verify)(?:\?|$)/, { timeout: 45_000 });
+  await expect(page.getByText('🌐 Circle')).not.toBeVisible();
+
+  failVerificationRead = false;
+  await page.goto('/comfort?bipDevAudience=teen');
+  await expect(page).not.toHaveURL(/\/login(?:\?|$)/, { timeout: 45_000 });
+  await expect(page.getByText('Grounding Steps', { exact: true })).toBeVisible({ timeout: 45_000 });
 
   await page.goto('/cloud?bipDevAudience=teen');
   const cloudInput = page.getByTestId('cloud-thought-input');
@@ -109,11 +183,19 @@ test('controlled Teen account reaches Cloud and Comfort without retaining privat
     accountClass: 'controlled-permanent-teen',
     checkpoints: {
       returningSignIn: 'passed',
+      verificationFailurePreservesAuthenticatedComfort: 'passed',
+      verificationFailureKeepsSocialLocked: 'passed',
+      verificationRecoveryWithoutRelogin: 'passed',
       cloudAuthenticatedEntry: 'passed',
       cloudSyntheticSuccess: 'passed-with-intercepted-provider-request',
       cloudOfflineLocalRecovery: 'passed',
       comfortAuthenticatedEntry: 'passed',
       comfortGroundingControl: 'passed',
+    },
+    safeguards: {
+      verificationReadFailures,
+      blockedSupabaseMutationRequests,
+      productionMutationAllowed: false,
     },
     privacy: {
       screenshotsCaptured: false,
