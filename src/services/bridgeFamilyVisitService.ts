@@ -262,12 +262,16 @@ export async function generateBridgeFamilyVisitHumanSummaries(sessionId: string)
     const body = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
     if (!response.ok) {
       if (response.status === 403 || response.status === 409) {
+        let message = 'This Family Visit session is not ready for summary generation.';
+        if (body?.failureCode === 'family_visit_mode_disabled') {
+          message = 'Family Visit summary generation is not enabled for this account yet.';
+        } else if (body?.failureCode === 'participant_reflections_required') {
+          message = 'Waiting for the child, parent, and professional to each save a structured reflection.';
+        }
         return {
           ok: false,
           code: 'not_authorized',
-          message: body?.failureCode === 'family_visit_mode_disabled'
-            ? 'Family Visit summary generation is not enabled for this account yet.'
-            : 'This Family Visit session is not ready for summary generation.',
+          message,
         };
       }
       return { ok: false, code: 'ai_unavailable', message: 'Se’kret could not prepare the summaries yet.', retryable: true };
