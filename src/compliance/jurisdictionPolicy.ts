@@ -97,38 +97,32 @@ export function getJurisdictionPolicy(jurisdiction: JurisdictionKey): Jurisdicti
   return JURISDICTION_POLICIES[jurisdiction];
 }
 
+function teenPermissionForEvidence(
+  evidence: AgeEvidence,
+): 'blocked' | 'guardian_required' | 'allowed' {
+  if (evidence.ageBand === 'under-13') return 'blocked';
+  if (evidence.ageBand === '18-19') return 'allowed';
+  if (evidence.guardianApproval === 'denied') return 'blocked';
+  if (evidence.guardianApproval === 'granted') return 'allowed';
+  return 'guardian_required';
+}
+
 export function resolveFeaturePermissions(
   evidence: AgeEvidence,
   jurisdiction: JurisdictionKey,
 ): FeaturePermissions {
   const policy = getJurisdictionPolicy(jurisdiction);
-
-  if (evidence.ageBand === 'under-13') {
-    return {
-      teenAccount: 'blocked',
-      teenMode: 'blocked',
-      guardianFlow: 'required',
-      rawAgeEvidenceStorage: 'forbidden',
-      distribution: policy.launchDisposition,
-      significantChangeReview: policy.significantChangeReview,
-    };
-  }
-
-  if (evidence.ageBand === '13-15' || evidence.ageBand === '16-17') {
-    return {
-      teenAccount: 'guardian_required',
-      teenMode: 'guardian_required',
-      guardianFlow: 'required',
-      rawAgeEvidenceStorage: 'forbidden',
-      distribution: policy.launchDisposition,
-      significantChangeReview: policy.significantChangeReview,
-    };
-  }
+  const teenPermission = teenPermissionForEvidence(evidence);
+  const guardianFlow =
+    evidence.ageBand === 'under-13' ||
+    ((evidence.ageBand === '13-15' || evidence.ageBand === '16-17') && teenPermission !== 'allowed')
+      ? 'required'
+      : 'available';
 
   return {
-    teenAccount: 'allowed',
-    teenMode: 'allowed',
-    guardianFlow: 'available',
+    teenAccount: teenPermission,
+    teenMode: teenPermission,
+    guardianFlow,
     rawAgeEvidenceStorage: 'forbidden',
     distribution: policy.launchDisposition,
     significantChangeReview: policy.significantChangeReview,
