@@ -1,10 +1,14 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import test from 'node:test';
 
 import {
   evaluatePagesBranchAuthority,
   fingerprintPagesAuthority,
   normalizePagesProject,
+  verifyPagesBranchAuthority,
 } from '../scripts/verify-cloudflare-pages-branch-authority.mjs';
 
 function project(overrides = {}) {
@@ -112,4 +116,36 @@ test('fingerprint changes when load-bearing Pages authority changes', () => {
     sourceConfig: { repo_name: 'not-sekret-bip' },
   }));
   assert.notEqual(fingerprintPagesAuthority(first), fingerprintPagesAuthority(second));
+});
+
+test('retains a sanitized blocked receipt when the Pages credential is missing', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'sekret-pages-authority-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const output = join(directory, 'receipt.json');
+
+  await assert.rejects(
+    verifyPagesBranchAuthority({
+      argv: ['--output', output],
+      env: {
+        CLOUDFLARE_ACCOUNT_ID: 'account-id',
+        CLOUDFLARE_PAGES_PROJECT: 'sekret-bip',
+        CLOUDFLARE_PAGES_PRODUCTION_BRANCH: 'main',
+      },
+    }),
+    /A Cloudflare token with read access to the Pages project is required/,
+  );
+
+  const receipt = JSON.parse(await readFile(output, 'utf8'));
+  assert.equal(receipt.mode, 'read-only');
+  assert.equal(receipt.mutationPerformed, false);
+  assert.equal(receipt.status, 'blocked');
+  assert.equal(receipt.credentialSource, null);
+  assert.deepEqual(receipt.credentialConfiguredSources, []);
+  assert.equal(receipt.verified, false);
+  assert.deepEqual(receipt.failures, ['credential-not-configured']);
+  assert.equal(receipt.failure.code, 'credential-not-configured');
+  assert.equal(receipt.failure.providerStatus, null);
+  assert.deepEqual(receipt.failure.providerCodes, []);
+  assert.equal(receipt.observed, null);
+  assert.equal(JSON.stringify(receipt).includes('account-id'), false);
 });

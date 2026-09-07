@@ -35,7 +35,7 @@ const REQUIRED_HISTORY_FIXTURES = [
 
 const ACCEPTED_LIVE_RECEIPTS = [
   { version: '20260806020640', name: 'extend_auth_profile_sync_identity' },
-  { version: '20260808073044', name: '20260806024500_harden_uos_set_updated_at_search_path' },
+  { version: '20260808073044', name: '20260808073044_harden_uos_set_updated_at_search_path' },
   { version: '20260808221720', name: 'reconcile_safety_alert_runtime_schema' },
   { version: '20260808222306', name: 'lock_safety_alert_table_grants' },
   { version: '20260813222648', name: 'founder_owned_auth_identity' },
