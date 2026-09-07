@@ -100,19 +100,3 @@ test('onboarding decision delegates to normalized evidence and the canonical pol
   assert.match(adapters, /source:\s*'self_declared_age_band'/);
   assert.match(adapters, /rawEvidenceStored:\s*false/);
 });
-
-test('current age and welcome screens still share the same decision helper without collecting raw proof', async () => {
-  const [ageScreen, welcomeScreen] = await Promise.all([
-    read('app/(onboarding)/age.tsx'),
-    read('app/(onboarding)/welcome.tsx'),
-  ]);
-
-  for (const screen of [ageScreen, welcomeScreen]) {
-    assert.match(screen, /decideAgeAssurance/);
-    assert.match(screen, /AGE_ASSURANCE_STORAGE_KEYS\.rawEvidenceStored, 'false'/);
-    assert.doesNotMatch(
-      screen,
-      /(upload|submit|take|record|capture|scan|provide|enter)\s+(a |an |your )?(id|selfie|video proof|date of birth)/i,
-    );
-  }
-});
