@@ -19,6 +19,7 @@ jobs:
     env:
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      CF_APP_DOMAIN_TOKEN: ${{ secrets.CLOUDFLARE_APP_DOMAIN_API_TOKEN }}
       CF_ACCESS_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
       CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CF_BUILD_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
@@ -69,6 +70,7 @@ jobs:
           };
 
           const candidates = [
+            { source: 'CLOUDFLARE_APP_DOMAIN_API_TOKEN', raw: process.env.CF_APP_DOMAIN_TOKEN },
             { source: 'CLOUDFLARE_ACCESS_API_TOKEN', raw: process.env.CF_ACCESS_TOKEN },
             { source: 'CLOUDFLARE_API_TOKEN', raw: process.env.CF_API_TOKEN },
             { source: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', raw: process.env.CF_BUILD_TOKEN },
