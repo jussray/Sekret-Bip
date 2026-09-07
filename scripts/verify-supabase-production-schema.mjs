@@ -162,6 +162,8 @@ function initialEvidence(config) {
     authorityFloorVersion: core.PRODUCTION_HISTORY_AUTHORITY_FLOOR,
     expectedVersion: null,
     liveMaxVersion: null,
+    providerHttpStatus: null,
+    schemaComparisonPerformed: false,
     pgjwtObserved: null,
     pgjwtInstalled: null,
     pgjwtVersion: null,
@@ -182,6 +184,29 @@ async function failWithEvidence(config, evidence, status, errorCode, error) {
   evidence.checkedAt = new Date().toISOString();
   await writeEvidence(config.evidencePath, evidence);
   throw error;
+}
+
+export function classifyManagementApiHttpFailure(status) {
+  const httpStatus = Number(status);
+  if (httpStatus === 401) {
+    return {
+      status: 'provider-auth-failed',
+      errorCode: 'supabase_access_token_rejected',
+      message: 'Supabase Management API rejected SUPABASE_ACCESS_TOKEN with HTTP 401; production schema drift was not evaluated.',
+    };
+  }
+  if (httpStatus === 403) {
+    return {
+      status: 'provider-auth-failed',
+      errorCode: 'supabase_access_token_forbidden',
+      message: 'Supabase Management API denied SUPABASE_ACCESS_TOKEN with HTTP 403; production schema drift was not evaluated.',
+    };
+  }
+  return {
+    status: 'provider-query-failed',
+    errorCode: `management_api_http_${httpStatus}`,
+    message: `Supabase read-only production schema verification failed with HTTP ${httpStatus}.`,
+  };
 }
 
 export async function verifySupabaseProductionSchema(options = {}) {
@@ -256,6 +281,8 @@ export async function verifySupabaseProductionSchema(options = {}) {
     );
   }
 
+  evidence.providerHttpStatus = Number.isInteger(response?.status) ? response.status : null;
+
   let payload;
   try {
     payload = await readJson(response);
@@ -270,12 +297,13 @@ export async function verifySupabaseProductionSchema(options = {}) {
   }
 
   if (!response.ok) {
+    const failure = classifyManagementApiHttpFailure(response.status);
     await failWithEvidence(
       config,
       evidence,
-      'provider-query-failed',
-      `management_api_http_${response.status}`,
-      new Error(`Supabase read-only production schema verification failed with HTTP ${response.status}.`),
+      failure.status,
+      failure.errorCode,
+      new Error(failure.message),
     );
   }
 
@@ -295,6 +323,7 @@ export async function verifySupabaseProductionSchema(options = {}) {
     );
   }
 
+  evidence.schemaComparisonPerformed = true;
   const evaluated = core.evaluateMigrationHistory({
     ...row,
     migration_history: migrationHistory,
