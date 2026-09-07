@@ -1,4 +1,8 @@
-export type AgeBucket = 'under-13' | '13-15' | '16-17' | '18-19';
+import { normalizeSelfDeclaredAgeBand } from '../../compliance/ageSignalAdapters';
+import { resolveAgeSignalDecision } from '../../compliance/ageSignalDecision';
+import type { AgeBand, JurisdictionKey } from '../../compliance/jurisdictionPolicy';
+
+export type AgeBucket = AgeBand;
 
 export type AgeVerificationStatus =
   | 'not_started'
@@ -63,8 +67,37 @@ export const AGE_ASSURANCE_STORAGE_KEYS = {
   rawEvidenceStored: 'bip_age_raw_evidence_stored',
 } as const;
 
-export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
-  if (ageBucket === 'under-13') {
+/**
+ * Current onboarding uses a privacy-minimal self-declared age bucket.
+ * The second parameter is intentionally optional so existing callers preserve
+ * today's US-general behavior until a separately reviewed jurisdiction resolver
+ * is wired. Provider/native integrations should enter through the same policy
+ * kernel rather than reimplementing age permissions in UI code.
+ */
+export function decideAgeAssurance(
+  ageBucket: AgeBucket,
+  jurisdiction: JurisdictionKey = 'us-general',
+): AgeAssuranceDecision {
+  const outcome = resolveAgeSignalDecision(
+    normalizeSelfDeclaredAgeBand(ageBucket),
+    jurisdiction,
+  );
+
+  if (outcome.status === 'recovery_required') {
+    return {
+      ageBucket,
+      allowed: false,
+      status: 'third_party_required',
+      method: 'third_party_age_assurance',
+      guardianRequired: true,
+      nextSide: 'parent',
+      nextRoute: '/(onboarding)/parental-consent',
+      actionLabel: 'Complete age check →',
+      message: 'We need another age check before teen setup can continue. Bip does not store raw age proof on this path.',
+    };
+  }
+
+  if (outcome.permissions.teenAccount === 'blocked') {
     return {
       ageBucket,
       allowed: false,
@@ -78,7 +111,7 @@ export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
     };
   }
 
-  if (ageBucket === '13-15' || ageBucket === '16-17') {
+  if (outcome.permissions.teenAccount === 'guardian_required') {
     return {
       ageBucket,
       allowed: true,
