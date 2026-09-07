@@ -6,6 +6,7 @@ on:
       - fix/cloudflare-build-cost-guard
     paths:
       - .github/workflows/cloudflare-user-token-preflight.yml
+      - test/cloudflare-user-token-preflight-contract.test.mjs
   workflow_dispatch:
 
 permissions:
@@ -17,47 +18,124 @@ jobs:
     timeout-minutes: 5
     env:
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CF_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+      CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      CF_ACCESS_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_BUILD_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
     steps:
-      - name: Verify Cloudflare user token and account read scope
+      - name: Verify Cloudflare credential transport and read authority
         shell: bash
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
           const API = 'https://api.cloudflare.com/client/v4';
-          const token = String(process.env.CF_TOKEN || '').trim();
           const accountId = String(process.env.CF_ACCOUNT_ID || '').trim();
-          if (!token) throw new Error('TOKEN_MISSING');
+          const zoneId = String(process.env.CF_ZONE_ID || '').trim();
           if (!/^[0-9a-f]{32}$/.test(accountId)) throw new Error('ACCOUNT_ID_INVALID_FORMAT');
+          if (!/^[0-9a-f]{32}$/.test(zoneId)) throw new Error('ZONE_ID_INVALID_FORMAT');
 
-          const tokenClass = token.startsWith('cfut_') ? 'user-token'
-            : token.startsWith('cfat_') ? 'account-token'
-              : token.startsWith('cfk_') ? 'global-key'
-                : /^[0-9a-f]{32}$/i.test(token) ? 'likely-token-id'
-                  : 'legacy-or-unknown';
-          console.log(`TOKEN_FORMAT class=${tokenClass} length=${token.length} contains_equals=${token.includes('=')} contains_whitespace=${/\\s/u.test(token)}`);
+          const normalize = (value) => {
+            const raw = String(value ?? '');
+            if (!raw) return { token: '', changed: false, nonAsciiRemaining: false };
+            let token = raw.trim().normalize('NFKC');
+            let previous;
+            do {
+              previous = token;
+              token = token.trim();
+              token = token.replace(/^[A-Z_][A-Z0-9_]*[\p{White_Space}\p{Cf}]*=[\p{White_Space}\p{Cf}]*/u, '');
+              const asciiQuoted = token.match(/^(["'])([\s\S]*)\1$/u);
+              if (asciiQuoted) token = asciiQuoted[2].trim();
+              const smartDoubleQuoted = token.match(/^“([\s\S]*)”$/u);
+              if (smartDoubleQuoted) token = smartDoubleQuoted[1].trim();
+              const smartSingleQuoted = token.match(/^‘([\s\S]*)’$/u);
+              if (smartSingleQuoted) token = smartSingleQuoted[1].trim();
+              token = token.replace(/^Bearer[\p{White_Space}\p{Cf}]+/iu, '');
+            } while (token !== previous);
+            token = token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+            return {
+              token,
+              changed: token !== raw,
+              nonAsciiRemaining: /[^\x21-\x7e]/.test(token),
+            };
+          };
 
-          const request = async (path) => {
+          const classify = (token) => {
+            if (!token) return 'empty';
+            if (/^[0-9a-f]{32}$/i.test(token)) return 'likely-token-id';
+            if (token.startsWith('cfut_')) return 'user-prefixed';
+            if (token.startsWith('cfat_')) return 'account-prefixed';
+            if (token.startsWith('cfk_')) return 'key-prefixed';
+            return 'opaque-ascii';
+          };
+
+          const candidates = [
+            { source: 'CLOUDFLARE_ACCESS_API_TOKEN', raw: process.env.CF_ACCESS_TOKEN },
+            { source: 'CLOUDFLARE_API_TOKEN', raw: process.env.CF_API_TOKEN },
+            { source: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', raw: process.env.CF_BUILD_TOKEN },
+          ];
+
+          const probes = [
+            { name: 'zone-identity', path: `/zones/${zoneId}` },
+            { name: 'pages-domains', path: `/accounts/${accountId}/pages/projects/sekret-bip/domains` },
+            { name: 'worker-domains', path: `/accounts/${accountId}/workers/domains?hostname=app.sekretbip.net` },
+            { name: 'worker-routes', path: `/zones/${zoneId}/workers/routes` },
+            { name: 'account-access-apps', path: `/accounts/${accountId}/access/apps?per_page=1` },
+            { name: 'zone-access-apps', path: `/zones/${zoneId}/access/apps?per_page=1` },
+          ];
+          const covered = new Set();
+
+          const summarize = (body, status) => {
+            const errors = Array.isArray(body?.errors) ? body.errors : [];
+            const provider = errors
+              .map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`)
+              .join(';');
+            return provider || `HTTP ${status}`;
+          };
+
+          const request = async (token, path) => {
             const response = await fetch(`${API}${path}`, {
-              headers: { Authorization: `Bearer ${token}` },
+              headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
             });
             const body = await response.json().catch(() => null);
             return { response, body };
           };
-          const summary = (body, status) => {
-            const errors = Array.isArray(body?.errors) ? body.errors : [];
-            return errors.map((e) => `${e?.code ?? 'unknown'}:${e?.message ?? 'provider error'}`).join('; ') || `HTTP ${status}`;
-          };
 
-          const verify = await request('/user/tokens/verify');
-          if (!verify.response.ok || verify.body?.success === false) {
-            throw new Error(`TOKEN_VERIFY_FAILED ${summary(verify.body, verify.response.status)}`);
-          }
-          console.log(`TOKEN_VERIFY_OK status=${verify.body?.result?.status ?? 'unknown'}`);
+          for (const candidate of candidates) {
+            const configured = Boolean(String(candidate.raw || ''));
+            if (!configured) {
+              console.log(`TOKEN_CANDIDATE source=${candidate.source} configured=false transport=missing`);
+              continue;
+            }
 
-          const scripts = await request(`/accounts/${accountId}/workers/scripts?per_page=1`);
-          if (!scripts.response.ok || scripts.body?.success === false) {
-            throw new Error(`WORKERS_READ_FAILED ${summary(scripts.body, scripts.response.status)}`);
+            const normalized = normalize(candidate.raw);
+            const shape = classify(normalized.token);
+            if (!normalized.token || normalized.nonAsciiRemaining) {
+              console.log(`TOKEN_CANDIDATE source=${candidate.source} configured=true transport=invalid normalized=${normalized.changed} ascii=${!normalized.nonAsciiRemaining} shape=${shape}`);
+              continue;
+            }
+
+            console.log(`TOKEN_CANDIDATE source=${candidate.source} configured=true transport=valid normalized=${normalized.changed} ascii=true shape=${shape}`);
+            const verify = await request(normalized.token, '/user/tokens/verify');
+            if (!verify.response.ok || verify.body?.success === false) {
+              console.log(`TOKEN_VERIFY source=${candidate.source} result=failed provider=${summarize(verify.body, verify.response.status)}`);
+              continue;
+            }
+            console.log(`TOKEN_VERIFY source=${candidate.source} result=ok status=${verify.body?.result?.status ?? 'unknown'}`);
+
+            for (const probe of probes) {
+              const result = await request(normalized.token, probe.path);
+              if (!result.response.ok || result.body?.success === false) {
+                console.log(`READ_PROBE source=${candidate.source} probe=${probe.name} result=failed provider=${summarize(result.body, result.response.status)}`);
+                continue;
+              }
+              covered.add(probe.name);
+              console.log(`READ_PROBE source=${candidate.source} probe=${probe.name} result=ok`);
+            }
           }
-          console.log('WORKERS_READ_OK');
+
+          const missing = probes.map((probe) => probe.name).filter((name) => !covered.has(name));
+          if (missing.length) {
+            throw new Error(`CLOUDFLARE_READ_AUTHORITY_INCOMPLETE missing=${missing.join(',')}`);
+          }
+          console.log('CLOUDFLARE_READ_AUTHORITY_READY');
           NODE
