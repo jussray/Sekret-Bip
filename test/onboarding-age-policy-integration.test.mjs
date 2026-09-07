@@ -65,13 +65,14 @@ test('under-13 remains blocked from teen signup through the composed policy kern
   assert.equal(decision.nextRoute, '/(onboarding)/parental-consent');
 });
 
-test('13-17 remains guardian-gated through the composed policy kernel', async () => {
+test('13-17 may create an account but remain guardian-required', async () => {
   const assurance = await loadAgeAssurance();
 
   for (const ageBucket of ['13-15', '16-17']) {
     const decision = assurance.decideAgeAssurance(ageBucket);
     assert.equal(decision.allowed, true);
     assert.equal(decision.status, 'guardian_required');
+    assert.notEqual(decision.status, 'verified');
     assert.equal(decision.method, 'self_declared_age_bucket');
     assert.equal(decision.guardianRequired, true);
     assert.equal(decision.nextSide, 'teen');
@@ -99,4 +100,27 @@ test('onboarding decision delegates to normalized evidence and the canonical pol
   assert.doesNotMatch(source, /ageBucket\s*===\s*['"]under-13['"]/);
   assert.match(adapters, /source:\s*'self_declared_age_band'/);
   assert.match(adapters, /rawEvidenceStored:\s*false/);
+});
+
+test('account-creation age gate cannot masquerade as server-backed teen verification', async () => {
+  const [assurance, verification, index, limitedMode, routeAccess, rootLayout] = await Promise.all([
+    read('src/features/onboarding/ageAssurance.ts'),
+    read('src/services/verificationState.ts'),
+    read('app/index.tsx'),
+    read('app/(auth)/limited-mode.tsx'),
+    read('src/services/routeAccess.ts'),
+    read('app/_layout.tsx'),
+  ]);
+
+  assert.match(assurance, /not a VERIFIED_TEEN claim/);
+  assert.match(assurance, /account_verification remains authoritative/);
+  assert.match(verification, /canUnlockSocial[\s\S]*state === 'VERIFIED_TEEN'/);
+  assert.match(index, /verificationState === 'VERIFIED_TEEN'[\s\S]*\/\(auth\)\/limited-mode/);
+  assert.match(limitedMode, /Unlocks after approval/);
+  assert.match(limitedMode, /Circle/);
+  assert.match(limitedMode, /Crew/);
+  assert.match(limitedMode, /Discovery/);
+  assert.match(rootLayout, /SOCIAL_SEGMENTS/);
+  assert.match(rootLayout, /first === '\(teen\)' && SOCIAL_SEGMENTS\.has\(second\) \? '\(social\)'/);
+  assert.match(routeAccess, /area === '\(social\)' && !canUnlockSocial\(options\.verificationState\)/);
 });
