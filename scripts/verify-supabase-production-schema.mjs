@@ -27,6 +27,37 @@ export const PRODUCTION_PGJWT_POLICY = Object.freeze({
   boundTo: 'supabase-dashboard:2026-08-20T21:51:28.984Z',
 });
 
+export function excludeProductionReceiptMarkers(
+  repositoryMigrations,
+  acceptedAliases = PRODUCTION_HISTORY_RUNTIME_ALIASES,
+) {
+  if (!Array.isArray(repositoryMigrations)) return repositoryMigrations;
+
+  const migrations = repositoryMigrations
+    .map((migration) => ({
+      ...migration,
+      version: core.normalizeSchemaVersion(migration?.version),
+      name: core.normalizeMigrationName(migration?.name),
+    }))
+    .sort((left, right) => String(left.version ?? '').localeCompare(String(right.version ?? '')));
+  const byVersion = new Map(
+    migrations
+      .filter((migration) => migration.version)
+      .map((migration) => [migration.version, migration]),
+  );
+  const receiptVersions = new Set();
+
+  for (const [canonicalVersion, receiptVersion] of Object.entries(acceptedAliases ?? {})) {
+    const canonical = byVersion.get(canonicalVersion);
+    const receipt = byVersion.get(receiptVersion);
+    if (!canonical || !receipt) continue;
+    if (!canonical.name || canonical.name !== receipt.name) continue;
+    receiptVersions.add(receiptVersion);
+  }
+
+  return migrations.filter((migration) => !receiptVersions.has(migration.version));
+}
+
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -161,16 +192,18 @@ export async function verifySupabaseProductionSchema(options = {}) {
   let expectedVersion;
   let repositoryMigrations;
   try {
+    const repositoryMigrationCandidates = options.repositoryMigrations
+      ?? await core.deriveRepositoryMigrationIdentities(config.migrationsDir);
+    repositoryMigrations = excludeProductionReceiptMarkers(repositoryMigrationCandidates);
+
     expectedVersion = options.expectedVersion
-      ?? await core.deriveRepositorySchemaVersion(config.migrationsDir);
+      ?? repositoryMigrations.at(-1)?.version
+      ?? null;
     expectedVersion = core.normalizeSchemaVersion(expectedVersion);
     if (!expectedVersion) {
       throw new Error('Expected Supabase schema version must be exactly 14 digits.');
     }
     evidence.expectedVersion = expectedVersion;
-
-    repositoryMigrations = options.repositoryMigrations
-      ?? await core.deriveRepositoryMigrationIdentities(config.migrationsDir);
   } catch (error) {
     await failWithEvidence(
       config,
