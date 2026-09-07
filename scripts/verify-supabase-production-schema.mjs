@@ -283,6 +283,17 @@ export async function verifySupabaseProductionSchema(options = {}) {
 
   evidence.providerHttpStatus = Number.isInteger(response?.status) ? response.status : null;
 
+  if (!response.ok) {
+    const failure = classifyManagementApiHttpFailure(response.status);
+    await failWithEvidence(
+      config,
+      evidence,
+      failure.status,
+      failure.errorCode,
+      new Error(failure.message),
+    );
+  }
+
   let payload;
   try {
     payload = await readJson(response);
@@ -293,17 +304,6 @@ export async function verifySupabaseProductionSchema(options = {}) {
       'provider-query-failed',
       'management_api_response_read_failed',
       error,
-    );
-  }
-
-  if (!response.ok) {
-    const failure = classifyManagementApiHttpFailure(response.status);
-    await failWithEvidence(
-      config,
-      evidence,
-      failure.status,
-      failure.errorCode,
-      new Error(failure.message),
     );
   }
 
