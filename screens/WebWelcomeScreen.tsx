@@ -55,6 +55,11 @@ function getPreviewAudience(defaultAudience: WelcomeAudience): WelcomeAudience {
   return defaultAudience;
 }
 
+function getInitialReducedMotionPreference(): boolean | null {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export function WebWelcomeScreen({
   onEnter,
   variant = 'teen',
@@ -63,7 +68,7 @@ export function WebWelcomeScreen({
 }: WebWelcomeScreenProps) {
   const { width, height } = useWindowDimensions();
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(getInitialReducedMotionPreference);
   const defaultAudience = audience ?? welcomeAudienceForAccountSide(variant);
   const [activeAudience, setActiveAudience] = useState<WelcomeAudience>(() =>
     getPreviewAudience(defaultAudience),
@@ -86,6 +91,14 @@ export function WebWelcomeScreen({
   const heroDrift = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const update = () => setReduceMotion(query.matches);
+      update();
+      query.addEventListener?.('change', update);
+      return () => query.removeEventListener?.('change', update);
+    }
+
     let mounted = true;
 
     AccessibilityInfo.isReduceMotionEnabled()
@@ -763,10 +776,10 @@ const styles = StyleSheet.create({
     backgroundColor: color.heroGlow,
   },
   hero: {
-    width: '124%',
+    width: '100%',
     height: '100%',
     alignSelf: 'center',
-    transform: [{ translateX: 26 }],
+    transform: [{ translateX: 0 }],
   },
   heroBipJr: {
     width: '100%',
