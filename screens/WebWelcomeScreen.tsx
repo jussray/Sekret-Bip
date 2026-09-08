@@ -19,6 +19,7 @@ import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
 
 const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
+const GRID_POSITIONS = ['20%', '40%', '60%', '80%'] as const;
 
 export type WelcomeAudience = 'teen' | 'bip-jr';
 
@@ -246,10 +247,10 @@ export function WebWelcomeScreen({
         nextAudience: 'teen' as WelcomeAudience,
       }
     : {
-        eyebrow: 'YOUR PEOPLE. YOUR PEACE.',
-        title: 'Come on in.',
-        lead: 'You can be real here.',
-        subtitle: 'Reflect, talk, breathe, create, or just be for a minute.',
+        eyebrow: 'PUBLIC PREVIEW',
+        title: 'Your people.\nYour peace.',
+        lead: 'A safe little world where kids, teens, and parents can stay close—without losing their own space.',
+        subtitle: 'Come on in.',
         hero: TEEN_HERO,
         heroLabel: 'Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together',
         cues: [
@@ -258,7 +259,7 @@ export function WebWelcomeScreen({
           { symbol: '✦', label: 'keep your space' },
         ],
         cueLabel: "Se'kret Bip world cues: start quiet, stay close, keep your space",
-        note: '☁  stay awhile. start when you’re ready.',
+        note: 'YOUR PEOPLE. YOUR PEACE.',
         enterText: 'Enter Se’kret Bip',
         enterLabel: "Se'kret Bip teen welcome — continue to age setup",
         switchText: 'Looking for Bip Jr. + Family? →',
@@ -288,33 +289,59 @@ export function WebWelcomeScreen({
         accessibilityLabel={isBipJr ? 'Bip Jr welcome' : "Se'kret Bip teen welcome"}
         style={[styles.shell, { height: shellHeight }, compact && styles.shellCompact]}
       >
+        <View
+          pointerEvents="none"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          style={styles.gridLayer}
+        >
+          {GRID_POSITIONS.map(position => (
+            <View key={`v-${position}`} style={[styles.gridLineVertical, { left: position }]} />
+          ))}
+          {GRID_POSITIONS.map(position => (
+            <View key={`h-${position}`} style={[styles.gridLineHorizontal, { top: position }]} />
+          ))}
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
           <View style={styles.topBar}>
-            <Text style={styles.wordmarkText}>SE’KRET BIP</Text>
+            <Pressable
+              testID="web-welcome-about"
+              accessibilityRole="button"
+              accessibilityLabel={aboutOpen ? "Close About Se'kret Bip" : "About Se'kret Bip"}
+              accessibilityState={{ expanded: aboutOpen }}
+              onPress={() => setAboutOpen(value => !value)}
+              style={({ pressed }) => [styles.roundButton, pressed && styles.controlPressed]}
+            >
+              <Text style={styles.roundButtonText}>i</Text>
+            </Pressable>
 
-            <View style={styles.topControls}>
-              <Pressable
-                testID="web-welcome-about"
-                accessibilityRole="button"
-                accessibilityLabel={aboutOpen ? "Close About Se'kret Bip" : "About Se'kret Bip"}
-                accessibilityState={{ expanded: aboutOpen }}
-                onPress={() => setAboutOpen(value => !value)}
-                style={({ pressed }) => [styles.roundButton, pressed && styles.controlPressed]}
+            <View
+              accessible
+              accessibilityLabel="Se'kret Bip"
+              style={styles.brandLockup}
+            >
+              <LinearGradient
+                colors={FRONT_DOOR_THEME.gradient.action}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.brandMark}
               >
-                <Text style={styles.roundButtonText}>i</Text>
-              </Pressable>
+                <Text style={styles.brandHeart}>♡</Text>
+              </LinearGradient>
+              <Text style={styles.wordmarkText}>SE’KRET BIP</Text>
+            </View>
 
-              <View
-                accessible={false}
-                importantForAccessibility="no-hide-descendants"
-                style={styles.decorativeSpark}
-              >
-                <Animated.Text style={[styles.decorativeSparkText, sparkMotionStyle]}>✦</Animated.Text>
-              </View>
+            <View
+              accessible={false}
+              importantForAccessibility="no-hide-descendants"
+              style={styles.sparkButton}
+            >
+              <Animated.Text style={[styles.decorativeSparkText, sparkMotionStyle]}>✦</Animated.Text>
             </View>
           </View>
 
@@ -332,11 +359,16 @@ export function WebWelcomeScreen({
             </View>
           )}
 
-          <View style={styles.copy}>
-            <Text testID="web-welcome-eyebrow" style={styles.eyebrow}>{copy.eyebrow}</Text>
-            <Text style={styles.title}>{copy.title}</Text>
-            <Text style={styles.lead}>{copy.lead}</Text>
-            <Text style={styles.subtitle}>{copy.subtitle}</Text>
+          <View style={[styles.copy, isBipJr && styles.copyBipJr]}>
+            <Text
+              testID="web-welcome-eyebrow"
+              style={[styles.eyebrow, isBipJr && styles.eyebrowBipJr]}
+            >
+              {copy.eyebrow}
+            </Text>
+            <Text style={[styles.title, isBipJr && styles.titleBipJr]}>{copy.title}</Text>
+            <Text style={[styles.lead, isBipJr && styles.leadBipJr]}>{copy.lead}</Text>
+            <Text style={[styles.subtitle, isBipJr && styles.subtitleBipJr]}>{copy.subtitle}</Text>
           </View>
 
           <View
@@ -356,7 +388,7 @@ export function WebWelcomeScreen({
               <Image
                 testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
                 source={copy.hero}
-                resizeMode={isBipJr ? 'contain' : 'cover'}
+                resizeMode="contain"
                 style={[styles.hero, isBipJr && styles.heroBipJr]}
                 accessibilityLabel={copy.heroLabel}
               />
@@ -367,7 +399,7 @@ export function WebWelcomeScreen({
             testID="web-welcome-world-cues"
             accessible
             accessibilityLabel={copy.cueLabel}
-            style={styles.worldCues}
+            style={[styles.worldCues, !isBipJr && styles.worldCuesTeen]}
           >
             {copy.cues.map(cue => (
               <View
@@ -382,7 +414,7 @@ export function WebWelcomeScreen({
             ))}
           </View>
 
-          <Text style={styles.handNote}>{copy.note}</Text>
+          <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
 
           <Pressable
             testID="web-welcome-enter"
@@ -472,7 +504,7 @@ const styles = StyleSheet.create({
     right: 42,
     color: color.lilacLight,
     fontSize: 34,
-    opacity: 0.72,
+    opacity: 0.36,
     textShadowColor: color.heroGlow,
     textShadowRadius: 18,
   },
@@ -482,7 +514,7 @@ const styles = StyleSheet.create({
     left: 28,
     color: color.pinkLight,
     fontSize: 22,
-    opacity: 0.68,
+    opacity: 0.48,
     textShadowColor: color.ambientPink,
     textShadowRadius: 16,
   },
@@ -492,7 +524,7 @@ const styles = StyleSheet.create({
     right: 34,
     color: color.textHigh,
     fontSize: 26,
-    opacity: 0.28,
+    opacity: 0.2,
     textShadowColor: color.heroGlow,
     textShadowRadius: 18,
   },
@@ -504,7 +536,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
     borderRadius: RADIUS.xxl + SPACE[2],
-    backgroundColor: color.shell,
+    backgroundColor: '#0D071E',
     boxShadow: FRONT_DOOR_THEME.shadow.shell as never,
   },
   shellCompact: {
@@ -512,12 +544,34 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.none,
     borderWidth: 0,
   },
+  gridLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    opacity: 0.22,
+  },
+  gridLineVertical: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(226,210,255,0.08)',
+  },
+  gridLineHorizontal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(226,210,255,0.08)',
+  },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: SPACE[6],
+    paddingBottom: SPACE[5],
   },
   topBar: {
-    minHeight: 70,
+    minHeight: 78,
     paddingHorizontal: SPACE[5],
     paddingTop: SPACE[4],
     paddingBottom: SPACE[2],
@@ -525,20 +579,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  wordmarkText: {
-    color: color.textHigh,
-    fontSize: TYPE.sm,
-    fontWeight: '900',
-    letterSpacing: 1.2,
-  },
-  topControls: {
+  brandLockup: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: SPACE[2],
   },
+  brandMark: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 6px 18px rgba(200,100,255,0.28)' as never,
+  },
+  brandHeart: {
+    color: color.textHigh,
+    fontSize: 19,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  wordmarkText: {
+    color: color.textHigh,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 3,
+  },
   roundButton: {
-    width: 40,
-    height: 40,
+    width: 42,
+    height: 42,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: color.border,
@@ -547,18 +616,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   roundButtonText: {
-    color: color.textMid,
-    fontSize: TYPE.sm,
-    fontWeight: TYPE.bold,
+    color: color.textHigh,
+    fontSize: TYPE.lg,
+    fontWeight: '500',
+    fontFamily: 'Georgia',
+  },
+  sparkButton: {
+    width: 42,
+    height: 42,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surfaceSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   controlPressed: {
     opacity: 0.72,
-  },
-  decorativeSpark: {
-    width: 28,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   decorativeSparkText: {
     color: color.pinkLight,
@@ -586,51 +660,96 @@ const styles = StyleSheet.create({
     marginTop: SPACE[1],
   },
   copy: {
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    paddingTop: SPACE[2],
+  },
+  copyBipJr: {
     alignItems: 'flex-start',
     paddingHorizontal: SPACE[5],
-    paddingTop: SPACE[2],
   },
   eyebrow: {
     color: color.eyebrow,
-    fontSize: TYPE.xs,
+    fontSize: 11,
+    lineHeight: 18,
     fontWeight: '800',
-    letterSpacing: 1.1,
+    letterSpacing: 2.3,
     textTransform: 'uppercase',
+    textAlign: 'center',
+  },
+  eyebrowBipJr: {
+    textAlign: 'left',
+    letterSpacing: 1.1,
   },
   title: {
     color: color.textHigh,
+    fontFamily: 'Georgia',
+    fontSize: 52,
+    lineHeight: 50,
+    fontWeight: '400',
+    letterSpacing: -2.2,
+    marginTop: SPACE[2],
+    maxWidth: 360,
+    textAlign: 'center',
+    textShadowColor: 'rgba(153,119,255,0.26)',
+    textShadowRadius: 24,
+  },
+  titleBipJr: {
+    fontFamily: undefined,
     fontSize: 36,
     lineHeight: 40,
     fontWeight: '900',
     letterSpacing: -1.2,
-    marginTop: SPACE[2],
-    maxWidth: 350,
+    textAlign: 'left',
   },
   lead: {
+    color: color.textMid,
+    fontSize: 15,
+    lineHeight: 23,
+    fontWeight: '400',
+    maxWidth: 346,
+    marginTop: SPACE[3],
+    textAlign: 'center',
+  },
+  leadBipJr: {
     color: color.lilacLight,
     fontSize: TYPE.xl,
     lineHeight: 28,
     fontWeight: '800',
     marginTop: SPACE[1],
+    textAlign: 'left',
   },
   subtitle: {
+    color: color.lilacLight,
+    fontSize: TYPE.sm,
+    lineHeight: 20,
+    fontWeight: '700',
+    maxWidth: 350,
+    marginTop: SPACE[2],
+    textAlign: 'center',
+  },
+  subtitleBipJr: {
     color: color.textMid,
     fontSize: TYPE.base,
     lineHeight: 22,
-    maxWidth: 350,
-    marginTop: SPACE[2],
+    fontWeight: '400',
+    textAlign: 'left',
   },
   heroWrap: {
-    marginHorizontal: SPACE[5],
-    marginTop: SPACE[4],
+    marginHorizontal: 0,
+    marginTop: SPACE[1],
     overflow: 'hidden',
     justifyContent: 'flex-end',
+    borderRadius: RADIUS.none,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  heroWrapBipJr: {
+    marginHorizontal: SPACE[5],
+    marginTop: SPACE[4],
     borderRadius: RADIUS.xxl,
     borderWidth: 1,
     borderColor: color.border,
-    backgroundColor: color.shellRaised,
-  },
-  heroWrapBipJr: {
     backgroundColor: color.shellRaised,
   },
   heroGlow: {
@@ -638,17 +757,20 @@ const styles = StyleSheet.create({
     width: 340,
     height: 340,
     left: '50%',
-    top: 35,
+    top: 20,
     marginLeft: -170,
     borderRadius: RADIUS.pill,
     backgroundColor: color.heroGlow,
   },
   hero: {
-    width: '100%',
+    width: '124%',
     height: '100%',
-    borderRadius: RADIUS.xxl,
+    alignSelf: 'center',
+    transform: [{ translateX: 26 }],
   },
   heroBipJr: {
+    width: '100%',
+    transform: [{ translateX: 0 }],
     borderRadius: RADIUS.xxl,
   },
   worldCues: {
@@ -660,13 +782,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACE[2],
   },
+  worldCuesTeen: {
+    opacity: 0.62,
+    marginTop: -SPACE[2],
+  },
   worldCue: {
-    minHeight: 36,
+    minHeight: 32,
     paddingHorizontal: SPACE[3],
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: color.border,
-    backgroundColor: color.surfaceSoft,
+    backgroundColor: 'rgba(255,255,255,0.035)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -688,6 +814,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: SPACE[3],
     paddingHorizontal: SPACE[5],
+  },
+  handNoteTeen: {
+    color: color.textLow,
+    fontSize: 10,
+    fontStyle: 'normal',
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    opacity: 0.72,
   },
   enterButton: {
     minHeight: 54,
