@@ -63,7 +63,7 @@ authorshipInference = not-supported
 ## Control Room workflow
 
 1. Open the existing founder Control Room.
-2. Choose the Redteam tab.
+2. Choose the quality tab.
 3. Select a persona.
 4. Paste an avatar draft.
 5. Review whether style markers form a real cluster.
