@@ -21,26 +21,32 @@ async function expectNoDocumentHorizontalOverflow(page: Page) {
   expect(Math.max(metrics.htmlScrollWidth, metrics.bodyScrollWidth)).toBeLessThanOrEqual(viewportWidth + 1);
 }
 
-test('caveman visual teaches the doorway, stays contained, then clears for interaction', async ({ page }) => {
+test('family photo blocking stays contained, then clears for interaction', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 320, height: 568 });
   await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
 
-  const primer = page.getByTestId('web-welcome-caveman-visual');
-  await expect(primer).toBeVisible({ timeout: 5_000 });
-  await expect(primer).toHaveAccessibleName('You. Your space. Enter.');
-  await expect(primer).toContainText('YOU');
-  await expect(primer).toContainText('YOUR SPACE');
-  await expect(primer).toContainText('ENTER');
+  const blocking = page.getByTestId('web-welcome-photo-blocking');
+  await expect(blocking).toBeVisible({ timeout: 5_000 });
 
-  const primerBox = await primer.boundingBox();
-  expect(primerBox).not.toBeNull();
-  expect(primerBox!.x).toBeGreaterThanOrEqual(0);
-  expect(primerBox!.x + primerBox!.width).toBeLessThanOrEqual(320);
+  for (const id of [
+    'web-welcome-stage-parents',
+    'web-welcome-stage-night',
+    'web-welcome-stage-suhana',
+    'web-welcome-stage-sy',
+    'web-welcome-stage-cloud',
+  ]) {
+    await expect(page.getByTestId(id)).toBeAttached();
+  }
+
+  const blockingBox = await blocking.boundingBox();
+  expect(blockingBox).not.toBeNull();
+  expect(blockingBox!.x).toBeGreaterThanOrEqual(0);
+  expect(blockingBox!.x + blockingBox!.width).toBeLessThanOrEqual(320);
   await expectNoDocumentHorizontalOverflow(page);
 
   await expect(page.getByTestId('web-welcome-scene-settled')).toBeAttached({ timeout: 5_000 });
-  await expect(primer).toHaveCount(0);
+  await expect(blocking).toHaveCount(0);
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible();
   await expectNoDocumentHorizontalOverflow(page);
 });
