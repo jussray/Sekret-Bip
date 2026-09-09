@@ -3,6 +3,9 @@
  * Density-based persona voice QA for avatar responses.
  * Style signals are not evidence of AI authorship and never block on one word,
  * phrase, punctuation mark, or rhetorical structure.
+ * Pattern catalog derived in part from humanizer v2.8.2 (blader/humanizer).
+ * Upstream copyright (c) 2025 Siqi Chen; MIT License.
+ * License: https://github.com/blader/humanizer/blob/main/LICENSE
  */
 export type AvatarPersona = 'redteam' | 'cool-cousin' | 'caveman' | 'hype-queen' | 'ghostwriter';
 export type PatternSeverity = 'strong' | 'soft';
@@ -93,6 +96,19 @@ interface PatternOccurrence {
   end: number;
 }
 
+interface SentenceSpan {
+  text: string;
+  start: number;
+  end: number;
+}
+
+const STACCATO_MAX_SENTENCE_LENGTH = 32;
+const CROSS_PATTERN_CLUSTER_WINDOW = 280;
+const SENTENCE_ABBREVIATIONS = [
+  'mr.', 'mrs.', 'ms.', 'dr.', 'prof.', 'sr.', 'jr.', 'st.', 'vs.', 'etc.',
+  'e.g.', 'i.e.', 'u.s.', 'u.k.',
+];
+
 const PATTERNS: PatternDef[] = [
   { id: 20, name: 'Chatbot artifacts', terms: [/\bgreat question\b/i, /\bof course[!,]/i, /\bcertainly[!,]/i, /\byou're absolutely right\b/i, /\bi hope this helps\b/i, /\blet me know if you need\b/i, /\bwould you like me to\b/i, /\bshould i continue\b/i, /\bhere is (an? )?(overview|summary|breakdown)\b/i, /\bwant me to give examples\b/i], strongFor: ALL_PERSONAS, softFor: [] },
   { id: 22, name: 'Sycophancy', terms: [/\bfascinating (question|point|perspective|insight)\b/i, /\bexcellent (question|point|observation)\b/i, /\bthat'?s a (great|fantastic|wonderful|brilliant) (point|question|observation)\b/i, /\bwhat an insightful\b/i, /\bthank you for sharing\b/i], strongFor: ALL_PERSONAS, softFor: [] },
@@ -102,7 +118,7 @@ const PATTERNS: PatternDef[] = [
   { id: 25, name: 'Vague positive conclusions', terms: [/\bthe future looks bright\b/i, /\bexciting times (lie ahead|ahead)\b/i, /\ba (major |big )?step in the right direction\b/i, /\bcontinues to thrive\b/i, /\bjourney toward excellence\b/i], strongFor: ALL_PERSONAS, softFor: [] },
   { id: 27, name: 'Authority tropes', terms: [/\bthe real question is\b/i, /\bat its core\b/i, /\bwhat really matters\b/i, /\bfundamentally[,. ]/i, /\bthe heart of the matter\b/i, /\bthe deeper issue\b/i], strongFor: ALL_PERSONAS, softFor: [] },
   { id: 7, name: 'Loaded vocabulary cluster', terms: [/\btapestry\b/i, /\blandscape\b/i, /\bdelve\b/i, /\bunderscore(s|d)?\b/i, /\bshowcase(s|d|ing)?\b/i, /\bvibrant\b/i, /\bpivotal\b/i, /\bintricate(ly|ies)?\b/i, /\bgarner(s|ed|ing)?\b/i, /\bfostering\b/i, /\benduring\b/i, /\btestament\b/i, /\binterplay\b/i], strongFor: ['redteam', 'caveman', 'hype-queen'], softFor: ['cool-cousin', 'ghostwriter'] },
-  { id: 31, name: 'Manufactured punchlines / staccato drama', terms: [/(?:\b[\w][\w ,']{0,30}[.!?]\s*){3,}/], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'], occurrenceMode: 'staccato-sentences' },
+  { id: 31, name: 'Manufactured punchlines / staccato drama', terms: [], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'], occurrenceMode: 'staccato-sentences' },
   { id: 32, name: 'Aphorism formulas', terms: [/\b\w+ is the \w+ of \w+\b/i, /\b\w+ becomes a trap\b/i, /\bis not a tool but\b/i, /\bthe language of\b/i, /\bthe currency of\b/i, /\bthe architecture of\b/i], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'] },
   { id: 33, name: 'Performative candor openers', terms: [/^honestly\?/im, /^look,/im, /^here'?s the thing[,:.]/im, /^the thing is[,:.]/im, /^let'?s be honest[,:.]/im, /^real talk[,:.]/im], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'] },
   { id: 24, name: 'Excessive hedging', terms: [/\bcould potentially possibly\b/i, /\bmight possibly\b/i, /\bit could be argued that\b/i, /\bone could argue\b/i, /\bsome might say\b/i], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'] },
@@ -131,21 +147,73 @@ function collectRegexOccurrences(text: string, regex: RegExp, patternId: number)
   return occurrences;
 }
 
-function expandStaccatoSentences(run: PatternOccurrence): PatternOccurrence[] {
-  const sentencePattern = /\b[\w][\w ,']{0,30}[.!?]/g;
-  const sentences: PatternOccurrence[] = [];
+function periodBelongsToAbbreviation(text: string, periodIndex: number): boolean {
+  const before = text.slice(Math.max(0, periodIndex - 12), periodIndex + 1).toLowerCase();
+  return SENTENCE_ABBREVIATIONS.some((abbreviation) => before.endsWith(abbreviation));
+}
 
-  for (const match of run.text.matchAll(sentencePattern)) {
-    if (match.index == null || match[0].length === 0) continue;
-    sentences.push({
-      patternId: run.patternId,
-      text: match[0],
-      start: run.start + match.index,
-      end: run.start + match.index + match[0].length,
-    });
+function isSentenceBoundary(text: string, index: number): boolean {
+  const character = text[index];
+  if (character !== '.' && character !== '!' && character !== '?') return false;
+
+  if (character === '.') {
+    const previous = text[index - 1] ?? '';
+    const next = text[index + 1] ?? '';
+    if (/\d/.test(previous) && /\d/.test(next)) return false;
+    if (periodBelongsToAbbreviation(text, index)) return false;
+  }
+
+  let lookahead = index + 1;
+  while (lookahead < text.length && /["'’”\)\]]/.test(text[lookahead])) lookahead += 1;
+  return lookahead >= text.length || /\s/.test(text[lookahead]);
+}
+
+function segmentSentenceSpans(text: string): SentenceSpan[] {
+  const sentences: SentenceSpan[] = [];
+  let sentenceStart = 0;
+
+  for (let index = 0; index < text.length; index += 1) {
+    if (!isSentenceBoundary(text, index)) continue;
+
+    let sentenceEnd = index + 1;
+    while (sentenceEnd < text.length && /["'’”\)\]]/.test(text[sentenceEnd])) sentenceEnd += 1;
+
+    const raw = text.slice(sentenceStart, sentenceEnd);
+    const leadingWhitespace = raw.search(/\S/);
+    if (leadingWhitespace >= 0) {
+      const start = sentenceStart + leadingWhitespace;
+      const sentenceText = text.slice(start, sentenceEnd).trimEnd();
+      sentences.push({ text: sentenceText, start, end: start + sentenceText.length });
+    }
+
+    sentenceStart = sentenceEnd;
+    while (sentenceStart < text.length && /\s/.test(text[sentenceStart])) sentenceStart += 1;
+    index = sentenceStart - 1;
   }
 
   return sentences;
+}
+
+function collectStaccatoOccurrences(text: string, patternId: number): PatternOccurrence[] {
+  const qualifying: PatternOccurrence[] = [];
+  let shortRun: PatternOccurrence[] = [];
+
+  const flushRun = () => {
+    if (shortRun.length >= 3) qualifying.push(...shortRun);
+    shortRun = [];
+  };
+
+  for (const sentence of segmentSentenceSpans(text)) {
+    const occurrence = { patternId, ...sentence };
+    if (sentence.text.length <= STACCATO_MAX_SENTENCE_LENGTH) {
+      shortRun.push(occurrence);
+    } else {
+      flushRun();
+    }
+  }
+
+  flushRun();
+  return qualifying;
 }
 
 function selectNonOverlappingOccurrences(occurrences: PatternOccurrence[]): PatternOccurrence[] {
@@ -171,6 +239,30 @@ function overlaps(left: PatternOccurrence, right: PatternOccurrence): boolean {
   return left.start < right.end && right.start < left.end;
 }
 
+function hasProximateCrossPatternCluster(occurrences: PatternOccurrence[]): boolean {
+  const sorted = [...occurrences].sort((left, right) => left.start - right.start || left.end - right.end);
+  const latestByPattern = new Map<number, PatternOccurrence>();
+
+  for (const current of sorted) {
+    for (const [patternId, previous] of latestByPattern) {
+      if (current.start - previous.end > CROSS_PATTERN_CLUSTER_WINDOW) {
+        latestByPattern.delete(patternId);
+        continue;
+      }
+      if (
+        patternId !== current.patternId
+        && !overlaps(previous, current)
+        && current.end - previous.start <= CROSS_PATTERN_CLUSTER_WINDOW
+      ) {
+        return true;
+      }
+    }
+    latestByPattern.set(current.patternId, current);
+  }
+
+  return false;
+}
+
 export function lintAvatarResponse(text: string, persona: AvatarPersona): LintResult {
   const hits: PatternHit[] = [];
   const independentOccurrences: PatternOccurrence[] = [];
@@ -180,11 +272,10 @@ export function lintAvatarResponse(text: string, persona: AvatarPersona): LintRe
     const isSoft = pattern.softFor.includes(persona);
     if (!isStrong && !isSoft) continue;
 
-    const rawOccurrences = pattern.terms.flatMap((regex) => collectRegexOccurrences(text, regex, pattern.id));
-    const expandedOccurrences = pattern.occurrenceMode === 'staccato-sentences'
-      ? rawOccurrences.flatMap(expandStaccatoSentences)
-      : rawOccurrences;
-    const patternOccurrences = selectNonOverlappingOccurrences(expandedOccurrences);
+    const rawOccurrences = pattern.occurrenceMode === 'staccato-sentences'
+      ? collectStaccatoOccurrences(text, pattern.id)
+      : pattern.terms.flatMap((regex) => collectRegexOccurrences(text, regex, pattern.id));
+    const patternOccurrences = selectNonOverlappingOccurrences(rawOccurrences);
 
     if (patternOccurrences.length > 0) {
       independentOccurrences.push(...patternOccurrences);
@@ -199,11 +290,9 @@ export function lintAvatarResponse(text: string, persona: AvatarPersona): LintRe
   }
 
   const repeatedPatternCluster = hits.some((hit) => hit.occurrences >= 3);
-  const crossPatternCluster = independentOccurrences.some((left, index) =>
-    independentOccurrences.slice(index + 1).some((right) =>
-      left.patternId !== right.patternId && !overlaps(left, right),
-    ),
-  );
+  const crossPatternCluster = repeatedPatternCluster
+    ? false
+    : hasProximateCrossPatternCluster(independentOccurrences);
   const clustered = repeatedPatternCluster || crossPatternCluster;
   const score = clustered
     ? hits.reduce((acc, hit) => acc + (hit.severity === 'strong' ? 2 : 1) * hit.occurrences, 0)
