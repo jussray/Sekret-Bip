@@ -83,6 +83,14 @@ interface PatternDef {
   terms: RegExp[];
   strongFor: AvatarPersona[];
   softFor: AvatarPersona[];
+  occurrenceMode?: 'staccato-sentences';
+}
+
+interface PatternOccurrence {
+  patternId: number;
+  text: string;
+  start: number;
+  end: number;
 }
 
 const PATTERNS: PatternDef[] = [
@@ -94,7 +102,7 @@ const PATTERNS: PatternDef[] = [
   { id: 25, name: 'Vague positive conclusions', terms: [/\bthe future looks bright\b/i, /\bexciting times (lie ahead|ahead)\b/i, /\ba (major |big )?step in the right direction\b/i, /\bcontinues to thrive\b/i, /\bjourney toward excellence\b/i], strongFor: ALL_PERSONAS, softFor: [] },
   { id: 27, name: 'Authority tropes', terms: [/\bthe real question is\b/i, /\bat its core\b/i, /\bwhat really matters\b/i, /\bfundamentally[,. ]/i, /\bthe heart of the matter\b/i, /\bthe deeper issue\b/i], strongFor: ALL_PERSONAS, softFor: [] },
   { id: 7, name: 'Loaded vocabulary cluster', terms: [/\btapestry\b/i, /\blandscape\b/i, /\bdelve\b/i, /\bunderscore(s|d)?\b/i, /\bshowcase(s|d|ing)?\b/i, /\bvibrant\b/i, /\bpivotal\b/i, /\bintricate(ly|ies)?\b/i, /\bgarner(s|ed|ing)?\b/i, /\bfostering\b/i, /\benduring\b/i, /\btestament\b/i, /\binterplay\b/i], strongFor: ['redteam', 'caveman', 'hype-queen'], softFor: ['cool-cousin', 'ghostwriter'] },
-  { id: 31, name: 'Manufactured punchlines / staccato drama', terms: [/(?:\b[\w][\w ,']{0,30}[.!?]\s*){3,}/], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'] },
+  { id: 31, name: 'Manufactured punchlines / staccato drama', terms: [/(?:\b[\w][\w ,']{0,30}[.!?]\s*){3,}/], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'], occurrenceMode: 'staccato-sentences' },
   { id: 32, name: 'Aphorism formulas', terms: [/\b\w+ is the \w+ of \w+\b/i, /\b\w+ becomes a trap\b/i, /\bis not a tool but\b/i, /\bthe language of\b/i, /\bthe currency of\b/i, /\bthe architecture of\b/i], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'] },
   { id: 33, name: 'Performative candor openers', terms: [/^honestly\?/im, /^look,/im, /^here'?s the thing[,:.]/im, /^the thing is[,:.]/im, /^let'?s be honest[,:.]/im, /^real talk[,:.]/im], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'] },
   { id: 24, name: 'Excessive hedging', terms: [/\bcould potentially possibly\b/i, /\bmight possibly\b/i, /\bit could be argued that\b/i, /\bone could argue\b/i, /\bsome might say\b/i], strongFor: ['redteam', 'caveman'], softFor: ['cool-cousin', 'hype-queen', 'ghostwriter'] },
@@ -105,32 +113,98 @@ const PATTERNS: PatternDef[] = [
   { id: 10, name: 'Repeated rule-of-three structure', terms: [/\b[\w-]+ [\w-]+, [\w-]+ [\w-]+, and [\w-]+ [\w-]+\b/], strongFor: ['redteam', 'caveman', 'hype-queen'], softFor: ['cool-cousin', 'ghostwriter'] },
 ];
 
+function collectRegexOccurrences(text: string, regex: RegExp, patternId: number): PatternOccurrence[] {
+  const flags = regex.flags.includes('g') ? regex.flags : `${regex.flags}g`;
+  const matcher = new RegExp(regex.source, flags);
+  const occurrences: PatternOccurrence[] = [];
+
+  for (const match of text.matchAll(matcher)) {
+    if (match.index == null || match[0].length === 0) continue;
+    occurrences.push({
+      patternId,
+      text: match[0],
+      start: match.index,
+      end: match.index + match[0].length,
+    });
+  }
+
+  return occurrences;
+}
+
+function expandStaccatoSentences(run: PatternOccurrence): PatternOccurrence[] {
+  const sentencePattern = /\b[\w][\w ,']{0,30}[.!?]/g;
+  const sentences: PatternOccurrence[] = [];
+
+  for (const match of run.text.matchAll(sentencePattern)) {
+    if (match.index == null || match[0].length === 0) continue;
+    sentences.push({
+      patternId: run.patternId,
+      text: match[0],
+      start: run.start + match.index,
+      end: run.start + match.index + match[0].length,
+    });
+  }
+
+  return sentences;
+}
+
+function selectNonOverlappingOccurrences(occurrences: PatternOccurrence[]): PatternOccurrence[] {
+  const unique = new Map<string, PatternOccurrence>();
+  for (const occurrence of occurrences) {
+    unique.set(`${occurrence.start}:${occurrence.end}`, occurrence);
+  }
+
+  const sorted = [...unique.values()].sort((left, right) => left.start - right.start || right.end - left.end);
+  const selected: PatternOccurrence[] = [];
+  let occupiedUntil = -1;
+
+  for (const occurrence of sorted) {
+    if (occurrence.start < occupiedUntil) continue;
+    selected.push(occurrence);
+    occupiedUntil = occurrence.end;
+  }
+
+  return selected;
+}
+
+function overlaps(left: PatternOccurrence, right: PatternOccurrence): boolean {
+  return left.start < right.end && right.start < left.end;
+}
+
 export function lintAvatarResponse(text: string, persona: AvatarPersona): LintResult {
   const hits: PatternHit[] = [];
+  const independentOccurrences: PatternOccurrence[] = [];
+
   for (const pattern of PATTERNS) {
     const isStrong = pattern.strongFor.includes(persona);
     const isSoft = pattern.softFor.includes(persona);
     if (!isStrong && !isSoft) continue;
 
-    const matches: string[] = [];
-    for (const regex of pattern.terms) {
-      const flags = regex.flags.includes('g') ? regex.flags : `${regex.flags}g`;
-      const found = text.match(new RegExp(regex.source, flags));
-      if (found) matches.push(...found);
-    }
-    if (matches.length > 0) {
+    const rawOccurrences = pattern.terms.flatMap((regex) => collectRegexOccurrences(text, regex, pattern.id));
+    const expandedOccurrences = pattern.occurrenceMode === 'staccato-sentences'
+      ? rawOccurrences.flatMap(expandStaccatoSentences)
+      : rawOccurrences;
+    const patternOccurrences = selectNonOverlappingOccurrences(expandedOccurrences);
+
+    if (patternOccurrences.length > 0) {
+      independentOccurrences.push(...patternOccurrences);
       hits.push({
         patternId: pattern.id,
         patternName: pattern.name,
         severity: isStrong ? 'strong' : 'soft',
-        matches: [...new Set(matches)].slice(0, 4),
-        occurrences: matches.length,
+        matches: patternOccurrences.map((occurrence) => occurrence.text).slice(0, 4),
+        occurrences: patternOccurrences.length,
       });
     }
   }
 
-  const totalOccurrences = hits.reduce((acc, hit) => acc + hit.occurrences, 0);
-  const clustered = hits.length >= 2 || totalOccurrences >= 3;
+  const repeatedPatternCluster = hits.some((hit) => hit.occurrences >= 3);
+  const crossPatternCluster = independentOccurrences.some((left, index) =>
+    independentOccurrences.slice(index + 1).some((right) =>
+      left.patternId !== right.patternId && !overlaps(left, right),
+    ),
+  );
+  const clustered = repeatedPatternCluster || crossPatternCluster;
   const score = clustered
     ? hits.reduce((acc, hit) => acc + (hit.severity === 'strong' ? 2 : 1) * hit.occurrences, 0)
     : 0;
