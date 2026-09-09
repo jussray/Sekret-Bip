@@ -163,7 +163,7 @@ test.describe('Founder Operator access boundary', () => {
     await expect(page.getByText(/Isolated style marker observed/i)).toBeVisible();
     await expect(page.getByText('Authorship inference: not-supported', { exact: true })).toBeVisible();
 
-    await draft.fill('Furthermore, moreover, the tapestry was robust and seamless.');
+    await draft.fill('The tapestry felt vibrant, pivotal, intricate, and enduring.');
     await expect(page.getByText(/Voice-density warning/i)).toBeVisible();
     await expect(page.getByText('Authorship inference: not-supported', { exact: true })).toBeVisible();
     expect(interceptedCount()).toBeGreaterThan(0);
