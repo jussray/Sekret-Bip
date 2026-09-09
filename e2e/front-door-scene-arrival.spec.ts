@@ -9,42 +9,57 @@ type MotionSample = {
   height: number;
 };
 
+type StageSamples = Record<string, MotionSample[]>;
+
+const STAGE_IDS = [
+  'web-welcome-stage-parents',
+  'web-welcome-stage-night',
+  'web-welcome-stage-suhana',
+  'web-welcome-stage-sy',
+  'web-welcome-stage-cloud',
+] as const;
+
 async function installArrivalSampler(page: import('@playwright/test').Page) {
-  await page.addInitScript(() => {
-    const samples: MotionSample[] = [];
-    Object.defineProperty(window, '__sekretSceneArrivalSamples', {
+  await page.addInitScript((stageIds: string[]) => {
+    const samples: Record<string, MotionSample[]> = Object.fromEntries(
+      stageIds.map(id => [id, []]),
+    );
+
+    Object.defineProperty(window, '__sekretPhotoBlockingSamples', {
       configurable: true,
       value: samples,
     });
 
     const capture = () => {
-      const scene = document.querySelector('[data-testid="web-welcome-scene-arrival"]');
-      if (scene instanceof HTMLElement) {
-        const style = getComputedStyle(scene);
-        const rect = scene.getBoundingClientRect();
-        samples.push({
-          opacity: Number.parseFloat(style.opacity),
-          transform: style.transform,
-          top: rect.top,
-          left: rect.left,
-          width: rect.width,
-          height: rect.height,
-        });
+      for (const id of stageIds) {
+        const node = document.querySelector(`[data-testid="${id}"]`);
+        if (node instanceof HTMLElement) {
+          const style = getComputedStyle(node);
+          const rect = node.getBoundingClientRect();
+          samples[id].push({
+            opacity: Number.parseFloat(style.opacity),
+            transform: style.transform,
+            top: rect.top,
+            left: rect.left,
+            width: rect.width,
+            height: rect.height,
+          });
+        }
       }
       window.requestAnimationFrame(capture);
     };
 
     window.requestAnimationFrame(capture);
-  });
+  }, [...STAGE_IDS]);
 }
 
-async function readSamples(page: import('@playwright/test').Page): Promise<MotionSample[]> {
+async function readSamples(page: import('@playwright/test').Page): Promise<StageSamples> {
   return page.evaluate(() => (
-    window as typeof window & { __sekretSceneArrivalSamples?: MotionSample[] }
-  ).__sekretSceneArrivalSamples ?? []);
+    window as typeof window & { __sekretPhotoBlockingSamples?: StageSamples }
+  ).__sekretPhotoBlockingSamples ?? {});
 }
 
-test('canonical teen front door enters as one scene, settles, and stays interactive', async ({ page }) => {
+test('canonical teen front door stages the family into photo positions, settles, and stays interactive', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 390, height: 844 });
   await installArrivalSampler(page);
@@ -63,17 +78,34 @@ test('canonical teen front door enters as one scene, settles, and stays interact
   const pointerEvents = await scene.evaluate(node => getComputedStyle(node).pointerEvents);
   expect(pointerEvents).not.toBe('none');
 
+  await expect(page.getByTestId('web-welcome-photo-blocking')).toBeVisible();
   await expect(page.getByTestId('web-welcome-scene-settled')).toHaveCount(1, { timeout: 5_000 });
-  await page.waitForTimeout(100);
+  await page.waitForTimeout(120);
 
   const samples = await readSamples(page);
-  expect(samples.length).toBeGreaterThan(5);
-  expect(samples.some(sample => sample.opacity < 0.95)).toBe(true);
-  expect(samples.some(sample => sample.transform !== 'none' && sample.transform !== 'matrix(1, 0, 0, 1, 0, 0)')).toBe(true);
 
-  const final = samples.at(-1);
-  expect(final).toBeTruthy();
-  expect(final!.opacity).toBeGreaterThanOrEqual(0.99);
+  for (const id of STAGE_IDS) {
+    const stageSamples = samples[id] ?? [];
+    expect(stageSamples.length, `${id} should be sampled while moving`).toBeGreaterThan(3);
+    expect(
+      new Set(stageSamples.map(sample => sample.transform)).size,
+      `${id} should change transform while taking its place`,
+    ).toBeGreaterThan(1);
+    expect(
+      stageSamples.some(sample => sample.opacity < 0.5),
+      `${id} should enter from a hidden/faded state`,
+    ).toBe(true);
+    expect(
+      stageSamples.some(sample => sample.opacity > 0.85),
+      `${id} should become clearly visible before the final photo`,
+    ).toBe(true);
+  }
+
+  await expect(page.getByTestId('web-welcome-photo-blocking')).toHaveCount(0);
+  await expect(hero).toBeVisible();
+
+  const visibleText = await page.locator('body').innerText();
+  expect(visibleText).not.toContain('Night · Suhana · Sy');
 
   const dimensions = await page.evaluate(() => ({
     scrollWidth: document.documentElement.scrollWidth,
@@ -82,31 +114,21 @@ test('canonical teen front door enters as one scene, settles, and stays interact
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
 });
 
-test('reduced motion renders the canonical scene settled from the first sampled frame', async ({ page }) => {
+test('reduced motion renders the finished canonical photo immediately without character staging', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 390, height: 844 });
   await installArrivalSampler(page);
 
   await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
 
-  const scene = page.getByTestId('web-welcome-scene-arrival');
-  await expect(scene).toBeVisible();
+  await expect(page.getByTestId('web-welcome-scene-arrival')).toBeVisible();
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible();
+  await expect(page.getByTestId('web-welcome-photo-blocking')).toHaveCount(0);
   await expect(page.getByTestId('web-welcome-scene-settled')).toHaveCount(1);
   await page.waitForTimeout(450);
 
   const samples = await readSamples(page);
-  expect(samples.length).toBeGreaterThan(2);
-
-  for (const key of ['top', 'left', 'width', 'height'] as const) {
-    const values = samples.map(sample => sample[key]);
-    expect(Math.max(...values) - Math.min(...values)).toBeLessThanOrEqual(0.5);
+  for (const id of STAGE_IDS) {
+    expect(samples[id] ?? []).toHaveLength(0);
   }
-
-  const opacities = samples.map(sample => sample.opacity);
-  expect(Math.max(...opacities) - Math.min(...opacities)).toBeLessThanOrEqual(0.001);
-  expect(Math.min(...opacities)).toBeGreaterThanOrEqual(0.99);
-
-  const transforms = new Set(samples.map(sample => sample.transform));
-  expect(transforms.size).toBe(1);
 });
