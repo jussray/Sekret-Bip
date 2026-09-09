@@ -15,6 +15,7 @@ const consent = read('app/(onboarding)/consent.tsx');
 const reflection = read('app/(onboarding)/reflection.tsx');
 const parentSetup = read('app/(onboarding)/parent-setup.tsx');
 const bootstrap = read('src/services/auth/postAuthBootstrap.ts');
+const founderAudit = read('src/services/founderAudit.ts');
 const ageAssurance = read('src/features/onboarding/ageAssurance.ts');
 const manifest = JSON.parse(read('.control-room/repository.manifest.json'));
 
@@ -78,7 +79,7 @@ test('profile hydration failure preserves auth and fails closed through onboardi
 });
 
 test('authorized founder login routes before public consent and onboarding gates', () => {
-  const founderLookupIndex = bootstrap.indexOf('const founderProfile = await getCurrentFounderProfile()');
+  const founderLookupIndex = bootstrap.indexOf('const founderProfile = await getCurrentFounderProfileForRouting()');
   const founderRouteIndex = bootstrap.indexOf("nextRoute: '/(dev)/control-room'");
   const profileHydrationIndex = bootstrap.indexOf('const profile = prehydratedProfile === undefined');
   const consentLoadIndex = bootstrap.indexOf('await consentService.load(user.id)');
@@ -89,6 +90,16 @@ test('authorized founder login routes before public consent and onboarding gates
   assert.ok(profileHydrationIndex > founderRouteIndex);
   assert.ok(consentLoadIndex > founderRouteIndex);
   assert.match(bootstrap, /requiredConsentsComplete: false/);
+});
+
+test('founder routing distinguishes lookup failure from a verified non-founder', () => {
+  assert.match(bootstrap, /getCurrentFounderProfileForRouting/);
+  assert.doesNotMatch(bootstrap, /const founderProfile = await getCurrentFounderProfile\(\)/);
+  assert.match(founderAudit, /export async function getCurrentFounderProfileForRouting/);
+  assert.match(founderAudit, /const \{ data: authData, error: authError \} = await sb\.auth\.getUser\(\)/);
+  assert.match(founderAudit, /if \(authError\) \{/);
+  assert.match(founderAudit, /if \(error\) \{/);
+  assert.match(founderAudit, /Signed in, but we could not verify your account access/);
 });
 
 test('required consent is explicit, persisted, and not inferred from navigation', () => {
