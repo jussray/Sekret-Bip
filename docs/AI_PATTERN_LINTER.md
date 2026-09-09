@@ -2,6 +2,10 @@
 
 Density-based persona voice-quality audit for Se'kret Bip avatars. The historical filename remains `AI_PATTERN_LINTER.md` for compatibility, but this system is **not an AI-authorship detector**.
 
+## Upstream provenance
+
+The pattern catalog is derived in part from **humanizer v2.8.2 (`blader/humanizer`)**, licensed under the MIT License. Upstream copyright: **Copyright (c) 2025 Siqi Chen**. The authoritative upstream license is retained by reference at `https://github.com/blader/humanizer/blob/main/LICENSE`, and the repository-level release attribution boundary is recorded in `THIRD_PARTY_NOTICES.md`.
+
 ## Core rule
 
 A word, phrase, punctuation mark, list structure, or rhetorical pattern is never treated as proof of AI authorship and never blocks a response by itself.
