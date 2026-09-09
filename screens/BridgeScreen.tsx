@@ -204,7 +204,8 @@ export function BridgeScreen({
   };
 
   const handleCreateBridgeSummary = () => {
-    setBridgeStatus('Bridge Summaries become available when you share a journal, check-in, or reflection with your Parent Window.');
+    setBridgeStatus('Opening Pages so you can choose what to share. Nothing is sent until you preview and confirm it there.');
+    setScreen('pages');
   };
 
   const handleRevokeBridgeSummary = async (requestId: string) => {
@@ -493,7 +494,7 @@ export function BridgeScreen({
           <View style={[styles.card, { backgroundColor: 'rgba(30,18,55,0.72)', borderColor: glow + '66' }]}>
             <Text style={[styles.cardLabel, { color: glow }]}>Parent-safe Bridge Summary</Text>
             <Text style={styles.noteText}>
-              Bridge Summaries become available when you share a journal, check-in, or reflection with your Parent Window.
+              Choose an existing journal, check-in, or reflection in Pages. You preview exactly what will be shared before anything can leave your private space.
             </Text>
             {!!bridgeStatus && <Text style={[styles.noteText, { color: '#cbb6f7' }]}>{bridgeStatus}</Text>}
             <TouchableOpacity
@@ -501,7 +502,7 @@ export function BridgeScreen({
               onPress={handleCreateBridgeSummary}
               disabled={sending}
             >
-              <Text style={[styles.seenBtnText, { color: glow }]}>summary sharing not ready here yet</Text>
+              <Text style={[styles.seenBtnText, { color: glow }]}>choose something in Pages →</Text>
             </TouchableOpacity>
           </View>
 

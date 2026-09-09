@@ -30,10 +30,12 @@ export type IssueSource =
   | 'supabase_advisor'
   | 'cloudflare_log'
   | 'founder_idea'
-  | 'manual';
+  | 'manual'
+  | 'user_report';
 
 export type IssueStatus =
   | 'open'
+  | 'reported'
   | 'investigating'
   | 'planned'
   | 'building'
@@ -79,6 +81,10 @@ export interface NormalizedIssue {
   metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  // 'unverified' = user-submitted (report_own_audit_event_issue), never
+  // independently confirmed; 'system' = derived from an audit_events row by
+  // upsert_control_room_issue; 'confirmed' = a founder has verified it.
+  trust_level: 'unverified' | 'system' | 'confirmed';
 }
 
 export interface IssueHistoryEntry {

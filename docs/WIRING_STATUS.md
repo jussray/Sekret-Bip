@@ -1,91 +1,22 @@
-# Se'kret Bip — Backend Wiring Status
+<!-- truth-mode: historical -->
+# Se’kret Bip — Backend Wiring Status
 
-Last reviewed: 2026-07-04
+> **Historical snapshot.** This former current-status document is retained so old links keep working. Its detailed prior contents remain preserved in Git history. Do not use it to determine current repository, provider, database, browser, issue, or device state.
 
-## Implemented
+For current structural contracts, use `README.md`, `docs/CURRENT_STATUS.md`, `DEPLOYMENT.md`, `docs/CLOUDFLARE_OWNERSHIP.md`, and the source code. For volatile state, resolve the owning system live and apply `docs/TRUTH_AUTHORITY.md`.
 
-- Supabase authentication and persisted sessions
-- Local-first AsyncStorage restore and cloud merge
-- Teen Circle and Parent Circle data flows
-- Bip Crew members, invites, connection states, and check-ins
-- Points snapshots and rewards infrastructure
-- Voice Bip recording, transcription, reply, and speech playback
-- Oracle profile/session persistence paths
-- Parent-link invites and redemption
-- Safety tables, triggers, alerts, and Edge Function scaffolding
-- Period-calendar synchronization
-- Explicit splash entry controls
-- Bridge signals and linked-account messages
-- Founder Control Room ingestion and release-health systems
+The durable wiring invariants are:
 
-## Current route model
+- Expo Router owns auth, onboarding, Teen, Parent, and founder/internal route groups.
+- Supabase owns Auth, Postgres, RLS, Storage, Edge Functions, and ordered migrations.
+- `supabase/migrations/` is the schema source of truth.
+- `api.sekretbip.net` is the stable public API origin and is currently configured by the repository to `sekret-backend`.
+- `sekret` is a founder-confirmed active companion API Worker lineage; its exact live provider routes/bindings must be read from Cloudflare rather than inferred from historical Wrangler names.
+- The durable purpose split is companion reply/voice/transcription execution on `sekret` and privileged Bridge/data/email/platform authority on `sekret-backend`.
+- The preferred migration keeps the client single-homed and uses a Cloudflare Service Binding from `sekret-backend` to `sekret` for `/api/sekret/*`; this is not live until provider and release evidence prove it.
+- `sekret-bip` is the canonical Cloudflare Pages project.
+- Shared typed frontend-to-companion contracts should remain the transport spine.
+- `SUPABASE_SERVICE_ROLE_KEY` belongs to the privileged platform boundary and must not be duplicated into the companion Worker for convenience.
+- Repository presence, deployment, live database state, production browser behavior, controlled-account behavior, and physical-device behavior are separate evidence classes.
 
-The app uses Expo Router route groups:
-
-- teen routes: `app/(teen)/`
-- parent routes: `app/(parent)/`
-
-Older references to `app/(main)/`, `app/parent/`, or a global string router are historical and should not be used for new work.
-
-## Database source of truth
-
-`supabase/migrations/` is the schema source of truth.
-
-Fresh projects should use:
-
-```bash
-npx supabase link --project-ref <project-ref>
-npx supabase db push
-```
-
-Do not rely on missing `0003_*` files or a separate full-bootstrap SQL file. Migration ordering must remain safe for an empty database.
-
-## Parent and Bridge status
-
-The linked-account data model is implemented, including parent links, Bridge signals, Bridge messages, and relationship-aware RLS.
-
-The parent product remains an enforced release gate. It is not production/demo-complete until issue #212 verifies:
-
-- canonical Parent Bridge tabs
-- parent splash and onboarding
-- pending, active, expired, revoked, and blocked states
-- Parent Circle privacy validation
-- Parent Coach memory boundaries
-- period-sharing permissions
-- minimal-content notifications
-- end-to-end relationship and privacy tests
-
-## Companion status
-
-Current companion maturity is L2:
-
-- unified reply payloads
-- short-term conversation history
-- supplied RoomMemory and Oracle context
-- metadata-only provider telemetry
-
-Durable semantic memory, persistent goals, scheduled reflection, and inter-companion coordination are not implemented and must not be demoed as complete. See `AGENT_L4_ARCHITECTURE.md`.
-
-## Deployment checks still required
-
-These are enforced release gates, not optional notes:
-
-- confirm current Cloudflare Worker and web deployment secrets
-- verify the safety-scan Edge Function is deployed in the active Supabase project
-- verify Worker CORS and authenticated request handling
-- verify fresh migration replay
-- run the repository validation scripts before release
-- resolve or formally document the `notification_deliveries` RLS scanner warning
-
-## Validation
-
-```bash
-npm run type-check
-npm test
-npm run test:device-sync
-npm run audit:control-room
-npm run validate:companions
-npm run verify:prepush
-```
-
-Do not mark a path complete merely because code exists. Completion requires the route, service, database policy, and tests to agree.
+Use Git history when a past wiring diagnosis or exact historical observation is needed.

@@ -1,0 +1,30 @@
+{
+  "$schema": "juss/sekret-bip-character-canon@v1",
+  "status": "canonical",
+  "authority": "character",
+  "source": {
+    "canva_design_id": "DAHTsB_iTGk",
+    "note": "Canonical fingerprint sheet. World/portal/ensemble images are forbidden as character authority."
+  },
+  "provider_compiler": {
+    "higgsfield": "Translate trigger to <<<higgsfield_element_id>>>. Do not assume a raw @trigger is a provider reference."
+  },
+  "characters": [
+    {"key":"night","display_name":"Night","role":"The Watcher","trigger":"@NIGHT_CANON","higgsfield_element_id":"25b76824-adb9-4cc6-803f-9d272ed8417b","age_lane":"teen","status":"approved"},
+    {"key":"suhana","display_name":"Suhana","role":"The Center","trigger":"@SUHANA_CANON","higgsfield_element_id":"b504054a-ee65-491e-aa37-0dccc740458c","age_lane":"teen","status":"approved"},
+    {"key":"sy","display_name":"Sy","role":"The Mind","trigger":"@SY_CANON","higgsfield_element_id":"d0705c8f-4941-47f3-9d00-cb6161f1c9d3","age_lane":"teen","status":"approved"},
+    {"key":"cloud","display_name":"Cloud","role":"The Calm","trigger":"@CLOUD_CANON","higgsfield_element_id":"45cc0133-5ad3-4182-90a5-4dca0d5b58fa","age_lane":"companion","status":"approved"},
+    {"key":"dad","display_name":"Dad","role":"The Guardian","trigger":"@DAD_GUARDIAN_CANON","higgsfield_element_id":"b7f88401-c66d-4b54-9460-94313b28e886","age_lane":"parent","status":"approved"},
+    {"key":"mom","display_name":"Mom","role":"The Heart","trigger":"@MOM_HEART_CANON","higgsfield_element_id":"e8d19172-ae3d-41d5-b42f-01666d322b9d","age_lane":"parent","status":"approved"},
+    {"key":"bipjr-spark","display_name":"Bip Jr. 1","role":"The Spark","trigger":"@BIPJR_SPARK","higgsfield_element_id":"663a9e85-30e8-409d-b408-846f4c73ab46","age_lane":"bip-jr","status":"approved"},
+    {"key":"bipjr-giggle","display_name":"Bip Jr. 2","role":"The Giggle","trigger":"@BIPJR_GIGGLE","higgsfield_element_id":"508d8676-c053-4ecd-942f-06030b6142ee","age_lane":"bip-jr","status":"approved"},
+    {"key":"bipjr-dreamer","display_name":"Bip Jr. 3","role":"The Dreamer","trigger":"@BIPJR_DREAMER","higgsfield_element_id":"cc4bc603-0250-4e99-b8f8-227dab2d93ea","age_lane":"bip-jr","status":"approved"},
+    {"key":"bipjr-explorer","display_name":"Bip Jr. 4","role":"The Explorer","trigger":"@BIPJR_EXPLORER","higgsfield_element_id":"5a9dfde6-11a0-4345-8e98-4bfffb743ec8","age_lane":"bip-jr","status":"approved"}
+  ],
+  "invariants": [
+    "World expression may vary; companion identity stays locked.",
+    "No random or substitute people may stand in for a canonical companion.",
+    "Ensemble posters and world images are not character authority.",
+    "Video generation is blocked until the exact cast passes a still-image canon check."
+  ]
+}

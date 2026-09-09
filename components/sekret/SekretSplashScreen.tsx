@@ -15,35 +15,35 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 // Teen splash  → the two teens (back-to-back, neon pink/purple, headphone cloud mascot)
 // Parent splash → the couple (candlelight, lanterns, warm purple neon)
 const SPLASH_ASSETS = {
-  teen: require('../../assets/images/A2EB8B5A-0109-4A02-927A-FA7080B5F501.png'),
-  parent: require('../../assets/images/parent-space-splash.png'),
+  teen: require('../../assets/images/splash-teen.jpeg'),
+  parent: require('../../assets/images/splash-parent.png'),
 } as const;
 
 // ─── Role-specific copy ──────────────────────────────────────────────────────
 const ROLE_CONFIG = {
   teen: {
-    tagline: 'Press Se\u2019kret Bip to enter your safe space',
-    ctaLabel: 'Se\u2019kret Bip \u2665',
+    tagline: 'Press Se’kret Bip to enter your safe space',
+    ctaLabel: 'Se’kret Bip ♥',
     quickActions: [
-      { icon: '\u270F\uFE0F', label: 'Write It Out' },
-      { icon: '\uD83C\uDFA4', label: 'Voice Bip' },
-      { icon: '\uD83D\uDCA7', label: 'Calm Me' },
-      { icon: '\uD83D\uDC65', label: 'Circle' },
+      { icon: '✏️', label: 'Write It Out' },
+      { icon: '🎤', label: 'Voice Bip' },
+      { icon: '💧', label: 'Calm Me' },
+      { icon: '👥', label: 'Circle' },
     ],
-    footer: 'your space. your voice. always you. \u2665',
+    footer: 'your space. your voice. always you. ♥',
     accentColor: '#FF3CA0',
     glowColor: 'rgba(255, 60, 160, 0.35)',
   },
   parent: {
-    tagline: 'Press Se\u2019kret Bip to enter your parent space',
-    ctaLabel: 'Se\u2019kret Bip \u2665',
+    tagline: 'Press Se’kret Bip to enter your parent space',
+    ctaLabel: 'Se’kret Bip ♥',
     quickActions: [
-      { icon: '\uD83D\uDCD6', label: 'Parent Pages' },
-      { icon: '\uD83C\uDFA4', label: 'Parent Voice' },
-      { icon: '\uD83C\uDF09', label: 'Bridge' },
-      { icon: '\uD83D\uDC65', label: 'Parent Circle' },
+      { icon: '📖', label: 'Parent Pages' },
+      { icon: '🎤', label: 'Parent Voice' },
+      { icon: '🌉', label: 'Bridge' },
+      { icon: '👥', label: 'Parent Circle' },
     ],
-    footer: 'better conversations start here. \u2665',
+    footer: 'better conversations start here. ♥',
     accentColor: '#9B59FF',
     glowColor: 'rgba(155, 89, 255, 0.35)',
   },
@@ -94,7 +94,7 @@ export default function SekretSplashScreen({ role, onEnter }: SekretSplashScreen
         source={SPLASH_ASSETS[role]}
         style={styles.artwork}
         resizeMode="cover"
-        accessibilityLabel={role === 'teen' ? 'Se\u2019kret Bip teen safe space' : 'Se\u2019kret Bip parent space'}
+        accessibilityLabel={role === 'teen' ? 'Se’kret Bip teen safe space' : 'Se’kret Bip parent space'}
       />
 
       {/* Dark gradient overlay so bottom text stays readable */}

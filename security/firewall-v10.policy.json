@@ -1,0 +1,116 @@
+{
+  "version": "10",
+  "name": "Se'kret Bip Founder Shield",
+  "repository": "jussray/Sekret-Bip",
+  "activationStage": "policy-ci-only",
+  "claims": {
+    "productionProtectionStatus": "not-verified",
+    "reason": "Repository CI can verify application auth, rate limiting, canonical-origin CORS, and response-header manifests, but live Cloudflare configuration, Security Events, deployed header behavior, and production credentials still require runtime evidence."
+  },
+  "cloudflare": {
+    "primaryHosts": ["sekretbip.net", "api.sekretbip.net"],
+    "activeWorker": "sekret-backend",
+    "retiredWorkersNoNewAuthority": ["bip-mail", "sekret"],
+    "edgeControls": {
+      "managedWaf": {
+        "target": true,
+        "targetMode": "log-then-block",
+        "desiredRuleFamilies": ["OWASP Core Rules", "Cloudflare Managed Rules", "Known bad bots"],
+        "enforcementStatus": "live-not-verified"
+      },
+      "apiShield": {
+        "targetSchemaValidation": "log-then-block",
+        "targetJwtValidation": "required-on-protected-api",
+        "sessionIdentifier": "Authorization",
+        "enforcementStatus": "live-not-verified"
+      },
+      "authenticatedOriginPulls": {
+        "target": true,
+        "enforcementStatus": "live-not-verified"
+      }
+    }
+  },
+  "controls": {
+    "rateLimiting": {
+      "implementationStatus": "repo-verified",
+      "liveBindingStatus": "not-verified",
+      "strategy": "per-user-then-client-ip",
+      "binding": "SEKRET_RATE_LIMITER",
+      "failureMode": "fail-closed-retryable",
+      "routes": [
+        { "match": "/api/sekret/reply", "limit": 60, "periodSeconds": 10 },
+        { "match": "/api/sekret/voice", "limit": 60, "periodSeconds": 10 },
+        { "match": "/api/sekret/transcribe", "limit": 60, "periodSeconds": 10 },
+        { "match": "/api/bridge/summary/generate", "limit": 60, "periodSeconds": 10 }
+      ]
+    },
+    "botDefense": {
+      "target": true,
+      "targetMode": "challenge-unknown-automation",
+      "allowVerifiedGoodBots": true,
+      "preserveHumanSignupAndLogin": true,
+      "enforcementStatus": "live-not-verified"
+    },
+    "auth": {
+      "implementationStatus": "repo-verified",
+      "liveConfigurationStatus": "not-verified",
+      "failClosed": true,
+      "signedInCredential": "supabase-jwt",
+      "guestCredential": "explicit-shared-token",
+      "tokenlessProductionAccess": "forbidden",
+      "privateRoutesRequireServerVerifiedSession": true,
+      "serverOnlySecrets": ["SUPABASE_SERVICE_ROLE_KEY", "RESEND_API_KEY", "GITHUB_WEBHOOK_SECRET", "CLOUDFLARE_API_TOKEN"],
+      "forbiddenClientSecrets": true
+    },
+    "cors": {
+      "implementationStatus": "repo-verified",
+      "liveEnforcementStatus": "not-verified",
+      "productionDefaultOrigins": ["https://sekretbip.net", "https://www.sekretbip.net"],
+      "wildcardOnlyInExplicitDevOpen": true,
+      "nativeRequestsWithoutOriginRemainSupported": true
+    },
+    "headers": {
+      "implementationStatus": "repo-verified",
+      "liveEnforcementStatus": "not-verified",
+      "liveVerificationRequired": true,
+      "targets": {
+        "csp": "narrow-frame-base-object-protection",
+        "hsts": "max-age-31536000-no-preload",
+        "xFrameOptions": "DENY",
+        "referrerPolicy": "strict-origin-when-cross-origin-pages-no-referrer-api",
+        "xContentTypeOptions": "nosniff"
+      }
+    },
+    "integrations": {
+      "githubWritesRequireExactHead": true,
+      "hubspotWritesRequireExplicitApproval": true,
+      "emailProviderRequiresDomainVerification": true,
+      "automationPublishAllowed": false,
+      "draftOnlyByDefault": true
+    },
+    "observability": {
+      "securityEventsRequiredBeforeBlockMode": true,
+      "logBlockedReason": true,
+      "noSilentNulls": true,
+      "retainRollbackEvidence": true
+    },
+    "productDesign": {
+      "blockedStateMustBeHumanReadable": true,
+      "doNotUseCAPTCHAOnFirstPassWhenChallengeWorks": true,
+      "legitimateUsersGetRecoveryPath": true,
+      "teenParentSignupMustStayUsable": true,
+      "noMisleadingConnectedOrProtectedClaims": true
+    }
+  },
+  "activationGates": {
+    "required": [
+      "repository-truth-green",
+      "founder-shield-green",
+      "product-design-playwright-green",
+      "cloudflare-live-config-verified",
+      "cloudflare-security-events-reviewed",
+      "guest-and-signed-in-production-smoke-green"
+    ],
+    "automaticBlockMode": false
+  }
+}

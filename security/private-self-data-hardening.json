@@ -1,0 +1,60 @@
+{
+  "migration": {
+    "version": "20260713230600",
+    "name": "harden_private_self_data_permanent_accounts",
+    "repositoryPath": "supabase/migrations/20260713230600_harden_private_self_data_permanent_accounts.sql",
+    "applied": true,
+    "verified": true,
+    "repositoryAndLiveMigrationParity": true
+  },
+  "scope": {
+    "tables": [
+      "public.comfort_sessions",
+      "public.room_memory"
+    ],
+    "risk": "Anonymous Supabase Auth sessions receive auth.uid() and previously satisfied legacy owner-only policies.",
+    "behaviorChanged": "Anonymous-authenticated sessions can no longer read or write these private tables.",
+    "behaviorPreserved": "Permanent authenticated owners retain select, insert, update, and delete access to their own rows."
+  },
+  "grants": {
+    "anonTablePrivileges": false,
+    "authenticatedCrudOnly": true,
+    "authenticatedTruncate": false,
+    "authenticatedReferences": false,
+    "authenticatedTrigger": false,
+    "serviceRoleChanged": false
+  },
+  "policies": {
+    "comfortSessionsPolicy": "comfort_sessions_permanent_owner_all",
+    "roomMemoryPolicy": "room_memory_permanent_owner_all",
+    "role": "authenticated",
+    "ownerCheck": true,
+    "permanentAccountGuard": "public.is_non_anonymous_user()",
+    "legacyOverlappingPoliciesRemoved": true
+  },
+  "liveProof": {
+    "probePath": "supabase/probes/authorization_private_self_data_phase1.sql",
+    "transactionOutcome": "rolled_back",
+    "passedChecks": 7,
+    "failedChecks": 0,
+    "syntheticUsersCreated": 0,
+    "syntheticRowsWrittenInsideTransaction": 2,
+    "productionDataRetained": false,
+    "userIdsOrPrivateContentReturned": false
+  },
+  "checks": {
+    "anonymousComfortWriteDenied": true,
+    "anonymousRoomMemoryWriteDenied": true,
+    "permanentComfortOwnerWriteAllowed": true,
+    "permanentRoomMemoryOwnerWriteAllowed": true,
+    "comfortTableGrantsLeastPrivilege": true,
+    "roomMemoryTableGrantsLeastPrivilege": true,
+    "singlePolicyContractInstalled": true
+  },
+  "advisor": {
+    "rerunCompleted": true,
+    "staticAnonymousRoleWarningsRemain": true,
+    "reason": "The Supabase advisor flags policies assigned to authenticated when anonymous Auth is enabled, but does not evaluate the explicit is_non_anonymous_user() predicate. The rollback-contained live probe is the authorization evidence.",
+    "remediationReference": "https://supabase.com/docs/guides/database/database-advisors?queryGroups=lint&lint=0012_auth_allow_anonymous_sign_ins"
+  }
+}

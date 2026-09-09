@@ -13,23 +13,27 @@ test('first launch collects identity before reflection', () => {
   assert.equal(identity.includes('/(onboarding)/reflection'), true);
 });
 
-test('onboarding completion writes one complete private profile', () => {
+test('onboarding completion writes one complete server-backed private profile', () => {
   const reflection = read('app/(onboarding)/reflection.tsx');
-  assert.equal(reflection.includes('teen_profile_done'), true);
-  assert.equal(reflection.includes('teen_profile_data'), true);
-  assert.equal(reflection.includes('bip_onboarding_gender'), true);
-  assert.equal(reflection.includes('bip_onboarding_companion'), true);
-  assert.equal(reflection.includes('...existing'), true);
+  assert.equal(reflection.includes('saveAccountProfile'), true);
+  assert.equal(reflection.includes("accountSide: 'teen'"), true);
+  assert.equal(reflection.includes('privateDisplayName'), true);
+  assert.equal(reflection.includes('ageRange'), true);
   assert.equal(reflection.includes('gender'), true);
-  assert.equal(reflection.includes('choice'), true);
+  assert.equal(reflection.includes('selectedCompanion'), true);
+  assert.equal(reflection.includes("circleNickname: 'anonymous bip'"), true);
+  assert.equal(reflection.includes("['teen_profile_done', 'true']"), false);
+  assert.equal(reflection.includes("['teen_profile_data'"), false);
 });
 
-test('unfinished teen routes redirect to onboarding', () => {
+test('unfinished teen routes use the durable account profile guard', () => {
   const layout = read('app/(teen)/_layout.tsx');
-  assert.equal(layout.includes('teen_profile_done'), true);
+  assert.equal(layout.includes("hydrateAccountProfile('teen')"), true);
   assert.equal(layout.includes('profileChecked'), true);
-  assert.equal(layout.includes('!profileDone'), true);
+  assert.equal(layout.includes('profileComplete'), true);
+  assert.match(layout, /profile\??\.accountSide === 'teen' && profile\.onboardingComplete/);
   assert.equal(layout.includes('/(onboarding)/welcome'), true);
+  assert.equal(layout.includes('AsyncStorage'), false);
 });
 
 test('editing identity does not silently replace the chosen companion', () => {

@@ -1,0 +1,198 @@
+name: Controlled Account Cloud Comfort Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/controlled-account-cloud-comfort.yml'
+      - 'playwright.controlled-account.config.ts'
+      - 'scripts/playwright-executable.mjs'
+      - 'e2e/controlled-account-cloud-comfort.spec.ts'
+      - 'test/controlled-account-cloud-comfort-gate.test.mjs'
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Exact deployed current-main SHA to verify'
+        required: true
+        type: string
+      confirm_controlled_account_use:
+        description: 'Allow one login-only proof with the controlled permanent account'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: controlled-account-cloud-comfort-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CI: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.target_sha || github.event.pull_request.head.sha }}
+  SEKRET_CONTROLLED_ACCOUNT_BASE_URL: https://sekretbip.net
+  PRODUCTION_RELEASE_URL: https://sekretbip.net/.well-known/sekret-release.json
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    name: Compile and lock controlled-account proof
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run controlled-account safety contract
+        run: node --test test/controlled-account-cloud-comfort-gate.test.mjs
+
+      - name: Run zero-error TypeScript
+        run: npm run type-check
+
+      - name: Compile and list controlled-account Playwright proof
+        env:
+          EXPECTED_HEAD_SHA: ${{ env.EXPECTED_HEAD_SHA }}
+        run: npx playwright test --config=playwright.controlled-account.config.ts --list
+
+  proof:
+    if: github.event_name == 'workflow_dispatch'
+    name: Exact-production authenticated Cloud and Comfort
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact requested head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Record and verify exact requested head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Require requested head to equal current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          current_main="$(git ls-remote origin refs/heads/main | awk '{print $1}')"
+          test -n "$current_main"
+          printf 'requested=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
+
+      - name: Verify canonical production serves exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const expected = process.env.EXPECTED_HEAD_SHA?.trim().toLowerCase();
+          const releaseUrl = process.env.PRODUCTION_RELEASE_URL;
+          if (!expected || !releaseUrl) throw new Error('Missing exact-production verification inputs.');
+
+          const deadline = Date.now() + 240_000;
+          let last = null;
+          while (Date.now() < deadline) {
+            try {
+              const response = await fetch(`${releaseUrl}?controlledProof=${Date.now()}`, {
+                cache: 'no-store',
+                headers: { 'cache-control': 'no-cache, no-store, max-age=0' },
+              });
+              const body = response.ok ? await response.json() : null;
+              last = {
+                status: response.status,
+                commitSha: body?.commitSha ?? null,
+                environment: body?.environment ?? null,
+                branch: body?.branch ?? null,
+              };
+              if (
+                response.ok &&
+                String(body?.commitSha ?? '').toLowerCase() === expected &&
+                body?.environment === 'production' &&
+                body?.branch === 'main'
+              ) {
+                console.log(`Canonical production verified at exact current main ${expected}.`);
+                process.exit(0);
+              }
+            } catch (error) {
+              last = { error: error instanceof Error ? error.message : String(error) };
+            }
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
+          throw new Error(`Canonical production did not reach exact current main ${expected}: ${JSON.stringify(last)}`);
+          NODE
+
+      - name: Require explicit controlled-account authority
+        shell: bash
+        env:
+          CONFIRM_CONTROLLED_ACCOUNT_USE: ${{ inputs.confirm_controlled_account_use }}
+          CONTROLLED_EMAIL: ${{ secrets.SEKRET_CONTROLLED_ACCOUNT_EMAIL }}
+          CONTROLLED_PASSWORD: ${{ secrets.SEKRET_CONTROLLED_ACCOUNT_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM_CONTROLLED_ACCOUNT_USE" = 'true' || {
+            echo '::error::Controlled account proof requires confirm_controlled_account_use=true.'
+            exit 1
+          }
+          test -n "$CONTROLLED_EMAIL" || {
+            echo '::error::Missing SEKRET_CONTROLLED_ACCOUNT_EMAIL repository secret.'
+            exit 1
+          }
+          test -n "$CONTROLLED_PASSWORD" || {
+            echo '::error::Missing SEKRET_CONTROLLED_ACCOUNT_PASSWORD repository secret.'
+            exit 1
+          }
+          echo 'Controlled account authority and masked credentials are present.'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove authenticated Cloud and Comfort without private content
+        env:
+          SEKRET_CONTROLLED_ACCOUNT_EMAIL: ${{ secrets.SEKRET_CONTROLLED_ACCOUNT_EMAIL }}
+          SEKRET_CONTROLLED_ACCOUNT_PASSWORD: ${{ secrets.SEKRET_CONTROLLED_ACCOUNT_PASSWORD }}
+        run: npx playwright test --config=playwright.controlled-account.config.ts
+
+      - name: Upload sanitized controlled-account receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: controlled-account-cloud-comfort-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/controlled-account-cloud-comfort.json
+          if-no-files-found: warn
+          retention-days: 14

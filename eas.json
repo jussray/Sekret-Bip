@@ -10,7 +10,7 @@
       "env": {
         "APP_VARIANT": "teen",
         "EXPO_PUBLIC_APP_VARIANT": "teen",
-        "EXPO_PUBLIC_BACKEND_URL": "https://bip.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       },
       "ios": {
         "simulator": true,
@@ -23,7 +23,7 @@
       "env": {
         "APP_VARIANT": "parent",
         "EXPO_PUBLIC_APP_VARIANT": "parent",
-        "EXPO_PUBLIC_BACKEND_URL": "https://bip.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       },
       "ios": {
         "simulator": true,
@@ -38,7 +38,8 @@
       "env": {
         "APP_VARIANT": "teen",
         "EXPO_PUBLIC_APP_VARIANT": "teen",
-        "EXPO_PUBLIC_BACKEND_URL": "https://bip.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "beta",
+        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend-alpha.mcgill-raylene.workers.dev"
       }
     },
     "parent-preview": {
@@ -49,7 +50,8 @@
       "env": {
         "APP_VARIANT": "parent",
         "EXPO_PUBLIC_APP_VARIANT": "parent",
-        "EXPO_PUBLIC_BACKEND_URL": "https://bip.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "beta",
+        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend-alpha.mcgill-raylene.workers.dev"
       }
     },
     "production": {
@@ -60,7 +62,8 @@
       "env": {
         "APP_VARIANT": "teen",
         "EXPO_PUBLIC_APP_VARIANT": "teen",
-        "EXPO_PUBLIC_BACKEND_URL": "https://bip.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "public",
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       }
     },
     "parent-production": {
@@ -71,7 +74,8 @@
       "env": {
         "APP_VARIANT": "parent",
         "EXPO_PUBLIC_APP_VARIANT": "parent",
-        "EXPO_PUBLIC_BACKEND_URL": "https://bip.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "public",
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       }
     }
   }

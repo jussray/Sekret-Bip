@@ -1,10 +1,7 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -12,6 +9,10 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   lint:
@@ -21,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm run lint
@@ -33,7 +34,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm run type-check
@@ -45,7 +46,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm test
@@ -59,10 +60,27 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
-      - run: npm run verify:bundle
+      - name: Export Expo web bundle
+        id: bundle
+        shell: bash
+        run: |
+          set +e
+          npm run verify:bundle > expo-bundle.log 2>&1
+          status=$?
+          set -e
+          tail -n 160 expo-bundle.log
+          exit "$status"
+      - name: Upload Expo bundle diagnostics
+        if: failure() && steps.bundle.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-bundle-diagnostics
+          path: expo-bundle.log
+          retention-days: 7
+          if-no-files-found: error
 
   audit:
     name: Control Room audits
@@ -71,7 +89,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
       - run: npm ci
       - run: npm run audit:runtime-assets
@@ -98,3 +116,31 @@ jobs:
           name: supabase-advisors-report
           path: artifacts/control-room/supabase-advisors-report.json
           if-no-files-found: warn
+
+  route-failure:
+    name: Route failure to Founder Control Room
+    needs: [lint, type-check, test, build, audit]
+    if: ${{ always() && (needs.lint.result != 'success' || needs.type-check.result != 'success' || needs.test.result != 'success' || needs.build.result != 'success' || needs.audit.result != 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Capture exact failed run in Founder Control Room
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONTROL_ROOM_GITHUB_RUN_ID: ${{ github.run_id }}
+          CONTROL_ROOM_GITHUB_HEAD_SHA: ${{ github.sha }}
+        run: node scripts/control-room-ingest-github-failures.mjs
+      - name: Upload Founder Control Room GitHub failure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-control-room-github-failure-${{ github.run_id }}
+          path: reports/control-room/github-failures-latest.json
+          retention-days: 14
+          if-no-files-found: error

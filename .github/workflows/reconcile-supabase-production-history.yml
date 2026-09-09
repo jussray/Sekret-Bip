@@ -1,0 +1,376 @@
+name: Reconcile Supabase Production Migration History
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Exact current-main commit SHA that owns the reconciliation plan'
+        required: true
+        type: string
+      confirm_project:
+        description: 'Type the production Supabase project ref to confirm the target'
+        required: true
+        type: string
+      reconciliation_confirmation:
+        description: 'Type RECONCILE SIX SECURITY RECEIPT ALIASES'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  SUPABASE_PROJECT_REF: tbsevonvegdnlyjgplmm
+  SUPABASE_POOLER_HOST: aws-1-us-east-1.pooler.supabase.com
+
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  reconcile-history:
+    name: Reconcile six production security receipt aliases
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Validate dispatch intent
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          CONFIRM_PROJECT: ${{ inputs.confirm_project }}
+          RECONCILIATION_CONFIRMATION: ${{ inputs.reconciliation_confirmation }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo 'target_sha must be a full 40-character commit SHA.' >&2
+            exit 1
+          }
+          test "$CONFIRM_PROJECT" = "$SUPABASE_PROJECT_REF" || {
+            echo 'Production project confirmation does not match the repository-owned project ref.' >&2
+            exit 1
+          }
+          test "$RECONCILIATION_CONFIRMATION" = 'RECONCILE SIX SECURITY RECEIPT ALIASES' || {
+            echo 'Reconciliation confirmation is missing or incorrect.' >&2
+            exit 1
+          }
+
+      - name: Check out exact target
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact target is current main
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$TARGET_SHA"
+          git fetch --no-tags --depth=1 origin main
+          current_main="$(git rev-parse FETCH_HEAD)"
+          printf 'requested=%s\nactual=%s\ncurrent_main=%s\n' "$TARGET_SHA" "$actual" "$current_main"
+          test "$TARGET_SHA" = "$current_main" || {
+            echo 'Refusing production history reconciliation from a SHA that is no longer current main.' >&2
+            exit 1
+          }
+
+      - name: Validate exact repository reconciliation plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node scripts/verify-supabase-history-reconciliation-plan.mjs | tee artifacts/supabase-history-reconciliation-plan.json
+          node --input-type=module <<'NODE'
+          import {
+            PRODUCTION_HISTORY_RECONCILIATION_PLAN,
+            PRODUCTION_SECURITY_APPLY_RECEIPTS,
+            PENDING_SECURITY_MIGRATIONS,
+          } from './scripts/verify-supabase-history-reconciliation-plan.mjs';
+
+          const expectedBaseline = [
+            ['20260723203050', '20260718035000'],
+            ['20260723203116', '20260718035500'],
+            ['20260820214601', '20260820211200'],
+            ['20260821073219', '20260821071500'],
+            ['20260826065736', '20260824223800'],
+          ];
+          const actualBaseline = PRODUCTION_HISTORY_RECONCILIATION_PLAN.map(
+            ({ liveVersion, canonicalVersion }) => [liveVersion, canonicalVersion],
+          );
+          if (JSON.stringify(actualBaseline) !== JSON.stringify(expectedBaseline)) {
+            throw new Error('Exact five-pair reconciled baseline changed.');
+          }
+
+          const expectedSecurityReceipts = [
+            ['20260905233953', '20260826012500'],
+            ['20260905234133', '20260827060000'],
+            ['20260905234009', '20260827061000'],
+            ['20260905234019', '20260827062000'],
+            ['20260905234039', '20260827063000'],
+            ['20260905234048', '20260831233000'],
+          ];
+          const actualSecurityReceipts = PRODUCTION_SECURITY_APPLY_RECEIPTS.map(
+            ({ liveVersion, canonicalVersion }) => [liveVersion, canonicalVersion],
+          );
+          if (JSON.stringify(actualSecurityReceipts) !== JSON.stringify(expectedSecurityReceipts)) {
+            throw new Error('Exact six security receipt alias plan changed.');
+          }
+
+          if (PENDING_SECURITY_MIGRATIONS.length !== 0) {
+            throw new Error('History reconciliation requires zero pending production security migrations; completed security applies must be receipt-bound before history-only repair.');
+          }
+          NODE
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1
+        with:
+          version: 2.113.0
+
+      - name: Build masked production session-pooler URL
+        shell: bash
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_PASSWORD" || {
+            echo 'SUPABASE_DB_PASSWORD is not configured for this workflow.' >&2
+            exit 1
+          }
+          encoded_password="$(python3 - <<'PY'
+          import os
+          import urllib.parse
+          print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
+          PY
+          )"
+          db_url="postgresql://postgres.${SUPABASE_PROJECT_REF}:${encoded_password}@${SUPABASE_POOLER_HOST}:5432/postgres"
+          echo "::add-mask::$encoded_password"
+          echo "::add-mask::$db_url"
+          printf 'SUPABASE_DB_URL=%s\n' "$db_url" >> "$GITHUB_ENV"
+
+      - name: Capture and classify migration history before mutation
+        id: history_state
+        shell: bash
+        env:
+          NO_COLOR: '1'
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          supabase migration list --db-url "$SUPABASE_DB_URL" 2>&1 | tee artifacts/supabase-migration-list-before-reconciliation.txt
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          text = re.sub(r'\x1b\[[0-9;]*m', '', Path('artifacts/supabase-migration-list-before-reconciliation.txt').read_text())
+          local, remote = set(), set()
+          for line in text.splitlines():
+              if '│' not in line:
+                  continue
+              cols = [part.strip() for part in line.split('│')]
+              if len(cols) < 2:
+                  continue
+              if re.fullmatch(r'\d{14}', cols[0] or ''):
+                  local.add(cols[0])
+              if re.fullmatch(r'\d{14}', cols[1] or ''):
+                  remote.add(cols[1])
+
+          baseline_pairs = [
+              ('20260723203050', '20260718035000'),
+              ('20260723203116', '20260718035500'),
+              ('20260820214601', '20260820211200'),
+              ('20260821073219', '20260821071500'),
+              ('20260826065736', '20260824223800'),
+          ]
+          security_pairs = [
+              ('20260905233953', '20260826012500'),
+              ('20260905234133', '20260827060000'),
+              ('20260905234009', '20260827061000'),
+              ('20260905234019', '20260827062000'),
+              ('20260905234039', '20260827063000'),
+              ('20260905234048', '20260831233000'),
+          ]
+
+          all_canonical = {canonical for _, canonical in [*baseline_pairs, *security_pairs]}
+          missing_local = all_canonical - local
+          if missing_local:
+              raise SystemExit(f'Canonical migrations missing from exact repository target: {sorted(missing_local)}')
+
+          baseline_live = {live for live, _ in baseline_pairs}
+          baseline_canonical = {canonical for _, canonical in baseline_pairs}
+          baseline_live_remote = baseline_live & remote
+          baseline_canonical_remote = baseline_canonical & remote
+          if baseline_live_remote or baseline_canonical_remote != baseline_canonical:
+              raise SystemExit(
+                  'Previously reconciled five-pair production baseline is not clean; refusing six-receipt mutation. '
+                  f'live_aliases_present={sorted(baseline_live_remote)} canonical_present={sorted(baseline_canonical_remote)}'
+              )
+
+          security_live = {live for live, _ in security_pairs}
+          security_canonical = {canonical for _, canonical in security_pairs}
+          security_live_remote = security_live & remote
+          security_canonical_remote = security_canonical & remote
+          if security_live_remote == security_live and not security_canonical_remote:
+              mode = 'needs-reconciliation'
+          elif not security_live_remote and security_canonical_remote == security_canonical:
+              mode = 'already-reconciled'
+          else:
+              raise SystemExit(
+                  'Production security receipt history is mixed or ambiguous; refusing mutation. '
+                  f'live_aliases_present={sorted(security_live_remote)} canonical_present={sorted(security_canonical_remote)}'
+              )
+
+          evidence = {
+              'mode': mode,
+              'baselineLiveAliasCount': len(baseline_live_remote),
+              'baselineCanonicalCount': len(baseline_canonical_remote),
+              'securityLiveAliasCount': len(security_live_remote),
+              'securityCanonicalCount': len(security_canonical_remote),
+              'verifiedReconciledFivePairBaseline': True,
+              'verifiedExactSixSecurityReceiptShape': True,
+          }
+          Path('artifacts/supabase-history-precondition-state.json').write_text(json.dumps(evidence, indent=2) + '\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'mode={mode}\n')
+          print(f'HISTORY_RECONCILIATION_MODE={mode}')
+          PY
+
+      - name: Record already-reconciled no-op path
+        if: steps.history_state.outputs.mode == 'already-reconciled'
+        shell: bash
+        run: |
+          {
+            echo '## Supabase production security receipt history already reconciled'
+            echo
+            echo '- Mutation: none'
+            echo '- Next action: re-observe exact post-state and run db push dry-run proof'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Re-verify current main immediately before history mutation
+        if: steps.history_state.outputs.mode == 'needs-reconciliation'
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          current_main="$(git rev-parse FETCH_HEAD)"
+          printf 'mutation_target=%s\ncurrent_main=%s\n' "$TARGET_SHA" "$current_main"
+          test "$TARGET_SHA" = "$current_main" || {
+            echo 'Main advanced after pre-mutation proof; refusing production history reconciliation.' >&2
+            exit 1
+          }
+
+      - name: Mark canonical security receipt versions applied
+        if: steps.history_state.outputs.mode == 'needs-reconciliation'
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration repair \
+            20260826012500 \
+            20260827060000 \
+            20260827061000 \
+            20260827062000 \
+            20260827063000 \
+            20260831233000 \
+            --status applied --db-url "$SUPABASE_DB_URL" 2>&1 | tee artifacts/supabase-history-canonical-applied.txt
+
+      - name: Capture migration history after canonical markers
+        if: steps.history_state.outputs.mode == 'needs-reconciliation'
+        shell: bash
+        env:
+          NO_COLOR: '1'
+        run: |
+          set -euo pipefail
+          supabase migration list --db-url "$SUPABASE_DB_URL" 2>&1 | tee artifacts/supabase-migration-list-mid-reconciliation.txt
+
+      - name: Retire receipted live aliases
+        if: steps.history_state.outputs.mode == 'needs-reconciliation'
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase migration repair \
+            20260905233953 \
+            20260905234133 \
+            20260905234009 \
+            20260905234019 \
+            20260905234039 \
+            20260905234048 \
+            --status reverted --db-url "$SUPABASE_DB_URL" 2>&1 | tee artifacts/supabase-history-live-reverted.txt
+
+      - name: Re-verify current main before final history proof
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          current_main="$(git rev-parse FETCH_HEAD)"
+          printf 'proof_target=%s\ncurrent_main=%s\n' "$TARGET_SHA" "$current_main"
+          test "$TARGET_SHA" = "$current_main" || {
+            echo 'Main advanced before final production history proof; refusing stale success evidence.' >&2
+            exit 1
+          }
+
+      - name: Verify exact post-reconciliation migration history
+        shell: bash
+        env:
+          NO_COLOR: '1'
+        run: |
+          set -euo pipefail
+          supabase migration list --db-url "$SUPABASE_DB_URL" 2>&1 | tee artifacts/supabase-migration-list-after-reconciliation.txt
+          python3 - <<'PY'
+          import re
+          from pathlib import Path
+
+          text = re.sub(r'\x1b\[[0-9;]*m', '', Path('artifacts/supabase-migration-list-after-reconciliation.txt').read_text())
+          remote = set()
+          for line in text.splitlines():
+              if '│' not in line:
+                  continue
+              cols = [part.strip() for part in line.split('│')]
+              if len(cols) >= 2 and re.fullmatch(r'\d{14}', cols[1] or ''):
+                  remote.add(cols[1])
+
+          baseline_live = {'20260723203050','20260723203116','20260820214601','20260821073219','20260826065736'}
+          baseline_canonical = {'20260718035000','20260718035500','20260820211200','20260821071500','20260824223800'}
+          security_live = {'20260905233953','20260905234133','20260905234009','20260905234019','20260905234039','20260905234048'}
+          security_canonical = {'20260826012500','20260827060000','20260827061000','20260827062000','20260827063000','20260831233000'}
+
+          missing = (baseline_canonical | security_canonical) - remote
+          stale = (baseline_live | security_live) & remote
+          if missing:
+              raise SystemExit(f'Canonical migration markers still missing remotely: {sorted(missing)}')
+          if stale:
+              raise SystemExit(f'Historical aliases still present remotely: {sorted(stale)}')
+          PY
+
+      - name: Prove db push no longer fails on remote-only aliases
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase db push --db-url "$SUPABASE_DB_URL" --dry-run 2>&1 | tee artifacts/supabase-db-push-after-history-reconciliation.txt
+          ! grep -q 'Remote migration versions not found in local migrations directory' artifacts/supabase-db-push-after-history-reconciliation.txt
+
+      - name: Retain reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: supabase-production-history-reconciliation-${{ inputs.target_sha }}
+          path: |
+            artifacts/supabase-history-reconciliation-plan.json
+            artifacts/supabase-history-precondition-state.json
+            artifacts/supabase-migration-list-before-reconciliation.txt
+            artifacts/supabase-history-canonical-applied.txt
+            artifacts/supabase-migration-list-mid-reconciliation.txt
+            artifacts/supabase-history-live-reverted.txt
+            artifacts/supabase-migration-list-after-reconciliation.txt
+            artifacts/supabase-db-push-after-history-reconciliation.txt
+          if-no-files-found: warn
+          retention-days: 30

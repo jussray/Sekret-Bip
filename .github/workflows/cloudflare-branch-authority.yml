@@ -1,0 +1,92 @@
+name: Audit Cloudflare Worker and Pages Branch Authority
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-worker-branch-authority
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EVIDENCE_PATH: artifacts/cloudflare-worker-branch-authority.json
+  PAGES_EVIDENCE_PATH: artifacts/cloudflare-pages-branch-authority.json
+
+jobs:
+  audit:
+    name: Audit current three-Worker and one-Pages authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify exact current main before provider credential use
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main"
+          current_main="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          test -n "$current_main"
+          test "$GITHUB_SHA" = "$current_main"
+
+      - name: Check out exact current main without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up Node for Cloudflare authority verifier
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+
+      # CLOUDFLARE_API_TOKEN is intentionally excluded from both dedicated
+      # authority lanes. A missing or under-scoped dedicated token must fail
+      # explicitly instead of falling through to a broader general credential.
+      - name: Read current three-Worker topology and verify Worker build authority
+        id: workers_audit
+        continue-on-error: true
+        shell: bash
+        env:
+          CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          node scripts/verify-cloudflare-worker-branch-authority.mjs
+
+      - name: Read and verify Pages branch authority with dedicated read-only credential
+        id: pages_audit
+        continue-on-error: true
+        env:
+          CLOUDFLARE_PAGES_READ_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_READ_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: sekret-bip
+          CLOUDFLARE_PAGES_PRODUCTION_BRANCH: main
+        run: node scripts/verify-cloudflare-pages-branch-authority.mjs --output "$PAGES_EVIDENCE_PATH"
+
+      - name: Require both independent provider readbacks
+        if: always()
+        shell: bash
+        env:
+          WORKERS_AUDIT_OUTCOME: ${{ steps.workers_audit.outcome }}
+          PAGES_AUDIT_OUTCOME: ${{ steps.pages_audit.outcome }}
+        run: |
+          set -euo pipefail
+          printf 'workers=%s\npages=%s\n' "$WORKERS_AUDIT_OUTCOME" "$PAGES_AUDIT_OUTCOME"
+          test "$WORKERS_AUDIT_OUTCOME" = "success"
+          test "$PAGES_AUDIT_OUTCOME" = "success"
+
+      - name: Upload Cloudflare branch-authority evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-branch-authority-${{ github.sha }}
+          path: |
+            ${{ env.EVIDENCE_PATH }}
+            ${{ env.PAGES_EVIDENCE_PATH }}
+          if-no-files-found: error
+          retention-days: 30

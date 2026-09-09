@@ -35,6 +35,7 @@ import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
 import { fetchSekretReply, fetchSekretVoice, fetchSekretTranscribe } from '../utils/api';
 import { useVoiceBipIntelligence } from '../hooks/useVoiceBipIntelligence';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 import type { OracleJournalEntry } from '../types/voiceIntelligence';
 import type { OracleProfile, OracleSide } from '../services/oracleDiscovery';
 import {
@@ -49,6 +50,7 @@ import {
   PRESENCE_TIME_BADGE,
 } from '../constants/presence/timeOfDay';
 import { toPresenceCharacter } from '../constants/presence/avatarStates';
+import { PRESENCE_MOTION } from '../src/motion/presenceMotion';
 
 // ── DEBUG ──────────────────────────────────────────────────────────────────
 const DEBUG_HOTSPOTS = false;
@@ -122,6 +124,7 @@ export function VoiceBipScreen({
 }: VoiceBipScreenProps) {
 
   const voiceHistoryRef = useRef<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
+  const reduceMotion = useReducedMotion();
 
   const [showBipMenu,      setShowBipMenu]      = useState(false);
   const [showArchive,      setShowArchive]       = useState(false);
@@ -191,39 +194,51 @@ export function VoiceBipScreen({
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-  // Cloud drift + breath ────────────────────────────────────────────────────
+  // Cloud + presence-pill ambience follows the same accessibility authority as
+  // the avatar. Reduced motion keeps the room expressive but physically still.
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(cloudFloat, { toValue: 1, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(cloudFloat, { toValue: 0, duration: 3600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(cloudBreath, { toValue: 1, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(cloudBreath, { toValue: 0, duration: 2200, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pillBreath, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(pillBreath, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ])
-    ).start();
-  }, [cloudBreath, cloudFloat, pillBreath]);
+    cloudFloat.stopAnimation();
+    cloudBreath.stopAnimation();
+    pillBreath.stopAnimation();
+    cloudFloat.setValue(0);
+    cloudBreath.setValue(0);
+    pillBreath.setValue(0);
 
-  const cloudStyle = {
+    if (reduceMotion) return undefined;
+
+    const loopValue = (value: Animated.Value, duration: number) => Animated.loop(
+      Animated.sequence([
+        Animated.timing(value, { toValue: 1, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(value, { toValue: 0, duration, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]),
+    );
+
+    const loops = [
+      loopValue(cloudFloat, PRESENCE_MOTION.cloudFloatDurationMs),
+      loopValue(cloudBreath, PRESENCE_MOTION.cloudBreathDurationMs),
+      loopValue(pillBreath, PRESENCE_MOTION.pillBreathDurationMs),
+    ];
+    loops.forEach(loop => loop.start());
+    return () => loops.forEach(loop => loop.stop());
+  }, [cloudBreath, cloudFloat, pillBreath, reduceMotion]);
+
+  const cloudStyle = reduceMotion ? {
+    transform: [{ translateX: 0 }, { translateY: 0 }, { scale: 1 }],
+    opacity: 1,
+  } : {
     transform: [
-      { translateX: cloudFloat.interpolate({ inputRange: [0, 1], outputRange: [-6, 6] }) },
-      { translateY: cloudFloat.interpolate({ inputRange: [0, 1], outputRange: [-3, 3] }) },
-      { scale:      cloudBreath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] }) },
+      { translateX: cloudFloat.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudTranslateX }) },
+      { translateY: cloudFloat.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudTranslateY }) },
+      { scale: cloudBreath.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudScale }) },
     ],
-    opacity: cloudBreath.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }),
+    opacity: cloudBreath.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudOpacity }),
   };
-  const pillStyle = {
-    opacity: pillBreath.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }),
-    transform: [{ scale: pillBreath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.03] }) }],
+  const pillStyle = reduceMotion ? {
+    opacity: 1,
+    transform: [{ scale: 1 }],
+  } : {
+    opacity: pillBreath.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.pillOpacity }),
+    transform: [{ scale: pillBreath.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.pillScale }) }],
   };
 
   const startRecording = async () => {
@@ -368,7 +383,7 @@ export function VoiceBipScreen({
     ].slice(-20);
     setSekretReply(reply);
     setIsVoiceLoading(true);
-    const audio = await fetchSekretVoice({ reply, characterId: avatarKey });
+    const audio = await fetchSekretVoice({ reply, characterId: avatar.personality });
     if (audio) setReplyAudioUri(`data:${audio.contentType};base64,${audio.audioBase64}`);
     setIsVoiceLoading(false);
     setIsThinking(false);
@@ -519,8 +534,12 @@ export function VoiceBipScreen({
             pointerEvents="none"
           />
 
-          {/* Cloud companion — drifts above */}
-          <Animated.View style={[styles.cloudWrap, cloudStyle]} pointerEvents="none">
+          {/* Cloud companion — drifts only when motion is enabled */}
+          <Animated.View
+            testID="voice-presence-cloud"
+            style={[styles.cloudWrap, cloudStyle]}
+            pointerEvents="none"
+          >
             <Image source={CLOUD_HP} style={styles.cloudImg} resizeMode="contain" />
           </Animated.View>
 
@@ -538,7 +557,11 @@ export function VoiceBipScreen({
           </View>
 
           {/* Companion presence pill */}
-          <Animated.View style={[styles.presencePill, pillStyle]} pointerEvents="none">
+          <Animated.View
+            testID="voice-presence-pill"
+            style={[styles.presencePill, pillStyle]}
+            pointerEvents="none"
+          >
             <Text style={styles.presenceText}>
               {companion?.presenceMessage || avatar.presence}
             </Text>

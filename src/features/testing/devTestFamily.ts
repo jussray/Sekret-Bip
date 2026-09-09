@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isFounderPreviewEnabled } from '@/constants/founderPreview';
 
 const TEST_FAMILY_KEY = 'dev_test_family_v1';
 
@@ -10,7 +11,7 @@ export interface DevTestFamily {
 }
 
 export function isDevTestFamilyEnabled(): boolean {
-  return __DEV__ && process.env.EXPO_PUBLIC_ENABLE_FOUNDER_TOOLS === 'true';
+  return isFounderPreviewEnabled();
 }
 
 export async function createDevTestFamily(): Promise<DevTestFamily> {

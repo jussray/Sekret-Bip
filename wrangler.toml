@@ -1,19 +1,82 @@
-name = "bip"
-main = "worker/observed-index.ts"
+name = "sekret-backend"
+main = "worker/voice-entry.ts"
 compatibility_date = "2026-06-13"
 compatibility_flags = ["nodejs_compat"]
+logpush = true
+workers_dev = false
+
+[build]
+command = "node scripts/write-worker-release-identity.mjs"
 
 [observability]
 enabled = true
+head_sampling_rate = 1
 
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = true
+
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
+# Cloudflare Workers AI binding used by the routed voice runtime.
+[ai]
+binding = "AI"
+
+# Non-secret model vars — safe to commit.
+# To rotate a model: edit here and run `wrangler deploy --name sekret-backend`.
+# Secrets (OPENAI_API_KEY, ELEVENLABS_API_KEY, and SUPABASE_SERVICE_ROLE_KEY)
+# must use `wrangler secret put`, never this file.
 [vars]
-OPENAI_CHAT_MODEL = "gpt-4o-mini"
-OPENAI_TTS_MODEL = "gpt-4o-mini-tts"
-OPENAI_STT_MODEL = "whisper-1"
 SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
-AUDIO_MAX_BYTES = "524288"
+OPENAI_CHAT_MODEL = "gpt-4o"
+OPENAI_TTS_MODEL  = "gpt-4o-mini-tts"
+OPENAI_STT_MODEL  = "whisper-1"
 
+# Firebase App Check starts disabled. Moving this to `observe` or `enforce`
+# requires FIREBASE_PROJECT_NUMBER and FIREBASE_WEB_APP_ID to be configured
+# on the Worker and exact-runtime evidence for the intended client cohort.
+# `off` is the one-variable rollback to the pre-App-Check request path.
+FIREBASE_APPCHECK_MODE = "off"
+
+# `legacy` delegates voice requests to the previous Piper/OpenAI path.
+# `cloudflare-only` uses Aura for every voice request.
+# `hybrid` uses Aura by default and ElevenLabs only when precise timing is requested.
+VOICE_PROVIDER_MODE = "hybrid"
+
+# Bridge summary rollout control (worker/bridge-summary.ts). This fails closed:
+# unset, blank, or "disabled" blocks generation. Switch to a reviewed cohort
+# only for a time-bounded live proof after Cloudflare deployment credentials
+# have been verified.
+BRIDGE_SUMMARIES_ROLLOUT = "disabled"
+
+# ── CPU time limit ────────────────────────────────────────────────────
+# Do not commit `[limits] cpu_ms` in the default Worker config.
+# Cloudflare rejects CPU limits on Free-plan deploys, so the repo default
+# must stay free-plan safe for PR previews and documentation-only changes.
+# Paid production CPU limits can be restored only through an approved
+# paid-plan release lane after Founder Control Room records that gate.
+
+# ── Production routing authority ──────────────────────────────────────
+# api.sekretbip.net remains the canonical production Worker hostname, but
+# its Custom Domain is provider-managed rather than re-provisioned on every
+# Workers Build. Keep route/routes absent here and workers_dev=false so a
+# normal `wrangler deploy` updates the Worker script without requiring the
+# build token to mutate Custom Domain DNS/certificate records.
+# Production verification must still prove https://api.sekretbip.net/health.
+
+# ── Rate limiting binding ─────────────────────────────────────────────
+# 60 requests per 10-second window per user/IP key.
+# Current first-class Wrangler Rate Limiting binding syntax.
+# Binding name must match Env interface: SEKRET_RATE_LIMITER
 [[ratelimits]]
 name = "SEKRET_RATE_LIMITER"
 namespace_id = "1001"
-simple = { limit = 60, period = 60 }
+simple = { limit = 60, period = 10 }

@@ -35,6 +35,20 @@ export interface FounderAuditCard {
   source: 'static-playbook' | 'live-audit-event';
 }
 
+export interface FounderBusinessSnapshot {
+  // A trustworthy cross-account total needs an approved founder-only aggregate RPC.
+  // Returning null prevents own-row RLS from masquerading as the global user count.
+  users: number | null;
+  openIssues: number;
+  unresolvedAudits: number;
+  releases: number;
+  latestRelease: {
+    release_key: string;
+    status: string;
+    deployed_at: string;
+  } | null;
+}
+
 const FOUNDER_ROLES = new Set<string>(['developer', 'admin', 'founder']);
 
 export const founderAuditPlaybook: FounderAuditCard[] = [
@@ -116,6 +130,14 @@ export function isFounderProfile(profile: FounderProfile | null): boolean {
   return Boolean(profile?.can_view_audits && FOUNDER_ROLES.has(profile.role));
 }
 
+export function isFounderBusinessProfile(profile: FounderProfile | null): boolean {
+  return Boolean(
+    profile?.role === 'founder'
+      && profile.can_manage_app
+      && profile.can_view_audits,
+  );
+}
+
 export async function getCurrentFounderProfile(): Promise<FounderProfile | null> {
   if (!isSupabaseConfigured) return null;
   const sb = getSupabase();
@@ -133,6 +155,42 @@ export async function getCurrentFounderProfile(): Promise<FounderProfile | null>
 
   if (error || !data) return null;
   return data as FounderProfile;
+}
+
+export async function getFounderBusinessSnapshot(): Promise<FounderBusinessSnapshot | null> {
+  const profile = await getCurrentFounderProfile();
+  if (!isFounderBusinessProfile(profile)) return null;
+
+  const sb = getSupabase();
+  if (!sb) return null;
+
+  const [issuesResult, auditsResult, releasesResult, latestReleaseResult] = await Promise.all([
+    sb
+      .from('control_room_issues')
+      .select('id', { count: 'exact', head: true })
+      .neq('status', 'resolved')
+      .neq('status', 'ignored'),
+    sb.from('audit_events').select('id', { count: 'exact', head: true }).eq('resolved', false),
+    sb.from('control_room_releases').select('id', { count: 'exact', head: true }),
+    sb
+      .from('control_room_releases')
+      .select('release_key,status,deployed_at')
+      .order('deployed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const firstError = [issuesResult.error, auditsResult.error, releasesResult.error, latestReleaseResult.error]
+    .find(Boolean);
+  if (firstError) throw firstError;
+
+  return {
+    users: null,
+    openIssues: issuesResult.count ?? 0,
+    unresolvedAudits: auditsResult.count ?? 0,
+    releases: releasesResult.count ?? 0,
+    latestRelease: latestReleaseResult.data ?? null,
+  };
 }
 
 export async function listFounderAuditEvents(limit = 40): Promise<AuditEvent[]> {

@@ -1,4 +1,8 @@
 import { sendBridgePushAlert } from '@/services/pushAlerts';
+import {
+  loadBridgeResponsePreference,
+  type BridgeResponsePreference,
+} from '@/features/bridge/responsePreference';
 import { getSupabase } from './supabase';
 import {
   generateInviteCode,
@@ -33,10 +37,13 @@ export async function fetchLinkedTeenId(): Promise<string | null> {
   return fetchLinkedTeenIdBase();
 }
 
+export type { BridgeResponsePreference } from '@/features/bridge/responsePreference';
+
 export interface BridgeSignal {
   id: number;
   share_type: string;
   conv_mode: string | null;
+  response_preference: BridgeResponsePreference | null;
   char_key: string;
   sent_at: string;
   created_at: string;
@@ -59,16 +66,20 @@ export interface ParentEngagement {
 export async function sendBridgeSignal(params: {
   shareType: string;
   convMode: string | null;
+  responsePreference?: BridgeResponsePreference | null;
   charKey: 'raylene' | 'rylane';
 }): Promise<void> {
   const sb = getSupabase();
   const userId = await uid();
   if (!sb || !userId) return;
+
+  const responsePreference = params.responsePreference ?? await loadBridgeResponsePreference();
   await sb.from('bridge_signals').insert({
     teen_user_id: userId,
     char_key: params.charKey,
     share_type: params.shareType,
     conv_mode: params.convMode ?? null,
+    response_preference: responsePreference,
     sent_at: new Date().toISOString(),
   });
 }
@@ -124,7 +135,7 @@ export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]
   if (!sb || !teenId) return [];
   const { data } = await sb
     .from('bridge_signals')
-    .select('id, share_type, conv_mode, char_key, sent_at, created_at')
+    .select('id, share_type, conv_mode, response_preference, char_key, sent_at, created_at')
     .eq('teen_user_id', teenId)
     .order('sent_at', { ascending: false })
     .limit(30);

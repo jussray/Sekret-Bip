@@ -1,0 +1,77 @@
+name: Supabase PR Preview
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  fresh-replay:
+    name: Replay migrations from empty local database
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Verify canonical migration authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s supabase/migrations/0001_init.sql
+          test -s supabase/migrations/0002_circle_v1.sql
+          test -s supabase/migrations/0003_oracle_parentlinks_period_safety.sql
+          test ! -e supabase/migrations/0004_supplemental_tables.sql
+          test ! -e supabase/migrations/20260616224106_0002_circle_v1.sql
+          test ! -e supabase/migrations/20260622190209_remote_history.sql
+          test ! -e supabase/migrations/20240701_founder_ideas.sql
+          test ! -e supabase/migrations/20240702_control_room_issues.sql
+          test ! -e supabase/migrations/20260627_bip_events.sql
+          test ! -e supabase/migrations/20260627_point_ledger.sql
+          test ! -e supabase/migrations/20260701010000_circle_kind_add_parent_community.sql
+          test ! -e supabase/migrations/20260701020000_circle_v2_parent_community.sql
+          test -s supabase/migrations/20260701174924_circle_kind_add_parent_community.sql
+          test -s supabase/migrations/20260701174943_circle_v2_parent_community_guardian_access.sql
+          test -s supabase/reference/legacy_migrations/20240701_founder_ideas.sql
+          test -s supabase/reference/legacy_migrations/20240702_control_room_issues.sql
+          test -s supabase/reference/legacy_migrations/20260627_bip_events.sql
+          test -s supabase/reference/legacy_migrations/20260627_point_ledger.sql
+          test -s supabase/reference/legacy_migrations/20260701010000_circle_kind_add_parent_community.sql
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1
+        with:
+          version: 2.113.0
+
+      - name: Initialize ephemeral local Supabase config
+        shell: bash
+        run: supabase init --force
+
+      - name: Start empty local database and replay ordered migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Stop ephemeral Supabase
+        if: always()
+        shell: bash
+        run: supabase stop --no-backup || true

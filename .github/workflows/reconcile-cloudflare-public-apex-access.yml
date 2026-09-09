@@ -1,0 +1,185 @@
+name: Reconcile sekretbip.net Public Access
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/reconcile-cloudflare-public-apex-access.yml'
+      - 'scripts/reconcile-cloudflare-public-apex-access.mjs'
+      - 'test/cloudflare-public-apex-access-reconciler.test.mjs'
+      - 'test/post-989-access-fail-closed.test.mjs'
+      - 'test/cloudflare-production-browser-contract.test.mjs'
+      - 'e2e/production-public-front-door.spec.ts'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Create the exact public-apex Access bypass and verify production anonymously
+        required: true
+        default: false
+        type: boolean
+      expected_main_sha:
+        description: Exact current main SHA authorized for the public-apex repair
+        required: false
+        type: string
+      confirmation:
+        description: Type FIX_SEKRET_BIP_PUBLIC_APEX_ACCESS when apply=true
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sekretbip-public-apex-access-production
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BIP_PUBLIC_HOSTNAME: sekretbip.net
+  BIP_PUBLIC_URL: https://sekretbip.net/
+  BIP_PUBLIC_ACCESS_APP_NAME: sekretbip.net - public apex bypass
+  BIP_PUBLIC_ACCESS_BLOCKING_AUD: ef61d51178d6c6fd8e69210c2b32738207d99c00e3a5d1aa297e99779f18e39d
+  BIP_PUBLIC_ACCESS_EVIDENCE_PATH: artifacts/cloudflare-public-apex-access.json
+
+jobs:
+  verify:
+    name: Verify public apex Access repair contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify focused Access reconciler contract
+        run: >-
+          node --test
+          test/cloudflare-public-apex-access-reconciler.test.mjs
+          test/post-989-access-fail-closed.test.mjs
+          test/cloudflare-production-browser-contract.test.mjs
+
+  apply:
+    name: Founder-authorized public apex Access repair
+    if: github.event_name == 'workflow_dispatch' && inputs.apply == true
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 20
+    steps:
+      - name: Verify founder authorization and exact current main
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "jussray" || {
+            echo 'Refusing Cloudflare Access mutation because the workflow actor is not the founder.' >&2
+            exit 1
+          }
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo 'Refusing Cloudflare Access mutation because the workflow is not running from main.' >&2
+            exit 1
+          }
+          test "$CONFIRMATION" = "FIX_SEKRET_BIP_PUBLIC_APEX_ACCESS" || {
+            echo 'Refusing Cloudflare Access mutation because the explicit confirmation is missing.' >&2
+            exit 1
+          }
+          current_main="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          test -n "$current_main"
+          test "$GITHUB_SHA" = "$current_main" || {
+            echo 'Refusing Cloudflare Access mutation because workflow SHA is no longer current main.' >&2
+            exit 1
+          }
+          test "$EXPECTED_MAIN_SHA" = "$GITHUB_SHA" || {
+            echo 'Refusing Cloudflare Access mutation because expected_main_sha does not match the workflow SHA.' >&2
+            exit 1
+          }
+
+      - name: Check out exact approved main
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Install project dependencies
+        run: npm ci
+
+      - name: Require least-privilege Access credentials
+        shell: bash
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCESS_API_TOKEN" || {
+            echo 'CLOUDFLARE_ACCESS_API_TOKEN is not configured. Required permission: Access: Apps and Policies Write.' >&2
+            exit 1
+          }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || {
+            echo 'CLOUDFLARE_ACCOUNT_ID is not configured.' >&2
+            exit 1
+          }
+
+      - name: Install Chromium for anonymous production proof
+        run: npx playwright install --with-deps chromium
+
+      - name: Revalidate exact current main immediately before mutation
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+        run: |
+          set -euo pipefail
+          current_main="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          test -n "$current_main"
+          test "$GITHUB_SHA" = "$current_main" || {
+            echo 'Refusing Cloudflare Access mutation because main moved during job setup.' >&2
+            exit 1
+          }
+          test "$EXPECTED_MAIN_SHA" = "$current_main" || {
+            echo 'Refusing Cloudflare Access mutation because expected_main_sha is stale.' >&2
+            exit 1
+          }
+
+      - name: Reconcile exact public apex Access exception
+        id: reconcile
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/reconcile-cloudflare-public-apex-access.mjs --apply
+
+      - name: Prove public apex with Playwright
+        env:
+          CI: 'true'
+        run: npx playwright test e2e/production-public-front-door.spec.ts --config=playwright.production.config.ts --project=chromium
+
+      - name: Roll back run-created bypass after any failed or cancelled post-mutation path
+        if: (failure() || cancelled()) && steps.reconcile.outcome != 'skipped'
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/reconcile-cloudflare-public-apex-access.mjs --rollback-created
+
+      - name: Upload Access reconciliation evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-public-apex-access-${{ github.run_id }}
+          path: |
+            artifacts/cloudflare-public-apex-access.json
+            playwright-report-production
+            test-results
+          if-no-files-found: warn
+          retention-days: 30

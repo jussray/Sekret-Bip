@@ -1,0 +1,114 @@
+name: Main Contract Drift Exact-Head Gate
+
+on:
+  pull_request:
+    paths:
+      - 'config/cloudflare-targets.json'
+      - 'docs/CLOUDFLARE_OWNERSHIP.md'
+      - 'docs/CLOUDFLARE_EMAIL_ROUTING.md'
+      - 'docs/MAIN_CONTRACT_DRIFT_REPAIR.md'
+      - 'reports/control-room/2026-07-29-main-contract-drift-repair.md'
+      - 'test/cloudflare-worker-consolidation.test.mjs'
+      - 'test/cloudflare-worker-identity.test.mjs'
+      - 'test/cloudflare-workers-build-trigger-failure-evidence.test.mjs'
+      - 'test/controlled-alpha-activation.test.mjs'
+      - 'test/main-contract-drift-proof.test.mjs'
+      - 'test/sekret-control-room-contracts.test.mjs'
+      - 'supabase/migrations/20260806024500_harden_uos_set_updated_at_search_path.sql'
+      - 'test/uos-trigger-search-path.test.mjs'
+      - 'scripts/verify-supabase-production-schema.mjs'
+      - 'test/supabase-bridge-production-receipt-alias.test.mjs'
+      - 'test/app-domain-founder-command-contract.test.mjs'
+      - 'test/auth-email-provider-contract.test.mjs'
+      - 'test/cloudflare-native-deploy.test.mjs'
+      - 'test/cloudflare-token-verification-fallback.test.mjs'
+      - 'test/founder-preview-unlock.test.mjs'
+      - '.github/workflows/app-domain-founder-command.yml'
+      - '.github/workflows/auth-email-provider.yml'
+      - 'scripts/verify-cloudflare-native-deploy.mjs'
+      - 'scripts/verify-cloudflare-worker-branch-authority.mjs'
+      - 'scripts/verify-firewall-v10.mjs'
+      - 'app/(teen)/_layout.tsx'
+      - '.github/workflows/main-contract-drift-exact-head.yml'
+      - 'package.json'
+      - 'wrangler.toml'
+      - 'worker/voice-entry.ts'
+      - '.github/workflows/deploy-cloudflare.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: main-contract-drift-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-contract-authority:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Validate production Worker config with Wrangler
+        run: npx wrangler deploy --dry-run --config wrangler.toml
+
+      - name: Run repaired contract tests
+        run: >-
+          node --test
+          test/cloudflare-worker-consolidation.test.mjs
+          test/cloudflare-worker-identity.test.mjs
+          test/cloudflare-workers-build-trigger-failure-evidence.test.mjs
+          test/controlled-alpha-activation.test.mjs
+          test/main-contract-drift-proof.test.mjs
+          test/uos-trigger-search-path.test.mjs
+          test/app-domain-founder-command-contract.test.mjs
+          test/auth-email-provider-contract.test.mjs
+          test/cloudflare-native-deploy.test.mjs
+          test/cloudflare-token-verification-fallback.test.mjs
+          test/founder-preview-unlock.test.mjs
+
+      - name: Run complete unit suite
+        run: npm test
+
+      - name: Type-check exact head
+        run: npm run type-check
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: main-contract-drift-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            docs/CLOUDFLARE_OWNERSHIP.md
+            docs/CLOUDFLARE_EMAIL_ROUTING.md
+            docs/MAIN_CONTRACT_DRIFT_REPAIR.md
+            reports/control-room/2026-07-29-main-contract-drift-repair.md
+          if-no-files-found: error
+          retention-days: 30

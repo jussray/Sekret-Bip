@@ -1,0 +1,15 @@
+# Se'kret Bip crawler policy
+# Public discovery is explicit. Application, auth, onboarding, and member routes
+# remain outside compliant crawler scope unless deliberately added here later.
+
+User-agent: *
+Disallow: /
+Allow: /$
+Allow: /auth.md$
+Allow: /what-is-sekret-bip/
+Allow: /how-it-works/
+Allow: /privacy-and-safety/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+
+Sitemap: https://sekretbip.net/sitemap.xml

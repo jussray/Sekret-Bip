@@ -3,30 +3,6 @@
 // Enforces archive backup rules for Phase 2 room integration.
 // Run: node scripts/verify-room-archives.js
 // Or:  npm run verify:room-archives
-//
-// DIRECTORY CONTRACT:
-//   assets/images/archive/bg-*.png  = original untouched backgrounds (read-only originals)
-//   assets/images/bg-*.png          = current live files (may be composites after Phase 2)
-//
-// WHAT THIS SCRIPT CHECKS:
-//   1. Every live bg-*.png has a matching file in archive/
-//   2. Every archive file is a real PNG (>= 1 MB — rejects LFS pointer stubs)
-//   3. SHA match is INFORMATIONAL only in default mode — live and archive will intentionally
-//      differ once Phase 2 composites are pushed.
-//
-// STRICT MODE (pre-composite validation only):
-//   node scripts/verify-room-archives.js --strict-match
-//   Fails if live and archive SHA differ. Use this BEFORE pushing any composite.
-//
-// HOW ARCHIVE STUBS GET FIXED:
-//   The archive/ files are LFS pointer stubs when git lfs pull has not been run.
-//   Fix locally:
-//     git lfs pull
-//     cp -f assets/images/bg-*.png assets/images/archive/
-//     git add assets/images/archive/
-//     git commit -m "fix: replace LFS stub archive copies with real PNG bytes"
-//     git push
-//   See docs/ASSET_BACKUP_RULES.md
 
 const fs     = require('fs');
 const path   = require('path');
@@ -34,25 +10,26 @@ const crypto = require('crypto');
 
 const LIVE_DIR    = path.join(__dirname, '..', 'assets', 'images');
 const ARCHIVE_DIR = path.join(LIVE_DIR, 'archive');
-const MIN_SIZE_BYTES = 1024 * 1024; // 1 MB — anything smaller is an LFS pointer stub
-
+const MIN_SIZE_BYTES = 1024 * 1024;
 const STRICT_MATCH = process.argv.includes('--strict-match');
 
-function sha256(filepath) {
-  const buf = fs.readFileSync(filepath);
+function sha256Buffer(buf) {
   return crypto.createHash('sha256').update(buf).digest('hex');
 }
 
-function isLfsPointer(filepath) {
-  // LFS pointer files start with "version https://git-lfs.github.com/spec/"
-  // and are always < 200 bytes
-  const stat = fs.statSync(filepath);
-  if (stat.size > 512) return false;
+function readSnapshot(filepath) {
   try {
-    const head = fs.readFileSync(filepath, 'utf8').slice(0, 64);
-    return head.startsWith('version https://git-lfs');
-  } catch {
-    return false;
+    const bytes = fs.readFileSync(filepath);
+    return {
+      exists: true,
+      bytes,
+      size: bytes.length,
+      lfsPointer: bytes.length <= 512
+        && bytes.toString('utf8', 0, Math.min(bytes.length, 64)).startsWith('version https://git-lfs'),
+    };
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { exists: false, bytes: null, size: 0, lfsPointer: false };
+    throw error;
   }
 }
 
@@ -62,7 +39,6 @@ function formatBytes(n) {
   return n + ' bytes';
 }
 
-// ── Collect live bg-*.png files ────────────────────────────────────────────
 const liveFiles = fs
   .readdirSync(LIVE_DIR)
   .filter(f => f.startsWith('bg-') && f.endsWith('.png'))
@@ -80,9 +56,13 @@ if (!fs.existsSync(ARCHIVE_DIR)) {
   process.exit(1);
 }
 
-// ── Detect environment ─────────────────────────────────────────────────────
-// Check if any live files are LFS pointers (lfs pull not run yet)
-const liveStubs = liveFiles.filter(f => isLfsPointer(path.join(LIVE_DIR, f)));
+const liveSnapshots = new Map();
+const liveStubs = [];
+for (const filename of liveFiles) {
+  const snapshot = readSnapshot(path.join(LIVE_DIR, filename));
+  liveSnapshots.set(filename, snapshot);
+  if (snapshot.lfsPointer) liveStubs.push(filename);
+}
 if (liveStubs.length > 0) {
   console.error('\n❌ LIVE files are LFS pointer stubs. Run git lfs pull first.');
   console.error(`   Stub count: ${liveStubs.length} of ${liveFiles.length}`);
@@ -90,51 +70,46 @@ if (liveStubs.length > 0) {
   process.exit(1);
 }
 
-// ── Check each file ────────────────────────────────────────────────────────
 let allOk = true;
 const results = [];
 let stubCount = 0;
 
 for (const filename of liveFiles) {
-  const livePath    = path.join(LIVE_DIR, filename);
+  const liveSnapshot = liveSnapshots.get(filename);
   const archivePath = path.join(ARCHIVE_DIR, filename);
+  const archiveSnapshot = readSnapshot(archivePath);
 
-  // Check 1: archive counterpart must exist
-  if (!fs.existsSync(archivePath)) {
+  if (!archiveSnapshot.exists) {
     results.push({ ok: false, filename, reason: 'MISSING from archive/' });
     allOk = false;
     continue;
   }
 
-  const archiveSize = fs.statSync(archivePath).size;
-
-  // Check 2: detect LFS pointer stub in archive
-  if (isLfsPointer(archivePath)) {
+  if (archiveSnapshot.lfsPointer) {
     stubCount++;
     results.push({
       ok: false,
       filename,
-      reason: `archive is an LFS pointer stub (${archiveSize} bytes).\n    Fix: git lfs pull && cp -f assets/images/${filename} assets/images/archive/${filename}`,
+      reason: `archive is an LFS pointer stub (${archiveSnapshot.size} bytes).\n    Fix: git lfs pull && cp -f assets/images/${filename} assets/images/archive/${filename}`,
     });
     allOk = false;
     continue;
   }
 
-  // Check 3: archive must be >= 1 MB (belt-and-suspenders for non-LFS small files)
-  if (archiveSize < MIN_SIZE_BYTES) {
+  if (archiveSnapshot.size < MIN_SIZE_BYTES) {
     results.push({
       ok: false,
       filename,
-      reason: `archive is ${formatBytes(archiveSize)} — too small to be a real PNG. Minimum: 1 MB.`,
+      reason: `archive is ${formatBytes(archiveSnapshot.size)} — too small to be a real PNG. Minimum: 1 MB.`,
     });
     allOk = false;
     continue;
   }
 
-  // Check 4 (--strict-match only): SHA must match — use before any composites are pushed
+  const liveSha = sha256Buffer(liveSnapshot.bytes);
+  const archiveSha = sha256Buffer(archiveSnapshot.bytes);
+
   if (STRICT_MATCH) {
-    const liveSha    = sha256(livePath);
-    const archiveSha = sha256(archivePath);
     if (liveSha !== archiveSha) {
       results.push({
         ok: false,
@@ -144,22 +119,18 @@ for (const filename of liveFiles) {
       allOk = false;
       continue;
     }
-    results.push({ ok: true, filename, size: archiveSize, note: 'identical to archive ✓ (pre-composite)' });
+    results.push({ ok: true, filename, size: archiveSnapshot.size, note: 'identical to archive ✓ (pre-composite)' });
   } else {
-    // Default mode: archive exists and is real — sufficient for Phase 2 to proceed
-    const liveSha    = sha256(livePath);
-    const archiveSha = sha256(archivePath);
     const same = liveSha === archiveSha;
     results.push({
       ok: true,
       filename,
-      size: archiveSize,
+      size: archiveSnapshot.size,
       note: same ? 'pre-composite (matches original)' : 'composite active ✦',
     });
   }
 }
 
-// ── Print results ──────────────────────────────────────────────────────────
 console.log('');
 console.log(STRICT_MATCH
   ? '── verify-room-archives [--strict-match] ──'
@@ -201,7 +172,7 @@ if (!allOk) {
 }
 
 const composited = results.filter(r => r.note && r.note.includes('✦')).length;
-const pristine   = results.filter(r => r.note && r.note.includes('pre-composite')).length;
+const pristine = results.filter(r => r.note && r.note.includes('pre-composite')).length;
 console.log(`✅ ${liveFiles.length} of ${liveFiles.length} archive files verified.  All real PNGs >= 1 MB.`);
 if (composited > 0) {
   console.log(`   ${composited} composite(s) active  |  ${pristine} still pre-composite`);

@@ -6,6 +6,13 @@ export const SIDE_ROOTS = {
   parent: PARENT_ROUTES.room,
 } as const;
 
+function missingRoute(side: 'teen' | 'parent', key: string): string {
+  if (__DEV__) {
+    console.warn(`[navigation] Unknown ${side} route key: ${key}. Opening More instead.`);
+  }
+  return side === 'parent' ? PARENT_ROUTES.more : TEEN_ROUTES.more;
+}
+
 export function routeForSide(side: 'teen' | 'parent' | null | undefined, key: string): string {
   if (key === 'logout') return '/(auth)/logout';
 
@@ -51,7 +58,7 @@ export function routeForSide(side: 'teen' | 'parent' | null | undefined, key: st
       cloud: PARENT_ROUTES.calm,
       comfort: PARENT_ROUTES.calm,
     };
-    return parentMap[key] ?? PARENT_ROUTES.room;
+    return parentMap[key] ?? missingRoute('parent', key);
   }
 
   const teenMap: Record<string, string> = {
@@ -60,26 +67,29 @@ export function routeForSide(side: 'teen' | 'parent' | null | undefined, key: st
     pages: TEEN_ROUTES.pages,
     calm: TEEN_ROUTES.calm,
     circle: TEEN_ROUTES.circle,
-    sekret: TEEN_ROUTES.room,
-    companionPicker: TEEN_ROUTES.companionPicker,
+    sekret: '/(teen)/sekret',
+    companionPicker: '/(teen)/sekret',
     voiceBip: TEEN_ROUTES.voiceBip,
     voicebip: TEEN_ROUTES.voiceBip,
     cloudThoughts: TEEN_ROUTES.cloud,
     cloud: TEEN_ROUTES.cloud,
     comfort: TEEN_ROUTES.comfort,
-    crew: TEEN_ROUTES.crew,
+    crew: TEEN_ROUTES.circle,
     settings: TEEN_ROUTES.settings,
     more: TEEN_ROUTES.more,
     points: TEEN_ROUTES.points,
     chores: TEEN_ROUTES.chores,
     history: TEEN_ROUTES.history,
+    continuity: TEEN_ROUTES.continuity,
+    memory: TEEN_ROUTES.continuity,
+    l4: TEEN_ROUTES.continuity,
     bridge: TEEN_ROUTES.bridge,
     parentBridge: TEEN_ROUTES.bridge,
     s2tell: TEEN_ROUTES.s2tell,
     periodCalendar: TEEN_ROUTES.periodCalendar,
     discover: TEEN_ROUTES.discover,
     profile: TEEN_ROUTES.profile,
-    userRoom: TEEN_ROUTES.userRoom,
+    userRoom: TEEN_ROUTES.room,
     'parent-link-verify': TEEN_ROUTES.parentLinkVerify,
     parentLinkVerify: TEEN_ROUTES.parentLinkVerify,
     write: TEEN_ROUTES.pages,
@@ -87,12 +97,12 @@ export function routeForSide(side: 'teen' | 'parent' | null | undefined, key: st
     memories: TEEN_ROUTES.profile,
     music: TEEN_ROUTES.calm,
     rewards: TEEN_ROUTES.points,
-    vibeLab: TEEN_ROUTES.userRoom,
+    vibeLab: TEEN_ROUTES.room,
     bippin2: TEEN_ROUTES.bippin2,
     growth: TEEN_ROUTES.growth,
     mindReset: TEEN_ROUTES.mindReset,
     bodyReset: TEEN_ROUTES.bodyReset,
     resources: TEEN_ROUTES.resources,
   };
-  return teenMap[key] ?? TEEN_ROUTES.room;
+  return teenMap[key] ?? missingRoute('teen', key);
 }

@@ -1,0 +1,41 @@
+{
+  "id": "control-room-playwright-verification",
+  "name": "Playwright-backed Control Room frontend verification",
+  "status": "integrated",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/435",
+  "acceptanceCriteria": [
+    "The founder can invoke one allowlisted verify-frontend mission that runs the repository Playwright smoke suite when Chromium is available.",
+    "The generated report states browserProof=true only after a successful Playwright run and never treats local fallback verification as browser evidence.",
+    "Missing Playwright or Chromium produces an explicit non-browser fallback report instead of a silent skip or false green browser claim.",
+    "Pull-request CI, unit tests, and Playwright checks pass on the current main lineage before promotion beyond integrated."
+  ],
+  "contractPaths": [
+    "src/types/controlRoomOs.ts",
+    "src/config/controlRoomOs.ts",
+    "docs/CONTROL_ROOM.md"
+  ],
+  "runtimePaths": [
+    "scripts/control-room-agent.mjs",
+    "scripts/control-room-verify-frontend.mjs",
+    "package.json"
+  ],
+  "testPaths": [
+    "test/control-room-os.test.mjs",
+    "test/control-room-verify-frontend.test.mjs",
+    "e2e/smoke.spec.ts"
+  ],
+  "telemetryPaths": [
+    "scripts/control-room-verify-frontend.mjs"
+  ],
+  "rollout": {
+    "state": "internal",
+    "controlPath": "src/config/controlRoomOs.ts",
+    "controlKey": "verify-frontend founder mission"
+  },
+  "verification": {
+    "state": "partial",
+    "evidence": "https://github.com/jussray/Sekret-Bip/issues/435",
+    "blocker": "The current-head pull request must pass unit, type, quality, regression, and Playwright checks; a retained real browser report is still required before verified status."
+  },
+  "rollback": "Remove the verify-frontend mission, Playwright connector registration, runner script, tests, and this extension. Existing Playwright CI and verify:local remain available."
+}

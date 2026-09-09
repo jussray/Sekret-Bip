@@ -1,0 +1,145 @@
+name: GitHub Failure Routing Exact-Head Gate
+
+on:
+  push:
+    branches:
+      - batch/481-03-github-failure-routing-current-main
+  pull_request:
+    paths:
+      - '.github/workflows/ci.yml'
+      - '.github/workflows/control-room-github-failures.yml'
+      - '.github/workflows/github-failure-routing-exact-head.yml'
+      - 'batches/481/manifest.json'
+      - 'docs/CONTROL_ROOM_GITHUB_FAILURES.md'
+      - 'implementation-ledger.extensions/github-failure-routing.json'
+      - 'package.json'
+      - 'scripts/control-room-ingest-github-failures.mjs'
+      - 'test/control-room-github-failure-routing.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: github-failure-routing-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  EXPO_NO_TELEMETRY: '1'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  github-failure-routing:
+    name: Contracts, failed-run rehearsal, unit, type, lint, and Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Check scanner syntax
+        run: node --check scripts/control-room-ingest-github-failures.mjs
+
+      - name: Run focused routing contracts
+        run: npm run test:github-failure-routing
+
+      - name: Verify implementation ledger claims
+        run: npm run verify:implementation-ledger
+
+      - name: Run complete unit suite
+        run: npm test
+
+      - name: Run TypeScript with zero-error requirement
+        run: npm run type-check
+
+      - name: Run repository lint
+        run: npm run lint
+
+      - name: Select a real completed failed run
+        id: failed-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          response="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?status=failure&per_page=100")"
+          run_id="$(jq -r '[.workflow_runs[] | select(.name != "GitHub Failure Routing Exact-Head Gate")][0].id // empty' <<<"$response")"
+          head_sha="$(jq -r '[.workflow_runs[] | select(.name != "GitHub Failure Routing Exact-Head Gate")][0].head_sha // empty' <<<"$response")"
+          test -n "$run_id"
+          test -n "$head_sha"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Rehearse exact failed-run capture
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONTROL_ROOM_GITHUB_RUN_ID: ${{ steps.failed-run.outputs.run_id }}
+          CONTROL_ROOM_GITHUB_HEAD_SHA: ${{ steps.failed-run.outputs.head_sha }}
+        run: node scripts/control-room-ingest-github-failures.mjs
+
+      - name: Verify exact-run report
+        env:
+          EXPECTED_RUN_ID: ${{ steps.failed-run.outputs.run_id }}
+          EXPECTED_HEAD_SHA: ${{ steps.failed-run.outputs.head_sha }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const report = JSON.parse(fs.readFileSync('reports/control-room/github-failures-latest.json', 'utf8'));
+          if (report.mode !== 'scan-only') throw new Error(`unexpected mode: ${report.mode}`);
+          if (report.failure_count !== 1) throw new Error(`expected one exact failure, got ${report.failure_count}`);
+          const failure = report.failures[0];
+          if (String(failure.run_id) !== process.env.EXPECTED_RUN_ID) throw new Error('run id mismatch');
+          if (failure.head_sha !== process.env.EXPECTED_HEAD_SHA) throw new Error('head sha mismatch');
+          if (!['runner_startup_failure', 'workflow_no_jobs', 'workflow_step_failure'].includes(failure.failure_class)) {
+            throw new Error(`unsupported failure class: ${failure.failure_class}`);
+          }
+          if (!failure.workflow_name || !failure.run_url || !Array.isArray(failure.jobs)) {
+            throw new Error('required workflow evidence missing');
+          }
+          NODE
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run focused front-door Playwright contracts
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p reports/control-room/github-failure-routing
+          npx playwright test e2e/smoke.spec.ts \
+            --grep "teen splash leads into onboarding welcome|web welcome|frontend entry" \
+            --trace on 2>&1 | tee reports/control-room/github-failure-routing/playwright.log
+
+      - name: Upload exact-head routing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: github-failure-routing-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            reports/control-room/github-failures-latest.json
+            reports/control-room/github-failure-routing/
+            test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14

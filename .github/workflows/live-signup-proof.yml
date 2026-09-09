@@ -1,0 +1,259 @@
+name: Live Signup Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/live-signup-proof.yml'
+      - 'playwright.live-onboarding.config.ts'
+      - 'scripts/playwright-executable.mjs'
+      - 'e2e/live-onboarding-email.spec.ts'
+      - 'app/(auth)/signup.tsx'
+      - 'scripts/live-signup-mailbox.mjs'
+      - 'test/live-onboarding-email-gate.test.mjs'
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Exact PR head SHA to prove'
+        required: true
+        type: string
+      preview_url:
+        description: 'Exact isolated Cloudflare Pages preview URL'
+        required: true
+        type: string
+      confirm_live_write:
+        description: 'Allow one disposable signup/email confirmation transaction'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: live-signup-${{ github.event_name == 'workflow_dispatch' && 'write' || github.event.pull_request.number }}-${{ github.repository }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CI: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.target_sha || github.event.pull_request.head.sha }}
+
+jobs:
+  live-signup-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact proof head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Resolve live-write authority
+        id: opt_in
+        shell: bash
+        env:
+          CONFIRM_LIVE_WRITE: ${{ inputs.confirm_live_write || false }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ] && [ "$CONFIRM_LIVE_WRITE" = 'true' ]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+            echo 'Live signup transaction explicitly enabled for this exact head.'
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Readiness-only mode: no account or email write will occur.'
+          fi
+
+      - name: Resolve isolated preview URL
+        shell: bash
+        env:
+          DISPATCH_PREVIEW_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_url || '' }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { appendFileSync } = await import('node:fs');
+
+          const dispatchPreview = process.env.DISPATCH_PREVIEW_URL?.trim() || '';
+          const expected = process.env.EXPECTED_HEAD_SHA;
+          const repository = process.env.GITHUB_REPOSITORY;
+          const prNumber = process.env.PR_NUMBER?.trim() || '';
+          const token = process.env.GH_TOKEN?.trim() || '';
+          const environmentFile = process.env.GITHUB_ENV;
+
+          function persistPreview(url) {
+            const parsed = new URL(url);
+            if (!parsed.hostname.endsWith('.pages.dev') || parsed.hostname === 'sekretbip.net') {
+              throw new Error(`Live signup proof must target an isolated Pages preview, got ${parsed.hostname}`);
+            }
+            appendFileSync(environmentFile, `LIVE_ONBOARDING_BASE_URL=${parsed.origin}\n`);
+            console.log(`Resolved isolated Pages preview: ${parsed.origin}`);
+          }
+
+          if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+            if (!dispatchPreview) throw new Error('workflow_dispatch requires preview_url.');
+            persistPreview(dispatchPreview);
+            process.exit(0);
+          }
+
+          if (!prNumber) throw new Error('Pull-request preview resolution requires PR_NUMBER.');
+
+          const shortSha = expected.slice(0, 7);
+          const deadline = Date.now() + 240_000;
+          let last = null;
+
+          while (Date.now() < deadline) {
+            try {
+              const headers = {
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+              };
+              if (token) headers.Authorization = `Bearer ${token}`;
+
+              const response = await fetch(
+                `https://api.github.com/repos/${repository}/issues/${prNumber}/comments?per_page=100`,
+                { headers, cache: 'no-store' },
+              );
+              if (!response.ok) {
+                last = { status: response.status };
+              } else {
+                const comments = await response.json();
+                const cloudflareComments = comments
+                  .filter((comment) => comment?.user?.login === 'cloudflare-workers-and-pages[bot]')
+                  .reverse();
+
+                for (const comment of cloudflareComments) {
+                  const body = String(comment?.body || '');
+                  if (!body.includes(`<code>${shortSha}</code>`)) continue;
+
+                  const branchPreview = body.match(
+                    /Branch Preview URL:[\s\S]{0,600}?href=['"]([^'"]+\.pages\.dev)['"]/i,
+                  );
+                  const immutablePreview = body.match(
+                    /<strong>Preview URL:<\/strong>[\s\S]{0,600}?href=['"]([^'"]+\.pages\.dev)['"]/i,
+                  );
+                  const resolved = branchPreview?.[1] || immutablePreview?.[1] || null;
+                  if (!resolved) continue;
+
+                  persistPreview(resolved);
+                  process.exit(0);
+                }
+
+                last = {
+                  cloudflareComments: cloudflareComments.length,
+                  expectedShortSha: shortSha,
+                };
+              }
+            } catch (error) {
+              last = { error: error instanceof Error ? error.message : String(error) };
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+
+          throw new Error(
+            `Cloudflare PR preview for ${shortSha} was not discoverable from PR evidence: ${JSON.stringify(last)}`,
+          );
+          NODE
+
+      - name: Verify isolated preview is exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const base = process.env.LIVE_ONBOARDING_BASE_URL;
+          const expected = process.env.EXPECTED_HEAD_SHA;
+          const parsedBase = new URL(base);
+          if (!parsedBase.hostname.endsWith('.pages.dev') || parsedBase.hostname === 'sekretbip.net') {
+            throw new Error(`Live signup PR proof must target an isolated Pages preview, got ${parsedBase.hostname}`);
+          }
+          const markerUrl = new URL('/.well-known/sekret-release.json', base);
+          const deadline = Date.now() + 240_000;
+          let last = null;
+          while (Date.now() < deadline) {
+            try {
+              const response = await fetch(`${markerUrl}?proof=${Date.now()}`, { cache: 'no-store' });
+              const body = response.ok ? await response.json() : null;
+              last = { status: response.status, commitSha: body?.commitSha ?? null, environment: body?.environment ?? null };
+              if (response.ok && body?.commitSha === expected && body?.environment === 'preview') {
+                console.log(`Exact isolated preview verified: ${parsedBase.hostname} @ ${expected}`);
+                process.exit(0);
+              }
+            } catch (error) {
+              last = { error: error instanceof Error ? error.message : String(error) };
+            }
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+          throw new Error(`Exact preview did not reach ${expected}: ${JSON.stringify(last)}`);
+          NODE
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove exact-preview browser readiness without account write
+        env:
+          LIVE_ONBOARDING_PHASE: readiness
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Prepare disposable guest identity and mailbox
+        if: steps.opt_in.outputs.enabled == 'true'
+        run: node scripts/live-signup-mailbox.mjs create
+
+      - name: Create disposable account through exact preview UI
+        if: steps.opt_in.outputs.enabled == 'true'
+        env:
+          LIVE_ONBOARDING_PHASE: signup
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Confirm disposable signup email
+        if: steps.opt_in.outputs.enabled == 'true'
+        env:
+          LIVE_MAILBOX_TIMEOUT_MS: '120000'
+          LIVE_MAILBOX_POLL_MS: '3000'
+        run: node scripts/live-signup-mailbox.mjs confirm
+
+      - name: Prove returning-user sign in
+        if: steps.opt_in.outputs.enabled == 'true'
+        env:
+          LIVE_ONBOARDING_PHASE: signin
+          LIVE_SIGNIN_ATTEMPTS: '3'
+          LIVE_SIGNIN_RETRY_MS: '5000'
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Remove disposable mailbox
+        if: always() && steps.opt_in.outputs.enabled == 'true'
+        run: node scripts/live-signup-mailbox.mjs cleanup
+
+      - name: Upload live signup proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-signup-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            artifacts/live-signup-proof-account.json
+            artifacts/live-signup-confirmation.json
+            artifacts/live-signup-mailbox-cleanup.json
+            playwright-report-live-onboarding/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14

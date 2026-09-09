@@ -1,0 +1,60 @@
+name: Verify Cloudflare Email Routing control plane
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/cloudflare-email-routing.yml"
+      - ".github/workflows/cloudflare-email-routing-contract.yml"
+      - "scripts/reconcile-cloudflare-email-routing.mjs"
+      - "test/cloudflare-email-routing-control-plane.test.mjs"
+      - "docs/CLOUDFLARE_EMAIL_ROUTING.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cloudflare-email-routing.yml"
+      - ".github/workflows/cloudflare-email-routing-contract.yml"
+      - "scripts/reconcile-cloudflare-email-routing.mjs"
+      - "test/cloudflare-email-routing-control-plane.test.mjs"
+      - "docs/CLOUDFLARE_EMAIL_ROUTING.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+concurrency:
+  group: cloudflare-email-routing-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    name: Verify Email Routing control-plane contract
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Parse-check Email Routing reconciler
+        run: node --check scripts/reconcile-cloudflare-email-routing.mjs
+
+      - name: Run Email Routing control-plane contract
+        run: node --test test/cloudflare-email-routing-control-plane.test.mjs

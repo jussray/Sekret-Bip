@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "project": "sekret-bip",
+  "visualAuthority": {
+    "finalDecisionOwner": "founder",
+    "nonDelegable": true,
+    "directionSource": "explicit founder-approved vision, prompt, or specification",
+    "canvaRole": "visual communication and editable reference only",
+    "githubRole": "implementation and machine-verifiable product contracts",
+    "runtimeProofRole": "exact-head browser evidence that implementation renders and behaves as intended",
+    "precedence": [
+      "founder",
+      "founder-approved-direction",
+      "canva-reference",
+      "github-implementation",
+      "playwright-runtime-proof"
+    ],
+    "conflictRule": "When Canva, GitHub implementation, or runtime evidence conflicts with explicit founder direction, the lower layer must be corrected. Canva and generated visuals cannot override founder intent."
+  }
+}

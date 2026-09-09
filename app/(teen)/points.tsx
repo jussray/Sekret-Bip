@@ -7,11 +7,19 @@ import { useStreak } from '@/hooks/useStreak';
 
 export default function PointsRoute() {
   const {
-    theme, mood, selectedSekret,
-    moodHistory, entries, voiceNotes, circlePosts, crewCheckIns,
+    theme,
+    mood,
+    selectedSekret,
+    moodHistory,
+    entries,
+    voiceNotes,
+    circlePosts,
+    comfortSessions,
+    crewCheckIns,
   } = useAppContext();
   const t = THEME_PACKS[theme] ?? THEME_PACKS.neon;
   const { streakDays } = useStreak();
+
   return (
     <PointsScreen
       t={t}
@@ -21,7 +29,7 @@ export default function PointsRoute() {
       journalEntries={entries}
       voiceNotes={voiceNotes}
       circlePosts={circlePosts}
-      comfortSessions={[]}
+      comfortSessions={comfortSessions}
       crewCheckIns={crewCheckIns}
       streakDays={streakDays}
       setScreen={(screen: string) => navigateTo(screen, 'teen')}

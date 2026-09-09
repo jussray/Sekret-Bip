@@ -1,0 +1,108 @@
+name: Verify Se'kret control room test catalog
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "control-room.manifest.json"
+      - ".control-room/repository.manifest.json"
+      - ".control-room/plugin-management.json"
+      - "scripts/verify-control-room-tests.mjs"
+      - "scripts/verify-plugin-management-contract.mjs"
+      - "test/control-room-tests-catalog.test.mjs"
+      - "test/ai-skill-gap-blueprint-workflow.test.mjs"
+      - "test/juss-os-command-contract.test.mjs"
+      - "AGENTS.md"
+      - "AGENTS_FOUNDER_INTELLIGENCE.md"
+      - ".agents/skills/founder-dev-flow/SKILL.md"
+      - ".ai-skills/**"
+      - ".cursor/rules"
+      - "CLAUDE.md"
+      - "CHATGPT.md"
+      - "PERPLEXITY.md"
+      - "package.json"
+      - ".github/workflows/**"
+  push:
+    branches: [main]
+    paths:
+      - "control-room.manifest.json"
+      - ".control-room/repository.manifest.json"
+      - ".control-room/plugin-management.json"
+      - "scripts/verify-control-room-tests.mjs"
+      - "scripts/verify-plugin-management-contract.mjs"
+      - "test/control-room-tests-catalog.test.mjs"
+      - "test/ai-skill-gap-blueprint-workflow.test.mjs"
+      - "test/juss-os-command-contract.test.mjs"
+      - "AGENTS.md"
+      - "AGENTS_FOUNDER_INTELLIGENCE.md"
+      - ".agents/skills/founder-dev-flow/SKILL.md"
+      - ".ai-skills/**"
+      - ".cursor/rules"
+      - "CLAUDE.md"
+      - "CHATGPT.md"
+      - "PERPLEXITY.md"
+      - "package.json"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  CONTROL_ROOM_TEST_REPORT_PATH: artifacts/control-room-tests.json
+
+concurrency:
+  group: sekret-control-room-tests-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Discover repo-native tests and enforce critical workflow authority
+    runs-on: ubuntu-22.04
+    timeout-minutes: 8
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Parse-check catalog verifier
+        run: node --check scripts/verify-control-room-tests.mjs
+
+      - name: Run focused catalog contracts
+        run: node --test test/control-room-tests-catalog.test.mjs
+
+      - name: Run governed gap-to-merge workflow contract
+        run: node --test test/ai-skill-gap-blueprint-workflow.test.mjs
+
+      - name: Verify portable Juss OS command contract
+        run: node --test test/juss-os-command-contract.test.mjs
+
+      - name: Verify ChatGPT plugin management contract
+        run: node scripts/verify-plugin-management-contract.mjs
+
+      - name: Verify dynamic package-script and workflow inventory
+        run: node scripts/verify-control-room-tests.mjs
+
+      - name: Retain sanitized test-authority receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sekret-control-room-tests-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/control-room-tests.json
+          if-no-files-found: error
+          retention-days: 14

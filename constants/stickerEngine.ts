@@ -66,7 +66,7 @@ type StickerMap = Record<SekretPersonality, Record<EmotionalState, StickerEntry>
 export const STICKER_MAP: StickerMap = {
 
   // ── Raylene ─────────────────────────────────────────────────────────────────
-  raylene: {
+  suhana: {
     neutral:    { imageKey: 'rayleneNeutral',    fallbackKey: 'rayleneNeutral',   description: 'Raylene — calm, present' },
     happy:      { imageKey: 'rayleneHappy',      fallbackKey: 'rayleneNeutral',   description: 'Raylene — joy, celebration' },
     thinking:   { imageKey: 'rayleneThinking',   fallbackKey: 'rayleneNeutral',   description: 'Raylene — processing, pondering' },
@@ -82,7 +82,7 @@ export const STICKER_MAP: StickerMap = {
   },
 
   // ── Rylane ──────────────────────────────────────────────────────────────────
-  rylane: {
+  sy: {
     neutral:    { imageKey: 'rylaneNeutral',    fallbackKey: 'rylaneNeutral',    description: 'Rylane — composed, ready' },
     happy:      { imageKey: 'rylaneHappy',      fallbackKey: 'rylaneNeutral',    description: 'Rylane — proud, winning' },
     thinking:   { imageKey: 'rylaneThinking',   fallbackKey: 'rylaneNeutral',    description: 'Rylane — calculating, focused' },
@@ -140,8 +140,8 @@ export const STICKER_MAP: StickerMap = {
  * Falls back to neutral if anything is missing.
  *
  * Usage:
- *   <Image source={getStickerForState('raylene', 'thinking')} />
- *   <Image source={getStickerForState('rylane', 'voiceDay', { timeOfDay: 'day' })} />
+ *   <Image source={getStickerForState('suhana', 'thinking')} />
+ *   <Image source={getStickerForState('sy', 'voiceDay', { timeOfDay: 'day' })} />
  */
 export function getStickerForState(
   character: SekretPersonality,
@@ -181,7 +181,7 @@ export function getStickerEntry(
   character: SekretPersonality,
   state: EmotionalState,
 ): StickerEntry {
-  return STICKER_MAP[character]?.[state] ?? STICKER_MAP.raylene.neutral;
+  return STICKER_MAP[character]?.[state] ?? STICKER_MAP.suhana.neutral;
 }
 
 /**

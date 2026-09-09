@@ -1,19 +1,9 @@
 /**
- * src/services/ai/buildReplyRequest.ts
- *
  * Single source of truth for assembling the rich `/api/sekret/reply` payload.
- *
- * Every companion surface (main chat, journal, companion chat, page replies)
- * should route through this so a reply carries the same continuity signal:
- *   - learned relationship style (tone/nickname/profanity preferences)
- *   - conversation phase + phase instruction
- *   - long-term oracle understandings (memory)
- *   - the teen's name context
- *
- * Without this, a surface sends a thin payload and the companion feels generic
- * ("which part feels loudest right now?") instead of continuous
- * ("weren't you stressing about that test two days ago 😭").
+ * Every companion surface routes through this builder so continuity behavior is
+ * shared rather than reimplemented inside individual screens.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loadTeenRelationshipProfile,
   learnTeenRelationshipStyle,
@@ -21,6 +11,10 @@ import {
   relationshipProfileToOracleNote,
   type TeenRelationshipProfile,
 } from '../../../services/oracleRelationship';
+import {
+  buildOracleContext,
+  normalizeOracleProfile,
+} from '../../../services/oracleDiscovery';
 import {
   getConversationPhase,
   buildConversationPhaseInstruction,
@@ -39,10 +33,12 @@ export interface ReplyRequestContext {
   userName?: string;
   displayName?: string;
   profileName?: string;
-  /** Long-term oracle understandings, e.g. buildOracleContext(oracleProfile, 'teen'). */
+  /** Explicit structured Oracle context. When omitted, the bounded teen profile is loaded locally. */
   oracleContext?: string[];
   /** Surface-specific memory keys folded into the memory bundle (e.g. teenGender). */
   extraMemory?: Record<string, unknown>;
+  /** True only for the user's first introduction to this companion. */
+  isFirstCompanionChat?: boolean;
 }
 
 export interface SekretReplyRequest {
@@ -58,6 +54,7 @@ export interface SekretReplyRequest {
   conversationPhase: ConversationPhase;
   phaseInstruction: string;
   isArrival: boolean;
+  isFirstCompanionChat: boolean;
   memory: Record<string, unknown>;
 }
 
@@ -67,30 +64,47 @@ export interface BuiltReplyRequest {
   relationship: TeenRelationshipProfile;
 }
 
+async function resolveOracleContext(explicit?: string[]): Promise<string[]> {
+  if (explicit?.length) return explicit.filter(value => typeof value === 'string').slice(0, 8);
+
+  try {
+    const raw = await AsyncStorage.getItem('oracleProfile');
+    if (!raw) return [];
+    const profile = normalizeOracleProfile(JSON.parse(raw), 'teen');
+    return buildOracleContext(profile, 'teen').slice(0, 8);
+  } catch {
+    return [];
+  }
+}
+
 /**
- * Load + advance the teen relationship profile, compute conversation phase, and
- * assemble the full reply request. Persists the learned profile as a side effect
- * (matching the main chat path) so every surface contributes to memory.
+ * Load + advance the teen relationship profile, compute conversation phase,
+ * recover bounded structured Oracle context, and assemble the reply request.
  */
 export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<BuiltReplyRequest> {
   const history = ctx.history ?? [];
   const historyLength = history.length;
 
-  const currentRelationship = await loadTeenRelationshipProfile();
+  const [currentRelationship, oracleContext] = await Promise.all([
+    loadTeenRelationshipProfile(),
+    resolveOracleContext(ctx.oracleContext),
+  ]);
   const relationship = learnTeenRelationshipStyle(ctx.text, currentRelationship);
   await saveTeenRelationshipProfile(relationship);
 
   const conversationPhase = getConversationPhase(historyLength);
+  const isFirstCompanionChat = ctx.isFirstCompanionChat ?? historyLength === 0;
   const phaseInstruction = buildConversationPhaseInstruction(
     conversationPhase,
     historyLength,
     ctx.characterId,
+    isFirstCompanionChat,
   );
   const isArrival = isArrivalMessage(ctx.text, historyLength);
 
   const memory: Record<string, unknown> = {
     relationshipStyle: relationshipProfileToOracleNote(relationship),
-    ...(ctx.oracleContext && ctx.oracleContext.length > 0 ? { oracleContext: ctx.oracleContext } : {}),
+    ...(oracleContext.length > 0 ? { oracleContext } : {}),
     ...(ctx.extraMemory ?? {}),
   };
 
@@ -108,6 +122,7 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
       conversationPhase,
       phaseInstruction,
       isArrival,
+      isFirstCompanionChat,
       memory,
     },
     relationship,

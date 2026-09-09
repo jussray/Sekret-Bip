@@ -1,3 +1,5 @@
+import { execFileSync } from 'node:child_process';
+import * as path from 'node:path';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 import appJson from './app.json';
 
@@ -9,6 +11,18 @@ const PARENT_EAS_PROJECT_ID = '40fc6484-b1e6-4668-b9bc-c7515684f817';
 
 type ExpoExtra = NonNullable<ExpoConfig['extra']>;
 type ExpoPlugin = NonNullable<ExpoConfig['plugins']>[number];
+
+function prepareCloudflareReleaseSource(): void {
+  if (process.env.CF_PAGES !== '1') return;
+
+  const cwd = process.cwd();
+  const scriptPath = path.join(cwd, 'scripts', 'bootstrap-release-metadata-source.mjs');
+  execFileSync(process.execPath, [scriptPath], {
+    cwd,
+    env: process.env,
+    stdio: 'inherit',
+  });
+}
 
 function getAppVariant(): AppVariant {
   const explicitVariant = process.env.APP_VARIANT ?? process.env.EXPO_PUBLIC_APP_VARIANT;
@@ -41,6 +55,8 @@ function isSplashPlugin(plugin: ExpoPlugin): boolean {
 // "Could not find MIME for Buffer <null>".
 
 export default ({ config }: ConfigContext): ExpoConfig => {
+  prepareCloudflareReleaseSource();
+
   const variant = getAppVariant();
   const isParent = variant === 'parent';
   const base = appJson.expo as ExpoConfig;

@@ -10,18 +10,20 @@ import { buildReplyRequest } from '../services/ai/buildReplyRequest';
 import type { PagesTab } from '../../screens/PagesScreen';
 import type { ChatMessage } from '../../src/services/ai/chat';
 
-export type PagesAvatarKey = 'raylene' | 'rylane' | 'cloud' | 'night';
-const REPLY_TABS = new Set<PagesTab>(['raylene', 'rylane', 'cloud', 'night']);
+export type PagesAvatarKey = 'suhana' | 'sy' | 'cloud' | 'night';
+const REPLY_TABS = new Set<PagesTab>(['suhana', 'sy', 'cloud', 'night']);
 
 const avatarState: Record<PagesAvatarKey, SekretAvatarState> = {
-  raylene: 'neutral',
-  rylane: 'neutral',
+  suhana: 'neutral',
+  sy: 'neutral',
   cloud: 'neutral',
   night: 'neutral',
 };
 
+// IMAGES.rayleneXxx / IMAGES.rylaneXxx are the underlying asset-file constant
+// names (unrenamed on disk) for the characters now displayed as Suhana/Sy.
 const avatarAssets: Record<PagesAvatarKey, Record<SekretAvatarState, any>> = {
-  raylene: {
+  suhana: {
     neutral: IMAGES.rayleneNeutral,
     listening: IMAGES.rayleneThinking,
     thinking: IMAGES.rayleneThinking,
@@ -30,7 +32,7 @@ const avatarAssets: Record<PagesAvatarKey, Record<SekretAvatarState, any>> = {
     concerned: IMAGES.rayleeneSad,
     responding: IMAGES.rayleneConfident,
   },
-  rylane: {
+  sy: {
     neutral: IMAGES.rylaneNeutral,
     listening: IMAGES.rylaneThinking,
     thinking: IMAGES.rylaneThinking,
@@ -70,8 +72,8 @@ function installDynamicAvatar(
   });
 }
 
-installDynamicAvatar('rayleneNeutral', 'raylene');
-installDynamicAvatar('rylaneNeutral', 'rylane');
+installDynamicAvatar('rayleneNeutral', 'suhana');
+installDynamicAvatar('rylaneNeutral', 'sy');
 installDynamicAvatar('cloudAvatarNeutral', 'cloud');
 installDynamicAvatar('nightNeutral', 'night');
 
@@ -93,8 +95,8 @@ export function tabToAvatarKey(tab: PagesTab): PagesAvatarKey | null {
 }
 
 export const THINKING_LABELS: Record<string, string> = {
-  raylene: 'Raylene is thinking…',
-  rylane: 'Rylane is thinking…',
+  suhana: 'Suhana is thinking…',
+  sy: 'Sy is thinking…',
   cloud: 'Cloud is thinking…',
   night: 'Night is thinking…',
 };

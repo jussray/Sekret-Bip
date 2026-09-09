@@ -1,0 +1,94 @@
+name: Piper Voice Exact-Head Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - worker/piper-tts.ts
+      - worker/index.ts
+      - services/piper-tts/**
+      - test/piper-tts.test.mjs
+      - docs/piper-voice-contract.md
+      - docs/piper-voice-contract-proof.md
+      - .github/workflows/piper-voice-exact-head.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - worker/piper-tts.ts
+      - worker/index.ts
+      - services/piper-tts/**
+      - test/piper-tts.test.mjs
+      - docs/piper-voice-contract.md
+      - docs/piper-voice-contract-proof.md
+      - .github/workflows/piper-voice-exact-head.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: piper-voice-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify-piper-contract:
+    name: Exact head and Piper contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p piper-evidence
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          printf 'expected_head_sha=%s\nactual_head_sha=%s\nworkflow_run_id=%s\n' \
+            "$EXPECTED_HEAD_SHA" "$ACTUAL_HEAD_SHA" "$GITHUB_RUN_ID" \
+            | tee piper-evidence/exact-head.txt
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Run Piper contract tests
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test test/piper-tts.test.mjs \
+            2>&1 | tee piper-evidence/piper-contract.log
+
+      - name: Validate Piper Python service syntax
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m py_compile services/piper-tts/server.py \
+            2>&1 | tee piper-evidence/python-syntax.log
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: piper-voice-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: piper-evidence/
+          if-no-files-found: error
+          retention-days: 14

@@ -1,145 +1,236 @@
 # bip-architecture
 
+## 5W1H operating contract
+
+Before planning, editing, or claiming completion, establish and state:
+
+- **Who** — requester, decision owner, affected users/data subjects, execution authority.
+- **What** — requested outcome, concrete deliverable, non-goals, work to preserve.
+- **Where** — exact repository, branch, environment, runtime, route, service, table, or provider boundary.
+- **When** — lifecycle/release state, ordering, timing constraint, rollback window.
+- **Why** — user problem and verified evidence.
+- **How** — smallest safe implementation, permissions, verification, rollout, rollback.
+
+Inspect repository and runtime truth for unknowns. Re-run 5W1H when red-team/OODA findings change the plan.
+
+Last reviewed: 2026-08-20
+
 ## Trigger
-Any session involving: new features, refactors, routing changes,
-context/state work, character/AI integration, onboarding flow changes,
-or Cloudflare deployment ownership.
 
-## Verified Repo Structure (jussray/Bip, main, 2026-07-07)
+Any session involving new features, refactors, routing changes, state ownership, character/AI integration, onboarding, Supabase trust boundaries, Cloudflare Worker ownership, Service Bindings, or deployment authority.
 
-This section is a snapshot, not permanent truth. Run `bip-repo-truth` first and verify paths
-before relying on it. If the repository has changed, update this skill in the same PR or open
-a follow-up issue rather than silently working from stale architecture.
+## Repository truth first
 
-### Route Groups (Expo Router)
-```
+Canonical repository: `jussray/Sekret-Bip`.
+
+Before editing:
+
+1. verify current branch and fresh `main` SHA;
+2. read `implementation-ledger.json`;
+3. read `docs/CURRENT_STATUS.md`, `docs/TRUTH_AUTHORITY.md`, `docs/CLOUDFLARE_OWNERSHIP.md`, `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md`, and `DEPLOYMENT.md`;
+4. inspect actual files/workflows/provider evidence involved;
+5. update this skill in the same PR when its durable architecture rules become stale.
+
+Do not use dated launch snapshots as current authority.
+
+## Route groups
+
+```text
 app/
-  (auth)/         — authentication (login, sign-up)
-  (onboarding)/   — first-run onboarding flow
-  (teen)/         — teen user experience (all teen-facing screens)
-  (parent)/       — parent/guardian experience
-  (modals)/       — modal overlays (context-preserving, overlay current route)
-  (dev)/          — dev/debug tooling (strip or gate in prod builds)
-  +not-found.tsx  — 404 handler
-  _layout.tsx     — root layout (auth guard lives here)
-  index.tsx       — entry point / redirect logic
+  (auth)/
+  (onboarding)/
+  (teen)/
+  (parent)/
+  (modals)/
+  (dev)/
+  +not-found.tsx
+  _layout.tsx
+  index.tsx
 ```
 
-**The `(teen)` / `(parent)` split is a routing and presentation boundary, not the sole privacy control.**
-New routes must land in the correct group, but authorization must also be enforced by Supabase
-RLS, RPC/Worker checks, consent records, and response minimization. A route-group split alone
-must never be treated as sufficient protection.
+The teen/parent route split is a presentation boundary, not authorization. Privacy must also be enforced by RLS, RPC/Worker checks, consent records, Storage policies, and response minimization.
 
-Do not create new feature routes at the `app/` root without an explicit architectural reason.
-Framework-required files such as `_layout.tsx`, `index.tsx`, and `+not-found.tsx` remain valid root files.
+## Current architecture anchors
 
-### Key Source Files (verified paths)
-```
-constants/
-  bip_voice.ts          — character voice definitions, copy source of truth
-  characterAssets.ts    — character asset mappings
-  characterAvatars.ts   — character avatar mappings
-  characterStickers.ts  — character sticker sets
-  guardrails.ts         — AI safety guardrails
-  parentSekret.ts       — parent-facing Sekret character config
-  theme.ts              — app theme tokens
-  vibeColors.ts         — vibe/mood color system
-  voiceBip.ts           — Bip voice config (separate from bip_voice.ts)
+Verify exact paths before use:
 
-context/               — React contexts; verify exact exported names before use
-services/              — API/service layer; verify current function signatures
-worker/                — backend Cloudflare Worker source
-supabase/              — migrations, functions, and RLS policies
+```text
+app/                         Expo Router surfaces
+src/features/sekret/         companion identity/style contracts
+src/contracts/sekretApi.ts   shared companion reply/voice/transcription contract
+src/services/backend/        typed Worker client boundary
+worker/sekret-reply.ts       companion brain/reply/TTS/STT implementation
+worker/index.ts              companion auth/rate/style wrapper
+worker/observed-index.ts     companion/backend telemetry wrapper
+worker/voice-entry.ts        current public backend entry point
+worker/bridge-summary.ts     privileged Bridge summary boundary
+worker/email-router.ts       inbound email boundary
+worker/audit/                assurance metadata persistence
+supabase/migrations/         schema source of truth
+supabase/functions/          Edge Functions
+security/                    machine-readable security evidence
+e2e/                         Playwright guardrails
+implementation-ledger.json   feature evidence state
 ```
 
-**No `constants/characters.ts` existed in the verified snapshot.** Character config was split
-across `characterAssets.ts`, `characterAvatars.ts`, `characterStickers.ts`, and `parentSekret.ts`.
-Do not invent or reference a monolithic file without first checking the current repo.
+Do not invent a remembered monolithic character, state, routing, or Worker file. Inspect current ownership first.
 
-## Canonical Cloudflare Ownership
+## Canonical Cloudflare ownership
 
-Read `docs/CLOUDFLARE_OWNERSHIP.md` before changing deployment code.
+### Public API / platform Worker: `sekret-backend`
 
-### `bip` — backend Worker
+Current repository configuration:
 
-Verified by `wrangler.toml`:
-- name: `bip`
-- entry point: `worker/observed-index.ts`
+- name: `sekret-backend`;
+- entry point: `worker/voice-entry.ts`;
+- stable public API origin: `https://api.sekretbip.net`;
+- deployment authority: Cloudflare native Git/Workers Builds, subject to live provider branch-control evidence.
 
-Owns:
-- authenticated API routes
-- Supabase access and authorization
-- OpenAI / Se'kret replies
-- Bridge Summary generation
-- safety, Oracle, voice, push, and backend business logic
+Best-fit purpose:
 
-### `sekret` — frontend Cloudflare Pages project
+- stable public ingress;
+- shared front-door auth/rate/release controls where applicable;
+- Bridge and privileged data operations;
+- Supabase service-role operations;
+- inbound email;
+- other platform/backend business logic outside companion inference;
+- narrow companion assurance ingestion if needed.
 
-Owner-confirmed frontend target. The repository deploys Expo web through
-`.github/workflows/deploy-cloudflare.yml` using `CLOUDFLARE_PAGES_PROJECT_NAME`.
+### Companion Worker: `sekret`
 
-Owns:
-- Expo web export
-- custom domain
-- browser routes and static assets
-- client bootstrap
+Founder-confirmed active companion API lineage. Historical Cloudflare-generated rename PRs show `sekret` targeted the same companion/backend lineage before `sekret-backend` became the repository’s canonical public Worker identity.
 
-The dashboard variable must be verified as `sekret`; never infer it only from memory.
+Best-fit purpose:
 
-### Boundary Rule
+- `/api/sekret/reply`;
+- `/api/sekret/voice`;
+- `/api/sekret/transcribe`;
+- companion identity/style enforcement;
+- safety-response logic coupled directly to companion replies;
+- AI/voice provider execution and provider secrets;
+- companion-scoped telemetry that does not require broad database privilege.
 
-- Secrets and database/business logic belong to `bip`, never the `sekret` frontend.
-- Frontend routing/assets belong to `sekret`, never the `bip` backend Worker.
-- The clients call `bip` through `EXPO_PUBLIC_BACKEND_URL`.
-- Do not rename either deployment target to resolve domain confusion.
+Exact live hostname, routes, custom domains, workers.dev state, service bindings, build trigger, version, traffic, and secrets/bindings remain Cloudflare provider-readback truth.
 
-### Contracts to Verify Each Session
-Before writing code that touches AI/character flow:
-1. Open `context/` and confirm current context names and ownership boundaries.
-2. Open `services/` and confirm the current brain-reply entry point and signature.
-3. Open `constants/bip_voice.ts`, `constants/voiceBip.ts`, and relevant Worker files.
-4. Confirm whether the change belongs in app state, server state, prompt/persona config, or copy config.
-5. Confirm the response/auth boundary before passing sensitive data between layers.
+### Preferred connection
 
-Before changing Cloudflare deployment:
-1. Verify `wrangler.toml` still names the backend Worker `bip`.
-2. Read `.github/workflows/deploy-cloudflare.yml`.
-3. Verify the actual Pages project variable and custom-domain attachment.
-4. Confirm `EXPO_PUBLIC_BACKEND_URL` targets the backend, not the frontend host.
+Keep the production client single-homed:
 
-Do not duplicate state or persona configuration merely because a remembered contract says it exists.
+```text
+client -> api.sekretbip.net -> sekret-backend -> Service Binding -> sekret
+                                              for /api/sekret/*
+```
 
-## State and Data Architecture
-- Supabase Realtime may carry live membership/post updates; verify current subscriptions, payloads, and RLS.
-- Context/local state owns transient UI and conversation state only where the current implementation says so.
-- Never store sensitive user content in AsyncStorage unencrypted unless an explicit reviewed exception exists.
-- Identity-bearing fields must not enter client state for audiences unauthorized to receive them.
-- Parent Bridge data must remain consent-based and summary-only at the response boundary.
-- Route separation never substitutes for database and server authorization.
+Use a Cloudflare Service Binding rather than adding a second public companion URL to Expo/Web configuration.
 
-## Deploy Pipeline
-The verified repository deployment paths are:
-- Mobile: Expo EAS Build / Update according to target channel and native-change requirements.
-- Backend: Wrangler / GitHub Actions to Cloudflare Worker `bip`.
-- Web frontend: Expo export to Cloudflare Pages project configured by `CLOUDFLARE_PAGES_PROJECT_NAME`; owner-confirmed target is `sekret`.
-- Supabase: versioned migrations and functions through the repository-controlled deployment path.
+The target Worker must be provider-proven and backward compatible before the caller activates delegation. Preserve the existing backend-local companion implementation as rollback until exact production proof completes.
 
-These paths must be verified against actual workflows and environment values before release.
+### Secret boundary
 
-### Environment-Aware Deployment Rules
-- If a configured staging environment exists for the affected layer, validate there before production.
-- If staging does not exist, do not invent a nonexistent gate or claim staging validation occurred.
-- Instead, document the available local/preview/test path, run applicable automated checks, and require explicit production-deploy approval.
-- Never make untracked production dashboard edits when a repository-controlled migration/config path exists.
-- For an emergency production fix, record the exact change, deployed version, validation performed, and required repository reconciliation immediately afterward.
+- `SUPABASE_SERVICE_ROLE_KEY` belongs to the privileged platform plane.
+- Do not copy it into `sekret` merely because current assurance telemetry writes metadata directly to Supabase.
+- Refactor privileged telemetry persistence behind a narrow backend/internal boundary before removing the direct path.
+- AI/voice provider secrets may move with the companion runtime only through an explicitly approved secret migration with rollback and provider readback.
+- Client/Pages never receive server secrets.
+
+### Frontend Pages
+
+- project: `sekret-bip`;
+- deployment: Cloudflare Pages native Git integration;
+- owns Expo web export, static/browser routes, custom domain, public `/.well-known/sekret-release.json`, and client bootstrap.
+
+## Boundary rules
+
+- Worker purpose is not inferred solely from a historical Worker name.
+- Current provider binding is not inferred solely from repository intent.
+- Clients use one stable public production API origin unless separately approved.
+- Bridge/email/platform privileged work does not move to the companion Worker as part of a reply/voice split.
+- A Service Binding is a separately gated provider mutation.
+- GitHub Actions verifies deployment; it does not become a second normal upload authority.
+- The retired Supabase `release-health` function is never valid release evidence.
+
+## Exact-release verification
+
+Before the Worker split, production claims require the current public backend release, Pages marker, Supabase runtime, and production journey proof required by `DEPLOYMENT.md` and issue #696.
+
+After a Service Binding cutover, add:
+
+1. exact `sekret-backend` release identity;
+2. exact `sekret` release/version identity;
+3. provider readback of the binding;
+4. production reply/voice/transcription proof that executes on that companion release;
+5. Bridge/email non-regression on the platform Worker;
+6. retained rollback proof.
+
+Check status is not enough when deployed identity or binding differs.
+
+## Identity and companion architecture
+
+Required invariants:
+
+- Se'kret is a continuity presence with canonical product identity;
+- Suhana, Sy, Cloud, and Night remain distinct named companions;
+- legacy identifiers remain only at verified compatibility seams;
+- internal-only identities do not leak into user-visible text, speech, archives, notifications, or accessibility labels;
+- question budgets/deterministic repair remain enforced;
+- telemetry remains metadata-only;
+- short-term history and approved context are supported;
+- durable L4 continuity memory remains planned until its schema/privacy proof exists.
+
+Do not replace the existing reply brain when a wrapper, adapter, or service delegation can make the canonical boundary authoritative with less blast radius.
+
+## Supabase architecture
+
+- `supabase/migrations/` is the only schema source of truth.
+- UI hiding never substitutes for RLS/server authorization.
+- server-only tables must not receive client grants merely to silence a scanner.
+- elevated database functions require positive owner/role and negative anonymous/cross-user tests.
+- retired Edge Functions need explicit replacements/no callers/platform protection where registered.
+
+## L4 continuity boundary
+
+Do not create L4 tables/dashboards before ownership, provenance, correction/deletion, retention, RLS/denial tests, one real runtime consumer, rollout, telemetry, and rollback are approved together.
+
+A dashboard is not implementation.
+
+## State and data rules
+
+- transient UI state belongs in client state only where implementation says so;
+- sensitive content must not enter AsyncStorage without reviewed exception;
+- identity-bearing fields must not enter unauthorized client state;
+- Parent Bridge remains consent-based and response-minimized;
+- route separation never substitutes for database/server authorization;
+- local/cloud conflict behavior must be explicit before claiming lossless multi-device editing.
+
+## Workflow before changing architecture
+
+1. Identify the user-visible outcome.
+2. Resolve current runtime/data/provider owners.
+3. Classify privacy, authorization, and secret boundaries.
+4. Attack whether the change can be a connection/delegation instead of replacement.
+5. Update ledger acceptance/evidence when feature state changes.
+6. Implement the smallest reversible runtime slice.
+7. Add executable tests, telemetry, rollout, rollback.
+8. Run exact-head CI and Playwright where applicable.
+9. Deploy/provider-mutate only through explicitly authorized authority.
+10. Reconcile provider evidence and durable docs.
+
+For the `sekret` split specifically: provider census -> compatibility -> telemetry least privilege -> service binding -> controlled proof -> exact production proof -> only then remove duplicate companion execution from `sekret-backend`.
+
+## Environment rules
+
+- Use staging when a real staging environment exists.
+- Do not claim staging when none exists.
+- Document real local/preview/controlled-production/rollback paths.
+- Avoid untracked production dashboard edits where repository-controlled paths exist.
+- Reconcile emergency production changes immediately.
 
 ## Output
-When starting a session, report:
-- verified commit/branch and timestamp;
-- route group and source files being touched;
-- data/auth/privacy boundaries that apply;
-- whether the target is backend `bip`, frontend `sekret`, mobile, or Supabase;
-- target environment and whether staging actually exists;
-- any architecture snapshot in this skill that is now stale.
 
-Read the file before changing it. Repository truth overrides this snapshot.
+At session start, report verified repository/branch/commit, runtime/data/provider owners, privacy/authorization/secret boundaries, target environment/deployment authority, implementation-ledger state, and stale assumptions found.
+
+Repository and live provider truth override this snapshot.
+
+## Control Room ownership boundary
+
+Keep one founder Control Room at `app/(dev)/control-room.tsx` and `src/screens/DevControlRoomWorkspace.tsx`. Local mission execution belongs in existing Control Room services/scripts. The browser never runs shell directly; it calls the authenticated loopback server, which invokes only fixed local-agent missions.

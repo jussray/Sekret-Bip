@@ -49,10 +49,12 @@ import { TEEN_ROUTES } from '@/teen/routes';
 import { updateSekretMemory } from '../../../services/sekretMemory';
 import {
   fetchSekretVoice,
+  normalizeSekretCharacter,
   type SekretAvatarState,
   type SekretCharacterId,
   type SekretHistoryTurn,
 } from '@/utils/api';
+import { getTeenCompanionAsset } from '@/utils/companions';
 import type { JournalEntry } from '@/types';
 import {
   sendCompanionMessage,
@@ -65,6 +67,7 @@ import {
 } from '../../../src/features/safety/safetyCoordinator';
 import { SafetyExperienceSheet } from '../../../components/safety/SafetyExperienceSheet';
 import {
+  buildBridgeSharePreview,
   createBridgeShareRequest,
   fetchBridgeShareStatusesForJournalEntries,
   revokeBridgeShareRequest,
@@ -77,9 +80,12 @@ import { syncJournal } from '@/utils/sync';
 const ACTIVE_BRIDGE_SHARE_STATUSES = new Set(['pending', 'processing', 'ready', 'viewed']);
 
 // ─── Companion manifest ───────────────────────────────────────────────────────
+// id stays on the persisted app_profiles.selected_companion vocabulary
+// (raylene/rylane, DB-constrained — see constants/voiceBip.ts); name is the
+// current canonical display text.
 const COMPANIONS = [
-  { id: 'raylene', name: 'Raylene', accent: '#f08bc5', vibe: 'warm + protective' },
-  { id: 'rylane',  name: 'Rylane',  accent: '#76a7ff', vibe: 'direct + loyal'    },
+  { id: 'raylene', name: 'Suhana', accent: '#f08bc5', vibe: 'warm + protective' },
+  { id: 'rylane',  name: 'Sy',     accent: '#76a7ff', vibe: 'direct + loyal'    },
   { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure' },
   { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady'    },
   { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages'     },
@@ -135,21 +141,70 @@ const PROMPTS: Record<string, string[]> = {
   ],
 };
 
-// ─── Avatar image helpers (unchanged from original) ───────────────────────────
+// ─── Avatar image helpers ─────────────────────────────────────────────────────
 function normalizeAvatar(value?: string): SekretCharacterId {
-  return value === 'rylane' || value === 'cloud' || value === 'night' ? value : 'raylene';
+  if (value === 'sy' || value === 'rylane') return 'sy';
+  if (value === 'cloud') return 'cloud';
+  if (value === 'night') return 'night';
+  return 'suhana';
 }
 
+const PAGES_COMPANION_POSES = {
+  raylene: {
+    neutral: 'neutral',
+    listening: 'listening',
+    thinking: 'thinking',
+    comforting: 'encouraging',
+    happy: 'happy',
+    concerned: 'encouraging',
+    responding: 'writing',
+  },
+  rylane: {
+    neutral: 'neutral',
+    listening: 'listening',
+    thinking: 'thinking',
+    comforting: 'calm',
+    happy: 'happy',
+    concerned: 'encouraging',
+    responding: 'writing',
+  },
+  night: {
+    neutral: 'neutral',
+    listening: 'listening',
+    thinking: 'thinking',
+    comforting: 'comfort',
+    happy: 'happy',
+    concerned: 'comfort',
+    responding: 'writing',
+  },
+} as const;
+
 function avatarImage(character: SekretCharacterId, state: SekretAvatarState) {
-  const map: Record<SekretCharacterId, Record<SekretAvatarState, any>> = {
-    raylene: { neutral: IMAGES.rayleneNeutral, listening: IMAGES.rayleneThinking, thinking: IMAGES.rayleneThinking, comforting: IMAGES.rayleneWindow, happy: IMAGES.rayleneHappy, concerned: IMAGES.rayleeneSad, responding: IMAGES.rayleneConfident },
-    rylane:  { neutral: IMAGES.rylaneNeutral,  listening: IMAGES.rylaneThinking,  thinking: IMAGES.rylaneThinking,  comforting: IMAGES.rylaneWindow,  happy: IMAGES.rylaneHappy,  concerned: IMAGES.rylaneWindow,  responding: IMAGES.rylaneFullbody },
-    cloud:   { neutral: IMAGES.cloudAvatarNeutral, listening: IMAGES.cloudAvatarThinking, thinking: IMAGES.cloudAvatarThinking, comforting: IMAGES.cloudAvatarWindow, happy: IMAGES.cloudAvatarHappy, concerned: IMAGES.cloudAvatarWindow, responding: IMAGES.cloudAvatarWriting },
-    night:   { neutral: IMAGES.nightNeutral, listening: IMAGES.nightListening, thinking: IMAGES.nightThinking, comforting: IMAGES.nightRelaxed, happy: IMAGES.nightHappy, concerned: IMAGES.nightProtective, responding: IMAGES.nightSoftsmile },
-    sekret:  { neutral: IMAGES.rayleneNeutral, listening: IMAGES.rayleneThinking, thinking: IMAGES.rayleneThinking, comforting: IMAGES.rayleneWindow, happy: IMAGES.rayleneHappy, concerned: IMAGES.rayleeneSad, responding: IMAGES.rayleneConfident },
+  character = normalizeAvatar(character);
+
+  if (character === 'suhana' || character === 'sekret') {
+    return getTeenCompanionAsset('raylene', PAGES_COMPANION_POSES.raylene[state]) ?? IMAGES.rayleneNeutral;
+  }
+
+  if (character === 'sy') {
+    return getTeenCompanionAsset('rylane', PAGES_COMPANION_POSES.rylane[state]) ?? IMAGES.rylaneNeutral;
+  }
+
+  if (character === 'night') {
+    return getTeenCompanionAsset('night', PAGES_COMPANION_POSES.night[state]) ?? IMAGES.nightNeutral;
+  }
+
+  const cloud: Record<SekretAvatarState, any> = {
+    neutral: IMAGES.cloudAvatarNeutral,
+    listening: IMAGES.cloudAvatarThinking,
+    thinking: IMAGES.cloudAvatarThinking,
+    comforting: IMAGES.cloudAvatarWindow,
+    happy: IMAGES.cloudAvatarHappy,
+    concerned: IMAGES.cloudAvatarWindow,
+    responding: IMAGES.cloudAvatarWriting,
   };
-  // 'me' and 'oracle' are never passed — isAiTab() guards all call sites.
-  return map[character][state] ?? map[character].neutral;
+
+  return cloud[state] ?? cloud.neutral;
 }
 
 function inferState(state: SekretAvatarState, mood?: string, tone?: string): SekretAvatarState {
@@ -255,7 +310,11 @@ export default function TeenPagesRoute() {
   const companion = COMPANIONS.find(c => c.id === activeTab) ?? COMPANIONS[0];
 
   const aiCompanion = isAiTab(activeTab);
-  const companionAvatarId: AiCompanionId | null = aiCompanion ? activeTab : null;
+  // activeTab/AiCompanionId is the persisted app_profiles.selected_companion
+  // vocabulary (raylene/rylane); normalize to the canonical SekretCharacterId
+  // (suhana/sy) at this boundary, since everything downstream (voice, avatar
+  // rendering) speaks the canonical vocabulary.
+  const companionAvatarId: SekretCharacterId | null = aiCompanion ? normalizeSekretCharacter(activeTab) : null;
 
   // Entries for current tab, chronological (oldest first for chat timeline)
   const threadEntries = useMemo(
@@ -434,12 +493,33 @@ export default function TeenPagesRoute() {
       return;
     }
 
-    if (current) return; // revoked/expired/failed — not re-shareable from here yet
+    // A terminal status (revoked/expired/failed) falls through to the same
+    // createBridgeShareRequest call below — reusing the same idempotency key
+    // causes the RPC to reactivate the existing request rather than reject it.
 
     if (!linkedParentId) {
       Alert.alert('no linked parent yet', 'Connect with a parent or trusted adult before sharing into Bridge.');
       return;
     }
+
+    const preview = buildBridgeSharePreview(linkedParentId, [{ kind: 'journal', sourceId: String(entryId) }]);
+    if (!preview.ok) {
+      Alert.alert('could not share right now', preview.message);
+      return;
+    }
+
+    const confirmed = await new Promise<boolean>((resolve) => {
+      Alert.alert(
+        'Share with Parent Window?',
+        `${preview.value.notice}\n\nYour parent will NOT see this entry's raw text — only a generated summary. To create that summary, this entry's text is sent to our AI provider for processing.`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Share', style: 'default', onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
+      );
+    });
+    if (!confirmed) return;
 
     setSharingEntryId(entryId);
     const result = await createBridgeShareRequest({
@@ -504,20 +584,20 @@ export default function TeenPagesRoute() {
                 const isTerminal = !!shareStatus && !isActive;
                 const busy = sharingEntryId === entry.id;
                 const label = isTerminal
-                  ? `Bridge share ${shareStatus!.status}`
+                  ? `Bridge share ${shareStatus!.status} — tap to share again`
                   : isActive
                     ? 'Shared into Bridge — tap to revoke'
                     : 'Share with Parent Window';
                 return (
                   <TouchableOpacity
                     onPress={() => handleShareWithParent(entry.id)}
-                    disabled={busy || isTerminal}
+                    disabled={busy}
                     accessibilityRole="button"
                     accessibilityLabel={label}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   >
-                    <Text style={[s.shareIcon, isTerminal && { opacity: 0.4 }]}>
-                      {busy ? '…' : isActive ? '💜' : isTerminal ? '🔒' : '👁️'}
+                    <Text style={s.shareIcon}>
+                      {busy ? '…' : isActive ? '💜' : isTerminal ? '↻' : '👁️'}
                     </Text>
                   </TouchableOpacity>
                 );

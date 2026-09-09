@@ -1,0 +1,306 @@
+name: Se'kret App Domain Founder Command
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: write
+  issues: read
+
+concurrency:
+  group: sekret-app-domain-founder-command
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  dispatch:
+    name: Route bounded founder reconciliation command
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Classify founder command
+        id: route
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+
+          issue = os.environ.get('ISSUE_NUMBER', '')
+          author = os.environ.get('COMMENT_AUTHOR', '')
+          body = os.environ.get('COMMAND_BODY', '').strip()
+
+          command = 'none'
+          if issue == '925' and author == 'jussray':
+              if body.startswith('/reconcile-app-domain '):
+                  command = 'app-domain'
+              elif body.startswith('/reconcile-supabase-history '):
+                  command = 'supabase-history'
+              elif body.startswith('/verify-production '):
+                  command = 'production-verify'
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'command={command}\n')
+
+          print(f'FOUNDER_COMMAND_ROUTE={command}')
+          PY
+
+      - name: Record ignored comment
+        if: ${{ steps.route.outputs.command == 'none' }}
+        shell: bash
+        run: |
+          {
+            echo '## Se’kret founder command router'
+            echo
+            echo '- Result: no recognized founder reconciliation command'
+            echo '- Mutation authority: none'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Parse app-domain founder command
+        id: app-domain-command
+        if: ${{ steps.route.outputs.command == 'app-domain' }}
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 3 or parts[0] != '/reconcile-app-domain':
+              raise SystemExit('Expected exactly: /reconcile-app-domain <40-char-main-sha> <approval-reference>')
+
+          sha, approval = parts[1], parts[2]
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit('Reconcile command SHA must be a lowercase 40-character commit SHA.')
+          if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
+              raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'expected_head_sha={sha}\n')
+              output.write(f'approval_reference={approval}\n')
+          PY
+
+      - name: Verify app-domain SHA is current main
+        if: ${{ steps.route.outputs.command == 'app-domain' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.app-domain-command.outputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN_SHA="$(curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+            | jq -r '.object.sha')"
+
+          echo "Requested exact head: $EXPECTED_HEAD_SHA"
+          echo "Current main:         $CURRENT_MAIN_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Dispatch existing bounded app-domain reconcile
+        if: ${{ steps.route.outputs.command == 'app-domain' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.app-domain-command.outputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg sha "$EXPECTED_HEAD_SHA" \
+            '{ref:"main",inputs:{target_sha:$sha,apply:true}}')"
+
+          curl --fail --silent --show-error \
+            -X POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/reconcile-cloudflare-app-domain.yml/dispatches" \
+            --data "$payload"
+
+          {
+            echo '## Se’kret app-domain reconcile command accepted'
+            echo
+            echo "- Exact approved head: \`${{ steps.app-domain-command.outputs.expected_head_sha }}\`"
+            echo "- Approval reference: \`${{ steps.app-domain-command.outputs.approval_reference }}\`"
+            echo '- Downstream target binding: exact approved SHA passed as `target_sha`'
+            echo '- Mutation authority: existing `.github/workflows/reconcile-cloudflare-app-domain.yml` only'
+            echo '- Target: restore Pages ownership of `app.sekretbip.net` while preserving `api.sekretbip.net` backend identity'
+            echo '- Cloudflare credentials in bridge: none'
+            echo '- Supabase/database mutation in bridge: none'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Parse Supabase history founder command
+        id: supabase-command
+        if: ${{ steps.route.outputs.command == 'supabase-history' }}
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 3 or parts[0] != '/reconcile-supabase-history':
+              raise SystemExit('Expected exactly: /reconcile-supabase-history <40-char-main-sha> <approval-reference>')
+
+          sha, approval = parts[1], parts[2]
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit('Supabase history command SHA must be a lowercase 40-character commit SHA.')
+          if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
+              raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'expected_head_sha={sha}\n')
+              output.write(f'approval_reference={approval}\n')
+          PY
+
+      - name: Verify Supabase history SHA is current main
+        if: ${{ steps.route.outputs.command == 'supabase-history' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.supabase-command.outputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN_SHA="$(curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+            | jq -r '.object.sha')"
+
+          echo "Requested exact head: $EXPECTED_HEAD_SHA"
+          echo "Current main:         $CURRENT_MAIN_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Dispatch exact six-receipt Supabase history reconciliation
+        if: ${{ steps.route.outputs.command == 'supabase-history' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.supabase-command.outputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n \
+            --arg sha "$EXPECTED_HEAD_SHA" \
+            '{
+              ref: "main",
+              inputs: {
+                target_sha: $sha,
+                confirm_project: "tbsevonvegdnlyjgplmm",
+                reconciliation_confirmation: "RECONCILE SIX SECURITY RECEIPT ALIASES"
+              }
+            }')"
+
+          curl --fail --silent --show-error \
+            -X POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/reconcile-supabase-production-history.yml/dispatches" \
+            --data "$payload"
+
+          {
+            echo '## Se’kret Supabase history reconcile command accepted'
+            echo
+            echo "- Exact approved head: \`${{ steps.supabase-command.outputs.expected_head_sha }}\`"
+            echo "- Approval reference: \`${{ steps.supabase-command.outputs.approval_reference }}\`"
+            echo '- Mutation authority: existing `.github/workflows/reconcile-supabase-production-history.yml` only'
+            echo '- Target project: `tbsevonvegdnlyjgplmm`'
+            echo '- Scope: exactly six receipt-backed migration aliases'
+            echo '- Completed production security applies remain receipt-bound; no security migration SQL apply is authorized here'
+            echo '- Supabase credentials in bridge: none'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Parse production verification founder command
+        id: production-command
+        if: ${{ steps.route.outputs.command == 'production-verify' }}
+        env:
+          COMMAND_BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os
+          import re
+
+          body = os.environ.get('COMMAND_BODY', '').strip()
+          parts = body.split()
+          if len(parts) != 3 or parts[0] != '/verify-production':
+              raise SystemExit('Expected exactly: /verify-production <40-char-main-sha> <approval-reference>')
+
+          sha, approval = parts[1], parts[2]
+          if not re.fullmatch(r'[0-9a-f]{40}', sha):
+              raise SystemExit('Production verification SHA must be a lowercase 40-character commit SHA.')
+          if not re.fullmatch(r'[A-Za-z0-9._:-]{8,200}', approval):
+              raise SystemExit('Approval reference must use 8-200 auditable characters: A-Z a-z 0-9 . _ : -')
+
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'expected_head_sha={sha}\n')
+              output.write(f'approval_reference={approval}\n')
+          PY
+
+      - name: Verify production target SHA is current main
+        if: ${{ steps.route.outputs.command == 'production-verify' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.production-command.outputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CURRENT_MAIN_SHA="$(curl --fail --silent --show-error \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/git/ref/heads/main" \
+            | jq -r '.object.sha')"
+
+          echo "Requested exact head: $EXPECTED_HEAD_SHA"
+          echo "Current main:         $CURRENT_MAIN_SHA"
+          test "$CURRENT_MAIN_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Dispatch exact-current-main production verification
+        if: ${{ steps.route.outputs.command == 'production-verify' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_HEAD_SHA: ${{ steps.production-command.outputs.expected_head_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          payload="$(jq -n --arg sha "$EXPECTED_HEAD_SHA" '{ref:"main",inputs:{target_sha:$sha}}')"
+
+          curl --fail --silent --show-error \
+            -X POST \
+            -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-cloudflare.yml/dispatches" \
+            --data "$payload"
+
+          {
+            echo '## Se’kret production verification command accepted'
+            echo
+            echo "- Exact approved head: \`${{ steps.production-command.outputs.expected_head_sha }}\`"
+            echo "- Approval reference: \`${{ steps.production-command.outputs.approval_reference }}\`"
+            echo '- Authority: read/verify existing current production release only'
+            echo '- Downstream workflow: `.github/workflows/deploy-cloudflare.yml`'
+            echo '- Required proof path: exact target → Supabase schema → release transport → Cloudflare release → backend → Supabase runtime → Chromium → production Playwright'
+            echo '- Provider/database credentials in bridge: none'
+          } >> "$GITHUB_STEP_SUMMARY"

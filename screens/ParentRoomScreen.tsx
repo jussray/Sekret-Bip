@@ -4,15 +4,17 @@
 //
 // Room art fills the screen. Se'kret presence floats inside it.
 // Tappable objects live where the objects are in the room.
-// A soft mood check-in sits at the bottom — 4 options only.
+// A soft mood check-in can be dragged anywhere the parent prefers.
 // Nothing demands. The room waits.
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Text, View, TouchableOpacity,
   ImageBackground, Animated, StyleSheet,
-  Platform, Dimensions, Easing,
+  Platform, Dimensions, Easing, PanResponder,
+  useWindowDimensions,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IMAGES, getParentRoomBg } from '../constants/theme';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
@@ -20,14 +22,20 @@ import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 const { width: W, height: H } = Dimensions.get('window');
 const NAV_H = Platform.OS === 'ios' ? 84 : 64;
 const TOP   = Platform.OS === 'ios' ? 56 : 36;
+const MOOD_PANEL_POSITION_KEY = 'parent_mood_panel_position_v1';
+const MOOD_PANEL_MARGIN = 12;
+const MOOD_PANEL_ESTIMATED_HEIGHT = 144;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 export type ParentRoomStyle = 'mom' | 'dad';
 
+type Point = { x: number; y: number };
+type PanelSize = { width: number; height: number };
+
 // ─── Overlay: dark vignette top + bottom, clear in the middle ─────────────────
 const OVERLAY: Record<ParentRoomStyle, [string, string, string, string]> = {
   mom: ['rgba(30,8,58,0.68)', 'rgba(20,4,40,0.06)', 'rgba(20,4,40,0.04)', 'rgba(12,2,30,0.82)'],
-  dad: ['rgba(4,7,22,0.70)',  'rgba(2,5,14,0.06)',  'rgba(2,5,14,0.04)', 'rgba(2,4,12,0.84)'],
+  dad: ['rgba(4,7,22,0.70)',  'rgba(2,5,14,0.06)',  'rgba(2,5,14,0.04)',  'rgba(2,4,12,0.84)'],
 };
 
 // ─── Color tokens per room style ──────────────────────────────────────────────
@@ -153,12 +161,18 @@ function getTimeSlot(weatherMode?: string) {
 }
 
 function getGreeting(style: ParentRoomStyle, slot: string) {
-  if (slot === 'day')       return style === 'mom' ? "hey, mama. how\'s the day?" : "hey, dad. how's the day?";
+  if (slot === 'day')       return style === 'mom' ? "hey, mama. how's the day?" : "hey, dad. how's the day?";
   if (slot === 'evening')   return "you made it through. breathe.";
   if (slot === 'night')     return "still up? sit down for a sec.";
   if (slot === 'deepNight') return "put it down for tonight.";
   if (slot === 'rain')      return "it's a quiet one. take it.";
   return style === 'mom' ? "good morning, mama." : "good morning, dad.";
+}
+
+function isSavedPoint(value: unknown): value is Point {
+  if (!value || typeof value !== 'object') return false;
+  const point = value as Partial<Point>;
+  return Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
 // ─── ParentRoomScreen ─────────────────────────────────────────────────────────
@@ -176,11 +190,13 @@ export function ParentRoomScreen({
   parentRoomStyle, parentMood, previousMood,
   setParentMood, setScreen, weatherMode, BottomNav,
 }: ParentRoomScreenProps) {
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
+  const moodPanelWidth = Math.max(240, Math.min(360, viewportWidth - MOOD_PANEL_MARGIN * 2));
 
-  const slot    = useMemo(() => getTimeSlot(weatherMode), [weatherMode]);
-  const tokens  = T[parentRoomStyle];
-  const roomBg  = getParentRoomBg(parentRoomStyle, weatherMode) ?? IMAGES.bgRayleneRoomNight;
-  const overlay = OVERLAY[parentRoomStyle];
+  const slot     = useMemo(() => getTimeSlot(weatherMode), [weatherMode]);
+  const tokens   = T[parentRoomStyle];
+  const roomBg   = getParentRoomBg(parentRoomStyle, weatherMode) ?? IMAGES.bgRayleneRoomNight;
+  const overlay  = OVERLAY[parentRoomStyle];
   const greeting = getGreeting(parentRoomStyle, slot);
 
   // Memory line: computed once on mount — 60% chance when previous session had a mood
@@ -221,6 +237,104 @@ export function ParentRoomScreen({
   const textFade    = useRef(new Animated.Value(0)).current;
   const cloudBreath = useRef(new Animated.Value(0)).current;
   const moodPop     = useRef(new Animated.Value(1)).current;
+
+  // The mood panel uses absolute coordinates so touch and mouse dragging behave
+  // consistently across native and web. Position is saved per device.
+  const initialMoodPanelPoint = useRef<Point>({
+    x: Math.max(MOOD_PANEL_MARGIN, (viewportWidth - moodPanelWidth) / 2),
+    y: Math.max(
+      TOP + 92,
+      viewportHeight - NAV_H - MOOD_PANEL_ESTIMATED_HEIGHT - MOOD_PANEL_MARGIN,
+    ),
+  }).current;
+  const moodPanelPosition = useRef(new Animated.ValueXY(initialMoodPanelPoint)).current;
+  const moodPanelPoint = useRef<Point>(initialMoodPanelPoint);
+  const dragStartPoint = useRef<Point>(initialMoodPanelPoint);
+  const moodPanelSize = useRef<PanelSize>({
+    width: moodPanelWidth,
+    height: MOOD_PANEL_ESTIMATED_HEIGHT,
+  });
+  const viewportSize = useRef<PanelSize>({
+    width: viewportWidth,
+    height: viewportHeight,
+  });
+
+  function clampMoodPanelPoint(point: Point): Point {
+    const panel = moodPanelSize.current;
+    const viewport = viewportSize.current;
+    const minX = MOOD_PANEL_MARGIN;
+    const maxX = Math.max(minX, viewport.width - panel.width - MOOD_PANEL_MARGIN);
+    const minY = TOP + 52;
+    const maxY = Math.max(
+      minY,
+      viewport.height - NAV_H - panel.height - MOOD_PANEL_MARGIN,
+    );
+
+    return {
+      x: Math.min(maxX, Math.max(minX, point.x)),
+      y: Math.min(maxY, Math.max(minY, point.y)),
+    };
+  }
+
+  function moveMoodPanel(point: Point) {
+    const clamped = clampMoodPanelPoint(point);
+    moodPanelPoint.current = clamped;
+    moodPanelPosition.setValue(clamped);
+  }
+
+  function saveMoodPanelPosition() {
+    void AsyncStorage.setItem(
+      MOOD_PANEL_POSITION_KEY,
+      JSON.stringify(moodPanelPoint.current),
+    ).catch(() => {});
+  }
+
+  const moodPanelPanResponder = useMemo(
+    () => PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2,
+      onPanResponderGrant: () => {
+        dragStartPoint.current = { ...moodPanelPoint.current };
+      },
+      onPanResponderMove: (_event, gesture) => {
+        moveMoodPanel({
+          x: dragStartPoint.current.x + gesture.dx,
+          y: dragStartPoint.current.y + gesture.dy,
+        });
+      },
+      onPanResponderRelease: saveMoodPanelPosition,
+      onPanResponderTerminate: saveMoodPanelPosition,
+      onPanResponderTerminationRequest: () => false,
+    }),
+    [moodPanelPosition],
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    AsyncStorage.getItem(MOOD_PANEL_POSITION_KEY)
+      .then(raw => {
+        if (!active || !raw) return;
+        try {
+          const saved = JSON.parse(raw) as unknown;
+          if (isSavedPoint(saved)) moveMoodPanel(saved);
+        } catch {
+          // Bad local state should never strand the control off-screen.
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, [moodPanelPosition]);
+
+  useEffect(() => {
+    viewportSize.current = { width: viewportWidth, height: viewportHeight };
+    moodPanelSize.current.width = moodPanelWidth;
+    moveMoodPanel(moodPanelPoint.current);
+  }, [moodPanelPosition, moodPanelWidth, viewportHeight, viewportWidth]);
 
   // Se'kret reacts when the parent picks a mood
   useEffect(() => {
@@ -329,8 +443,36 @@ export function ParentRoomScreen({
         </TouchableOpacity>
       </Animated.View>
 
-      {/* ── MOOD CHECK-IN — soft, at the bottom, 4 options only ──────────── */}
-      <Animated.View style={[s.bottomStrip, { opacity: textFade }]}>
+      {/* ── MOVABLE MOOD CHECK-IN — drag by the handle, tap moods normally ── */}
+      <Animated.View
+        onLayout={event => {
+          moodPanelSize.current = {
+            width: event.nativeEvent.layout.width,
+            height: event.nativeEvent.layout.height,
+          };
+          moveMoodPanel(moodPanelPoint.current);
+        }}
+        style={[
+          s.moodPanel,
+          {
+            width: moodPanelWidth,
+            opacity: textFade,
+            transform: moodPanelPosition.getTranslateTransform(),
+          },
+        ]}
+      >
+        <View
+          {...moodPanelPanResponder.panHandlers}
+          style={s.dragHandle}
+          accessible
+          accessibilityRole="adjustable"
+          accessibilityLabel="Drag to move the mood check-in"
+          accessibilityHint="Touch and drag this handle to reposition the mood choices"
+        >
+          <Text style={[s.dragDots, { color: tokens.sub }]}>•••</Text>
+          <Text style={[s.dragLabel, { color: tokens.sub }]}>drag to move</Text>
+        </View>
+
         <Text style={[s.moodAsk, { color: tokens.sub }]}>how you holding up?</Text>
         <View style={s.moodRow}>
           {MOODS.map(m => {
@@ -342,7 +484,7 @@ export function ParentRoomScreen({
                   s.moodChip,
                   {
                     backgroundColor: active ? tokens.accent + '44' : 'rgba(0,0,0,0.32)',
-                    borderColor:     active ? tokens.accent : tokens.accent + '55',
+                    borderColor: active ? tokens.accent : tokens.accent + '55',
                   },
                 ]}
                 onPress={() => setParentMood(m.id)}
@@ -365,7 +507,7 @@ export function ParentRoomScreen({
 
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#06030f' },
+  root: { flex: 1, backgroundColor: '#06030f', overflow: 'hidden' },
 
   // Time badge — top-right, minimal pill
   timeBadge: {
@@ -422,20 +564,45 @@ const s = StyleSheet.create({
     letterSpacing: 0.3,
   },
 
-  // Bottom mood strip — opaque card so it reads as a UI panel, not the
-  // cloud-shaped decal painted into the room background photo behind it.
-  bottomStrip: {
+  moodPanel: {
     position: 'absolute',
-    bottom: NAV_H,
     left: 0,
-    right: 0,
+    top: 0,
+    zIndex: 30,
+    elevation: 12,
     alignItems: 'center',
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
     backgroundColor: 'rgba(4,2,12,0.94)',
-    paddingTop: 44,
-    paddingBottom: 20,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
+    paddingBottom: 14,
+    shadowColor: '#000',
+    shadowOpacity: 0.38,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
   },
-  moodAsk:   {
+  dragHandle: {
+    width: '100%',
+    minHeight: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 4,
+    paddingBottom: 3,
+  },
+  dragDots: {
+    fontSize: 15,
+    fontWeight: '900',
+    letterSpacing: 4,
+    lineHeight: 14,
+  },
+  dragLabel: {
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+    opacity: 0.8,
+  },
+  moodAsk: {
     fontSize: 12,
     fontWeight: '600',
     marginBottom: 9,
@@ -444,11 +611,17 @@ const s = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 6,
   },
-  moodRow:   { flexDirection: 'row', gap: 8 },
-  moodChip:  {
+  moodRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  moodChip: {
+    minWidth: 58,
     borderWidth: 1,
     borderRadius: 16,
-    paddingHorizontal: 13,
+    paddingHorizontal: 10,
     paddingVertical: 7,
     alignItems: 'center',
   },

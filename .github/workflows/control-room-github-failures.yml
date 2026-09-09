@@ -1,0 +1,39 @@
+name: Founder Control Room GitHub Failure Router
+
+on:
+  workflow_run:
+    workflows:
+      - Quality Gate
+      - Type Check
+      - Implementation Evidence
+      - Playwright Smoke and Guardrails
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  route-failure:
+    name: Route completed failure to Founder Control Room
+    if: ${{ github.event.workflow_run.conclusion != 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Capture exact completed run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CONTROL_ROOM_GITHUB_RUN_ID: ${{ github.event.workflow_run.id }}
+          CONTROL_ROOM_GITHUB_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: node scripts/control-room-ingest-github-failures.mjs
+      - name: Upload Founder Control Room GitHub failure report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-control-room-github-failure-${{ github.event.workflow_run.id }}
+          path: reports/control-room/github-failures-latest.json
+          retention-days: 14
+          if-no-files-found: error

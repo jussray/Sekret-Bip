@@ -1,0 +1,269 @@
+name: Audit Cloudflare Zone Access Coverage
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-cloudflare-zone-access-coverage.yml'
+      - 'scripts/audit-cloudflare-zone-access-coverage.mjs'
+      - 'scripts/audit-cloudflare-app-binding-authority.mjs'
+      - 'scripts/run-with-normalized-cloudflare-token.mjs'
+      - 'test/cloudflare-zone-access-coverage-audit.test.mjs'
+      - 'test/cloudflare-app-binding-authority-audit.test.mjs'
+      - 'test/cloudflare-zone-access-workflow-contract.test.mjs'
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-zone-access-coverage-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  CLOUDFLARE_ZONE_ACCESS_EVIDENCE_PATH: artifacts/cloudflare-zone-access-coverage.json
+  CLOUDFLARE_APP_BINDING_EVIDENCE_PATH: artifacts/cloudflare-app-binding-authority.json
+  CLOUDFLARE_ACCESS_TARGET_ZONE: sekretbip.net
+  CLOUDFLARE_ACCESS_TARGET_HOSTS: app.sekretbip.net,api.sekretbip.net
+  CLOUDFLARE_ACCESS_BACKEND_WORKER_ID: sekret-backend
+  CLOUDFLARE_APP_HOSTNAME: app.sekretbip.net
+  CLOUDFLARE_PAGES_PROJECT: sekret-bip
+  CLOUDFLARE_APP_URL: https://app.sekretbip.net
+  CLOUDFLARE_API_HEALTH_URL: https://api.sekretbip.net/health
+
+jobs:
+  audit:
+    name: Audit Se’kret public front-door authority
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      evidence_artifact_id: ${{ steps.evidence_upload.outputs.artifact-id }}
+      evidence_artifact_url: ${{ steps.evidence_upload.outputs.artifact-url }}
+      evidence_artifact_digest: ${{ steps.evidence_upload.outputs.artifact-digest }}
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify redacted public front-door audit contracts
+        run: node --test test/cloudflare-zone-access-coverage-audit.test.mjs test/cloudflare-app-binding-authority-audit.test.mjs test/cloudflare-zone-access-workflow-contract.test.mjs
+
+      - name: Require exact current main before Cloudflare secret use
+        id: current_main_gate
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          current_main="$({
+            curl --fail-with-body --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$REPOSITORY/commits/main"
+          } | node -e "let body='';process.stdin.on('data',c=>body+=c);process.stdin.on('end',()=>{const parsed=JSON.parse(body);if(!parsed.sha)process.exit(2);process.stdout.write(parsed.sha);});")"
+          printf 'expected_head=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
+          test "$EXPECTED_HEAD_SHA" = "$current_main" || {
+            echo 'Refusing Cloudflare public front-door audit because workflow SHA is no longer current main.' >&2
+            exit 1
+          }
+
+      # Access authority is least-privilege by construction. Do not fall back
+      # to CLOUDFLARE_API_TOKEN when the dedicated Access credential is absent
+      # or under-scoped; that failure must remain explicit and independently fixable.
+      - name: Audit zone-scoped Access applications and policies
+        id: access_audit
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: node scripts/audit-cloudflare-zone-access-coverage.mjs
+
+      # Binding authority is independently scoped. The auditor keeps its internal
+      # CLOUDFLARE_API_TOKEN slot, but only the dedicated binding-read secret may fill it.
+      # Never fall back to the repository-wide CLOUDFLARE_API_TOKEN secret.
+      # Invalid transport must stay away from provider calls while the read-only auditor
+      # still retains a sanitized fail-closed receipt for the exact head.
+      - name: Audit public app Pages and Worker binding authority
+        id: binding_audit
+        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_BINDING_READ_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: |
+          set -euo pipefail
+          if node --input-type=module -e "import { normalizeCloudflareTokenTransport } from './scripts/run-with-normalized-cloudflare-token.mjs'; const result = normalizeCloudflareTokenTransport(process.env.CLOUDFLARE_API_TOKEN); process.exit(result.token && !result.nonAsciiRemaining ? 0 : 1);"; then
+            node scripts/run-with-normalized-cloudflare-token.mjs scripts/audit-cloudflare-app-binding-authority.mjs
+          else
+            echo 'CLOUDFLARE_APP_BINDING_TOKEN_TRANSPORT_INVALID_RETAINING_RECEIPT' >&2
+            CLOUDFLARE_API_TOKEN='' node scripts/audit-cloudflare-app-binding-authority.mjs
+          fi
+
+      - name: Require redacted provider receipts before publication
+        id: receipt_guard
+        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' }}
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          test -s "$CLOUDFLARE_ZONE_ACCESS_EVIDENCE_PATH"
+          test -s "$CLOUDFLARE_APP_BINDING_EVIDENCE_PATH"
+
+      - name: Upload redacted public front-door evidence
+        id: evidence_upload
+        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' && steps.receipt_guard.outcome == 'success' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-zone-access-coverage-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            artifacts/cloudflare-zone-access-coverage.json
+            artifacts/cloudflare-app-binding-authority.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail closed after retaining provider evidence
+        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' }}
+        shell: bash
+        env:
+          ACCESS_OUTCOME: ${{ steps.access_audit.outcome }}
+          BINDING_OUTCOME: ${{ steps.binding_audit.outcome }}
+          RECEIPT_OUTCOME: ${{ steps.receipt_guard.outcome }}
+        run: |
+          set -euo pipefail
+          printf 'access_outcome=%s\nbinding_outcome=%s\nreceipt_outcome=%s\n' "$ACCESS_OUTCOME" "$BINDING_OUTCOME" "$RECEIPT_OUTCOME"
+          test "$ACCESS_OUTCOME" = success
+          test "$BINDING_OUTCOME" = success
+          test "$RECEIPT_OUTCOME" = success
+
+  publish_receipt:
+    name: Publish sanitized binding receipt to Se’kret P0 ledger
+    needs: audit
+    if: ${{ always() && github.event_name != 'pull_request' && needs.audit.outputs.evidence_artifact_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - name: Download retained provider evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ needs.audit.outputs.evidence_artifact_id }}
+          path: retained-evidence
+
+      - name: Set up Node for sanitized ledger publication
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Publish exact-main binding receipt to issue 925
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          ISSUE_NUMBER: '925'
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+          ARTIFACT_URL: ${{ needs.audit.outputs.evidence_artifact_url }}
+          ARTIFACT_DIGEST: ${{ needs.audit.outputs.evidence_artifact_digest }}
+          RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          (async () => {
+            const findFile = (root, basename) => {
+              for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
+                const full = path.join(root, entry.name);
+                if (entry.isDirectory()) {
+                  const nested = findFile(full, basename);
+                  if (nested) return nested;
+                } else if (entry.name === basename) {
+                  return full;
+                }
+              }
+              return null;
+            };
+
+            const receiptPath = findFile('retained-evidence', 'cloudflare-app-binding-authority.json');
+            if (!receiptPath) throw new Error('CLOUDFLARE_APP_BINDING_RECEIPT_NOT_FOUND');
+            const receipt = JSON.parse(fs.readFileSync(receiptPath, 'utf8'));
+            const exactMain = process.env.EXPECTED_HEAD_SHA;
+            const marker = `<!-- sekret-app-binding-authority:${exactMain} -->`;
+            const safeReceipt = {
+              exactMain,
+              status: receipt.status ?? null,
+              target: receipt.target ?? null,
+              providerIdentityVerified: receipt.providerIdentityVerified === true,
+              pagesDomain: receipt.pagesDomain ?? null,
+              exactWorkerDomains: Array.isArray(receipt.exactWorkerDomains) ? receipt.exactWorkerDomains : [],
+              exactWorkerRoutes: Array.isArray(receipt.exactWorkerRoutes) ? receipt.exactWorkerRoutes : [],
+              broadWorkerRoutes: Array.isArray(receipt.broadWorkerRoutes) ? receipt.broadWorkerRoutes : [],
+              runtime: receipt.runtime ?? null,
+              backend: receipt.backend ?? null,
+              failure: receipt.failure ?? null,
+              mutationPerformed: receipt.mutationPerformed === true,
+              automaticMutationAuthorized: receipt.automaticMutationAuthorized === true,
+              evidence: {
+                workflowRun: process.env.RUN_URL,
+                artifactUrl: process.env.ARTIFACT_URL || null,
+                artifactDigest: process.env.ARTIFACT_DIGEST || null,
+              },
+            };
+            const json = JSON.stringify(safeReceipt, null, 2).replace(/```/g, '`\\`\\`');
+            const body = `${marker}\n## Exact-current-main Cloudflare binding receipt\n\nThis is a sanitized read-only provider observation. It does not authorize route, domain, Access, DNS, Worker, Pages, deployment, secret, or traffic mutation.\n\n\`\`\`json\n${json}\n\`\`\`\n`;
+
+            const repo = process.env.REPOSITORY;
+            const issue = process.env.ISSUE_NUMBER;
+            const token = process.env.GH_TOKEN;
+            const headers = {
+              Accept: 'application/vnd.github+json',
+              Authorization: `Bearer ${token}`,
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type': 'application/json',
+            };
+
+            const commentsResponse = await fetch(`https://api.github.com/repos/${repo}/issues/${issue}/comments?per_page=100`, { headers });
+            if (!commentsResponse.ok) throw new Error(`GITHUB_ISSUE_COMMENT_READ_FAILED:${commentsResponse.status}`);
+            const comments = await commentsResponse.json();
+            const existing = comments.find((comment) => String(comment?.body || '').includes(marker));
+            const url = existing
+              ? `https://api.github.com/repos/${repo}/issues/comments/${existing.id}`
+              : `https://api.github.com/repos/${repo}/issues/${issue}/comments`;
+            const method = existing ? 'PATCH' : 'POST';
+            const writeResponse = await fetch(url, { method, headers, body: JSON.stringify({ body }) });
+            if (!writeResponse.ok) throw new Error(`GITHUB_ISSUE_COMMENT_WRITE_FAILED:${writeResponse.status}`);
+            console.log(existing ? 'CLOUDFLARE_BINDING_RECEIPT_LEDGER_UPDATED' : 'CLOUDFLARE_BINDING_RECEIPT_LEDGER_CREATED');
+          })().catch((error) => {
+            console.error(error instanceof Error ? error.message : String(error));
+            process.exit(1);
+          });
+          NODE

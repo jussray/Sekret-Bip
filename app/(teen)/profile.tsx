@@ -3,11 +3,18 @@ import { ScrollView, StyleSheet, Switch, Text, TextInput, TouchableOpacity, View
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
+import {
+  hydrateAccountProfile,
+  saveAccountProfile,
+  type AgeRange,
+  type Companion,
+  type ProfileGender,
+} from '@/features/identity/accountProfile';
 import { GlitterSparkles } from '../../components/GlitterSparkles';
 import { MarqueeBanner } from '../../components/MarqueeBanner';
 import { RetroFrame } from '../../components/RetroFrame';
 
-type Gender = 'girl' | 'boy' | 'other';
+type Gender = ProfileGender;
 type TeenTab = 'identity' | 'circle' | 'memories';
 
 const PAGE_ACCENTS = ['#c4b5fd', '#f472b6', '#38bdf8', '#a3e635', '#fb923c', '#f43f5e'] as const;
@@ -25,7 +32,7 @@ const ALL_OPTIONS = [
   { id: 'night', label: 'Night', desc: 'Quiet + steady' },
 ] as const;
 
-type OptionId = (typeof ALL_OPTIONS)[number]['id'];
+type OptionId = Companion;
 
 function sekretToChoice(s: string): OptionId {
   if (s === 'soft') return 'raylene';
@@ -37,24 +44,43 @@ export default function TeenProfile() {
   const { setSelectedSekret, selectedSekret } = useAppContext();
   const [tab, setTab] = useState<TeenTab>('identity');
   const [name, setName] = useState('');
+  const [ageRange, setAgeRange] = useState<AgeRange | null>(null);
   const [gender, setGender] = useState<Gender | null>(null);
   const [choice, setChoice] = useState<OptionId>(() => sekretToChoice(selectedSekret));
   const [circleName, setCircleName] = useState('');
   const [pageAccent, setPageAccent] = useState<string>(PAGE_ACCENTS[0]);
   const [statusLine, setStatusLine] = useState('');
   const [glitterOn, setGlitterOn] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    AsyncStorage.multiGet(['teen_profile_data', 'teen_circle_identity']).then(pairs => {
-      const [profile, circle] = pairs.map(([, v]) => (v ? JSON.parse(v) : null));
-      if (profile?.name) setName(profile.name);
-      if (profile?.gender) setGender(profile.gender as Gender);
-      if (profile?.choice) setChoice(profile.choice as OptionId);
-      if (profile?.pageAccent) setPageAccent(profile.pageAccent);
-      if (typeof profile?.statusLine === 'string') setStatusLine(profile.statusLine);
-      if (typeof profile?.glitterOn === 'boolean') setGlitterOn(profile.glitterOn);
-      if (circle?.circleName) setCircleName(circle.circleName);
-    }).catch(() => {});
+    let active = true;
+    void Promise.all([
+      hydrateAccountProfile('teen'),
+      AsyncStorage.multiGet(['teen_profile_data', 'teen_circle_identity']),
+    ]).then(([profile, pairs]) => {
+      if (!active) return;
+      const [localProfile, localCircle] = pairs.map(([, value]) => {
+        try { return value ? JSON.parse(value) as Record<string, unknown> : null; } catch { return null; }
+      });
+
+      if (profile?.accountSide === 'teen') {
+        setName(profile.privateDisplayName);
+        setAgeRange(profile.ageRange);
+        setGender(profile.gender);
+        if (profile.selectedCompanion) setChoice(profile.selectedCompanion);
+        setCircleName(profile.circleNickname);
+      }
+
+      if (typeof localProfile?.pageAccent === 'string') setPageAccent(localProfile.pageAccent);
+      if (typeof localProfile?.statusLine === 'string') setStatusLine(localProfile.statusLine);
+      if (typeof localProfile?.glitterOn === 'boolean') setGlitterOn(localProfile.glitterOn);
+      if (!profile && typeof localCircle?.circleName === 'string') setCircleName(localCircle.circleName);
+    }).catch(caught => {
+      if (active) setError(caught instanceof Error ? caught.message : 'Unable to load your profile.');
+    });
+    return () => { active = false; };
   }, []);
 
   async function saveCustomization(next: Partial<{ pageAccent: string; statusLine: string; glitterOn: boolean }>) {
@@ -70,24 +96,33 @@ export default function TeenProfile() {
 
   function pickGender(g: Gender) {
     setGender(g);
+    setError(null);
   }
 
   async function finish() {
-    const existingRaw = await AsyncStorage.getItem('teen_profile_data');
-    let existing: Record<string, unknown> = {};
+    if (!ready || !ageRange || !gender || saving) return;
+    setSaving(true);
+    setError(null);
     try {
-      existing = existingRaw ? JSON.parse(existingRaw) : {};
-    } catch {
-      existing = {};
+      await saveAccountProfile({
+        accountSide: 'teen',
+        privateDisplayName: name.trim(),
+        onboardingComplete: true,
+        ageRange,
+        gender,
+        selectedCompanion: choice,
+        circleNickname: circleName.trim() || 'anonymous bip',
+      });
+      setSelectedSekret(choice === 'raylene' ? 'soft' : choice);
+      router.replace('/(teen)/room');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to save your profile.');
+    } finally {
+      setSaving(false);
     }
-    await AsyncStorage.setItem('teen_profile_done', 'true');
-    await AsyncStorage.setItem('teen_profile_data', JSON.stringify({ ...existing, name: name.trim(), choice, gender }));
-    await AsyncStorage.setItem('teen_circle_identity', JSON.stringify({ circleName: circleName.trim() || name.trim() }));
-    setSelectedSekret(choice === 'raylene' ? 'soft' : choice);
-    router.replace('/(teen)/room');
   }
 
-  const ready = name.trim().length > 0 && gender !== null;
+  const ready = name.trim().length > 0 && gender !== null && ageRange !== null;
 
   return (
     <View style={{ flex: 1 }}>
@@ -147,7 +182,7 @@ export default function TeenProfile() {
       {tab === 'identity' ? (
         <>
           <Text style={styles.label}>Name or nickname</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="nickname" placeholderTextColor="#7f7487" style={styles.input} />
+          <TextInput value={name} onChangeText={text => { setName(text); setError(null); }} placeholder="nickname" placeholderTextColor="#7f7487" style={styles.input} />
           <Text style={styles.label}>You are</Text>
           <View style={styles.grid}>
             {GENDER_OPTIONS.map(g => (
@@ -160,7 +195,7 @@ export default function TeenProfile() {
           <Text style={[styles.label, styles.labelSpaced]}>First Se'kret</Text>
           <View style={styles.grid}>
             {ALL_OPTIONS.map(item => (
-              <TouchableOpacity key={item.id} onPress={() => setChoice(item.id)} style={[styles.card, choice === item.id && styles.active]}>
+              <TouchableOpacity key={item.id} onPress={() => { setChoice(item.id); setError(null); }} style={[styles.card, choice === item.id && styles.active]}>
                 <Text style={styles.cardText}>{item.label}</Text>
                 <Text style={styles.cardDesc}>{item.desc}</Text>
               </TouchableOpacity>
@@ -174,8 +209,9 @@ export default function TeenProfile() {
             <Text style={styles.ownerTitle}>🌉 Support lives in Bridge</Text>
             <Text style={styles.ownerText}>Connection and shared moments with your parent live in Bridge.</Text>
           </TouchableOpacity>
-          <TouchableOpacity disabled={!ready} onPress={finish} style={[styles.button, !ready && styles.disabled]}>
-            <Text style={styles.buttonText}>Save my profile</Text>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <TouchableOpacity disabled={!ready || saving} onPress={finish} style={[styles.button, (!ready || saving) && styles.disabled]}>
+            <Text style={styles.buttonText}>{saving ? 'Saving…' : 'Save my profile'}</Text>
           </TouchableOpacity>
         </>
       ) : tab === 'circle' ? (
@@ -185,13 +221,14 @@ export default function TeenProfile() {
             <Text style={styles.identityHelp}>Your Circle identity is separate from your private account identity. Crew sees only what you choose to share.</Text>
           </View>
           <Text style={styles.label}>Circle name</Text>
-          <TextInput value={circleName} onChangeText={setCircleName} placeholder="how your crew sees you" placeholderTextColor="#7f7487" style={styles.input} />
+          <TextInput value={circleName} onChangeText={text => { setCircleName(text); setError(null); }} placeholder="how your crew sees you" placeholderTextColor="#7f7487" style={styles.input} />
           <TouchableOpacity style={styles.ownerCard} onPress={() => router.push('/(teen)/circle' as any)}>
             <Text style={styles.ownerTitle}>🤝 View your Circle</Text>
             <Text style={styles.ownerText}>Your social identity and crew connections live in Circle.</Text>
           </TouchableOpacity>
-          <TouchableOpacity disabled={!ready} onPress={finish} style={[styles.button, !ready && styles.disabled]}>
-            <Text style={styles.buttonText}>Save circle identity</Text>
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <TouchableOpacity disabled={!ready || saving} onPress={finish} style={[styles.button, (!ready || saving) && styles.disabled]}>
+            <Text style={styles.buttonText}>{saving ? 'Saving…' : 'Save circle identity'}</Text>
           </TouchableOpacity>
         </>
       ) : (
@@ -258,6 +295,7 @@ const styles = StyleSheet.create({
   ownerText: { color: '#a99fb1', fontSize: 12, lineHeight: 18, marginTop: 5 },
   memoryCard: { flexDirection: 'row', gap: 12, padding: 16, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: '#ffffff18', marginBottom: 10 },
   memoryEmoji: { fontSize: 24, width: 34, textAlign: 'center' },
+  error: { color: '#fca5a5', fontSize: 12, lineHeight: 18, marginTop: 14 },
   button: { height: 54, borderRadius: 18, backgroundColor: '#c4b5fd', alignItems: 'center', justifyContent: 'center', marginTop: 30 },
   disabled: { opacity: 0.4 },
   buttonText: { color: '#160b24', fontSize: 15, fontWeight: '900' },

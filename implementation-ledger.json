@@ -1,0 +1,334 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-15",
+  "documentationReview": {
+    "reviewedAt": "2026-07-13",
+    "baseCommit": "3b9673add18108bacf6de9d500ddccbdefa8e844",
+    "scope": [
+      "repository identity and setup",
+      "current product and wiring state",
+      "Cloudflare production ownership and exact-release evidence",
+      "unified frontend-to-Worker contract spine",
+      "Supabase authorization and retired Edge Functions",
+      "private self-data permanent-account hardening",
+      "companion identity/style integration",
+      "Mind and Body Reset guided tools and workouts",
+      "Bridge controlled rollout",
+      "L4 planned-only boundary",
+      "L5 planned-only boundary",
+      "agent architecture and Worker guardrails",
+      "historical audit labeling"
+    ],
+    "rule": "Markdown describes only the evidence state recorded in this ledger or explicitly labels historical snapshots. Status documentation is updated only after the implementation merges and the tested main content is verified."
+  },
+  "statusOrder": [
+    "planned",
+    "contract",
+    "integrated",
+    "verified",
+    "released"
+  ],
+  "features": [
+    {
+      "id": "bridge-summaries",
+      "name": "Parent–Teen Bridge summaries",
+      "status": "integrated",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/270",
+      "acceptanceCriteria": [
+        "A teen explicitly previews and confirms selected source content before sharing.",
+        "A linked parent can read only the generated summary and never raw source content.",
+        "Revocation removes access immediately and re-share does not expose stale sources or summaries.",
+        "The deployed Worker path is verified with two controlled accounts and cleanup evidence."
+      ],
+      "contractPaths": [
+        "supabase/migrations/20260705010000_bridge_summary_contract.sql",
+        "src/services/bridgeSummaryService.ts"
+      ],
+      "runtimePaths": [
+        "app/(teen)/pages/index.tsx",
+        "app/(parent)/bridge.tsx",
+        "worker/bridge-summary.ts",
+        "worker/bridge-summary-store.ts",
+        "worker/bridge-privacy-validator.ts"
+      ],
+      "testPaths": [
+        "test/bridge-privacy-validator.test.mjs",
+        "test/bridge-summary-store.test.mjs",
+        "test/bridge-summary-worker.test.mjs",
+        "e2e/smoke.spec.ts"
+      ],
+      "telemetryPaths": [
+        "worker/observed-index.ts"
+      ],
+      "rollout": {
+        "state": "disabled",
+        "controlPath": "wrangler.toml",
+        "controlKey": "BRIDGE_SUMMARIES_ROLLOUT"
+      },
+      "verification": {
+        "state": "blocked",
+        "evidence": "https://github.com/jussray/Sekret-Bip/issues/270",
+        "blocker": "Deploy the reviewed Worker through the canonical Cloudflare path and repeat the controlled two-account proof."
+      },
+      "rollback": "Keep BRIDGE_SUMMARIES_ROLLOUT disabled; revert the Worker deployment or merge commit if the controlled proof fails."
+    },
+    {
+      "id": "frontend-worker-contract-spine",
+      "name": "Unified frontend-to-Worker request, response, and failure contract",
+      "status": "integrated",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/402",
+      "acceptanceCriteria": [
+        "One typed frontend client owns companion reply, speech, transcription, and health routes.",
+        "Authentication headers, timeouts, trace IDs, stable error codes, Worker fallback, and local fallback are represented consistently.",
+        "The Worker always returns a visual avatar state that the frontend can render truthfully.",
+        "Migrated chat, legacy API, and founder surfaces do not create independent direct Worker fetch paths."
+      ],
+      "contractPaths": [
+        "src/contracts/sekretApi.ts"
+      ],
+      "runtimePaths": [
+        "src/services/backend/sekretClient.ts",
+        "src/services/ai/chat.ts",
+        "src/services/ai/workerClient.ts",
+        "src/utils/api.ts",
+        "worker/runtime-style.ts"
+      ],
+      "testPaths": [
+        "test/worker-contract-spine.test.mjs",
+        "e2e/smoke.spec.ts"
+      ],
+      "telemetryPaths": [
+        "src/services/runtimeAudit.ts",
+        "worker/telemetry.ts"
+      ],
+      "rollout": {
+        "state": "controlled",
+        "controlPath": "src/services/backend/sekretClient.ts",
+        "controlKey": "authenticated Worker transport with local fallback"
+      },
+      "verification": {
+        "state": "partial",
+        "evidence": "https://github.com/jussray/Sekret-Bip/pull/398",
+        "blocker": "Exact-head CI, Type Check, Quality Gate, Regression, Pre-Push, Companion Lab, and Playwright passed and the tested content merged. Exact-production-release observation plus user-facing 401, 403, 429, timeout, offline, safety, and voice-unavailable state proof remain before verified or released status."
+      },
+      "rollback": "Revert merge commit 044d72ca4028c30401dd44c9948e4e51e8e51d3b. No database rollback is required."
+    },
+    {
+      "id": "sekret-identity-and-companion-style",
+      "name": "Se’kret identity boundary and named-companion style engine",
+      "status": "integrated",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/357",
+      "acceptanceCriteria": [
+        "Se’kret never appears as a selectable named companion.",
+        "The real Worker and TTS paths consume one canonical versioned style source.",
+        "Oracle never appears in user-visible text, speech, archives, notifications, or accessibility labels.",
+        "Companion Lab and Playwright prove distinct voices and question-budget enforcement."
+      ],
+      "contractPaths": [
+        "src/features/sekret/identityContract.ts",
+        "src/features/sekret/styleProfiles.ts",
+        "src/features/sekret/companionStyleEngine.ts",
+        "docs/CONTROL_ROOM_ARCHITECTURE.md"
+      ],
+      "runtimePaths": [
+        "worker/runtime-style.ts",
+        "worker/index.ts"
+      ],
+      "testPaths": [
+        "test/sekret-control-room-contracts.test.mjs",
+        "test/runtime-style-activation.test.mjs"
+      ],
+      "telemetryPaths": [
+        "worker/observed-index.ts",
+        "worker/telemetry.ts",
+        "worker/audit/persist-event.ts"
+      ],
+      "rollout": {
+        "state": "controlled",
+        "controlPath": "worker/index.ts",
+        "controlKey": "authenticated reply and voice runtime wrapper"
+      },
+      "verification": {
+        "state": "partial",
+        "evidence": "https://github.com/jussray/Sekret-Bip/pull/360",
+        "blocker": "Exact-head CI, Companion Lab, and Playwright passed; production deployment and observed live style-version telemetry remain before verified or released status."
+      },
+      "rollback": "Revert the runtime-activation merge commit; the existing reply brain remains intact behind the wrapper and no database migration is introduced."
+    },
+    {
+      "id": "mind-body-reset-workouts",
+      "name": "Mind and Body Reset guided regulation and bodyweight workouts",
+      "status": "integrated",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/374",
+      "acceptanceCriteria": [
+        "Mind Reset provides guided breathing, grounding, panoramic vision, bilateral tapping, and Brain Dump routing.",
+        "Body Reset provides guided somatic regulation plus real one-, three-, five-, and classic twelve-move bodyweight routines.",
+        "Workout flows include work and rest timers, low-impact alternatives, pause, skip, stop, progress, safety guidance, and completion states.",
+        "Only minimal routine metadata is written to the existing activity ledger, and instant skipping does not earn a completion event.",
+        "The existing Supabase event-to-points trigger is restored without adding a parallel workout or points table."
+      ],
+      "contractPaths": [
+        "src/features/reset/catalog.ts",
+        "src/features/activity/events.ts",
+        "supabase/migrations/20260713052511_restore_bip_events_points_trigger.sql"
+      ],
+      "runtimePaths": [
+        "screens/MindBodyResetScreen.tsx",
+        "src/features/reset/ResetFlows.tsx",
+        "app/(teen)/mind-body-reset.tsx",
+        "app/(teen)/body-workout.tsx"
+      ],
+      "testPaths": [
+        "test/body-reset-workouts.test.mjs"
+      ],
+      "telemetryPaths": [
+        "src/features/activity/events.ts",
+        "supabase/migrations/20260713052511_restore_bip_events_points_trigger.sql"
+      ],
+      "rollout": {
+        "state": "internal",
+        "controlPath": "app/(teen)/_layout.tsx",
+        "controlKey": "teen-only hidden reset routes"
+      },
+      "verification": {
+        "state": "partial",
+        "evidence": "https://github.com/jussray/Sekret-Bip/issues/374",
+        "blocker": "Exact-head CI, Expo web export, Playwright, source contract tests, and live trigger inspection passed. Physical iOS/Android plus manual timer, accessibility, and movement-safety QA remain before verified or released status."
+      },
+      "rollback": "Revert the feature merge and drop public.bip_events_award_points only if the restored award path regresses. Existing bip_events rows and points tables remain intact."
+    },
+    {
+      "id": "control-room-operational-observability",
+      "name": "Founder Control Room operational observability",
+      "status": "integrated",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/357",
+      "acceptanceCriteria": [
+        "Founder-gated screens load real operational records rather than decorative success states.",
+        "Every panel displays source freshness and an honest empty or unavailable state.",
+        "No raw teen content or raw user identifiers appear in observer panels.",
+        "Identity, style, voice, and L4 panels are added only after their runtime or data sources exist."
+      ],
+      "contractPaths": [
+        "docs/CONTROL_ROOM.md",
+        "src/types/controlRoomOs.ts"
+      ],
+      "runtimePaths": [
+        "app/(dev)/control-room.tsx",
+        "src/screens/DevControlRoomWorkspace.tsx",
+        "src/services/controlRoomAnalytics.ts",
+        "src/services/controlRoomIssues.ts"
+      ],
+      "testPaths": [
+        "test/control-room-os.test.mjs"
+      ],
+      "telemetryPaths": [
+        "src/services/controlRoomAnalytics.ts"
+      ],
+      "rollout": {
+        "state": "internal",
+        "controlPath": "src/config/controlRoomPlacement.ts",
+        "controlKey": "founder-only route placement"
+      },
+      "verification": {
+        "state": "partial",
+        "evidence": "https://github.com/jussray/Sekret-Bip/issues/357",
+        "blocker": "Operational data sources exist, but identity/style/L4 observer adapters and freshness evidence are not complete."
+      },
+      "rollback": "Remove the founder route entry and keep operational tables intact; do not expose Control Room routes to teen or parent navigation."
+    },
+    {
+      "id": "supabase-authorization-proof",
+      "name": "Supabase authorization inventory and denial harness",
+      "status": "contract",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/399",
+      "acceptanceCriteria": [
+        "Live RLS, table grants, database functions, Edge Function JWT settings, and migration parity are classified by trust boundary.",
+        "Rollback-contained live probes prove owner access, cross-user denial, anonymous denial, founder and guardian administration boundaries, and zero retained synthetic data.",
+        "Server-owned configuration tables expose no client table privileges and preserve their rows and service-role access.",
+        "Obsolete Edge Functions require platform JWT verification, return side-effect-free HTTP 410 responses, and have no executable callers.",
+        "Anonymous-authenticated sessions cannot obtain founder, Control Room, audit-review, guardian-administration, comfort-session, or room-memory authority even when they receive an authenticated database role and UID."
+      ],
+      "contractPaths": [
+        "security/supabase-authorization-baseline.json",
+        "security/private-self-data-hardening.json",
+        "docs/security/SUPABASE_AUTHORIZATION_PHASE0.md",
+        "supabase/probes/authorization_phase0.sql",
+        "supabase/probes/authorization_founder_guardian_phase1.sql",
+        "supabase/probes/authorization_private_self_data_phase1.sql",
+        "supabase/migrations/20260713011803_harden_config_table_grants.sql",
+        "supabase/migrations/20260713024231_harden_founder_helper_anonymous_guard.sql",
+        "supabase/migrations/20260713024245_harden_audit_control_room_policies.sql",
+        "supabase/migrations/20260713024253_remove_anon_audit_control_room_grants.sql",
+        "supabase/migrations/20260713230600_harden_private_self_data_permanent_accounts.sql",
+        "supabase/functions/retirement-manifest.json",
+        "supabase/functions/release-health/index.ts",
+        "supabase/functions/bridge-e2e-probe/index.ts",
+        "supabase/functions/github-workflow-status/index.ts"
+      ],
+      "testPaths": [
+        "test/supabase-authorization-phase0.test.mjs",
+        "test/supabase-config-grants.test.mjs",
+        "test/supabase-founder-guardian-authorization.test.mjs",
+        "test/private-self-data-hardening.test.mjs",
+        "test/retired-edge-functions.test.mjs",
+        "e2e/smoke.spec.ts"
+      ],
+      "verification": {
+        "state": "passed",
+        "evidence": "https://github.com/jussray/Sekret-Bip/pull/400",
+        "blocker": "Phase 0, config grants, retired Edge Functions, founder/guardian authorization, and permanent-account denial for comfort_sessions and room_memory passed. Parent-link, Bridge, activity, points/rewards, task-review, remaining Control Room RPCs, other anonymous-auth policy surfaces, custom-auth Edge Functions, and password-breach protection still require focused proof before L4 activation."
+      }
+    },
+    {
+      "id": "l4-continuity-memory",
+      "name": "L4 continuity memory, goals, and reflection",
+      "status": "planned",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/357",
+      "acceptanceCriteria": [
+        "Memory, goal, and reflection records have ownership, provenance, correction, expiry, and deletion semantics.",
+        "RLS and executable denial tests prevent cross-user, parent, anonymous, and unintended service access.",
+        "One real user-visible continuity path consumes reviewed memory before broad dashboards are built.",
+        "Relationship phase is derived from persisted evidence and never manufactured from empty counters."
+      ],
+      "verification": {
+        "state": "not-run",
+        "evidence": "https://github.com/jussray/Sekret-Bip/issues/357",
+        "blocker": "Additional anonymous-auth policy and authenticated database-function denial suites, negative tests for the two custom-auth Edge Functions, and password-breach protection require focused proof before L4 schema activation."
+      }
+    },
+    {
+      "id": "bridge-learning-oracle-grounding",
+      "name": "Bridge Learning Oracle source grounding (search-backed teaching packet)",
+      "status": "planned",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/357",
+      "acceptanceCriteria": [
+        "Grounding queries are issued server-side only, from a Worker route, using a Worker-only secret never present in client bundles, logs, or telemetry.",
+        "Grounding queries carry only the shared Bridge Learning session's subject, topic, and current step; never private Study Buddy history, journal content, or content outside the session.",
+        "GroundedSource.sourceType only ever assigns 'reference' to a search-grounded citation, never 'approved_curriculum' or 'user_source'.",
+        "When no citable, on-topic source is found, the packet sets needsOutsideHelp true with a correspondingly low confidence instead of fabricating a citation.",
+        "A scoped usage boundary distinct from the root PERPLEXITY.md creative-IP research contract exists and is followed before any real grounding query is issued."
+      ],
+      "verification": {
+        "state": "not-run",
+        "evidence": "docs/BRIDGE_LEARNING_SEKRET_TEACHER.md",
+        "blocker": "This is Bridge Learning implementation slice 4. Slices 2 (schema/RPCs/RLS) and 3 (teen/parent UI) have not started, and slice 4 depends on them. Only slice 1 (contracts, feature flag, pure state machine) exists today. No Worker route, secret, schema, or grounding call exists. Not implemented yet."
+      }
+    },
+    {
+      "id": "l5-cross-companion-synthesis",
+      "name": "L5 cross-companion synthesis, consented goal proposal",
+      "status": "planned",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/357",
+      "acceptanceCriteria": [
+        "Cross-companion memory synthesis requires an explicit, reviewed consent contract before any read spans more than one companion_id.",
+        "Autonomous goal proposals are distinguishable from teen-stated goals in storage and in any surface that displays them, and a teen can reject or delete a proposed goal.",
+        "Self-directed reflection scheduling runs outside the live reply latency path and never promotes relationship phase from empty or synthetic evidence."
+      ],
+      "verification": {
+        "state": "not-run",
+        "evidence": "https://github.com/jussray/Sekret-Bip/issues/357",
+        "blocker": "l4-continuity-memory must reach 'verified' first. L5 contract work (schema, services, consent flow) has not started and must not start before L4 is verified, per .agents/skills/bip-l4-memory/SKILL.md's rule against inventing a parallel implementation ahead of its runtime boundaries."
+      }
+    }
+  ]
+}

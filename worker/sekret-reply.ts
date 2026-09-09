@@ -1,5 +1,11 @@
 /** Se'kret Brain + Voice Worker */
 import { ORACLE_HIDDEN_GUIDANCE } from './companion-curriculum';
+import { COMPANION_REPLY_POOLS } from './companion-replies';
+import { getModels } from './config/models';
+import { PROMPT_VERSION, POLICY_VERSION } from './config/policy';
+import { estimateCostUsd } from './config/pricing';
+import { evaluateReply, repairReply, type Decision, type ViolationCode } from './audit/evaluate-reply';
+import { runPreflight, type PreflightPrincipal } from './audit/preflight';
 
 type CharacterId = 'raylene' | 'rylane' | 'cloud' | 'night' | 'sekret' | 'parentCoach';
 type Surface = 'journal' | 'voiceBip' | 'comfort' | 'circle' | 'parentBridge' | 'selfDiscovery' | 'parentCoach';
@@ -20,6 +26,9 @@ type ConversationIntent =
 
 interface Env {
   OPENAI_API_KEY: string;
+  OPENAI_CHAT_MODEL?: string;
+  OPENAI_TTS_MODEL?: string;
+  OPENAI_STT_MODEL?: string;
   RAYLENE_VOICE_ID?: string;
   RYLANE_VOICE_ID?: string;
   CLOUD_VOICE_ID?: string;
@@ -1197,68 +1206,8 @@ CONVERSATION CONTINUITY RULES:
 `.trim();
 
 // ─── Fallbacks ──────────────────────────────────────────────────────────────
-const CHARACTER_FALLBACKS: Record<CharacterId, string[]> = {
-  raylene: [
-    // greeting / short-input fallbacks first
-    "Hey! Random or did something actually happen?",
-    "That's valid. We can start with random, drama, music, or just sit here looking cute.",
-    "Bet. Would you rather have a closet full of perfect outfits or a playlist that always matches your mood?",
-    // deeper fallbacks
-    'You do not have to make it sound neat for me. Say the messy version.',
-    'Whew, yeah—that would get under my skin too. Do you need comfort, honesty, or a game plan?',
-    'Which part of that is sitting heaviest on you right now?',
-  ],
-  rylane: [
-    // greeting / short-input fallbacks first
-    "Aight, I'm here. Talk.",
-    "You chilling or got something on your mind?",
-    "Bet. Something happen or you just pulling up?",
-    // deeper fallbacks
-    'Yeah, that is real. What is the part you have not said out loud yet?',
-    'You do not have to act unbothered in here. Give me the honest version.',
-    'Do you want to vent or figure out your next move?',
-  ],
-  cloud: [
-    // greeting / short-input fallbacks first
-    "Hey. No pressure — what's on your mind or nothing at all?",
-    "Hi hi. Good or not-so-good today?",
-    "Hey. We can just vibe for a second.",
-    // deeper fallbacks
-    'No rush. You do not have to solve the whole feeling right now.',
-    'We do not have to fix it. We can just name what hurts first.',
-    'Take one breath. Then tell me the tiniest thing.',
-  ],
-  night: [
-    // greeting / short-input fallbacks first
-    "Hey. You trying to talk, plan, or just sit in it?",
-    "What's the mood tonight?",
-    "Okay, I'm here. What you bringing?",
-    // deeper fallbacks
-    'Yeah… nights make everything talk louder. What thought keeps circling back?',
-    'Tell me the version you hide during the day.',
-    'Let us not rush past it. What did this make you believe about yourself?',
-  ],
-  sekret: [
-    // greeting / short-input fallbacks first
-    "Something brought you here — what is it?",
-    "I'm here. No agenda. Where do you want to start?",
-    "You showed up. That means something. What's the thing?",
-    // deeper fallbacks
-    "I might be reading this wrong, but it sounds like you want to be understood without having to explain every detail. Does that feel close?",
-    "You may be carrying more than you let people see. Keep the part that fits and correct what doesn't.",
-    "Your answers seem to point toward wanting both privacy and real connection. Which side feels harder to ask for right now?",
-  ],
-  parentCoach: [
-    // greeting / short-input fallbacks first
-    "Hey. Glad you're here. What's going on at home?",
-    "Hi. Tell me what's happening — I'm listening.",
-    "What brought you here today? Start wherever feels right.",
-    // deeper fallbacks
-    "That sounds like a lot to carry. What's the part that's hardest right now?",
-    "Tell me what you're actually seeing — not what you're afraid of, just what's there.",
-    "What would feel different if this conversation went well?",
-  ],
-};
+// Full 200-reply pools live in companion-replies.ts; aliased here for callsite compatibility.
+const CHARACTER_FALLBACKS: Record<CharacterId, string[]> = COMPANION_REPLY_POOLS;
 
 const BUILT_IN_VOICES: Record<CharacterId, string> = {
   raylene: 'nova',
@@ -1583,7 +1532,10 @@ function buildBrainPrompt(
   return sections.join('\n');
 }
 
-async function handleReply(request: Request, env: Env): Promise<Response> {
+async function handleReply(request: Request, env: Env, principal: PreflightPrincipal | null = null): Promise<Response> {
+  const startedAt = Date.now();
+  const models = getModels(env);
+  const traceId = crypto.randomUUID();
   let body: ReplyRequestBody;
   try { body = await request.json() as ReplyRequestBody; } catch { return json({ error: 'Invalid JSON' }, 400); }
   const userText = (typeof body.userText === 'string' ? body.userText : typeof body.text === 'string' ? body.text : '').trim();
@@ -1592,7 +1544,9 @@ async function handleReply(request: Request, env: Env): Promise<Response> {
   if (!characterId) return json({ error: 'characterId must be raylene, rylane, cloud, night, sekret, or parentCoach' }, 400);
   const surface = normalizeSurface(body.surface ?? body.context);
   const parentSharingEnabled = body.parentSharingEnabled === true;
-  const history = normalizeHistory(body.history);
+  const rawHistory = normalizeHistory(body.history);
+  const preflight = runPreflight(rawHistory, body.memory, principal);
+  const history = preflight.sanitizedHistory;
   const userName = normalizeUserName(body);
   const intent = detectIntent(userText, history);
 
@@ -1609,6 +1563,18 @@ async function handleReply(request: Request, env: Env): Promise<Response> {
       replySource: 'fallback',
       detectedIntent: intent,
       usedGreetingVariant: intent === 'greeting',
+      decision: 'fallback',
+      violationCodes: [],
+      schemaValid: true,
+      promptVersion: PROMPT_VERSION,
+      policyVersion: POLICY_VERSION,
+      traceId,
+      audit: {
+        principalKind: preflight.context.principalKind,
+        memoryCategoriesUsed: preflight.context.memoryCategoriesUsed,
+        historyTruncated: preflight.context.historyTruncated,
+      },
+      durationMs: Date.now() - startedAt,
     });
   }
 
@@ -1624,7 +1590,7 @@ async function handleReply(request: Request, env: Env): Promise<Response> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.OPENAI_API_KEY}` },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: models.chat,
         temperature,
         max_tokens: 300,
         response_format: { type: 'json_object' },
@@ -1636,19 +1602,81 @@ async function handleReply(request: Request, env: Env): Promise<Response> {
       }),
     });
     if (!res.ok) throw new Error(`OpenAI ${res.status}`);
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
-    const parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}') as Partial<CompanionReply>;
-    const openAIReply = typeof parsed.reply === 'string' ? parsed.reply.trim() : '';
-    if (!openAIReply) throw new Error('OpenAI returned an empty reply');
+    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } };
+    const usage = data.usage;
+    const inputTokens = usage?.prompt_tokens;
+    const outputTokens = usage?.completion_tokens;
+    const totalTokens = usage?.total_tokens;
+    let parsed = JSON.parse(data.choices?.[0]?.message?.content || '{}') as Partial<CompanionReply>;
+    let evaluation = evaluateReply({ parsed, parentSharingEnabled });
+
+    if (evaluation.decision === 'retry') {
+      const retryRes = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.OPENAI_API_KEY}` },
+        body: JSON.stringify({
+          model: models.chat,
+          temperature: Math.max(0.6, temperature - 0.2),
+          max_tokens: 300,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: buildBrainPrompt(characterId, surface, typeof body.mood === 'string' ? body.mood : undefined, body.memory, parentSharingEnabled, history, userName, intent, typeof body.phaseInstruction === 'string' ? body.phaseInstruction : undefined) },
+            ...history,
+            { role: 'user', content: userText.slice(0, 4000) },
+            { role: 'system', content: 'Your previous reply violated the output contract (' + evaluation.violations.join(', ') + '). Send only ONE short, casual, non-clinical reply as valid JSON matching the schema, with at most one question mark.' },
+          ],
+        }),
+      });
+      if (retryRes.ok) {
+        const retryData = await retryRes.json() as { choices?: Array<{ message?: { content?: string } }>; usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } };
+        parsed = JSON.parse(retryData.choices?.[0]?.message?.content || '{}') as Partial<CompanionReply>;
+        evaluation = evaluateReply({ parsed, parentSharingEnabled });
+      }
+    }
+
+    let decision: Decision = evaluation.decision;
+    const violationCodes: ViolationCode[] = evaluation.violations;
+
+    if (decision === 'repair') {
+      parsed = repairReply(parsed, violationCodes, parentSharingEnabled) as Partial<CompanionReply>;
+    } else if (decision === 'retry' || decision === 'block') {
+      decision = decision === 'block' ? 'block' : 'fallback';
+      parsed = {
+        reply: fallbackReply,
+        tone: intent === 'greeting' ? 'casual' : characterId,
+        safetyFlag: false,
+        parentShareSummary: null,
+        suggestedComfortTool: characterId === 'sekret' ? 'self-discovery' : null,
+      };
+    }
+
+    const finalReply = typeof parsed.reply === 'string' ? parsed.reply.trim() : fallbackReply;
+    const replySource = decision === 'block' || decision === 'fallback' ? 'fallback' : 'openai';
+
     return json({
-      reply: openAIReply.replace(/\bOracle\b/gi, "Se'kret"),
+      reply: finalReply.replace(/\bOracle\b/gi, "Se'kret"),
       tone: String(parsed.tone || characterId),
       safetyFlag: Boolean(parsed.safetyFlag),
       parentShareSummary: typeof parsed.parentShareSummary === 'string' ? parsed.parentShareSummary : null,
       suggestedComfortTool: typeof parsed.suggestedComfortTool === 'string' ? parsed.suggestedComfortTool : null,
-      replySource: 'openai',
+      replySource,
       detectedIntent: intent,
       usedGreetingVariant: intent === 'greeting',
+      model: models.chat,
+      usage: (inputTokens !== undefined || outputTokens !== undefined) ? { inputTokens, outputTokens, totalTokens } : undefined,
+      decision,
+      violationCodes,
+      schemaValid: evaluation.schemaValid,
+      promptVersion: PROMPT_VERSION,
+      policyVersion: POLICY_VERSION,
+      traceId,
+      estimatedCostUsd: estimateCostUsd(models.chat, inputTokens, outputTokens),
+      audit: {
+        principalKind: preflight.context.principalKind,
+        memoryCategoriesUsed: preflight.context.memoryCategoriesUsed,
+        historyTruncated: preflight.context.historyTruncated,
+      },
+      durationMs: Date.now() - startedAt,
     });
   } catch (error) {
     console.error('[sekret/reply]', error);
@@ -1661,6 +1689,19 @@ async function handleReply(request: Request, env: Env): Promise<Response> {
       replySource: 'fallback',
       detectedIntent: intent,
       usedGreetingVariant: intent === 'greeting',
+      model: models.chat,
+      decision: 'fallback',
+      violationCodes: [],
+      schemaValid: true,
+      promptVersion: PROMPT_VERSION,
+      policyVersion: POLICY_VERSION,
+      traceId,
+      audit: {
+        principalKind: preflight.context.principalKind,
+        memoryCategoriesUsed: preflight.context.memoryCategoriesUsed,
+        historyTruncated: preflight.context.historyTruncated,
+      },
+      durationMs: Date.now() - startedAt,
     });
   }
 }
@@ -1679,7 +1720,7 @@ async function handleVoice(request: Request, env: Env): Promise<Response> {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${env.OPENAI_API_KEY}` },
     body: JSON.stringify({
-      model: 'gpt-4o-mini-tts',
+      model: getModels(env).tts,
       voice: selectedVoice.voice,
       input: text.slice(0, 4000),
       instructions: VOICE_INSTRUCTIONS[characterId],
@@ -1696,6 +1737,7 @@ async function handleVoice(request: Request, env: Env): Promise<Response> {
     characterId,
     voiceSource: selectedVoice.source,
     aiGenerated: true,
+    model: getModels(env).tts,
   });
 }
 
@@ -1713,7 +1755,7 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
     for (let i = 0; i < binaryString.length; i += 1) bytes[i] = binaryString.charCodeAt(i);
     const formData = new FormData();
     formData.append('file', new Blob([bytes], { type: contentType }), `audio.${ext}`);
-    formData.append('model', 'whisper-1');
+    formData.append('model', getModels(env).stt);
     formData.append('language', 'en');
     const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -1722,7 +1764,7 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
     });
     if (!res.ok) return json({ error: 'transcription failed' }, 502);
     const data = await res.json() as { text?: string };
-    return json({ transcript: typeof data.text === 'string' ? data.text.trim() : '' });
+    return json({ transcript: typeof data.text === 'string' ? data.text.trim() : '', model: getModels(env).stt });
   } catch (error) {
     console.error('[sekret/transcribe]', error);
     return json({ error: 'transcription error' }, 500);
@@ -1730,13 +1772,13 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, principal: PreflightPrincipal | null = null): Promise<Response> {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
     const path = new URL(request.url).pathname;
     if (path.endsWith('/api/sekret/transcribe')) return handleTranscribe(request, env);
     if (path.endsWith('/api/sekret/voice')) return handleVoice(request, env);
-    if (path.endsWith('/api/sekret/reply')) return handleReply(request, env);
+    if (path.endsWith('/api/sekret/reply')) return handleReply(request, env, principal);
     return json({ error: 'Not found' }, 404);
   },
 };

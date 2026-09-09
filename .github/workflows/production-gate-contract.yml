@@ -1,0 +1,166 @@
+name: Production Gate Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app.config.ts'
+      - '.github/workflows/deploy-cloudflare.yml'
+      - '.github/workflows/deploy-supabase-migrations.yml'
+      - '.github/workflows/production-gate-contract.yml'
+      - 'e2e/production-smoke.spec.ts'
+      - 'playwright.production.config.ts'
+      - 'scripts/playwright-executable.mjs'
+      - 'scripts/cloudflare-access-service-auth.mjs'
+      - 'scripts/probe-production-release-endpoints.mjs'
+      - 'supabase/migrations/**'
+      - 'scripts/bootstrap-release-metadata-source.mjs'
+      - 'scripts/write-release-metadata.mjs'
+      - 'scripts/verify-cloudflare-native-deploy.mjs'
+      - 'scripts/verify-supabase-production-schema.mjs'
+      - 'scripts/verify-supabase-production-schema-core.mjs'
+      - 'scripts/publish-production-release-observation.mjs'
+      - 'test/cloudflare-access-production-verification.test.mjs'
+      - 'test/production-release-endpoint-probe.test.mjs'
+      - 'test/cloudflare-pages-build-environment.test.mjs'
+      - 'test/production-authority-workflow-contracts.test.mjs'
+      - 'test/production-deployment-gate-contract.test.mjs'
+      - 'test/production-release-observation.test.mjs'
+      - 'test/supabase-production-schema-witness.test.mjs'
+      - 'test/supabase-verifier-legacy-receipts.test.mjs'
+      - 'test/supabase-production-blocker-evidence.test.mjs'
+      - 'test/supabase-production-migration-workflow.test.mjs'
+      - 'test/supabase-anonymous-boundary-production-receipt-alias.test.mjs'
+      - 'test/release-metadata-bootstrap.test.mjs'
+      - 'test/release-metadata.test.mjs'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPO_NO_TELEMETRY: '1'
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  validate-production-gate:
+    name: Validate production proof contract
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Type-check production proof
+        run: npm run type-check
+
+      - name: Verify production and release-marker contracts
+        run: >-
+          node --test
+          test/cloudflare-access-production-verification.test.mjs
+          test/production-release-endpoint-probe.test.mjs
+          test/production-authority-workflow-contracts.test.mjs
+          test/production-deployment-gate-contract.test.mjs
+          test/production-release-observation.test.mjs
+          test/supabase-production-schema-witness.test.mjs
+          test/supabase-verifier-legacy-receipts.test.mjs
+          test/supabase-production-blocker-evidence.test.mjs
+          test/supabase-production-migration-workflow.test.mjs
+          test/supabase-anonymous-boundary-production-receipt-alias.test.mjs
+          test/release-metadata.test.mjs
+          test/release-metadata-bootstrap.test.mjs
+          test/cloudflare-pages-build-environment.test.mjs
+
+      - name: Prove direct Expo export retains the exact Cloudflare marker
+        env:
+          CF_PAGES: '1'
+          CF_PAGES_COMMIT_SHA: ${{ env.EXPECTED_HEAD_SHA }}
+          CF_PAGES_BRANCH: main
+          CF_PAGES_URL: https://exact-head.pages.dev
+          CF_PAGES_DEPLOYMENT_ID: github-contract-${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          rm -f public/release.json public/.well-known/sekret-release.json
+          npx expo export -p web
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+
+          const expectedSha = process.env.CF_PAGES_COMMIT_SHA.toLowerCase();
+          const paths = [
+            'public/release.json',
+            'public/.well-known/sekret-release.json',
+            'dist/release.json',
+            'dist/.well-known/sekret-release.json',
+          ];
+          const markers = paths.map((filePath) => {
+            assert.equal(fs.existsSync(filePath), true, `${filePath} must exist`);
+            return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          });
+          const stableIdentity = (marker) => ({
+            schemaVersion: marker.schemaVersion,
+            app: marker.app,
+            surface: marker.surface,
+            environment: marker.environment,
+            commitSha: marker.commitSha,
+            branch: marker.branch,
+            deploymentProvider: marker.deploymentProvider,
+            deploymentId: marker.deploymentId,
+            deploymentUrl: marker.deploymentUrl,
+            canonicalUrl: marker.canonicalUrl,
+          });
+
+          for (const marker of markers) {
+            assert.equal(marker.commitSha, expectedSha);
+            assert.equal(marker.branch, 'main');
+            assert.equal(marker.environment, 'production');
+            assert.equal(marker.deploymentProvider, 'cloudflare-pages');
+            assert.equal(marker.canonicalUrl, 'https://sekretbip.net');
+            assert.equal(Number.isFinite(Date.parse(marker.builtAt)), true);
+          }
+
+          const expectedIdentity = stableIdentity(markers[0]);
+          for (const marker of markers.slice(1)) {
+            assert.deepEqual(stableIdentity(marker), expectedIdentity);
+          }
+          NODE
+
+      - name: Upload exact release-marker build evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: production-release-bootstrap-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            dist/release.json
+            dist/.well-known/sekret-release.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Compile and list production Playwright tests
+        run: npx playwright test --config=playwright.production.config.ts e2e/production-smoke.spec.ts --list

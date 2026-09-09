@@ -36,6 +36,9 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     name: Build ${{ inputs.app }} ${{ inputs.platform }}
@@ -45,14 +48,17 @@ jobs:
       APP_VARIANT: ${{ inputs.app }}
       EXPO_PUBLIC_APP_VARIANT: ${{ inputs.app }}
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      # Prefer the current Supabase publishable-key contract. The legacy anon
+      # secret remains a bounded fallback so existing environments do not break
+      # before their GitHub secret is migrated.
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
 
       - run: npm ci
@@ -82,8 +88,8 @@ jobs:
             missing=1
           fi
 
-          if [ -z "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ]; then
-            echo "Missing EXPO_PUBLIC_SUPABASE_ANON_KEY GitHub Actions secret."
+          if [ -z "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" ]; then
+            echo "Missing EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY GitHub Actions secret (legacy EXPO_PUBLIC_SUPABASE_ANON_KEY is accepted temporarily)."
             missing=1
           fi
 
@@ -106,8 +112,8 @@ jobs:
 
           npx eas-cli@latest env:create \
             --environment "${{ inputs.channel }}" \
-            --name EXPO_PUBLIC_SUPABASE_ANON_KEY \
-            --value "$EXPO_PUBLIC_SUPABASE_ANON_KEY" \
+            --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+            --value "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
             --visibility sensitive \
             --scope project \
             --force \

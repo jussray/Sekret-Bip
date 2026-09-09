@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 1,
+  "planId": "20260718-controlled-alpha-activation",
+  "status": "planned-human-gated",
+  "evidenceLevel": "plan-only",
+  "fixtures": [
+    {
+      "id": "teen-alpha-a",
+      "role": "teen",
+      "accountClass": "synthetic-or-controlled",
+      "approvalRequired": true
+    },
+    {
+      "id": "parent-alpha-a",
+      "role": "parent",
+      "accountClass": "synthetic-or-controlled",
+      "approvalRequired": true
+    },
+    {
+      "id": "unrelated-alpha-b",
+      "role": "unrelated-user",
+      "accountClass": "synthetic-or-controlled",
+      "approvalRequired": true
+    }
+  ],
+  "preconditions": [
+    "Dedicated alpha Worker identity and exact deployed SHA are retained.",
+    "Bridge runtime cohort includes only the approved teen fixture.",
+    "Teen and parent preview builds use the same exact approved repository head.",
+    "Live Supabase migration, grant, RLS, RPC, and policy parity is recorded.",
+    "No real teen journal, mood, media, name, contact, or family content is used.",
+    "Rollback and kill-switch owners are present.",
+    "Founder approval is recorded before account creation, live writes, deletion, or credential use."
+  ],
+  "journeys": [
+    {
+      "id": "relationship-link-lifecycle",
+      "status": "not-run",
+      "steps": [
+        "Teen creates or receives the controlled parent-link flow.",
+        "Parent redeems the exact invite.",
+        "Both sides observe active relationship state.",
+        "Unrelated user cannot read the relationship.",
+        "Teen revokes or unlinks the relationship.",
+        "Parent access ends immediately.",
+        "Re-link or re-share requires a new explicit action."
+      ],
+      "requiredEvidence": [
+        "teen state",
+        "parent state",
+        "unrelated-user denial",
+        "exact relationship identifier",
+        "timestamps",
+        "revocation denial",
+        "screenshots or trace"
+      ]
+    },
+    {
+      "id": "bridge-summary-only-visibility",
+      "status": "not-run",
+      "steps": [
+        "Teen selects one synthetic Journal entry and one synthetic Mood check-in.",
+        "Teen sees the summary-only notice before submission.",
+        "Goal and Scrapbook selections are rejected before request creation.",
+        "Allowlisted teen creates one Bridge request.",
+        "Worker authenticates the teen and generates a validated summary or labeled fallback.",
+        "Parent reads themes, conversation starters, limitations, timestamps, and fallback state only.",
+        "Parent cannot query the raw Journal or Mood source.",
+        "Unrelated user cannot query the request, summary, view record, or source.",
+        "Teen revokes the share.",
+        "Parent and unrelated user are denied after revocation.",
+        "Teen may explicitly re-share through a new valid lifecycle."
+      ],
+      "requiredEvidence": [
+        "request identifier",
+        "summary identifier",
+        "source-kind inventory without content",
+        "allowlist decision",
+        "parent summary-only payload",
+        "raw-source denial",
+        "unrelated-user denial",
+        "revocation denial",
+        "fallback classification",
+        "trace and screenshots"
+      ]
+    },
+    {
+      "id": "crew-accountability-isolation",
+      "status": "not-run",
+      "steps": [
+        "Teen and one accepted Crew member establish the approved connection state.",
+        "Teen creates one synthetic check-in shared with that member.",
+        "Recipient sees only the shared active check-in.",
+        "Unrelated user and pending, blocked, removed, or revoked actors are denied.",
+        "Recipient sends one preset encouragement.",
+        "Duplicate, invalid, or unauthorized encouragement behavior is observed.",
+        "Owner revokes the exact active share and receives an observed-row success.",
+        "A repeated or unmatched revoke returns failure rather than false success.",
+        "Recipient loses feed access immediately after revocation."
+      ],
+      "requiredEvidence": [
+        "check-in identifier",
+        "share identifier",
+        "connection state",
+        "recipient feed payload",
+        "unrelated and inactive-state denials",
+        "encouragement result",
+        "observed revocation row",
+        "post-revocation denial"
+      ]
+    },
+    {
+      "id": "teen-account-deletion",
+      "status": "not-run",
+      "approvalGate": "Founder approval is required before destructive processing of the controlled fixture.",
+      "steps": [
+        "Teen requests deletion and observes the seven-day grace state.",
+        "Cancellation is tested before destructive processing.",
+        "A fresh request is created for the approved destructive probe.",
+        "The trusted processor is invoked through an approved path after the grace condition is satisfied in the test environment.",
+        "Private storage under the teen owner prefix is removed.",
+        "Auth identity is removed.",
+        "Owned rows cascade or are explicitly removed.",
+        "Parent Bridge and relationship access ends.",
+        "Crew identity retention is removed or anonymized as designed.",
+        "A hashed deletion receipt remains without private content.",
+        "Retry or replay does not restore content or create duplicate destructive work.",
+        "Orphan inventory returns zero."
+      ],
+      "requiredEvidence": [
+        "deletion request state",
+        "cancellation result",
+        "processor result",
+        "storage bucket inventory and object counts",
+        "Auth absence",
+        "owned-row absence",
+        "relationship denial",
+        "Crew cleanup",
+        "receipt state",
+        "retry result",
+        "orphan count"
+      ]
+    },
+    {
+      "id": "parent-account-deletion",
+      "status": "not-run",
+      "approvalGate": "Founder approval is required before destructive processing of the controlled fixture.",
+      "steps": [
+        "Parent requests and completes the approved deletion probe.",
+        "Parent Auth identity and parent-owned records are removed.",
+        "Teen-private Journal, Mood, Pages, and unrelated content remain intact.",
+        "Parent relationship and summary access ends.",
+        "No raw teen content is copied into receipts, logs, or retained artifacts."
+      ],
+      "requiredEvidence": [
+        "parent Auth absence",
+        "parent-owned-row absence",
+        "teen-private-row preservation",
+        "relationship denial",
+        "receipt state",
+        "log and artifact content scan"
+      ]
+    },
+    {
+      "id": "second-user-restore-isolation",
+      "status": "not-run",
+      "steps": [
+        "Sign out or delete the first controlled user as applicable.",
+        "Clear approved local caches through the product flow.",
+        "Sign in as the unrelated controlled user on the same device or browser context.",
+        "Confirm no first-user Pages, moods, Bridge state, Crew state, media, notifications, or cached identity is visible.",
+        "Restart or restore the app and repeat the isolation check."
+      ],
+      "requiredEvidence": [
+        "cache-clearing result",
+        "second-user route screenshots",
+        "first-user data absence",
+        "restart or restore result",
+        "storage and notification inspection"
+      ]
+    }
+  ],
+  "stopConditions": [
+    "Any parent or unrelated actor receives raw teen content.",
+    "Any revoked, blocked, removed, pending, deleted, or unrelated actor retains private access.",
+    "The app claims a revoke or deletion that cannot be observed in the authoritative state.",
+    "The runtime cohort is wider than the approved fixture list.",
+    "Private content appears in logs, screenshots, reports, notifications, or receipts.",
+    "Deletion leaves restorable or orphaned private data.",
+    "Production routing or public availability changes."
+  ],
+  "nonClaims": [
+    "This file contains no account identifier, credential, private content, or executed journey result.",
+    "Planned steps do not prove live RLS, deletion, revocation, isolation, or device behavior."
+  ]
+}

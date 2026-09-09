@@ -24,9 +24,9 @@ coverage — and found real drift (findings 1 and 2 below), which is why
 | `src/utils/supabase.ts` | Only app code that reads/writes `crew_members` |
 | `scripts/control-room-rls-scan.mjs` | Existing automated scanner — regex-based, checks `supabase/migrations/` only |
 
-## Current enforced release warning — notification_deliveries
+## Current verified exception — notification_deliveries
 
-`npm run audit:control-room` currently reports `notification_deliveries` as a table without an RLS policy. Treat this as release-blocking for any public demo, production launch, app-store release, or production teen-data collection until a migration adds the intended policy or the table is documented as service-role-only with a scanner allowlist rationale.
+`notification_deliveries` is intentionally service-role-only, not a user-facing table missing an access policy. The defining migration, `20260704030000_harden_push_notifications.sql`, enables RLS and revokes every table privilege from `anon` and `authenticated`. A live production check on 2026-07-12 confirmed RLS is enabled, no policies exist, neither public client role has a table grant, and only `service_role` has table privileges. The repository scanner may report the no-policy shape as a warning, but this specific table is not release-blocking unless those grants, its server-only ownership, or its write path change.
 
 ## Policy map
 

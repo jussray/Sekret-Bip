@@ -1,5 +1,19 @@
 # bip-privacy-redteam
 
+## 5W1H operating contract
+
+Before planning, editing, or claiming completion, establish and state:
+
+- **Who** — the requester, decision owner, affected users, data subjects, and execution authority.
+- **What** — the requested outcome, concrete deliverable, non-goals, and existing work that must be preserved.
+- **Where** — the exact repository, branch, environment, runtime, route, service, table, or provider boundary involved.
+- **When** — the current lifecycle or release state, required ordering, timing constraint, and rollback window.
+- **Why** — the user problem and verified evidence that justify the work.
+- **How** — the smallest safe implementation, required permissions, verification evidence, rollout, and rollback.
+
+Inspect repository and runtime truth for unknowns. Ask the user only when a missing answer would materially change the safe solution or authority. Re-run 5W1H after red-team/OODA findings change the plan. Finish by mapping the result, evidence, remaining blocker, and next owner back to these six questions.
+
+
 ## Trigger
 Any PR touching: Supabase migrations, RLS policies, Edge Functions, API routes
 that query user or circle data.
@@ -99,3 +113,7 @@ If new code reintroduces this pattern, it fails.
 Return: PASS | FAIL | NEEDS REVIEW
 - FAIL: exact file + line + violation type + affected audience.
 - NEEDS REVIEW: ambiguous contract or behavior requiring a migration, integration, realtime, or response test.
+
+## Control Room local-agent red team
+
+For Control Room execution, fail the review if the server binds beyond `127.0.0.1`, accepts non-local origins, lacks timing-safe bearer authentication, reuses a committed token, accepts arbitrary shell input, runs non-allowlisted missions, permits concurrent missions, omits a timeout, or exposes unbounded output. Verify teen and parent-private content cannot enter commands, output, reports, telemetry, or hosted provider prompts.

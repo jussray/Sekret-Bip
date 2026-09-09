@@ -1,101 +1,101 @@
-# Se'kret Bip 💜
+<!-- truth-mode: durable -->
+# Se’kret Bip 💜
 
-Se'kret Bip is a privacy-first emotional growth and self-expression app for teens, built with React Native, Expo Router, TypeScript, Supabase, and Cloudflare Workers.
+🌐 **Official site:** https://sekretbip.net
 
-> Warm, funny, soft, slightly nosy, and never clinical.
+> Copyright © 2024–2026 Juss Ray. All rights reserved. Proprietary software; see `LICENSE`.
+
+Se’kret Bip is a privacy-first emotional growth and self-expression product for teens, built with React Native, Expo Router, TypeScript, Supabase, and Cloudflare. Founder Control Room is the operating/evidence layer for approvals, changes, deployments, verification, and rollback.
+
+## Live truth boundary
+
+This README describes durable product and operating contracts. It does **not** declare the live release SHA, provider status, open/closed issue state, or launch verdict.
+
+Before making a current claim, resolve live authority in this order:
+
+1. fresh GitHub `main`, PRs, issues, checks, reviews, jobs, and logs;
+2. the newest marked exact-production receipt on issue #696;
+3. Cloudflare Pages / Workers / Access evidence for the same target;
+4. the intended Supabase project and live migration/runtime evidence;
+5. production Playwright and, where required, physical-device and controlled-account proof.
+
+See `docs/TRUTH_AUTHORITY.md` for expiry and supersession rules. A fact that was verified earlier remains historical evidence, but newer contradictory authority revokes its use as present-tense truth.
+
+## State → Evidence → Claim
+
+For every material completion or blocker claim, identify:
+
+- the state observed;
+- the evidence and authority that observed it;
+- the exact scope of the claim;
+- what makes that evidence expire;
+- whether newer evidence superseded it.
+
+Keep repository, CI, Cloudflare, Supabase, browser, device, and account witnesses separate.
 
 ## Product promise
 
 - Private reflections stay private.
 - Teens choose what they share.
 - Parent access is relationship-based, not surveillance-based.
-- Identity and permission rules are enforced across services and Supabase policies.
+- Identity and permissions are enforced by runtime and database boundaries, not only by UI hiding.
+- Operational evidence remains metadata-safe and never becomes a back door into private teen content.
+
+## Product and UX direction
+
+Se’kret Bip is a premium, living app experience. Cosmic and character art is visual DNA and atmosphere, not product architecture.
+
+Prioritize interactive product states, companions embedded into real flows, responsive emotional feedback, personalized home behavior, clear Teen / Parent / Bip Jr journeys, accessible motion, and a coherent mobile design system. Do not regress the product into splash-art-led UX.
+
+## Architecture
+
+- **Frontend:** React Native, Expo Router, TypeScript
+- **Routes:** auth, onboarding, Teen, Parent, and founder/internal groups
+- **Local state:** React state, context, hooks, and AsyncStorage
+- **Cloud data:** Supabase Auth, Postgres, RLS, Storage, Edge Functions, ordered migrations
+- **Public API front door:** `https://api.sekretbip.net`, currently pinned by repository configuration to Cloudflare Worker `sekret-backend`
+- **Companion runtime lineage:** Cloudflare Worker `sekret`; founder-confirmed active and historically the deployment identity for the Se’kret companion API. Exact live routes/custom domains remain Cloudflare provider-readback truth.
+- **Web:** canonical Cloudflare Pages project `sekret-bip`
+- **Production proof:** exact release identity + Worker health + Supabase runtime + production Playwright + any required account/device witnesses
+- **Schema source:** `supabase/migrations/`
+
+### Worker purpose boundary
+
+The checked-in production client is intentionally single-homed to `api.sekretbip.net`; product code must not choose between multiple public Worker URLs.
+
+The preferred purpose split is:
+
+- `sekret` owns the companion execution plane: `/api/sekret/reply`, `/api/sekret/voice`, `/api/sekret/transcribe`, companion style/safety enforcement, AI/voice provider capability, and companion-scoped telemetry;
+- `sekret-backend` owns the public API/front-door and privileged platform plane: authentication/rate-limit ingress, Bridge summary/data operations, server-side Supabase service-role work, inbound email, and other non-companion backend business logic;
+- when provider readback and code migration are approved, `sekret-backend` should delegate companion requests to `sekret` through a Cloudflare Service Binding rather than exposing a second client-facing URL;
+- `SUPABASE_SERVICE_ROLE_KEY` must not be duplicated into the companion Worker merely for telemetry. Privileged persistence should cross a narrow internal boundary or remain backend-owned.
+
+This is a **purpose/target contract**, not a claim that the service binding or route cutover is already deployed. Current provider binding remains Level 0 Cloudflare truth and must be proven before mutation.
+
+Legacy compatibility files and historical provider identities are not a second production authority. `sekret` is not classified as legacy while its active provider role remains founder-confirmed and provider-protected.
 
 ## Product areas
 
 ### Teen
 
-- Room and User Room
-- Pages and journal flows
-- Voice Bip
-- Raylene, Rylane, Cloud, Night, and Oracle/Se'kret
-- Calm, Comfort, Mind-Body Reset, and Cloud Thoughts
-- Bippin 2, Growth, Insights, History, and Memories
-- Period Calendar
-- Points and Rewards
+Room, Pages, journaling, voice reflection, companions, Daily Intentions, Calm/Comfort/Mind + Body Reset, Cloud Thoughts, Circle, Bip Crew, Growth/Insights/History/Memories, period tools, points, and rewards infrastructure exist at different evidence levels. Repository presence is not equivalent to release proof.
 
-### Social and trusted connection
+### Parent and trusted relationships
 
-- **Circle** — anonymous or circle-safe community posting
-- **Bip Crew** — trusted accountability relationships
-- **Bridge** — the private teen-parent connection system
-  - Doorbell is the signal layer inside Bridge
-  - S2Tell is the intentional share composer inside Bridge
-  - Parent Bridge is the parent view of the linked relationship
-- **Parent Circle** — separate parent-to-parent community space
-- No open stranger direct messages
+Parent routes, account linking, Bridge contracts, relationship-aware access, Parent Circle, and guarded parent surfaces exist. Parent launch readiness remains independently evidence-gated across lifecycle, privacy, production, notification, device, revocation, unlink, and deletion journeys.
 
-### Parent
+## Future lanes
 
-Parent routes and linked-account data exist, but parent product completion is now an enforced release gate. The parent experience remains in-progress until issue #212 verifies Parent Bridge presentation, onboarding, link lifecycle states, Parent Circle privacy, Parent Coach boundaries, period-sharing permissions, notifications, and end-to-end privacy tests. Demo scripts must avoid implying those flows are production-complete.
+Unless newer exact repository implementation proves otherwise, durable L4 continuity memory, persistent companion goals, scheduled reflection jobs, evidence-derived relationship phases, inter-companion coordination, and L5 cross-companion synthesis remain future lanes. They are not automatic launch dependencies.
 
-## Privacy boundaries
-
-Parent surfaces must not read:
-
-- raw journal text
-- Voice Bip transcripts
-- private companion chats
-- private character memory
-- private notes
-- unshared messages
-- general app activity history
-
-Bridge contains only content intentionally sent into the linked relationship. Circle and Bridge remain separate systems.
-
-## Architecture
-
-- **Frontend:** React Native, Expo Router, TypeScript
-- **Routes:** separate teen and parent route groups
-- **Local state:** React state, context, hooks, and AsyncStorage
-- **Cloud data:** Supabase Auth, Postgres, RLS, Storage, functions, and migrations
-- **API layer:** Cloudflare Worker for AI, voice, authenticated APIs, and metadata-only telemetry
-- **Deployment direction:** Cloudflare-first, with remaining Vercel compatibility treated as transitional
-- **Schema source of truth:** `supabase/migrations/`
-
-## Companion intelligence
-
-The enforced companion implementation is L2: short-term history and approved context are passed into each turn. Durable semantic memory, persistent goals, scheduled reflection, and inter-companion coordination must not be presented as implemented until the migrations, services, privacy controls, and tests described in `docs/AGENT_L4_ARCHITECTURE.md` exist.
-
-## Enforced readiness gates
-
-1. Parent/Bridge completion is blocked on issue #212 and may not expand parent visibility.
-2. Live demo readiness requires verified Cloudflare Worker/web secrets, restricted CORS, authenticated Worker handling, deployed Supabase functions, clean migration replay, and release-health telemetry.
-3. Parent-link, storage, RLS, identity, founder, age-gate, and deletion boundaries must be enforced by services/RLS/RPCs/storage policies, not UI hiding.
-4. The `notification_deliveries` RLS scanner warning is release-blocking until a policy or documented service-role-only exception is implemented.
-5. Durable character memory remains a roadmap item until privacy boundaries, migrations, and tests are implemented.
-
-## Project structure
-
-```text
-app/                 Expo Router route groups
-screens/             compatibility screen implementations
-src/                 components, features, hooks, services, types, utilities
-worker/              Cloudflare Worker
-supabase/            migrations and functions
-assets/              app artwork and media
-docs/                architecture and implementation guidance
-scripts/             audits and validation tools
-test/                automated tests
-```
-
-## Setup
+## Local setup
 
 ```bash
-gh repo clone jussray/Bip
-cd Bip
+gh repo clone jussray/Sekret-Bip
+cd Sekret-Bip
 npm install --legacy-peer-deps
 cp .env.example .env.local
+git lfs pull
 npx expo start --web -c
 ```
 
@@ -107,41 +107,35 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-Do not maintain a second schema bootstrap file. Use the ordered migration chain.
+Use ordered migrations as the schema authority; do not maintain a second bootstrap schema.
 
 ## Validation
 
 ```bash
 npm run type-check
 npm test
-npm run test:oracle
-npm run test:voice-intelligence
-npm run test:device-sync
+npm run lint
+node scripts/audit-documentation-truth.mjs
+npm run verify:bundle
 npm run audit:control-room
 npm run validate:companions
-```
-
-Full check:
-
-```bash
+npm run test:e2e
+npm run test:e2e:production
 npm run verify:prepush
 ```
 
-## Key guides
+A Playwright file committed to the repository is not proof that it executed against deployed production.
 
-- `docs/DEMO_READINESS_ENFORCEMENT.md`
-- `docs/CURRENT_STATUS.md`
-- `docs/ARCHITECTURE.md`
-- `docs/SUPABASE.md`
-- `docs/BRIDGE_CONNECTION_AUDIT.md`
-- `docs/AGENT_L4_ARCHITECTURE.md`
-- `docs/RLS_POLICY_AUDIT.md`
-- `docs/COPPA_COMPLIANCE.md`
-- `docs/PRIVACY_POLICY.md`
-- `DEPLOYMENT.md`
+## Canonical operating references
 
-Documentation is an implementation guardrail. When code and docs disagree, fix the stale source.
+- `docs/TRUTH_AUTHORITY.md` — claim freshness, expiry, and supersession
+- `docs/CURRENT_STATUS.md` — how to resolve current status without copying volatile state into docs
+- `docs/DOCUMENTATION_MAP.md` — documentation authority and archive rules
+- `docs/CLOUDFLARE_OWNERSHIP.md` — Worker identity, provider authority, and purpose boundary
+- `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md` — preservation, migration, and rollback sequence
+- `docs/LAUNCH_ROADMAP.md` — durable launch phases and exit evidence
+- `DEPLOYMENT.md` — deployment and exact-production verification contract
+- `implementation-ledger.json` and validated extensions — machine-checked feature state
+- issue #696 — exact-production release packet and marked receipts
 
-## License
-
-Private project.
+Dated snapshots, historical PR bodies, and old issue comments remain evidence for their observation window only. When documentation and live authority disagree, preserve the history and repair the stale current-use claim.

@@ -5,15 +5,10 @@ export async function getCurrentSessionUserId(): Promise<string | null> {
   const supabase = getSupabase();
   if (!supabase) return null;
 
-  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) throw sessionError;
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw error;
 
-  if (sessionData.session?.user.id) return sessionData.session.user.id;
-
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError) throw userError;
-
-  return userData.user?.id ?? null;
+  return data.session?.user.id ?? null;
 }
 
 export async function ensureAnonymousSession(): Promise<string | null> {

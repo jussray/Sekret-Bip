@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "waivers": [
+    {
+      "id": "calm-accessibility-linebreak-formatting",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-sanitization",
+      "path": "src/screens/CalmScreen.tsx",
+      "messageIncludes": "replaces only the first occurrence",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The replacement formats a fixed UI label for accessibility by collapsing one intentional line break. It is not used as a trust-boundary sanitizer or security validation."
+    },
+    {
+      "id": "identity-spaces-test-regex-builder",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-sanitization",
+      "path": "test/identity-spaces.test.mjs",
+      "messageIncludes": "does not escape backslash",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The helper builds a static source-contract assertion from repository-owned route literals; it does not sanitize untrusted runtime input."
+    },
+    {
+      "id": "parent-link-test-regexp-escape",
+      "language": "javascript-typescript",
+      "ruleId": "js/useless-regexp-character-escape",
+      "path": "test/parent-link-settings-state.test.mjs",
+      "messageIncludes": "escape sequence",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "This is a static repository source assertion. The finding has no runtime or provider trust boundary, but remains tracked until the assertion is simplified."
+    },
+    {
+      "id": "voice-foundation-test-regexp-escapes",
+      "language": "javascript-typescript",
+      "ruleId": "js/useless-regexp-character-escape",
+      "path": "test/voice-runtime-foundation.test.mjs",
+      "messageIncludes": "escape sequence",
+      "maxMatches": 4,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "These four results are static SQL source-contract regex construction in tests, not runtime validation of external input."
+    },
+    {
+      "id": "worker-identity-test-url-substring",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-url-substring-sanitization",
+      "path": "test/cloudflare-worker-identity.test.mjs",
+      "messageIncludes": "can be anywhere in the URL",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The check asserts absence of a repository-owned legacy URL in a static environment file; it does not authorize or validate a runtime URL."
+    },
+    {
+      "id": "agent-discovery-test-url-anchor",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/agent-discovery.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The expression is a static documentation source assertion, not a URL allowlist or runtime security decision."
+    },
+    {
+      "id": "auth-email-provider-test-domain-anchor",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/auth-email-provider-contract.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The expression verifies a static provider hostname appears in repository source; it is not runtime hostname validation."
+    },
+    {
+      "id": "access-audit-test-domain-anchors",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/cloudflare-access-coverage-audit.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 2,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "These assertions verify redacted static evidence text and do not authorize or sanitize runtime URLs."
+    },
+    {
+      "id": "zone-access-audit-test-domain-anchor",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/cloudflare-zone-access-coverage-audit.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The assertion checks redacted test evidence for a repository-owned domain string and is not runtime URL validation."
+    },
+    {
+      "id": "controlled-account-test-url-anchor",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/controlled-account-cloud-comfort-gate.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The assertion verifies a fixed production URL is present in workflow source; it is not an allowlist check over untrusted input."
+    },
+    {
+      "id": "password-recovery-doc-url-anchor",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/password-recovery-contract.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The assertion verifies static setup documentation contains the required recovery URL; it does not validate a runtime redirect."
+    },
+    {
+      "id": "production-gate-test-url-anchor",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/production-deployment-gate-contract.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The assertion verifies fixed production endpoint literals in workflow/config source and is not a runtime URL trust decision."
+    },
+    {
+      "id": "pages-domain-array-membership",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-url-substring-sanitization",
+      "path": "scripts/verify-cloudflare-pages-branch-authority.mjs",
+      "messageIncludes": "can be anywhere in the URL",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The reported includes call is Array.prototype.includes over Cloudflare's domains array, so it requires exact element equality with app.sekretbip.net. It is not substring matching on a URL string and therefore cannot accept an attacker-controlled hostname prefix or suffix."
+    },
+    {
+      "id": "pages-domain-array-membership-test",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-url-substring-sanitization",
+      "path": "test/cloudflare-pages-branch-authority.test.mjs",
+      "messageIncludes": "can be anywhere in the URL",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "This is an exact Array.prototype.includes assertion over normalized provider-domain fixtures in a unit test. It neither parses nor authorizes runtime URLs."
+    },
+    {
+      "id": "public-front-door-static-url-assertions",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/cloudflare-production-browser-contract.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 4,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "These four regular expressions inspect repository-owned Playwright source text to ensure the public front-door and production smoke specs mention expected production URL/domain literals. They are test source assertions, not runtime URL validation or hostname allowlisting."
+    },
+    {
+      "id": "post-989-public-apex-source-assertions",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/post-989-access-fail-closed.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 2,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "These two expressions inspect repository-owned Playwright source text to verify the public apex URL and hostname assertions survived the Access fail-closed repair. They do not validate or authorize an untrusted runtime URL."
+    }
+  ]
+}

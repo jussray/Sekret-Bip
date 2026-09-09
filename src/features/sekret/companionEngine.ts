@@ -4,21 +4,6 @@
  * Companion Engine — Phase 2C
  *
  * Single entry point for all companion interactions across every surface.
- * Previously each screen had its own import chain (api.ts, sekretCompanion.ts,
- * sekretCompanionReply.ts, sekretReply.ts). This file unifies them.
- *
- * Public surface:
- *   sendCompanionMessage()  — sends to AI backend, emits companion_message event
- *   getCompanionGreeting()  — opening line per companion
- *   getPresenceMessage()    — context-aware ambient presence line
- *   isSafetyTrigger()       — crisis phrase detection
- *   toCompanionId()         — normalizes legacy keys ('soft', 'oracle', etc.)
- *   COMPANION_PROFILES      — unified display config (name, emoji, title, vibe)
- *
- * What it does NOT do:
- *   - Manage memory/session persistence (stays in sekretCompanion.ts + sync.ts)
- *   - Render anything (no React here)
- *   - Replace existing AI infrastructure (wraps fetchSekretBrainReply)
  */
 
 import {
@@ -32,21 +17,22 @@ import { buildSekretPresence } from '../../../services/sekretPresence';
 import { buildReplyRequest } from '@/services/ai/buildReplyRequest';
 import { emitEvent } from '@/features/activity/events';
 import { COMPANION_CURRICULUM } from '@/config/companionCurriculum';
+import type { CompanionReplySource } from '@/contracts/sekretApi';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type CompanionId = SekretCharacterId; // 'raylene' | 'rylane' | 'cloud' | 'night' | 'sekret'
+export type CompanionId = SekretCharacterId; // 'suhana' | 'sy' | 'cloud' | 'night' | 'sekret'
 export type { SekretAvatarState };
 
 export type CompanionSurface =
-  | 'chat'           // persistent full chat session
-  | 'journal'        // in-journal companion prompt
-  | 'voiceBip'       // voice recording context
-  | 'comfort'        // breathe/comfort session
-  | 'circle'         // circle post helper
-  | 'parentBridge'   // bridge sharing screen
-  | 'selfDiscovery'  // oracle / self-discovery flow
-  | 'pages';         // Pages companion tabs (raylene/rylane)
+  | 'chat'
+  | 'journal'
+  | 'voiceBip'
+  | 'comfort'
+  | 'circle'
+  | 'parentBridge'
+  | 'selfDiscovery'
+  | 'pages';
 
 export interface CompanionReplyInput {
   companionId: CompanionId;
@@ -56,11 +42,12 @@ export interface CompanionReplyInput {
   history?: SekretHistoryTurn[];
   parentSharingEnabled?: boolean;
   teenGender?: 'girl' | 'boy' | 'other' | null;
-  /** Long-term oracle understandings, e.g. buildOracleContext(oracleProfile, 'teen'). */
   oracleContext?: string[];
   userName?: string;
   displayName?: string;
   profileName?: string;
+  /** True only when this is the user's first ever chat with this companion. */
+  isFirstCompanionChat?: boolean;
 }
 
 export interface CompanionReplyResult {
@@ -70,6 +57,8 @@ export interface CompanionReplyResult {
   tone: string;
   parentShareSummary: string | null;
   suggestedComfortTool: string | null;
+  replySource: CompanionReplySource;
+  questionBudget?: number;
 }
 
 export interface CompanionProfile {
@@ -78,48 +67,55 @@ export interface CompanionProfile {
   emoji: string;
   title: string;
   vibe: string;
+  /** First-chat-only /human-ai intro. */
+  firstChatIntro: string;
+  /** Normal greeting after the first introduction has already happened. */
   greeting: string;
   accentColor: string;
 }
 
 // ── Companion profiles ─────────────────────────────────────────────────────────
 // Unified display config across all surfaces.
-// Greetings come from companionCurriculum (single source of truth for identity).
+// Greetings and first-chat intros come from companionCurriculum.
 
 export const COMPANION_PROFILES: Record<CompanionId, CompanionProfile> = {
-  raylene: {
-    id:          'raylene',
-    name:        'Raylene',
+  suhana: {
+    id:          'suhana',
+    name:        'Suhana',
     emoji:       '🌸',
-    title:       'Soft Big Sis',
-    vibe:        'Warm, expressive, protective, and real.',
-    greeting:    COMPANION_CURRICULUM.raylene.greeting,
+    title:       'Sorian Twin / Porchlight',
+    vibe:        'Warm, expressive, protective, funny, and emotionally sharp.',
+    firstChatIntro: COMPANION_CURRICULUM.suhana.firstChatIntro,
+    greeting:    COMPANION_CURRICULUM.suhana.greeting,
     accentColor: '#FF4FA3',
   },
-  rylane: {
-    id:          'rylane',
-    name:        'Rylane',
+  sy: {
+    id:          'sy',
+    name:        'Sy',
     emoji:       '⚡',
-    title:       'Loyal Bro',
-    vibe:        'Quiet loyalty. Keeps it real. Never talks down.',
-    greeting:    COMPANION_CURRICULUM.rylane.greeting,
+    title:       'Sorian Twin / Quiet Seat',
+    vibe:        'Quiet loyalty. Practical truth. Keeps it real without crowding.',
+    firstChatIntro: COMPANION_CURRICULUM.sy.firstChatIntro,
+    greeting:    COMPANION_CURRICULUM.sy.greeting,
     accentColor: '#7C83FF',
   },
   cloud: {
     id:          'cloud',
-    name:        "Cloud Se'kret",
+    name:        'Cloud',
     emoji:       '☁️',
-    title:       'Quiet Observer',
-    vibe:        'Notices. Waits. Rarely pushes.',
+    title:       'Sorian Birth-Cloud',
+    vibe:        'Majestic, soft, low-pressure, and present without pushing.',
+    firstChatIntro: COMPANION_CURRICULUM.cloud.firstChatIntro,
     greeting:    COMPANION_CURRICULUM.cloud.greeting,
     accentColor: '#7dd3fc',
   },
   night: {
     id:          'night',
-    name:        "Night Se'kret",
+    name:        'Night',
     emoji:       '🌙',
     title:       'The Light Left On',
     vibe:        'Late-night builder. Future-focused. Honest.',
+    firstChatIntro: COMPANION_CURRICULUM.night.firstChatIntro,
     greeting:    COMPANION_CURRICULUM.night.greeting,
     accentColor: '#c4b5fd',
   },
@@ -128,33 +124,30 @@ export const COMPANION_PROFILES: Record<CompanionId, CompanionProfile> = {
     name:        "Se'kret",
     emoji:       '✨',
     title:       'Inner Oracle',
-    vibe:        'Reflects your patterns back to you.',
-    greeting:    "I've been listening. There's a pattern here — want to look at it together?",
+    vibe:        'Reflects your patterns back to you without exposing private memory.',
+    firstChatIntro: "I'm Se'kret, your human-shaped AI continuity guide. I notice patterns without making you feel watched. Start anywhere.",
+    greeting:    "I've been listening. There's a pattern here. Want to look at it together?",
     accentColor: '#fbbf24',
   },
 };
 
 // ── Companion ID normalizer ────────────────────────────────────────────────────
-// Handles legacy keys: 'soft' → 'raylene', 'oracle' → 'sekret', etc.
+// Handles old keys: 'soft'/'raylene' → 'suhana', 'rylane'/'bro' → 'sy', 'oracle' → 'sekret'.
 
 export function toCompanionId(value: string): CompanionId {
   return normalizeSekretCharacter(value);
 }
 
 // ── Safety detection ───────────────────────────────────────────────────────────
-// Tier 1 check (client-side). Backend also checks; this surfaces the flag
-// immediately so the screen can show an in-UI support nudge without waiting.
 
 const CRISIS_PATTERN =
-  /\b(kill myself|end my life|want to die|suicidal|self[- ]?harm|not safe|hurt myself|end it|disappear for real)\b/i;
+  /\b(suicidal|self[- ]?harm|not safe|abuse|danger)\b/i;
 
 export function isSafetyTrigger(text: string): boolean {
   return CRISIS_PATTERN.test(text);
 }
 
 // ── Surface mapping ────────────────────────────────────────────────────────────
-// Engine surfaces 'chat' and 'pages' don't exist in the backend contract;
-// map them to the closest semantic equivalent.
 
 type BackendSurface = 'journal' | 'voiceBip' | 'comfort' | 'circle' | 'parentBridge' | 'selfDiscovery';
 
@@ -164,25 +157,19 @@ function toBackendSurface(surface: CompanionSurface): BackendSurface {
   if (surface === 'circle')        return 'circle';
   if (surface === 'parentBridge')  return 'parentBridge';
   if (surface === 'selfDiscovery') return 'selfDiscovery';
-  return 'journal'; // chat, journal, pages → journal
+  return 'journal';
 }
 
 // ── Core: sendCompanionMessage ─────────────────────────────────────────────────
 
-/**
- * Send a message to a companion and receive their reply.
- *
- * Emits 'companion_message' before the network call so the point ledger
- * records the interaction regardless of whether the backend responds.
- * Falls back silently if the backend is unavailable — never throws.
- */
 export async function sendCompanionMessage(
   input: CompanionReplyInput,
 ): Promise<CompanionReplyResult> {
-  emitEvent('companion_message', { personalityId: input.companionId });
+  const companionId = normalizeSekretCharacter(input.companionId);
+  emitEvent('companion_message', { personalityId: companionId });
 
   const { request } = await buildReplyRequest({
-    characterId:          normalizeSekretCharacter(input.companionId),
+    characterId:          companionId,
     surface:              toBackendSurface(input.surface),
     text:                 input.text,
     mood:                 input.mood,
@@ -192,6 +179,7 @@ export async function sendCompanionMessage(
     userName:             input.userName,
     displayName:          input.displayName,
     profileName:          input.profileName,
+    isFirstCompanionChat: input.isFirstCompanionChat ?? !input.history?.length,
     extraMemory:          input.teenGender ? { teenGender: input.teenGender } : undefined,
   });
 
@@ -204,33 +192,30 @@ export async function sendCompanionMessage(
     tone:                 result.tone,
     parentShareSummary:   result.parentShareSummary,
     suggestedComfortTool: result.suggestedComfortTool,
+    replySource:          (result.replySource ?? 'openai') as CompanionReplySource,
+    questionBudget:       typeof result.questionBudget === 'number' ? result.questionBudget : undefined,
   };
 }
 
 // ── Greeting ───────────────────────────────────────────────────────────────────
 
-/**
- * Returns the companion's opening line — shown on first load or when chat
- * history is empty. Sourced from COMPANION_CURRICULUM (single source of truth).
- */
-export function getCompanionGreeting(id: CompanionId): string {
-  return COMPANION_PROFILES[id]?.greeting ?? COMPANION_PROFILES.raylene.greeting;
+export function getCompanionGreeting(id: CompanionId, options: { firstChat?: boolean } = {}): string {
+  const companionId = normalizeSekretCharacter(id);
+  const profile = COMPANION_PROFILES[companionId] ?? COMPANION_PROFILES.suhana;
+  return options.firstChat ? profile.firstChatIntro : profile.greeting;
 }
 
 // ── Presence message ───────────────────────────────────────────────────────────
 
-/**
- * Context-aware ambient message — shown as subtitle text, room nudge, or
- * pre-action prompt (e.g. before the teen starts a journal or voice bip).
- */
 export function getPresenceMessage(
   id: CompanionId,
   context: { mood?: string; screen?: string; isLateNight?: boolean } = {},
 ): string {
-  if (id === 'sekret') {
+  const companionId = normalizeSekretCharacter(id);
+  if (companionId === 'sekret') {
     return context.isLateNight
       ? 'quiet hours. good time to listen to yourself.'
       : 'ready when you are.';
   }
-  return buildSekretPresence(undefined, id, context.screen);
+  return buildSekretPresence(undefined, companionId, context.screen);
 }

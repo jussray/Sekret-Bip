@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "surface": "web-front-door",
+  "status": "awaiting-locked-visual-source",
+  "founderApprovalRequired": true,
+  "implementationMayNotSelfApprove": true,
+  "canonicalCharacters": [
+    { "name": "Night", "position": "left" },
+    { "name": "Suhana", "position": "center" },
+    { "name": "Sy", "position": "right" }
+  ],
+  "requiredCompanions": ["Cloud", "parents"],
+  "requiredProof": [
+    "approved-source identifier",
+    "approved mobile screenshot at 390x844",
+    "approved narrow screenshot at 320x568",
+    "approved desktop screenshot",
+    "exact artwork hashes",
+    "Teen entry recording",
+    "Parent entry recording",
+    "preview URL tied to exact PR head",
+    "founder approval recorded after preview"
+  ],
+  "releaseRules": [
+    "Engineering checks do not imply visual approval.",
+    "A PR changing the front door must not change its own approved reference evidence.",
+    "Production promotion is blocked until the live domain reports the approved commit SHA.",
+    "Do not call a reconstructed design approved without explicit founder review of the rendered preview."
+  ],
+  "rejectedImplementation": {
+    "pullRequest": 631,
+    "mergeCommit": "82e0714ec6e8721b435d55d85b9e996a7e192fe3",
+    "reason": "Technically coherent but did not match the founder-approved visual source."
+  }
+}

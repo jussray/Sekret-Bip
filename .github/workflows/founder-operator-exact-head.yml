@@ -1,0 +1,92 @@
+name: Founder Operator Exact-Head Gate
+
+on:
+  pull_request:
+    paths:
+      - '.agents/skills/bip-control-room/SKILL.md'
+      - 'batches/481/manifest.json'
+      - 'docs/CONTROL_ROOM_FOUNDER_OPERATOR.md'
+      - 'implementation-ledger.extensions/founder-operator.json'
+      - 'package.json'
+      - 'scripts/control-room-server.mjs'
+      - 'scripts/playwright-executable.mjs'
+      - 'src/features/control-room/FounderOperatorPanel.tsx'
+      - 'src/screens/DevControlRoomScreen.tsx'
+      - 'src/services/controlRoomFounderOperator.ts'
+      - 'src/services/controlRoomLocalAgent.ts'
+      - 'src/types/controlRoomFounderOperator.ts'
+      - 'test/control-room-core-contract.test.mjs'
+      - 'test/control-room-founder-operator-*.test.mjs'
+      - 'playwright.founder-operator.config.ts'
+      - 'e2e-founder-operator/**'
+      - '.github/workflows/founder-operator-exact-head.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  founder-operator:
+    name: Contracts, server, type, lint, and founder access Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          expected='${{ github.event.pull_request.head.sha }}'
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Check loopback server syntax
+        run: node --check scripts/control-room-server.mjs
+
+      - name: Run focused Founder Operator contracts and persistence proof
+        run: npm run test:founder-operator
+
+      - name: Run inherited Control Room process and frontend contracts
+        run: npm run test:control-room-core
+
+      - name: Verify implementation ledger claims
+        run: npm run verify:implementation-ledger
+
+      - name: Run TypeScript with zero-error requirement
+        run: npm run type-check
+
+      - name: Run repository lint
+        run: npm run lint
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove founder and non-founder browser access boundaries
+        env:
+          PLAYWRIGHT_ARTIFACT_DIR: reports/control-room/playwright/founder-operator
+        run: npx playwright test --config=playwright.founder-operator.config.ts
+
+      - name: Upload Founder Operator exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: founder-operator-evidence-${{ github.event.pull_request.head.sha }}
+          path: reports/control-room/playwright/founder-operator/
+          if-no-files-found: error
+          retention-days: 14

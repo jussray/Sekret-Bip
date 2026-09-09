@@ -1,91 +1,61 @@
 /**
- * src/constants/theme.ts
+ * Canonical theme and compatibility image map.
  *
- * Canonical location (moved from constants/theme.ts in Step 3).
- * All theme packs, personality profiles, mood data, message arrays,
- * image maps, avatar maps, and room-background helpers.
- *
- * Import via: import { THEME_PACKS, MOODS, IMAGES } from '@/constants';
+ * Human companion assets are identity-locked to the approved Raylene, Rylane,
+ * and Night masters. State-specific keys remain stable so existing screens do
+ * not need to change while matching emotional poses are regenerated.
  */
 import type { Theme, SekretProfile } from '@/types';
 
 export const THEME_PACKS: Record<string, Theme> = {
   night: {
-    name:       'Golden Moon',
-    emoji:      '🌙',
-    background: '#3A2503',
-    card:       '#5B3A00',
-    accent:     '#FFD84D',
-    soft:       '#FFF3B0',
+    name: 'Golden Moon', emoji: '🌙', background: '#3A2503',
+    card: '#5B3A00', accent: '#FFD84D', soft: '#FFF3B0',
   },
   flower: {
-    name:       'Soft Pink',
-    emoji:      '🌸',
-    background: '#4A1028',
-    card:       '#6D1B3B',
-    accent:     '#FF4FA3',
-    soft:       '#FFD6E7',
+    name: 'Soft Pink', emoji: '🌸', background: '#4A1028',
+    card: '#6D1B3B', accent: '#FF4FA3', soft: '#FFD6E7',
   },
   rain: {
-    name:       'Rain Blue',
-    emoji:      '🌧️',
-    background: '#243447',
-    card:       '#36506B',
-    accent:     '#4DA3FF',
-    soft:       '#B6DCFF',
+    name: 'Rain Blue', emoji: '🌧️', background: '#243447',
+    card: '#36506B', accent: '#4DA3FF', soft: '#B6DCFF',
   },
   neon: {
-    name:       'Night Purple',
-    emoji:      '💜',
-    background: '#160028',
-    card:       '#2B0A4D',
-    accent:     '#D946EF',
-    soft:       '#F5B8FF',
+    name: 'Night Purple', emoji: '💜', background: '#160028',
+    card: '#2B0A4D', accent: '#D946EF', soft: '#F5B8FF',
   },
   galaxy: {
-    name:       'Galaxy Night',
-    emoji:      '🌌',
-    background: '#151A40',
-    card:       '#2A2D73',
-    accent:     '#7C83FF',
-    soft:       '#D7D9FF',
+    name: 'Galaxy Night', emoji: '🌌', background: '#151A40',
+    card: '#2A2D73', accent: '#7C83FF', soft: '#D7D9FF',
   },
 };
 
 export const SEKRET_PROFILES: Record<string, SekretProfile> = {
   soft: {
-    name:     "Se'kret",
-    emoji:    '🌸',
-    title:    'Soft Big Sis',
-    vibe:     'Warm, expressive, protective, and real.',
+    name: "Se'kret", emoji: '🌸', title: 'Soft Big Sis',
+    vibe: 'Warm, expressive, protective, and real.',
     greeting: "Hey love. I'm here. Tell me what's on your mind.",
   },
   rylane: {
-    name:     'Rylane',
-    emoji:    '⚡',
-    title:    'Loyal Bro',
-    vibe:     'Quiet loyalty. Keeps it real. Never talks down.',
+    name: 'Rylane', emoji: '⚡', title: 'Loyal Bro',
+    vibe: 'Quiet loyalty. Keeps it real. Never talks down.',
     greeting: "Aight, I'm here. What's been heavy?",
   },
   cloud: {
-    name:     "Cloud Se'kret",
-    emoji:    '☁️',
-    title:    'Quiet Comfort',
-    vibe:     'Soft, calm, low-pressure presence.',
+    name: "Cloud Se'kret", emoji: '☁️', title: 'Quiet Comfort',
+    vibe: 'Soft, calm, low-pressure presence.',
     greeting: 'No pressure. We can just sit here for a minute.',
   },
   night: {
-    name:     "Night Se'kret",
-    emoji:    '🌙',
-    title:    'Late-Night Listener',
-    vibe:     'Minimal words, calm energy, safe space.',
+    name: "Night Se'kret", emoji: '🌙', title: 'Late-Night Listener',
+    vibe: 'Minimal words, calm energy, safe space.',
     greeting: "I'm here. You don't gotta explain perfectly.",
   },
 };
 
 export const MOODS = [
   { id: 'Happy', emoji: '😊' },
-  { id: 'Sad',   emoji: '😔' },
+  { id: 'Sad', emoji: '😔' },
   { id: 'Angry', emoji: '😡' },
   { id: 'Tired', emoji: '😴' },
 ];
@@ -111,28 +81,13 @@ export const HOME_MESSAGES = [
 ];
 
 export const HEAVY_WORDS = [
-  'alone', 'hurt',    'tired', 'done',    'empty',
-  'cry',   'sad',     'scared','anxious', 'panic',
+  'alone', 'hurt', 'tired', 'done', 'empty',
+  'cry', 'sad', 'scared', 'anxious', 'panic',
 ];
 
-// ─── Vibe / Room ──────────────────────────────────────────────────────────────
-
 export type VibeKey = 'soft' | 'rylane' | 'cloud' | 'night';
-
-/**
- * Character is the four personality IDs used for avatar/room lookups.
- * Screens that previously imported `Character` from theme now resolve here.
- */
 export type Character = VibeKey;
-
-/**
- * Four-phase time-of-day used by room backgrounds, presence, and screen themes.
- */
 export type TimeOfDay = 'morning' | 'day' | 'evening' | 'night';
-
-/**
- * Three-phase room phase (sub-division of TimeOfDay used by RoomScreen).
- */
 export type RoomPhase = 'day' | 'evening' | 'night';
 
 const VALID_VIBE_KEYS: VibeKey[] = ['soft', 'rylane', 'cloud', 'night'];
@@ -141,123 +96,104 @@ export function normalizeVibeKey(raw: string | undefined): VibeKey {
   return VALID_VIBE_KEYS.includes(raw as VibeKey) ? (raw as VibeKey) : 'soft';
 }
 
-/**
- * Normalize any string to a valid Character/VibeKey.
- * Used by SekretScreen and RoomScreen to prevent implicit-any indexing.
- */
 export function normalizeCharacterKey(raw: string | undefined): Character {
   return normalizeVibeKey(raw);
 }
 
 export const ROOM_BACKGROUNDS: Record<VibeKey, string> = {
-  soft:   '#4A1028',
+  soft: '#4A1028',
   rylane: '#243447',
-  cloud:  '#151A40',
-  night:  '#3A2503',
+  cloud: '#151A40',
+  night: '#3A2503',
 };
 
 export function getRoomBg(vibe: VibeKey): string {
   return ROOM_BACKGROUNDS[vibe] ?? ROOM_BACKGROUNDS.soft;
 }
 
-// ─── Parent room background ───────────────────────────────────────────────────
-
-/** Solid fallback background for the parent-side room/pages. */
 export function getParentRoomBg(): string {
   return '#1A0A2E';
 }
 
-// ─── Room scene / phase helpers ───────────────────────────────────────────────
-
 export interface AvatarMap {
   neutral: number;
-  happy?:  number;
+  happy?: number;
   window?: number;
-  voice?:  number;
+  voice?: number;
 }
 
 export type SceneKey = 'default' | 'writing' | 'window' | 'voiceBip';
 
 export interface RoomScene {
-  bg:     string;
+  bg: string;
   avatar: AvatarMap;
 }
 
-/**
- * Return the room phase from an hour (0-23).
- * Replaces the `getRoomPhase` import that many screens expected.
- */
 export function getRoomPhase(hour: number): RoomPhase {
-  if (hour >= 6  && hour < 17) return 'day';
+  if (hour >= 6 && hour < 17) return 'day';
   if (hour >= 17 && hour < 21) return 'evening';
   return 'night';
 }
 
-/**
- * Return a room scene descriptor for a given character and phase.
- * `BackgroundLayer` and `RoomScreen` call this.
- */
-export function getRoomScene(character: Character, phase: RoomPhase): RoomScene {
+export function getRoomScene(character: Character, _phase: RoomPhase): RoomScene {
   const bg = ROOM_BACKGROUNDS[character] ?? ROOM_BACKGROUNDS.soft;
-  // Avatar map filled lazily — callers that need specific poses use IMAGES directly.
-  const avatar: AvatarMap = { neutral: AVATARS[character] };
-  return { bg, avatar };
+  return { bg, avatar: { neutral: AVATARS[character] } };
 }
 
-// ─── Image maps ───────────────────────────────────────────────────────────────
+const RAYLENE_MASTER = require('../../assets/images/companions/raylene/raylene-master.png');
+const RYLANE_MASTER = require('../../assets/images/companions/rylane/rylane-master.png');
+const NIGHT_MASTER = require('../../assets/images/companions/night/night-master.png');
 
 export const IMAGES: Record<string, number> = {
-  rayleneNeutral:      require('../../assets/images/raylene-neutral.png'),
-  rayleneHappy:        require('../../assets/images/raylene-happy.png'),
-  rayleneHappyV3:      require('../../assets/images/raylene-happy-v3.png'),
-  rayleneWriting:      require('../../assets/images/raylene-writing.png'),
-  rayleneWindow:       require('../../assets/images/raylene-window.png'),
-  rayleneWindowRainy:  require('../../assets/images/raylene-window-rainy.png'),
-  rayleneFullbody:     require('../../assets/images/raylene-fullbody.png'),
-  rayleneVoiceDay:     require('../../assets/images/raylene-voice-day.png'),
-  rayleneVoiceNight:   require('../../assets/images/raylene-voice-night.png'),
-  raylene_Bippin2Day:  require('../../assets/images/raylene-voice-day.png'),
-  rylaneNeutral:       require('../../assets/images/rylane-neutral.png'),
-  rylaneNeutralV2:     require('../../assets/images/rylane-neutral-v2.png'),
-  rylaneHappy:         require('../../assets/images/rylane-happy.png'),
-  rylaneThinking:      require('../../assets/images/rylane-thinking.png'),
-  rylaneWriting:       require('../../assets/images/rylane-writing.png'),
-  rylaneWindow:        require('../../assets/images/rylane-window.png'),
-  rylaneWindowDay:     require('../../assets/images/rylane-window-day.png'),
-  rylaneFullbody:      require('../../assets/images/rylane-fullbody.png'),
-  rylaneVoiceDay:      require('../../assets/images/rylane-voice-day.png'),
-  rylaneVoiceNight:    require('../../assets/images/rylane-voice-night.png'),
-  cloud:               require('../../assets/images/cloud.png'),
-  cloudHappy:          require('../../assets/images/cloud-happy.png'),
-  cloudHeadphones:     require('../../assets/images/cloud-headphones.png'),
-  cloudHeadphonesV2:   require('../../assets/images/cloud-headphones-v2.png'),
-  cloudSleepy:         require('../../assets/images/cloud-sleepy.png'),
-  cloudStormy:         require('../../assets/images/cloud-stormy.png'),
-  // Se'kret Replies avatar moods consumed by app/(teen)/pages.tsx.
-  // Missing here previously caused blank journal avatars for raylene moods,
-  // cloud, and night companions (keys resolved to undefined).
-  rayleneThinking:     require('../../assets/images/raylene-thinking-new.png'),
-  rayleneConfident:    require('../../assets/images/raylene-confident-new.png'),
-  rayleeneSad:         require('../../assets/images/raylene-sad-new.png'),
-  cloudAvatarNeutral:  require('../../assets/images/cloud.png'),
-  cloudAvatarHappy:    require('../../assets/images/cloud-happy.png'),
+  rayleneNeutral: RAYLENE_MASTER,
+  rayleneHappy: RAYLENE_MASTER,
+  rayleneHappyV3: RAYLENE_MASTER,
+  rayleneWriting: RAYLENE_MASTER,
+  rayleneWindow: RAYLENE_MASTER,
+  rayleneWindowRainy: RAYLENE_MASTER,
+  rayleneFullbody: RAYLENE_MASTER,
+  rayleneVoiceDay: RAYLENE_MASTER,
+  rayleneVoiceNight: RAYLENE_MASTER,
+  raylene_Bippin2Day: RAYLENE_MASTER,
+  rayleneThinking: RAYLENE_MASTER,
+  rayleneConfident: RAYLENE_MASTER,
+  rayleeneSad: RAYLENE_MASTER,
+
+  rylaneNeutral: RYLANE_MASTER,
+  rylaneNeutralV2: RYLANE_MASTER,
+  rylaneHappy: RYLANE_MASTER,
+  rylaneThinking: RYLANE_MASTER,
+  rylaneWriting: RYLANE_MASTER,
+  rylaneWindow: RYLANE_MASTER,
+  rylaneWindowDay: RYLANE_MASTER,
+  rylaneFullbody: RYLANE_MASTER,
+  rylaneVoiceDay: RYLANE_MASTER,
+  rylaneVoiceNight: RYLANE_MASTER,
+
+  cloud: require('../../assets/images/cloud.png'),
+  cloudHappy: require('../../assets/images/cloud-happy.png'),
+  cloudHeadphones: require('../../assets/images/cloud-headphones.png'),
+  cloudHeadphonesV2: require('../../assets/images/cloud-headphones-v2.png'),
+  cloudSleepy: require('../../assets/images/cloud-sleepy.png'),
+  cloudStormy: require('../../assets/images/cloud-stormy.png'),
+  cloudAvatarNeutral: require('../../assets/images/cloud.png'),
+  cloudAvatarHappy: require('../../assets/images/cloud-happy.png'),
   cloudAvatarThinking: require('../../assets/images/cloud-headphones.png'),
-  cloudAvatarWriting:  require('../../assets/images/cloud-headphones-v2.png'),
-  cloudAvatarWindow:   require('../../assets/images/cloud-sleepy.png'),
-  nightNeutral:        require('../../assets/images/night-neutral.png'),
-  nightHappy:          require('../../assets/images/night-happy.png'),
-  nightListening:      require('../../assets/images/night-listening.png'),
-  nightProtective:     require('../../assets/images/night-protective.png'),
-  nightRelaxed:        require('../../assets/images/night-relaxed.png'),
-  nightSoftsmile:      require('../../assets/images/night-softsmile.png'),
-  nightThinking:       require('../../assets/images/night-thinking.png'),
+  cloudAvatarWriting: require('../../assets/images/cloud-headphones-v2.png'),
+  cloudAvatarWindow: require('../../assets/images/cloud-sleepy.png'),
+
+  nightNeutral: NIGHT_MASTER,
+  nightHappy: NIGHT_MASTER,
+  nightListening: NIGHT_MASTER,
+  nightProtective: NIGHT_MASTER,
+  nightRelaxed: NIGHT_MASTER,
+  nightSoftsmile: NIGHT_MASTER,
+  nightThinking: NIGHT_MASTER,
 };
 
-// ─── Avatar map ───────────────────────────────────────────────────────────────
-
 export const AVATARS: Record<VibeKey, number> = {
-  soft:   IMAGES.rayleneNeutral,
+  soft: IMAGES.rayleneNeutral,
   rylane: IMAGES.rylaneNeutral,
-  cloud:  IMAGES.cloud,
-  night:  IMAGES.rayleneVoiceNight,
+  cloud: IMAGES.cloud,
+  night: IMAGES.nightNeutral,
 };

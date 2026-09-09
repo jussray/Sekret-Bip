@@ -1,0 +1,119 @@
+name: Owned Bip Signup Proof
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Exact commit SHA to prove'
+        required: true
+        type: string
+      preview_url:
+        description: 'Exact isolated Cloudflare Pages preview URL'
+        required: true
+        type: string
+      confirm_live_write:
+        description: 'Allow one disposable signup using hello@sekretbip.net'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: owned-bip-signup-proof
+  cancel-in-progress: false
+
+env:
+  CI: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ inputs.target_sha }}
+  LIVE_ONBOARDING_BASE_URL: ${{ inputs.preview_url }}
+  LIVE_MAILBOX_MODE: bip_routed
+
+jobs:
+  proof:
+    if: inputs.confirm_live_write == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Verify exact target and isolated preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          node <<'NODE'
+          const base = new URL(process.env.LIVE_ONBOARDING_BASE_URL);
+          if (!base.hostname.endsWith('.pages.dev') || base.hostname === 'sekretbip.net') {
+            throw new Error(`Owned Bip proof requires an isolated Pages preview, got ${base.hostname}`);
+          }
+          const marker = new URL('/.well-known/sekret-release.json', base);
+          const response = await fetch(marker, { cache: 'no-store' });
+          const body = response.ok ? await response.json() : null;
+          if (!response.ok || body?.commitSha !== process.env.EXPECTED_HEAD_SHA || body?.environment !== 'preview') {
+            throw new Error(`Preview does not prove exact head ${process.env.EXPECTED_HEAD_SHA}.`);
+          }
+          console.log(`Exact owned-mailbox preview verified: ${base.hostname}`);
+          NODE
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove readiness without account write
+        env:
+          LIVE_ONBOARDING_PHASE: readiness
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Prepare owned Bip proof identity
+        run: node scripts/live-signup-mailbox.mjs create
+
+      - name: Create disposable account through exact preview UI
+        env:
+          LIVE_ONBOARDING_PHASE: signup
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Mark owned mailbox confirmation as externally controlled
+        run: node scripts/live-signup-mailbox.mjs confirm
+
+      - name: Wait for confirmation and prove returning sign in
+        env:
+          LIVE_ONBOARDING_PHASE: signin
+          LIVE_SIGNIN_ATTEMPTS: '120'
+          LIVE_SIGNIN_RETRY_MS: '5000'
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Record confirmed owned-mailbox proof
+        run: node scripts/live-signup-mailbox.mjs record-owned-confirmation
+
+      - name: Record persistent mailbox cleanup state
+        if: always()
+        run: node scripts/live-signup-mailbox.mjs cleanup
+
+      - name: Upload owned Bip proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: owned-bip-signup-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            artifacts/live-signup-proof-account.json
+            artifacts/live-signup-confirmation.json
+            artifacts/live-signup-mailbox-cleanup.json
+            playwright-report-live-onboarding/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14

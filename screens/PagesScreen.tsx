@@ -78,7 +78,7 @@ const PARENT_PAGES_SECTIONS: SectionDef[] = [
 
 // ── Legacy write-tab definitions (unchanged) ───────────────────────────────
 
-type TeenTab = 'me' | 'oracle' | 'raylene' | 'rylane' | 'cloud' | 'night';
+type TeenTab = 'me' | 'oracle' | 'suhana' | 'sy' | 'cloud' | 'night';
 type ParentTab = 'me' | 'oracle' | 'parentSekret' | 'bridge';
 export type PagesTab = TeenTab | ParentTab;
 
@@ -162,7 +162,7 @@ const TEEN_TABS: TabDefinition[] = [
   { id: 'me', label: 'Me', icon: '\u25cc', title: '', accent: '#c4b5fd' },
   { id: 'oracle', label: 'Se\u2019kret', icon: '\u25c7', title: 'Se\u2019kret Discovery', accent: '#8b7bb8' },
   {
-    id: 'raylene', label: 'Raylene', icon: '\u2726', eyebrow: 'Raylene pulled up',
+    id: 'suhana', label: 'Suhana', icon: '\u2726', eyebrow: 'Suhana pulled up',
     title: 'You been a little too quiet. What happened?',
     subtitle: 'Warm, curious, and already paying attention.', accent: '#e9a8d2',
     prompts: [
@@ -174,7 +174,7 @@ const TEEN_TABS: TabDefinition[] = [
     placeholder: 'Tell it how it happened\u2026',
   },
   {
-    id: 'rylane', label: 'Rylane', icon: '\u2014', eyebrow: 'Rylane keeps it real',
+    id: 'sy', label: 'Sy', icon: '\u2014', eyebrow: 'Sy keeps it real',
     title: 'What\u2019s real right now?',
     subtitle: 'No cushion. No lecture.', accent: '#79aaf2',
     prompts: [
@@ -246,8 +246,10 @@ const PARENT_TAGS = ['reactive', 'worried', 'hurt', 'stuck', 'open', 'steady'];
 const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'oracle'];
 
 function tabToStickerCharacter(tab: PagesTab): MiniAvatarCharacter {
-  if (tab === 'raylene') return 'raylene';
-  if (tab === 'rylane') return 'rylane';
+  // MiniAvatarCharacter is a separate, unrenamed sticker-asset vocabulary —
+  // only the PagesTab comparison targets the current tab id.
+  if (tab === 'suhana') return 'raylene';
+  if (tab === 'sy') return 'rylane';
   if (tab === 'cloud') return 'cloud';
   if (tab === 'night') return 'night';
   return null;
@@ -257,7 +259,7 @@ function normalizeSource(entry: JournalEntry): PagesTab {
   const source = entry.activeTab || entry.source;
   if (
     source === 'parentSekret' || source === 'bridge' || source === 'oracle' ||
-    source === 'raylene' || source === 'rylane' || source === 'cloud' || source === 'night'
+    source === 'suhana' || source === 'sy' || source === 'cloud' || source === 'night'
   ) {
     return source;
   }
@@ -279,7 +281,7 @@ interface SekretReplyBubbleProps {
 
 function SekretReplyBubble({ tab, reply, typing, accent }: SekretReplyBubbleProps) {
   const avatarKey = tabToAvatarKey(tab);
-  const voiceCharacter = avatarKey || (tab === 'bridge' ? 'rylane' : tab === 'parentSekret' ? 'raylene' : null);
+  const voiceCharacter = avatarKey || (tab === 'bridge' ? 'sy' : tab === 'parentSekret' ? 'suhana' : null);
   const [audioUri, setAudioUri] = useState('');
   const [loadingVoice, setLoadingVoice] = useState(false);
   if (!voiceCharacter) return null;
@@ -573,8 +575,8 @@ function PagesWorkspace({
   }, []);
 
   const COMPANION_IMAGES: Partial<Record<PagesTab, any>> = {
-    raylene: IMAGES.rayleneNeutral,
-    rylane:  IMAGES.rylaneNeutral,
+    suhana: IMAGES.rayleneNeutral,
+    sy:     IMAGES.rylaneNeutral,
     cloud:   IMAGES.cloudAvatarNeutral,
     night:   IMAGES.nightNeutral,
     parentSekret: IMAGES.rayleneNeutral,

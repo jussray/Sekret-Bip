@@ -1,159 +1,114 @@
 # Se'kret Bip — Architecture Audit for 1K to 100K Users
 
-Status: **Audit, per issue #141. No code changes bundled with this document**
-other than the point-ledger schema fix in
-`20260703_reconcile_point_ledger_schema.sql`, which was a correctness bug
-found during this audit, not a scale change.
+> **Historical audit snapshot.** Originally produced for issue #141. Historical findings remain preserved as an audit trail. Current feature/runtime state is governed by `implementation-ledger.json`, `docs/CURRENT_STATUS.md`, current source, and live evidence.
 
-Baseline: `docs/ARCHITECTURE.md`, `docs/CURRENT_STATUS.md`,
-`docs/WIRING_STATUS.md`, `docs/AGENT_L4_ARCHITECTURE.md`.
+Last reconciled with current documentation: 2026-08-20
 
-## Matters now (before 1K users)
+## Changes since the original audit
 
-### Duplicate table generations — point ledger (fixed this audit)
+Material durable changes now include:
 
-`20260627_point_ledger.sql` and `20260627193000_phase_2_tasks_approvals_rewards.sql`
-both write to `point_transactions` with incompatible schemas, and the second
-migration reads a `point_balances` table that was never created. Every
-point-awarding task approval and every reward redemption would fail at
-runtime. Fixed in `20260703_reconcile_point_ledger_schema.sql`. This class
-of bug — two migrations from the same work session defining incompatible
-shapes for the same table — is worth a pre-merge check (a CI step that
-diffs `information_schema` column expectations against RPC bodies would
-have caught this).
+- architecture and status claims are checked by evidence/truth gates;
+- `api.sekretbip.net` is the stable public API origin currently configured to `sekret-backend`;
+- `sekret` is a founder-confirmed active companion API Worker lineage whose provider binding must be read back before mutation;
+- the code now exposes a clean reply/voice/transcription companion contract separate from privileged Bridge/email/data operations;
+- the preferred future Worker split keeps one public API and uses a Cloudflare Service Binding from `sekret-backend` to `sekret` for `/api/sekret/*`;
+- production verification requires exact release identity, backend health, Supabase runtime, and production Playwright, with exact companion Worker/binding proof added after a split;
+- server-owned configuration/data operations remain protected by database/runtime boundaries;
+- companion identity/style enforcement is integrated into Worker and voice paths;
+- L4 continuity memory remains separately governed.
 
-### RLS on `point_transactions` is broader than the write paths need
+## Matters before meaningful scale
 
-Current policy is `FOR ALL USING/WITH CHECK (auth.uid() = user_id)`,
-meaning a client can insert arbitrary rows directly, including a fabricated
-large positive `amount`. In practice only `emitEvent()` and the
-`SECURITY DEFINER` task/reward RPCs write here today, but RLS is the actual
-control, not client discipline. Before this ledger is spendable against
-real Shopify inventory, narrow the policy to `INSERT`-only with a `CHECK`
-that the row's shape matches one of the known writer patterns, or move
-writes fully behind RPCs and drop direct table grants. Tracked in
-`docs/POINTS_ECONOMY_DESIGN.md`.
+### Point-ledger schema correctness
 
-### No server-side rate limiting on point-earning events
+Migrations, RPC bodies, and client expectations need executable contract checks. Machine evidence prevents unsupported feature claims but does not replace schema-behavior testing.
 
-`emitEvent()` is callable an unbounded number of times per event type per
-day. This doesn't matter at low user counts (abuse is manual and visible),
-but it's a correctness gap that becomes a real cost/fraud exposure once
-points convert to Shopify merch. Needs a daily-cap check server-side
-before rewards go live — see `docs/POINTS_ECONOMY_DESIGN.md`.
+### Point transaction authorization
 
-### Route/layout ownership: legacy `(main)` references
+Before points purchase real inventory, verify clients cannot fabricate positive transactions. Prefer server-owned writes through reviewed RPCs/APIs, narrow grants, and negative tests.
 
-PR #135 (merged 2026-06-28) eliminated hardcoded `/(main)/` navigation from
-route wrappers. `docs/WIRING_STATUS.md` confirms `(teen)`/`(parent)` are
-now canonical. Residual risk: any *new* screen copy-pasted from an old
-branch (there are 100+ stale branches in this repo, several pre-dating that
-fix) could reintroduce a `/(main)/` push. Worth a lint rule or CI grep
-(`grep -r "(main)/" app/ src/ screens/`) rather than relying on review
-alone, since this exact bug has already shipped once.
+### Point-earning limits
 
-### Local vs Supabase state: last-write-wins, not merge
+Point-earning events require server-side caps, idempotency, and reconciliation before rewards become financially material.
 
-`src/utils/sync.ts` upserts with `onConflict: 'id,user_id'` — the last
-write physically wins, there is no vector clock, version column, or merge
-strategy. At today's usage (one device per teen, mostly) this is invisible.
-It stops being invisible the moment a teen uses Bip on two devices
-(phone + a browser tab via the real `react-native-web` target) and edits
-the same journal entry offline on both — one edit silently disappears with
-no conflict surfaced to the user. Not urgent to fix before 1K users, but
-worth a tracked follow-up (`updated_at`-based last-write-wins with a
-visible "this was edited elsewhere" notice is a reasonable v1, full CRDT
-merge is not warranted at this scale).
+### Route ownership regressions
 
-## Matters at growth scale (10K–100K), not now
+`(teen)` and `(parent)` are canonical route groups. Historical route references must not silently re-enter current code. Route grouping is presentation, not authorization.
+
+### Multi-device conflict behavior
+
+Local/cloud synchronization needs an explicit conflict strategy before claiming lossless multi-device editing.
+
+## Matters at growth scale
 
 ### AI request and cost controls
 
-No token/message caps exist yet (see `docs/BUSINESS_MODEL.md` cost
-ceilings). At 1K users this is a monitoring problem (watch the bill); at
-100K it's a design requirement (per-user caps, cached companion responses
-for repeatable prompts, and degrade-before-drop behavior). Build the
-Founder Control Room Infrastructure module (issue #186) before this
-becomes urgent, so the signal exists before the cost does.
+Measure per-user AI and voice cost first. Introduce budgets, abuse limits, queueing, graceful degradation, and model routing from observed traffic rather than speculative complexity.
 
-### Voice/TTS cost and worker responsibilities
+### Companion Worker boundary
 
-`worker/sekret-reply.ts` (1,742 lines) is the single largest worker file
-and owns AI reply generation; `worker/piper-tts.ts` is small (44 lines) and
-likely a thin relay. Voice is the most expensive per-unit cost in this
-stack (per `docs/BUSINESS_MODEL.md`). At current scale, one Worker handling
-both reply generation and voice relay is fine. At 100K concurrent users,
-revisit whether voice needs its own scaling/queueing path separate from
-text replies — not before there's traffic data to justify it.
+Earlier versions of this audit said service splitting should wait for scale evidence. The code/provider history now supplies a stronger reason to split: **authority and least privilege**, not fashionable microservices.
 
-### Media storage growth
+The code already groups `/api/sekret/reply`, `/api/sekret/voice`, and `/api/sekret/transcribe` as one typed companion contract. Bridge summary and email are separate privileged responsibilities. Founder/provider history also preserves an active `sekret` companion Worker lineage.
 
-No retention-window policy exists for voice notes/images in Supabase
-Storage. Irrelevant at 1K users; becomes a real storage-cost line item at
-100K. Design a default retention window now (see `docs/BUSINESS_MODEL.md`
-storage cost ceiling) so it ships before it's expensive to retrofit against
-a large existing corpus of "keep forever" media.
+The best-fit target is therefore:
 
-### Companion memory persistence
+- `sekret`: companion inference, style/safety response enforcement, voice/transcription, AI/voice provider capability;
+- `sekret-backend`: stable public API ingress plus privileged Bridge/data/email/platform operations;
+- Service Binding between them so the client keeps one public API URL.
 
-Current state is L2 (stateless + client-passed history), fully documented
-in `docs/AGENT_L4_ARCHITECTURE.md` with a concrete L3 recommendation
-(Supabase `pgvector`, not a third-party memory vendor, per the COPPA
-subprocessor constraint). This is a product-quality gap more than a
-scale risk — L2 works at any user count, it just doesn't remember. Treat
-as a roadmap item, not a scale blocker.
+This split should happen only after provider readback, exact compatibility proof, telemetry least-privilege repair, rollback design, and release-gate coverage.
 
-### Offline sync and conflict handling
+### Secret blast radius
 
-Covered above under "matters now" for the correctness gap; the *scale*
-dimension (sync throughput, batching) is not a concern until well past
-100K concurrent devices — Supabase's upsert path handles today's write
-volume without any special-casing needed.
+The current companion telemetry persistence uses `SUPABASE_SERVICE_ROLE_KEY`. Do not copy that key into the companion Worker simply to enable a split. Move privileged persistence behind a narrow internal/backend-owned boundary first.
 
-### Observability, retries, and failure states
+Reducing the companion Worker to AI/voice capability plus user-authenticated context is a meaningful security/scaling improvement because high-churn companion code no longer needs the same privileged data plane as Bridge/email operations.
 
-`worker/telemetry.ts` and the Founder Control Room's ingestion
-(`docs/WIRING_STATUS.md`: "Founder Control Room ingestion and
-release-health systems" — implemented) already give metadata-only
-observability. Missing: systematic retry/backoff policy for Supabase
-writes from the client — `sync.ts` swallows errors by design (never throw,
-never break the local experience), which is correct for UX but means a
-failed sync is currently invisible rather than retried. At 1K users this is
-acceptable (rare, low blast radius); at 100K a silent, permanently-failed
-sync becomes a real data-loss-on-device-loss risk. A lightweight retry
-queue (exponential backoff, capped attempts, then surface to Control Room
-as a Sync module signal) is the right scale-triggered addition — not
-needed today.
+### Voice boundary
 
-### Moderation and safety processing
+Voice belongs with the companion execution plane because reply, TTS, and transcription share character identity/style contracts and one client transport. Splitting voice away from companion inference again would need separate latency/reliability evidence.
 
-Safety tables/triggers/Edge Function scaffolding already exist
-(`docs/WIRING_STATUS.md`). Per `docs/BUSINESS_MODEL.md`, moderation is the
-one cost category that must never be capped for cost reasons regardless of
-scale — flagging this here so a future cost-cutting pass doesn't
-accidentally throttle it.
+### Media retention
 
-## Event and ledger consistency (cross-cutting)
+Voice notes and images need approved retention/deletion rules before a large corpus accumulates.
 
-`bip_events` (activity log) and `point_transactions` (point ledger) are
-two separate append-only tables fed by the same `emitEvent()` call
-(`src/features/activity/events.ts` inserts into `bip_events`;
-`src/features/activity/ledger.ts` subscribes and inserts into
-`point_transactions`). They can drift: a `bip_events` write can succeed
-while the corresponding `point_transactions` write fails (separate network
-calls, no transaction spanning both). At 1K users this is a rare, low-
-stakes discrepancy (a teen's point total is off by one). Not worth a
-distributed-transaction fix at any scale Bip is likely to hit — a periodic
-reconciliation job (recompute `point_transactions` from `bip_events` for
-mismatched users) is the right-sized fix if drift is ever observed, and it
-doesn't need to exist before it's observed.
+### L4 continuity memory
 
-## Recommended order
+Durable continuity memory, persistent goals, scheduled reflection, and inter-companion coordination remain planned privacy-sensitive capabilities. They require provenance, correction, expiry, deletion, RLS, denial tests, runtime proof, rollout, telemetry, and rollback before activation.
 
-1. Ship the point ledger schema fix (done — `20260703_reconcile_point_ledger_schema.sql`).
-2. Add the `(main)/` regression grep to CI (cheap, prevents a repeat of a
-   bug that already shipped once).
-3. Add daily point-earning caps server-side before Shopify redemption goes
-   live (blocks issue #139/#138 launch, not urgent otherwise).
-4. Everything under "growth scale" — revisit when usage data exists to
-   prioritize among them, not on a fixed calendar date.
+### Observability and retries
+
+Metadata-only telemetry and Founder Control Room provide operational visibility. After the Worker split, observability must preserve trace continuity across the public backend and companion Worker without exposing conversation content.
+
+Recommended additions when evidence requires them:
+
+- shared correlation/trace IDs across the service binding;
+- per-Worker release/version identity in the same release packet;
+- provider latency/cost budgets;
+- queue/retry visibility where real traffic demonstrates need;
+- companion style-version metadata on the companion Worker;
+- no broad service-role secret solely for telemetry.
+
+### Moderation and safety
+
+Moderation and safety capacity must scale with usage and remain independently reviewed. Companion reply safety belongs with the companion execution contract; privileged account/data/notification operations remain separate runtime concerns.
+
+## Cross-cutting event and ledger consistency
+
+Activity events and point transactions can drift when written separately. Prefer idempotency and reconciliation over distributed-transaction complexity until traffic proves stronger guarantees are needed.
+
+## Recommended order from current state
+
+1. Complete Cloudflare provider readback for `sekret` and `sekret-backend`.
+2. Prove the target `sekret` companion contract is compatible with current reply/voice/transcription clients.
+3. Remove the telemetry dependency on `SUPABASE_SERVICE_ROLE_KEY` from the future companion boundary.
+4. Add a reviewed `sekret-backend -> sekret` Service Binding with rollback to the existing local companion implementation.
+5. Extend exact-release proof to bind both Worker versions and the binding.
+6. Continue high-blast-radius database authorization/behavior tests.
+7. Complete controlled Bridge/parent and deletion journeys.
+8. Add reward/fraud and media-retention controls before financial/storage scale makes them urgent.
+9. Revisit queues and further service splitting only from observed production data.
+
+Do not turn a scale audit into an infrastructure shopping list. Split where authority, privilege, rollback, and observed bottlenecks justify it.

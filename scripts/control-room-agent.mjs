@@ -2,8 +2,10 @@
 import { spawnSync } from 'node:child_process';
 
 const missions = new Map([
+  ['continue-yesterday', { command: 'git', args: ['status', '--short', '--branch'], description: 'Inspect the current branch and worktree so the founder can resume from repository truth.' }],
   ['launch-bip', { command: 'npm', args: ['run', 'start', '--', '--localhost'], description: 'Launch Bip through Expo on localhost.' }],
   ['verify-local', { command: 'npm', args: ['run', 'verify:local'], description: 'Run the local Control Room verification suite.' }],
+  ['verify-frontend', { command: 'node', args: ['scripts/control-room-verify-frontend.mjs'], description: 'Run Playwright browser smoke tests and retain evidence; fall back explicitly when browser proof is unavailable.' }],
   ['run-tests', { command: 'npm', args: ['test'], description: 'Run unit and regression tests.' }],
   ['build-web', { command: 'npm', args: ['run', 'build:web'], description: 'Build the Expo web artifact.' }],
   ['recover-system', { command: 'npm', args: ['run', 'audit:control-room'], description: 'Run Control Room recovery-oriented audits.' }],

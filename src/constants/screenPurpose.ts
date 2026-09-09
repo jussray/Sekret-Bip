@@ -23,7 +23,7 @@ export const SCREEN_PURPOSES: ScreenPurpose[] = [
   { id: 'pages', side: 'teen', title: 'Pages', purpose: 'Journal and notebook hub.', owns: ['typed entries', 'voice attachments', 'prompts', 'saved history', "entry-linked Se'kret replies"], mustNotBecome: ['a full companion chat', 'a comfort hub', 'a duplicate home screen'] },
   { id: 'calm', side: 'teen', title: 'Calm', purpose: 'Comfort tools and regulation exercises.', owns: ['breathing', 'grounding', 'Cloud Thoughts', 'comfort cards', 'wind-down tools'], mustNotBecome: ['a journal editor', 'a chat screen', 'a social feed'] },
   { id: 'voicebip', side: 'teen', title: 'Voice Bip', purpose: 'Voice-first talk mode.', owns: ['recording', 'playback', 'transcript', 'spoken companion reply', 'save to Pages'], mustNotBecome: ['Pages with a microphone', 'a text chat clone', 'a calm dashboard'] },
-  { id: 'circle', side: 'teen', title: 'Circle', purpose: 'Teen community, friends, and Crew.', owns: ['public anonymous posts', 'friends', 'Crew', 'reactions', 'moderation'], mustNotBecome: ['parent communication', 'private journaling', 'family messaging'] },
+  { id: 'circle', side: 'teen', title: 'Circle', purpose: 'Teen community, friends, and Crew.', owns: ['public anonymous posts', 'accepted Crew', 'reactions', 'moderation'], mustNotBecome: ['parent communication', 'private journaling', 'family messaging'] },
   { id: 'bridge', side: 'teen', title: 'Bridge', purpose: 'Private teen-to-parent connection.', owns: ['Doorbell signals', 'S2Tell shares', 'parent replies', 'shared moments', 'connection history'], mustNotBecome: ['Circle', 'public community', 'parent surveillance'] },
   { id: 'more', side: 'teen', title: 'More', purpose: 'Feature drawer, account tools, and settings.', owns: ['Profile', 'Bippin 2', 'Parent Link', 'Safety', 'Settings', 'Help and legal'], mustNotBecome: ['a second home', 'a flat junk drawer', 'a duplicate feature screen'] },
   { id: 'room', side: 'parent', title: 'Parent Room', purpose: 'Parent home base and calm starting point.', owns: ['parent mood check-in', 'return shortcuts', 'Bridge presence', 'time/weather atmosphere'], mustNotBecome: ['a monitoring dashboard', 'a copy of Teen Room', 'a private teen activity feed'] },
@@ -39,21 +39,24 @@ export interface FeatureDrawerItem { emoji: string; label: string; route: string
 export interface FeatureDrawerGroup { title: string; items: FeatureDrawerItem[]; }
 
 export const TEEN_MORE_GROUPS: FeatureDrawerGroup[] = [
-  { title: 'YOUR SPACE', items: [
-    { emoji: '👤', label: 'Profile', route: 'profile', description: 'Your identity and preferences.' },
+  { title: 'RETURN TO YOUR CORE TOOLS', items: [
+    { emoji: '🎙️', label: 'Voice Bip', route: 'voiceBip', description: 'Talk out loud and hear your companion respond.' },
+    { emoji: '🌉', label: 'Bridge', route: 'bridge', description: 'Share intentionally with your linked parent or guardian.' },
+    { emoji: '👤', label: 'Profile', route: 'profile', description: 'Your private identity and public Circle identity.' },
     { emoji: '📖', label: 'History', route: 'history', description: 'Your saved conversations and journal timeline.' },
   ] },
   { title: 'GROWTH TOOLS', items: [
-    { emoji: '🌱', label: 'Bippin 2', route: 'bippin2', description: 'Womanhood, manhood, body, emotions, points, and streaks — at your own pace.' },
-    { emoji: '✅', label: 'Chores', route: 'chores', description: 'Tasks your parent set up — mark them done when finished.' },
-    { emoji: '🔭', label: 'Discover', route: 'discover', description: 'Explore new companions, topics, and experiences.' },
-    { emoji: '🤝', label: 'Bip Crew', route: 'crew', description: 'Your chosen accountability people.' },
+    { emoji: '🌱', label: 'Bippin 2', route: 'bippin2', description: 'Body, emotions, points, and growth at your own pace.' },
+    { emoji: '✅', label: 'Chores', route: 'chores', description: 'Tasks your parent set up, when a trusted connection exists.' },
+    { emoji: '🔭', label: 'Discover', route: 'discover', description: 'Explore companions, topics, and experiences.' },
+    { emoji: '⭐', label: 'Bip Points', route: 'points', description: 'See the private receipts from showing up for yourself.' },
   ] },
   { title: 'ACCOUNT & SAFETY', items: [
-    { emoji: '🔗', label: 'Parent Link', route: 'parent-link-verify', description: 'Manage verification and trusted connection.' },
-    { emoji: '⚙️', label: 'Settings', route: 'settings', description: 'Theme, sekret selection, privacy, notifications, and account.' },
+    { emoji: '🔗', label: 'Parent Link', route: 'parent-link-verify', description: 'Manage verification and the trusted connection.' },
+    { emoji: '🧠', label: 'Memory & Continuity', route: 'l4', description: 'See what Bip remembers now and what stays protected until long-term memory is ready.' },
+    { emoji: '⚙️', label: 'Settings', route: 'settings', description: 'Theme, companion, privacy, notifications, and account.' },
     { emoji: '🛟', label: 'Help & Safety', route: 'resources', description: 'Support, safety tools, and legal information.' },
-    { emoji: '🚪', label: 'Sign out', route: 'logout', description: 'Securely sign out and stop alerts on this device.' },
+    { emoji: '🚪', label: 'Sign out', route: 'logout', description: 'Securely sign out and clear private device state.' },
   ] },
 ];
 
@@ -61,6 +64,7 @@ export const PARENT_MORE_GROUPS: FeatureDrawerGroup[] = [
   { title: 'PARENT CONNECTION', items: [
     { emoji: '🌉', label: 'Bridge', route: 'parent-bridge', description: 'Doorbell signals, S2Tell shares, replies, and shared moments.' },
     { emoji: '🤝', label: 'Connection Hub', route: 'parent-connection', description: 'Repair, boundaries, and relationship tools.' },
+    { emoji: '🌙', label: 'Pause Before Replying', route: 'calm', description: 'Regulate first, then return to Bridge.' },
   ] },
   { title: 'YOUR SUPPORT SPACE', items: [
     { emoji: '✅', label: 'Approvals', route: 'approvals', description: 'Review chore submissions and reward requests.' },
@@ -73,6 +77,6 @@ export const PARENT_MORE_GROUPS: FeatureDrawerGroup[] = [
     { emoji: '🔗', label: 'Parent Link', route: 'parent-link', description: 'Manage the trusted teen connection.' },
     { emoji: '⚙️', label: 'Settings', route: 'settings', description: 'Privacy, notifications, and account.' },
     { emoji: '📚', label: 'Resources', route: 'resources', description: 'Guides, support, and legal information.' },
-    { emoji: '🚪', label: 'Sign out', route: 'logout', description: 'Securely sign out and stop alerts on this device.' },
+    { emoji: '🚪', label: 'Sign out', route: 'logout', description: 'Securely sign out and clear private device state.' },
   ] },
 ];

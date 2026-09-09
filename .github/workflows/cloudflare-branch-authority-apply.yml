@@ -1,0 +1,339 @@
+name: Apply Cloudflare Worker Branch Authority Repair
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_main_sha:
+        description: Exact current main SHA authorized for #646 provider repair
+        required: true
+        type: string
+      confirmation:
+        description: Type FIX_646_MAIN_ONLY_WORKER_BUILDS
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-worker-branch-authority
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BEFORE_EVIDENCE_PATH: artifacts/cloudflare-worker-branch-authority-before.json
+  EVIDENCE_PATH: artifacts/cloudflare-worker-branch-authority-apply.json
+  PAGES_EVIDENCE_PATH: artifacts/cloudflare-pages-branch-authority-before.json
+  PAGES_APPLY_EVIDENCE_PATH: artifacts/cloudflare-pages-branch-authority-apply.json
+
+jobs:
+  preflight:
+    name: Capture current two-Worker and Pages authority snapshot
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Verify founder and exact current main
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "jussray"
+          test "$GITHUB_REF" = "refs/heads/main"
+          current_main="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          test -n "$current_main"
+          test "$GITHUB_SHA" = "$current_main"
+          test "$EXPECTED_MAIN_SHA" = "$GITHUB_SHA"
+          test "$CONFIRMATION" = "FIX_646_MAIN_ONLY_WORKER_BUILDS"
+
+      - name: Read and snapshot Pages branch authority before Worker mutation can be approved
+        env:
+          CLOUDFLARE_PAGES_READ_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_READ_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: sekret-bip
+          CLOUDFLARE_PAGES_PRODUCTION_BRANCH: main
+        run: node scripts/verify-cloudflare-pages-branch-authority.mjs --output "$PAGES_EVIDENCE_PATH"
+
+      - name: Read provider Worker topology and persist immutable snapshot
+        shell: bash
+        env:
+          CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          current_main="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          test "$GITHUB_SHA" = "$current_main"
+          mkdir -p artifacts
+          node <<'NODE'
+          const crypto = require('node:crypto');
+          const fs = require('node:fs');
+          const API = 'https://api.cloudflare.com/client/v4';
+          const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+          const token = String(process.env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN || '').trim();
+          const productionWorker = 'sekret-backend';
+          const alphaWorker = 'sekret-backend-alpha';
+          const pagesProject = 'sekret-bip';
+          const terminal = new Set(['success', 'fail', 'skipped', 'cancelled', 'terminated']);
+          const clean = (value) => String(value ?? '').trim();
+          const cleanArray = (value) => Array.isArray(value) ? value.map(clean) : [];
+          const active = (rows) => (Array.isArray(rows) ? rows : []).filter((row) => !row?.deleted_on);
+          const stableTrigger = (row) => ({
+            triggerUuid: clean(row?.trigger_uuid),
+            branchIncludes: cleanArray(row?.branch_includes),
+            branchExcludes: cleanArray(row?.branch_excludes),
+            buildCommand: clean(row?.build_command),
+            deployCommand: clean(row?.deploy_command),
+          });
+          const fingerprint = (rows) => crypto.createHash('sha256')
+            .update(JSON.stringify(active(rows).map(stableTrigger).sort((a, b) => a.triggerUuid.localeCompare(b.triggerUuid))))
+            .digest('hex');
+          async function get(path) {
+            const response = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || payload?.success === false) throw new Error(`GET ${path} failed with provider status ${response.status}`);
+            return payload?.result;
+          }
+          if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required.');
+          if (!token) throw new Error('CLOUDFLARE_WORKERS_BUILDS_API_TOKEN is required.');
+          const tokenState = await get('/user/tokens/verify');
+          if (tokenState?.status !== 'active') throw new Error('Dedicated Workers Builds API token is not active.');
+          const scripts = await get(`/accounts/${accountId}/workers/scripts?per_page=100`);
+          const findWorker = (name) => (Array.isArray(scripts) ? scripts : []).filter((row) => clean(row?.id) === name);
+          const productionMatches = findWorker(productionWorker);
+          const alphaMatches = findWorker(alphaWorker);
+          if (productionMatches.length !== 1) throw new Error(`${productionWorker}: expected exactly one Worker, found ${productionMatches.length}.`);
+          if (alphaMatches.length !== 1) throw new Error(`${alphaWorker}: expected exactly one Worker, found ${alphaMatches.length}.`);
+          const productionTag = clean(productionMatches[0]?.tag);
+          const alphaTag = clean(alphaMatches[0]?.tag);
+          if (!productionTag || !alphaTag) throw new Error('Both current Workers must expose immutable script tags.');
+          const productionTriggers = await get(`/accounts/${accountId}/builds/workers/${productionTag}/triggers`);
+          const activeProductionTriggers = active(productionTriggers);
+          if (activeProductionTriggers.length !== 1) {
+            throw new Error(`${productionWorker}: expected exactly one active build trigger; refusing automatic repair of a multi-trigger topology.`);
+          }
+          const productionTrigger = stableTrigger(activeProductionTriggers[0]);
+          if (!productionTrigger.triggerUuid) throw new Error(`${productionWorker}: active trigger UUID missing.`);
+          const productionBuilds = await get(`/accounts/${accountId}/builds/workers/${productionWorker}/builds?per_page=50`);
+          const activeNonMainBuilds = (Array.isArray(productionBuilds) ? productionBuilds : []).filter((build) => {
+            const branch = clean(build?.build_trigger_metadata?.branch);
+            const outcome = clean(build?.build_outcome).toLowerCase();
+            return branch && branch !== 'main' && !terminal.has(outcome);
+          }).map((build) => ({ buildUuid: clean(build?.build_uuid), branch: clean(build?.build_trigger_metadata?.branch), outcome: clean(build?.build_outcome) }));
+          if (activeNonMainBuilds.some((build) => !build.buildUuid)) throw new Error(`${productionWorker}: active non-main build UUID missing.`);
+          const alphaTriggers = await get(`/accounts/${accountId}/builds/workers/${alphaTag}/triggers`);
+          const before = {
+            schemaVersion: 4,
+            capturedAt: new Date().toISOString(),
+            trustedGitRef: process.env.GITHUB_REF || null,
+            trustedGitSha: process.env.GITHUB_SHA || null,
+            mode: 'preflight-before-mutation',
+            mutationPerformed: false,
+            providerTopology: {
+              workers: [
+                { name: productionWorker, role: 'production' },
+                { name: alphaWorker, role: 'founder-gated-alpha', mutationAuthorized: false }
+              ],
+              pages: [{ name: pagesProject, role: 'frontend', mutationAuthorized: false }]
+            },
+            productionWorker: {
+              name: productionWorker,
+              scriptTag: productionTag,
+              trigger: productionTrigger,
+              triggerFingerprint: fingerprint(productionTriggers),
+              activeNonMainBuilds
+            },
+            alphaWorker: {
+              name: alphaWorker,
+              scriptTag: alphaTag,
+              triggerFingerprint: fingerprint(alphaTriggers),
+              mutationAuthorized: false
+            },
+            pagesProject: { name: pagesProject, mutationAuthorized: false, verification: 'load-bearing-provider-readback' },
+            verifiedForApply: true
+          };
+          fs.writeFileSync(process.env.BEFORE_EVIDENCE_PATH, `${JSON.stringify(before, null, 2)}\n`, 'utf8');
+          console.log('CLOUDFLARE_TWO_WORKER_TOPOLOGY_PREFLIGHT_WRITTEN');
+          NODE
+
+      - name: Upload before-state evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-branch-authority-before-${{ github.sha }}
+          path: |
+            ${{ env.BEFORE_EVIDENCE_PATH }}
+            ${{ env.PAGES_EVIDENCE_PATH }}
+          if-no-files-found: error
+          retention-days: 30
+
+  apply:
+    name: Founder-authorized production Worker branch repair
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 10
+    steps:
+      - name: Verify founder and exact current main after approval
+        shell: bash
+        env:
+          EXPECTED_MAIN_SHA: ${{ inputs.expected_main_sha }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "jussray"
+          test "$GITHUB_REF" = "refs/heads/main"
+          current_main="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          test -n "$current_main"
+          test "$GITHUB_SHA" = "$current_main"
+          test "$EXPECTED_MAIN_SHA" = "$GITHUB_SHA"
+          test "$CONFIRMATION" = "FIX_646_MAIN_ONLY_WORKER_BUILDS"
+
+      - name: Download retained before-state evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: cloudflare-branch-authority-before-${{ github.sha }}
+          path: artifacts
+
+      - name: Re-read Pages authority after Production approval and refuse drift
+        env:
+          CLOUDFLARE_PAGES_READ_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_READ_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_PAGES_PROJECT: sekret-bip
+          CLOUDFLARE_PAGES_PRODUCTION_BRANCH: main
+        run: >-
+          node scripts/verify-cloudflare-pages-branch-authority.mjs
+          --expect-snapshot "$PAGES_EVIDENCE_PATH"
+          --output "$PAGES_APPLY_EVIDENCE_PATH"
+
+      - name: Apply main-only branch control to production Worker
+        shell: bash
+        env:
+          CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          current_main="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          test "$GITHUB_SHA" = "$current_main"
+          test -s "$BEFORE_EVIDENCE_PATH"
+          test -s "$PAGES_APPLY_EVIDENCE_PATH"
+          node <<'NODE'
+          const crypto = require('node:crypto');
+          const fs = require('node:fs');
+          const API = 'https://api.cloudflare.com/client/v4';
+          const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || '').trim();
+          const token = String(process.env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN || '').trim();
+          const beforeRaw = fs.readFileSync(process.env.BEFORE_EVIDENCE_PATH, 'utf8');
+          const before = JSON.parse(beforeRaw);
+          const pagesReadback = JSON.parse(fs.readFileSync(process.env.PAGES_APPLY_EVIDENCE_PATH, 'utf8'));
+          const terminal = new Set(['success', 'fail', 'skipped', 'cancelled', 'terminated']);
+          const clean = (value) => String(value ?? '').trim();
+          const cleanArray = (value) => Array.isArray(value) ? value.map(clean) : [];
+          const active = (rows) => (Array.isArray(rows) ? rows : []).filter((row) => !row?.deleted_on);
+          const stableTrigger = (row) => ({ triggerUuid: clean(row?.trigger_uuid), branchIncludes: cleanArray(row?.branch_includes), branchExcludes: cleanArray(row?.branch_excludes), buildCommand: clean(row?.build_command), deployCommand: clean(row?.deploy_command) });
+          const fingerprint = (rows) => crypto.createHash('sha256')
+            .update(JSON.stringify(active(rows).map(stableTrigger).sort((a, b) => a.triggerUuid.localeCompare(b.triggerUuid))))
+            .digest('hex');
+          async function request(path, options = {}) {
+            const method = options.method || 'GET';
+            const response = await fetch(`${API}${path}`, {
+              method,
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: options.body === undefined ? undefined : JSON.stringify(options.body)
+            });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || payload?.success === false) throw new Error(`${method} ${path} failed with provider status ${response.status}`);
+            return payload?.result;
+          }
+          if (before.schemaVersion !== 4 || !before.verifiedForApply) throw new Error('Preflight evidence is not authorized for apply.');
+          if (before.trustedGitSha !== process.env.GITHUB_SHA) throw new Error('Preflight SHA does not match this workflow run.');
+          if (before.productionWorker?.name !== 'sekret-backend') throw new Error('Unexpected production Worker identity.');
+          if (before.alphaWorker?.name !== 'sekret-backend-alpha' || before.alphaWorker?.mutationAuthorized !== false) throw new Error('Alpha Worker boundary is not preserved.');
+          if (before.pagesProject?.name !== 'sekret-bip' || before.pagesProject?.mutationAuthorized !== false) throw new Error('Pages boundary is not preserved.');
+          if (pagesReadback?.verified !== true || pagesReadback?.snapshotMatched !== true || pagesReadback?.mutationPerformed !== false) {
+            throw new Error('Pages branch authority was not re-verified after Production approval.');
+          }
+          const tokenState = await request('/user/tokens/verify');
+          if (tokenState?.status !== 'active') throw new Error('Dedicated Workers Builds API token is not active.');
+          const productionTriggers = await request(`/accounts/${accountId}/builds/workers/${before.productionWorker.scriptTag}/triggers`);
+          const alphaTriggers = await request(`/accounts/${accountId}/builds/workers/${before.alphaWorker.scriptTag}/triggers`);
+          if (fingerprint(productionTriggers) !== before.productionWorker.triggerFingerprint) throw new Error('Production Worker trigger state drifted after preflight.');
+          if (fingerprint(alphaTriggers) !== before.alphaWorker.triggerFingerprint) throw new Error('Founder-gated alpha Worker changed after preflight; refusing production mutation.');
+          const activeProductionTriggers = active(productionTriggers);
+          if (activeProductionTriggers.length !== 1) throw new Error('Production Worker no longer has exactly one active build trigger.');
+          const currentTrigger = stableTrigger(activeProductionTriggers[0]);
+          if (currentTrigger.triggerUuid !== before.productionWorker.trigger.triggerUuid) throw new Error('Production trigger identity changed after preflight.');
+          const receipt = {
+            schemaVersion: 5,
+            trustedGitSha: process.env.GITHUB_SHA,
+            mode: 'founder-authorized-apply',
+            beforeEvidenceSha256: crypto.createHash('sha256').update(beforeRaw).digest('hex'),
+            pagesEvidenceFingerprint: pagesReadback.fingerprint,
+            pagesSnapshotMatched: pagesReadback.snapshotMatched,
+            mutationPerformed: false,
+            journal: [],
+            alphaWorkerMutationPerformed: false,
+            pagesMutationPerformed: false,
+            verified: false,
+            failure: null
+          };
+          const persist = () => fs.writeFileSync(process.env.EVIDENCE_PATH, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+          const record = (entry) => { receipt.mutationPerformed = true; receipt.journal.push({ at: new Date().toISOString(), ...entry }); persist(); };
+          persist();
+          try {
+            const builds = await request(`/accounts/${accountId}/builds/workers/sekret-backend/builds?per_page=50`);
+            const activeNonMainBuilds = (Array.isArray(builds) ? builds : []).filter((build) => {
+              const branch = clean(build?.build_trigger_metadata?.branch);
+              const outcome = clean(build?.build_outcome).toLowerCase();
+              return branch && branch !== 'main' && !terminal.has(outcome);
+            });
+            for (const build of activeNonMainBuilds) {
+              const uuid = clean(build?.build_uuid);
+              if (!uuid) throw new Error('Active non-main build UUID missing.');
+              await request(`/accounts/${accountId}/builds/builds/${uuid}/cancel`, { method: 'PUT' });
+              record({ action: 'cancel-build', worker: 'sekret-backend', buildUuid: uuid, branch: clean(build?.build_trigger_metadata?.branch) });
+            }
+            const patch = { branch_includes: ['main'], branch_excludes: [], deploy_command: 'npm run deploy:api:production', build_command: '' };
+            await request(`/accounts/${accountId}/builds/triggers/${currentTrigger.triggerUuid}`, { method: 'PATCH', body: patch });
+            record({ action: 'patch-production-trigger', worker: 'sekret-backend', triggerUuid: currentTrigger.triggerUuid, appliedPatch: patch });
+            const verifyTriggers = await request(`/accounts/${accountId}/builds/workers/${before.productionWorker.scriptTag}/triggers`);
+            const verifyAlpha = await request(`/accounts/${accountId}/builds/workers/${before.alphaWorker.scriptTag}/triggers`);
+            const verifyBuilds = await request(`/accounts/${accountId}/builds/workers/sekret-backend/builds?per_page=50`);
+            const verifyActive = active(verifyTriggers);
+            const verifyTrigger = verifyActive.length === 1 ? stableTrigger(verifyActive[0]) : null;
+            const remainingNonMain = (Array.isArray(verifyBuilds) ? verifyBuilds : []).filter((build) => {
+              const branch = clean(build?.build_trigger_metadata?.branch);
+              const outcome = clean(build?.build_outcome).toLowerCase();
+              return branch && branch !== 'main' && !terminal.has(outcome);
+            });
+            const verified = verifyActive.length === 1 && verifyTrigger &&
+              JSON.stringify(verifyTrigger.branchIncludes) === JSON.stringify(['main']) &&
+              verifyTrigger.branchExcludes.length === 0 &&
+              verifyTrigger.deployCommand === 'npm run deploy:api:production' &&
+              verifyTrigger.buildCommand === '' &&
+              remainingNonMain.length === 0 &&
+              fingerprint(verifyAlpha) === before.alphaWorker.triggerFingerprint &&
+              pagesReadback.verified === true && pagesReadback.snapshotMatched === true;
+            receipt.verified = Boolean(verified);
+            receipt.alphaWorkerMutationPerformed = false;
+            receipt.pagesMutationPerformed = false;
+            persist();
+            if (!receipt.verified) throw new Error('Post-mutation readback is not main-only, alpha changed, or Pages authority is stale.');
+            console.log('CLOUDFLARE_PRODUCTION_WORKER_AND_PAGES_AUTHORITY_VERIFIED');
+          } catch (error) {
+            receipt.verified = false;
+            receipt.failure = { message: error instanceof Error ? error.message : String(error) };
+            persist();
+            throw error;
+          }
+          NODE
+
+      - name: Upload apply evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-branch-authority-apply-${{ github.sha }}
+          path: |
+            ${{ env.EVIDENCE_PATH }}
+            ${{ env.PAGES_APPLY_EVIDENCE_PATH }}
+          if-no-files-found: error
+          retention-days: 30

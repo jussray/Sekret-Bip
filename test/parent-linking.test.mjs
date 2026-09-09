@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const linkSrc = fs.readFileSync(new URL('../src/utils/parentLink.ts', import.meta.url), 'utf8');
-const reconcileSql = fs.readFileSync(new URL('../supabase/migrations/20260630003000_reconcile_parent_link_contract.sql', import.meta.url), 'utf8');
-const revokeSql = fs.readFileSync(new URL('../supabase/migrations/20260707022000_revoke_parent_link.sql', import.meta.url), 'utf8');
+const reconcileSql = fs.readFileSync(new URL('../supabase/migrations/20260630022018_limited_mode_parent_invite_transition.sql', import.meta.url), 'utf8');
+const lockSql = fs.readFileSync(new URL('../supabase/migrations/20260711070000_lock_parent_links_to_rpc_only.sql', import.meta.url), 'utf8');
+const revokeEdgeSrc = fs.readFileSync(new URL('../supabase/functions/parent-link-revoke/index.ts', import.meta.url), 'utf8');
 
 test('invite creation uses the protected RPC', () => {
   assert.match(linkSrc, /\.rpc\('create_parent_link_invite'\)/);
@@ -53,21 +54,48 @@ test('linked teen lookup reads only active links', () => {
   assert.match(linkSrc, /fetchLinkedTeenId[\s\S]*?\.eq\('status', 'active'\)[\s\S]*?\.eq\('is_active', true\)/s);
 });
 
+test('parent_links is read-only to app clients', () => {
+  assert.match(lockSql, /revoke all on table public\.parent_links from anon, authenticated/);
+  assert.match(lockSql, /grant select on table public\.parent_links to authenticated/);
+  assert.match(lockSql, /drop policy if exists "parent_links_insert"/);
+  assert.match(lockSql, /drop policy if exists "parent_links_update"/);
+  assert.doesNotMatch(lockSql, /create policy "parent_links_insert"/);
+  assert.doesNotMatch(lockSql, /create policy "parent_links_update"/);
+});
+
+test('linked users retain non-anonymous read access', () => {
+  assert.match(lockSql, /create policy "parent_links_select"/);
+  assert.match(lockSql, /to authenticated/);
+  assert.match(lockSql, /public\.is_non_anonymous_user\(\)/);
+  assert.match(lockSql, /auth\.uid\(\)\) = teen_user_id/);
+  assert.match(lockSql, /auth\.uid\(\)\) = parent_user_id/);
+});
+
 test('revocation uses an authenticated RPC instead of a client-side table update', () => {
   assert.match(linkSrc, /revokeParentLink[\s\S]*?\.rpc\('revoke_parent_link'\)/s);
   assert.doesNotMatch(linkSrc, /revokeParentLink[\s\S]*?\.from\('parent_links'\)/s);
-  assert.match(revokeSql, /v_user_id uuid := auth\.uid\(\)/);
-  assert.match(revokeSql, /teen_user_id = v_user_id or parent_user_id = v_user_id/);
-  assert.match(revokeSql, /status in \('pending', 'active'\)/);
-  assert.match(revokeSql, /status = 'revoked'/);
-  assert.match(revokeSql, /is_active = false/);
-  assert.match(revokeSql, /verification_state = 'PENDING_PARENT'/);
-  assert.match(revokeSql, /parent_link_state = 'revoked'/);
+  assert.match(lockSql, /revoke_parent_link\(p_link_id uuid default null\)/);
+  assert.match(lockSql, /v_user_id uuid := auth\.uid\(\)/);
+  assert.match(lockSql, /auth\.jwt\(\) ->> 'is_anonymous'/);
+  assert.match(lockSql, /teen_user_id = v_user_id or parent_user_id = v_user_id/);
+  assert.match(lockSql, /p_link_id is null or id = p_link_id/);
+  assert.match(lockSql, /status in \('pending', 'active'\)/);
+  assert.match(lockSql, /status = 'revoked'/);
+  assert.match(lockSql, /is_active = false/);
+  assert.match(lockSql, /verification_state = 'PENDING_PARENT'/);
+  assert.match(lockSql, /parent_link_state = 'revoked'/);
 });
 
 test('revocation RPC is authenticated-only', () => {
-  assert.match(revokeSql, /revoke execute on function public\.revoke_parent_link\(\) from public, anon/);
-  assert.match(revokeSql, /grant execute on function public\.revoke_parent_link\(\) to authenticated/);
+  assert.match(lockSql, /revoke execute on function public\.revoke_parent_link\(uuid\) from public, anon/);
+  assert.match(lockSql, /grant execute on function public\.revoke_parent_link\(uuid\) to authenticated, service_role/);
+});
+
+test('parent-link-revoke edge function calls the RPC and never updates the table directly', () => {
+  assert.match(revokeEdgeSrc, /db\.rpc\("revoke_parent_link",\s*\{\s*p_link_id: linkId/);
+  assert.doesNotMatch(revokeEdgeSrc, /\.from\(["']parent_links["']\)/);
+  assert.match(revokeEdgeSrc, /db\.auth\.getUser\(\)/);
+  assert.match(revokeEdgeSrc, /invalid_link_id/);
 });
 
 test('link helpers return actionable failures without Supabase or auth', () => {

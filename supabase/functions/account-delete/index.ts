@@ -18,8 +18,6 @@ const PROCESS_SECRET = Deno.env.get('ACCOUNT_DELETION_PROCESS_SECRET') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-const PRIVATE_BUCKETS = ['avatar-uploads', 'journal-images', 'voice-notes'] as const;
-
 interface DeleteRequestBody {
   requestId?: string;
 }
@@ -31,6 +29,11 @@ interface DeletionRequest {
   scheduled_for: string;
 }
 
+interface StorageCleanupResult {
+  bucketNames: string[];
+  objectsDeleted: number;
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -40,6 +43,25 @@ function json(body: unknown, status = 200): Response {
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function sha256(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+async function listPrivateBucketNames(admin: SupabaseClient): Promise<string[]> {
+  const { data, error } = await admin.storage.listBuckets();
+  if (error) throw new Error(`storage_bucket_inventory_failed:${error.message}`);
+
+  return (data ?? [])
+    .filter(bucket => bucket.public !== true)
+    .map(bucket => bucket.name)
+    .filter(Boolean)
+    .sort();
 }
 
 async function listFilesRecursively(
@@ -59,7 +81,6 @@ async function listFilesRecursively(
         .from(bucket)
         .list(current, { limit: 100, offset, sortBy: { column: 'name', order: 'asc' } });
 
-      // Missing optional buckets should not prevent deletion.
       if (error) {
         if (String(error.message).toLowerCase().includes('bucket not found')) break;
         throw new Error(`storage_list_failed:${bucket}`);
@@ -80,16 +101,107 @@ async function listFilesRecursively(
   return files;
 }
 
-async function removePrivateFiles(admin: SupabaseClient, userId: string): Promise<void> {
-  for (const bucket of PRIVATE_BUCKETS) {
+async function removePrivateFiles(
+  admin: SupabaseClient,
+  userId: string,
+): Promise<StorageCleanupResult> {
+  const bucketNames = await listPrivateBucketNames(admin);
+  let objectsDeleted = 0;
+
+  for (const bucket of bucketNames) {
     const paths = await listFilesRecursively(admin, bucket, userId);
 
     for (let index = 0; index < paths.length; index += 100) {
       const batch = paths.slice(index, index + 100);
       const { error } = await admin.storage.from(bucket).remove(batch);
       if (error) throw new Error(`storage_remove_failed:${bucket}`);
+      objectsDeleted += batch.length;
     }
   }
+
+  return { bucketNames, objectsDeleted };
+}
+
+function isMissingRelationError(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const message = String(error.message ?? '').toLowerCase();
+  return error.code === 'PGRST205' || message.includes('could not find the table');
+}
+
+async function clearDeletionBlockers(admin: SupabaseClient, userId: string): Promise<void> {
+  const blockers = [
+    { table: 'control_room_issue_history', column: 'changed_by' },
+    { table: 'control_room_issues', column: 'resolved_by' },
+  ] as const;
+
+  for (const blocker of blockers) {
+    const { error } = await admin
+      .from(blocker.table)
+      .update({ [blocker.column]: null })
+      .eq(blocker.column, userId);
+
+    if (error && !isMissingRelationError(error)) {
+      throw new Error(`deletion_reference_cleanup_failed:${blocker.table}.${blocker.column}`);
+    }
+  }
+}
+
+async function prepareReceipt(
+  admin: SupabaseClient,
+  requestId: string,
+  userIdHash: string,
+  cleanup: StorageCleanupResult,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .from('account_deletion_receipts')
+    .upsert({
+      request_id: requestId,
+      user_id_hash: userIdHash,
+      status: 'processing',
+      storage_buckets: cleanup.bucketNames,
+      storage_objects_deleted: cleanup.objectsDeleted,
+      failure_reason: null,
+      updated_at: now,
+    }, { onConflict: 'request_id' });
+
+  if (error) throw new Error(`deletion_receipt_prepare_failed:${error.message}`);
+}
+
+async function completeReceipt(admin: SupabaseClient, requestId: string): Promise<boolean> {
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .from('account_deletion_receipts')
+    .update({
+      status: 'completed',
+      completed_at: now,
+      updated_at: now,
+      failure_reason: null,
+    })
+    .eq('request_id', requestId)
+    .eq('status', 'processing');
+
+  if (error) {
+    console.error('[account-delete] receipt completion failed:', error.message);
+    return false;
+  }
+  return true;
+}
+
+async function failReceipt(
+  admin: SupabaseClient,
+  requestId: string,
+  reason: string,
+): Promise<void> {
+  await admin
+    .from('account_deletion_receipts')
+    .update({
+      status: 'failed',
+      failure_reason: reason.slice(0, 500),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('request_id', requestId)
+    .eq('status', 'processing');
 }
 
 async function markFailed(
@@ -158,9 +270,11 @@ Deno.serve(async (req: Request) => {
   if (!claimed) return json({ error: 'request_already_claimed' }, 409);
 
   const userId = deletionRequest.user_id;
+  let receiptPrepared = false;
 
   try {
-    await removePrivateFiles(admin, userId);
+    const cleanup = await removePrivateFiles(admin, userId);
+    await clearDeletionBlockers(admin, userId);
 
     // The live schema uses SET NULL for crew_members.member_user_id. Remove the
     // accepted display row so a deleted person's real name is not retained.
@@ -170,13 +284,25 @@ Deno.serve(async (req: Request) => {
       .eq('member_user_id', userId);
     if (crewError) throw new Error('crew_member_cleanup_failed');
 
+    await prepareReceipt(admin, requestId, await sha256(userId), cleanup);
+    receiptPrepared = true;
+
     // Remaining account-owned rows cascade from auth.users in the live project.
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
     if (deleteError) throw new Error(`auth_delete_failed:${deleteError.message}`);
 
-    return json({ ok: true, requestId, deletedUserId: userId });
+    const receiptCompleted = await completeReceipt(admin, requestId);
+
+    return json({
+      ok: true,
+      requestId,
+      storageBucketsChecked: cleanup.bucketNames,
+      storageObjectsDeleted: cleanup.objectsDeleted,
+      receiptStatus: receiptCompleted ? 'completed' : 'processing',
+    });
   } catch (error) {
     const reason = error instanceof Error ? error.message : 'account_delete_failed';
+    if (receiptPrepared) await failReceipt(admin, requestId, reason);
     await markFailed(admin, requestId, reason);
     return json({ error: reason }, 500);
   }
