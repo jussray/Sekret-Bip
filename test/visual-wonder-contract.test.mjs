@@ -21,13 +21,17 @@ describe('Se’kret Bip Visual Wonder contract', () => {
     assert.match(vibe, /Pass 2 — rendered artifact attack/i);
   });
 
-  it('keeps the current arrival visual-first, temporary, accessible, and reduced-motion aware', () => {
-    assert.ok(arrival.includes('testID="web-welcome-caveman-visual"'));
-    assert.ok(arrival.includes('You. Your space. Enter.'));
+  it('keeps the arrival visual-first, family-blocked, temporary, accessible, and reduced-motion aware', () => {
+    assert.ok(arrival.includes('testID="web-welcome-photo-blocking"'));
+    assert.ok(arrival.includes('testID="web-welcome-stage-parents"'));
+    assert.ok(arrival.includes('testID="web-welcome-stage-night"'));
+    assert.ok(arrival.includes('testID="web-welcome-stage-suhana"'));
+    assert.ok(arrival.includes('testID="web-welcome-stage-sy"'));
+    assert.ok(arrival.includes('testID="web-welcome-stage-cloud"'));
     assert.ok(arrival.includes("prefers-reduced-motion: reduce"));
     assert.match(arrival, /arrivalState === 'entering'/);
     assert.match(arrival, /arrivalState !== 'entering'/);
-    assert.match(motion, /arrivalDurationMs/);
+    assert.match(motion, /photoBlockingDurationMs/);
   });
 
   it('keeps product truth and human dignity inside the beauty gate', () => {
