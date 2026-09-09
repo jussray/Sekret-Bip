@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { lintAvatarResponse } from '../src/services/ai/aiPatternLinter.ts';
 
 const source = await readFile('src/services/ai/aiPatternLinter.ts', 'utf8');
 const docs = await readFile('docs/AI_PATTERN_LINTER.md', 'utf8');
@@ -9,9 +10,38 @@ const panel = await readFile('src/features/control-room/PromptOsPanel.tsx', 'utf
 test('voice audit is density based and explicitly not an authorship detector', () => {
   assert.match(source, /Density-based persona voice QA/);
   assert.match(source, /authorshipInference: 'not-supported'/);
-  assert.match(source, /hits\.length >= 2 \|\| totalOccurrences >= 3/);
+  assert.match(source, /repeatedPatternCluster \|\| crossPatternCluster/);
+  assert.match(source, /left\.patternId !== right\.patternId && !overlaps\(left, right\)/);
   assert.match(source, /severity: LintResult\['severity'\] = clustered \? 'warn' : 'clean'/);
   assert.doesNotMatch(source, /hits\.some\(\(hit\) => hit\.severity === 'hard'\) \? 'block'/);
+});
+
+test('overlapping pattern families stay one isolated evidence site', () => {
+  for (const draft of [
+    'The pivotal moment arrived.',
+    'It stands as a testament.',
+    'The vibrant community gathered.',
+  ]) {
+    const result = lintAvatarResponse(draft, 'redteam');
+    assert.equal(result.clustered, false, draft);
+    assert.equal(result.severity, 'clean', draft);
+  }
+});
+
+test('separate pattern sites still form a real cross-pattern cluster', () => {
+  const result = lintAvatarResponse('The pivotal moment arrived. The tapestry hung nearby.', 'redteam');
+  assert.equal(result.clustered, true);
+  assert.equal(result.severity, 'warn');
+});
+
+test('staccato runs count the short sentences they actually consume', () => {
+  const result = lintAvatarResponse('Go now. Be safe. Call me. Stay there. Keep calm.', 'redteam');
+  const staccato = result.hits.find((hit) => hit.patternId === 31);
+
+  assert.ok(staccato);
+  assert.equal(staccato.occurrences, 5);
+  assert.equal(result.clustered, true);
+  assert.equal(result.severity, 'warn');
 });
 
 test('voice prompts reject blacklist behavior while preserving valid punctuation and vocabulary', () => {
