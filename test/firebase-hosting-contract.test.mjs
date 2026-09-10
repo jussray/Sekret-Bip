@@ -18,11 +18,14 @@ test('Firebase Hosting serves the existing Expo web export as an alternate stati
 
 test('Firebase Hosting config cannot replace canonical Cloudflare frontend or API authority', () => {
   const firebase = read('firebase.json');
-  const eas = read('eas.json');
+  const eas = JSON.parse(read('eas.json'));
   const ownership = read('docs/CLOUDFLARE_OWNERSHIP.md');
 
   assert.doesNotMatch(firebase, /app\.sekretbip\.net|api\.sekretbip\.net/);
-  assert.match(eas, /EXPO_PUBLIC_BACKEND_URL": "https:\/\/api\.sekretbip\.net"/);
+  assert.equal(eas.build.development.env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
+  assert.equal(eas.build['parent-development'].env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
+  assert.equal(eas.build.production.env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
+  assert.equal(eas.build['parent-production'].env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
   assert.match(ownership, /`sekret-bip` — Cloudflare Pages frontend project/);
   assert.match(ownership, /`sekret-backend` — canonical public API\/front-door/);
 });
