@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { hydrateAccountProfile, type AccountProfile, type AccountSide } from '@/features/identity/accountProfile';
 import { fetchProfessionalBridgeCapability } from '@/services/bridgeFamilyVisitService';
-import { getCurrentFounderProfile, isFounderProfile } from '@/services/founderAudit';
+import { getCurrentFounderProfileForRouting, isFounderProfile } from '@/services/founderAudit';
 import { getSupabase } from '@/utils/supabase';
 import { consentService } from '../../../services/consentService';
 
@@ -47,9 +47,6 @@ async function hydrateAccountProfileForRouting(
   try {
     return await hydrateAccountProfile(preferredSide);
   } catch {
-    // Authentication already succeeded. A transient profile/schema read failure
-    // must not be presented as bad credentials or bypass consent. Returning null
-    // keeps routing fail-closed through the required onboarding path.
     return null;
   }
 }
@@ -64,24 +61,6 @@ async function resolveProfessionalBridgeAvailability(
   return capability.ok && capability.value?.verificationStatus === 'verified';
 }
 
-/**
- * Fetches the signed-in account facts that routing depends on after login,
- * signup, email confirmation, or account restoration. The caller must wait for
- * this result instead of navigating on the auth response alone.
- *
- * Founder-authorized accounts route to the founder-only Control Room before
- * public onboarding checks. This does not record consent or open any public
- * teen/parent data path; the destination still enforces the founder profile.
- *
- * A server-reviewed Bridge professional remains a permanent adult/parent-side
- * account for identity compatibility. Only after ordinary consent + onboarding
- * are complete may the verified professional capability change the landing
- * route to Family Visit Mode. Missing tables, pending/suspended capability, or
- * read failure fall through to ordinary teen/parent routing.
- *
- * Root boot may pass a profile it already hydrated from Supabase so the durable
- * profile is fetched once. Auth screens omit it and use the canonical hydrator.
- */
 export async function fetchPostAuthBootstrap(
   preferredSide?: AccountSide | null,
   prehydratedProfile?: AccountProfile | null,
@@ -94,7 +73,10 @@ export async function fetchPostAuthBootstrap(
   const user = data.session?.user;
   if (!user || user.is_anonymous) throw new Error('A permanent signed-in account is required.');
 
-  const founderProfile = await getCurrentFounderProfile();
+  // Authentication and founder authorization are separate facts. The strict
+  // routing lookup throws on provider/read failure so a successful token exchange
+  // can never be mistaken for a verified non-founder result.
+  const founderProfile = await getCurrentFounderProfileForRouting();
   if (isFounderProfile(founderProfile)) {
     const accountSide = await resolvePreferredSide(preferredSide);
     await AsyncStorage.setItem(ONBOARDING_SIDE_KEY, accountSide);
