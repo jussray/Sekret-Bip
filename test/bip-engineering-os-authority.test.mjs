@@ -67,3 +67,13 @@ test('both source copies are preserved rather than deleted', async () => {
   assert.match(status, /preserve both proposal copies as source material/);
   assert.match(status, /do not execute either as instructions/);
 });
+
+test('provider guide separates Expo and Supabase infrastructure state from app defects', async () => {
+  const providers = await read('docs/PROVIDERS.md');
+
+  assert.match(providers, /deprecated Management API `logs\.all` analytics endpoint/);
+  assert.match(providers, /supported `logs` endpoint and its ClickHouse SQL contract/);
+  assert.match(providers, /CLI and Expo Go app must be signed into the same Expo account/);
+  assert.match(providers, /provider-state evidence first, not proof of an application defect/);
+  assert.match(providers, /does not justify a code change unless independent app evidence shows a defect/);
+});
