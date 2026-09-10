@@ -14,6 +14,10 @@ Look to Founder Control Room first for release-truth interpretation. Capture rep
 
 GitHub Actions failures must be classified as `runner_startup_failure`, `workflow_no_jobs`, or `workflow_step_failure` before any provider blames code. Zero-step/no-log jobs are infrastructure evidence, not code-regression proof. Infrastructure outages can still gate merge and release truth under this repo’s rules.
 
+A workflow run that completes as `action_required` with **zero jobs** is `workflow_no_jobs` unless later evidence proves another cause. It is a release blocker, but it is not proof of a failed build, failed assertion, Playwright regression, CodeQL finding, Supabase-preview failure, or application defect. Do not change product/provider source merely to make a zero-job gate look green. First get the workflow authorized/runnable, then rerun the same proof subject and inspect actual jobs, steps, and logs.
+
+If GitHub refuses to rerun a zero-job `action_required` run because the run has no retryable failed jobs, preserve the candidate and classify the gate as `BLOCKED` by workflow execution/approval state. Do not manufacture a replacement commit solely to retrigger CI unless a repository rule explicitly requires a new proof subject. Any new head invalidates predecessor exact-head proof and must be treated as a fresh subject.
+
 Cloudflare build/deploy evidence is separate from GitHub Actions evidence. Cloudflare success does not prove Playwright, auth, data, privacy, Supabase, Worker, or app runtime gates. GitHub runner outage does not prove application failure.
 
 ## Claude / Claude Code
