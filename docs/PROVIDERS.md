@@ -87,6 +87,10 @@ GitHub Actions badges are not enough. Inspect runs, jobs, steps, and logs. If st
 
 Owns Auth, Postgres, RLS, Storage, RPCs, functions, and durable user data. Service-role credentials remain server-side. Identity, parent-link, consent, deletion, and visibility rules require policy/service enforcement and regression tests.
 
+Supabase is the canonical durable application base for Se’kret Bip. Auth identity, account and relationship state, consent and parent-link state, durable application records, storage references, and database policy truth must originate from or reconcile to Supabase. Do not create a second durable auth or data authority in Firebase, Cloudflare, Expo, or another provider.
+
+Firebase App Check, FCM, Firebase Hosting, Cloudflare, and Expo may protect, transport, execute, host, notify, cache, or observe within their approved boundaries, but they may not independently redefine user identity, RLS, consent, relationship truth, or durable user state. Any future provider must integrate around this Supabase authority unless a founder-approved migration explicitly replaces it with rollback and verified data/auth continuity.
+
 Do not introduce the deprecated Management API `logs.all` analytics endpoint into observability or proof tooling. New Management API log queries must use the supported `logs` endpoint and its ClickHouse SQL contract. A provider-log query is observability evidence only; it cannot grant data access, weaken RLS, or prove an application outcome.
 
 ## Cloudflare Workers / Pages
