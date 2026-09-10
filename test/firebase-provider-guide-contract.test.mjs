@@ -32,3 +32,12 @@ test('Firebase Hosting cannot silently become canonical Se’kret authority', ()
   assert.match(providers, /A Firebase Hosting deployment proves only that the Firebase-hosted artifact was deployed/);
   assert.match(providers, /Missing evidence at one layer stays `UNKNOWN` or `BLOCKED`/);
 });
+
+test('zero-job action-required workflows cannot be mislabeled as code regressions', () => {
+  assert.match(providers, /`action_required` with \*\*zero jobs\*\* is `workflow_no_jobs`/);
+  assert.match(providers, /it is not proof of a failed build, failed assertion, Playwright regression, CodeQL finding, Supabase-preview failure, or application defect/);
+  assert.match(providers, /Do not change product\/provider source merely to make a zero-job gate look green/);
+  assert.match(providers, /classify the gate as `BLOCKED` by workflow execution\/approval state/);
+  assert.match(providers, /Do not manufacture a replacement commit solely to retrigger CI/);
+  assert.match(providers, /Any new head invalidates predecessor exact-head proof/);
+});
