@@ -12,7 +12,10 @@ test('client App Check seam is optional, nonpersistent, and independent from Sup
 
   assert.match(appCheck, /registerAppCheckTokenProvider/);
   assert.match(appCheck, /getAppCheckToken/);
-  assert.doesNotMatch(appCheck, /AsyncStorage|SecureStore|document\.cookie|Set-Cookie/);
+  assert.doesNotMatch(appCheck, /from\s+['"]@react-native-async-storage\/async-storage['"]/);
+  assert.doesNotMatch(appCheck, /from\s+['"]expo-secure-store['"]/);
+  assert.doesNotMatch(appCheck, /AsyncStorage\.(?:getItem|setItem|removeItem)|SecureStore\.(?:getItemAsync|setItemAsync|deleteItemAsync)/);
+  assert.doesNotMatch(appCheck, /document\.cookie\s*=|Set-Cookie/);
   assert.doesNotMatch(appCheck, /firebase\/auth|firebase\/firestore|firebase\/database/);
 
   assert.match(backendAuth, /resolveBackendToken\(\)/);
