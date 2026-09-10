@@ -87,6 +87,8 @@ GitHub Actions badges are not enough. Inspect runs, jobs, steps, and logs. If st
 
 Owns Auth, Postgres, RLS, Storage, RPCs, functions, and durable user data. Service-role credentials remain server-side. Identity, parent-link, consent, deletion, and visibility rules require policy/service enforcement and regression tests.
 
+Do not introduce the deprecated Management API `logs.all` analytics endpoint into observability or proof tooling. New Management API log queries must use the supported `logs` endpoint and its ClickHouse SQL contract. A provider-log query is observability evidence only; it cannot grant data access, weaken RLS, or prove an application outcome.
+
 ## Cloudflare Workers / Pages
 
 Own privileged AI, voice, authenticated API, Pages/Worker build and deploy evidence, and server-side integration calls. Verify CORS, authentication, input validation, secrets, logging minimization, rate limits, costs, and fallback behavior. Worker or Pages deployment success is not proof that app clients use the intended endpoint safely.
@@ -94,6 +96,10 @@ Own privileged AI, voice, authenticated API, Pages/Worker build and deploy evide
 ## Expo / React Native
 
 Own app runtime, navigation, device behavior, permissions, and platform differences. Preserve Expo Go unless a native build requirement is explicit and approved. Verify web and device behavior where the changed path supports both. Use Playwright for applicable web/runtime path proof.
+
+When an Expo Go version enforces account matching, the CLI and Expo Go app must be signed into the same Expo account before a QR-code or project-loading failure is treated as application evidence. Account/session mismatch, EAS service disruption, build-queue failure, update failure, or push-delivery incident is provider-state evidence first, not proof of an application defect.
+
+Before changing app code in response to an Expo/EAS failure, inspect the provider status and the exact build/update/notification execution evidence. Provider failure may block release or device proof, but it does not justify a code change unless independent app evidence shows a defect. Preserve the previous code state and rerun the same proof path after provider recovery when that is the smallest valid check.
 
 ## Required provider handoff
 
