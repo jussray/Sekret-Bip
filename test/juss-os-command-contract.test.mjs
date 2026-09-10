@@ -18,6 +18,17 @@ const canonicalCommands = [
   '/visualize',
 ];
 
+const challengeStack = [
+  'ULTRATHINK',
+  'Red Team 1 — premise',
+  'Lindy mode',
+  'L99',
+  'Red Team 2 — implementation',
+  'OODA',
+  'Proof',
+  'Rollback / Next Gate',
+];
+
 const externalizableAuthorityPaths = [
   '.ai-skills/README.md',
   '.ai-skills/universal-commands.md',
@@ -40,6 +51,16 @@ const forbiddenRawActivationPhrases = [
 test('Founder Intelligence exposes the portable Juss OS command surface', () => {
   for (const command of canonicalCommands) {
     assert.match(entrypoint, new RegExp(command.replace('/', '\\/')));
+  }
+});
+
+test('nontrivial work preserves the canonical founder challenge order', () => {
+  let previousIndex = -1;
+  for (const step of challengeStack) {
+    const index = entrypoint.indexOf(step);
+    assert.ok(index >= 0, `missing challenge step: ${step}`);
+    assert.ok(index > previousIndex, `challenge stack out of order at: ${step}`);
+    previousIndex = index;
   }
 });
 
