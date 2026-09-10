@@ -20,18 +20,24 @@ function collectSourceFiles(directory) {
   return files;
 }
 
-test('Firebase App Check verifier uses strict project-number JWT validation', () => {
+test('Firebase App Check verifier uses strict project-number JWT validation and an explicit app allowlist', () => {
   const verifier = read('worker/firebase-app-check.ts');
 
   assert.ok(verifier.split('\n').some((line) => line.trim() === "const APP_CHECK_JWKS_URL = new URL('https://firebaseappcheck.googleapis.com/v1/jwks');"));
   assert.match(verifier, /FIREBASE_PROJECT_NUMBER/);
+  assert.match(verifier, /FIREBASE_APP_IDS/);
+  assert.match(verifier, /FIREBASE_WEB_APP_ID/);
+  assert.match(verifier, /function configuredAppIds/);
+  assert.match(verifier, /\.split\(','\)/);
   assert.match(verifier, /issuer:\s*`\$\{APP_CHECK_ISSUER\}\/\$\{projectNumber\}`/);
   assert.match(verifier, /audience:\s*`projects\/\$\{projectNumber\}`/);
   assert.match(verifier, /algorithms:\s*\['RS256'\]/);
   assert.match(verifier, /typ:\s*'JWT'/);
   assert.match(verifier, /protectedHeader\.alg !== 'RS256'/);
   assert.match(verifier, /protectedHeader\.typ !== 'JWT'/);
-  assert.match(verifier, /payload\.sub !== expectedAppId/);
+  assert.match(verifier, /typeof payload\.sub === 'string'/);
+  assert.match(verifier, /expectedAppIds\.has\(appId\)/);
+  assert.match(verifier, /return validVerification\(appId\)/);
   assert.match(verifier, /cacheMaxAge:\s*6 \* 60 \* 60 \* 1_000/);
   assert.doesNotMatch(verifier, /decodeJwt\s*\(/);
 });
@@ -78,7 +84,9 @@ test('Cloudflare carries the App Check header without changing the checked-in de
   assert.match(frontDoor, /Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Firebase-AppCheck'/);
   assert.match(wrangler, /main = "worker\/voice-entry\.ts"/);
   assert.match(wrangler, /FIREBASE_APPCHECK_MODE = "off"/);
+  assert.match(wrangler, /FIREBASE_APP_IDS/);
   assert.doesNotMatch(wrangler, /FIREBASE_PROJECT_NUMBER\s*=\s*"\d+"/);
+  assert.doesNotMatch(wrangler, /FIREBASE_APP_IDS\s*=/);
   assert.doesNotMatch(wrangler, /FIREBASE_WEB_APP_ID\s*=\s*"1:/);
 });
 
