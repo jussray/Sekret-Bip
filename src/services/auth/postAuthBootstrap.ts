@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { hydrateAccountProfile, type AccountProfile, type AccountSide } from '@/features/identity/accountProfile';
-import { getCurrentFounderProfile, isFounderProfile } from '@/services/founderAudit';
+import { getCurrentFounderProfileForRouting, isFounderProfile } from '@/services/founderAudit';
 import { getSupabase } from '@/utils/supabase';
 import { consentService } from '../../../services/consentService';
 
@@ -74,7 +74,10 @@ export async function fetchPostAuthBootstrap(
   const user = data.session?.user;
   if (!user || user.is_anonymous) throw new Error('A permanent signed-in account is required.');
 
-  const founderProfile = await getCurrentFounderProfile();
+  // Authentication and founder authorization are separate facts. The strict
+  // routing lookup throws on provider/read failure so a successful token exchange
+  // can never be mistaken for a verified non-founder result.
+  const founderProfile = await getCurrentFounderProfileForRouting();
   if (isFounderProfile(founderProfile)) {
     const accountSide = await resolvePreferredSide(preferredSide);
     await AsyncStorage.setItem(ONBOARDING_SIDE_KEY, accountSide);
