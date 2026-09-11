@@ -4,6 +4,7 @@ on:
   push:
     branches: [visual-proof/cinematic-evidence-dossier-v2]
 
+# Temporary exact-branch verifier. Delete before promotion.
 permissions:
   contents: read
 
