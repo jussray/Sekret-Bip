@@ -1,0 +1,61 @@
+name: Cinematic Dossier V2 Branch Proof
+
+on:
+  push:
+    branches: [visual-proof/cinematic-evidence-dossier-v2]
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  cinematic-dossier-v2-proof:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type-check exact head
+        run: npm run type-check
+
+      - name: Verify Product Design contracts
+        run: node --test test/founder-visual-authority-contract.test.mjs test/product-design-workflow-contract.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/pages-companion-asset-contract.test.mjs test/night-room-runtime-registry.test.mjs test/companion-runtime-contracts.test.mjs test/dual-front-door-contract.test.mjs test/front-door-motion-contract.test.mjs test/voice-presence-motion-contract.test.mjs test/calm-companion-motion-contract.test.mjs
+
+      - run: npx playwright install --with-deps chromium
+
+      - name: Capture exact-head Product Design evidence
+        env:
+          CI: 'true'
+          PLAYWRIGHT_ARTIFACT_DIR: artifacts/product-design-playwright
+          EXPO_PUBLIC_ENABLE_FOUNDER_PREVIEW: 'true'
+        run: npx playwright test e2e/product-design-review.spec.ts e2e/front-door-audience-switch.spec.ts e2e/calm-product-design.spec.ts e2e/room-canonical-display.spec.ts e2e/canonical-companion-identity.spec.ts e2e/cinematic-dossier.spec.ts e2e/guardrails.spec.ts e2e/ai-search-discovery.spec.ts --project=chromium
+
+      - name: Upload Product Design evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cinematic-dossier-v2-branch-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/product-design-playwright
+          if-no-files-found: error
+          retention-days: 30
