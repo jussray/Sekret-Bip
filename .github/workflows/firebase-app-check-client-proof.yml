@@ -1,0 +1,51 @@
+name: Firebase App Check Client Proof
+
+on:
+  push:
+    branches:
+      - feat/firebase-app-check-client
+    paths:
+      - package.json
+      - package-lock.json
+      - app.json
+      - .env.example
+      - src/services/firebase/appCheck.ts
+      - src/utils/backendAuth.ts
+      - test/firebase-app-check-client-contract.test.mjs
+      - test/firebase-app-check-contract.test.mjs
+      - .github/workflows/firebase-app-check-client-proof.yml
+
+permissions:
+  contents: read
+
+jobs:
+  firebase-client-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run App Check contracts
+        run: node --test test/firebase-app-check-client-contract.test.mjs test/firebase-app-check-contract.test.mjs
+
+      - name: Typecheck
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Resolve Expo public config
+        run: npx expo config --type public >/tmp/expo-public-config.txt
+
+      - name: Export web bundle
+        run: npm run build:web
