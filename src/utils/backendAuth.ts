@@ -9,10 +9,15 @@
  *   2. The shared client token (EXPO_PUBLIC_BACKEND_TOKEN) for guests /
  *      unauthenticated flows, or when no session exists.
  *
- * This is the single place the token policy lives; every call site uses
- * backendAuthHeaders(). Kept separate from env.ts to avoid a circular import
- * (this module depends on the Supabase client, which depends on env.ts).
+ * Firebase App Check is a separate app-attestation signal. It never becomes
+ * identity or authorization and is attached only from the canonical provider.
+ *
+ * This is the single place the backend request-credential policy lives; every
+ * protected client call uses backendAuthHeaders(). Kept separate from env.ts to
+ * avoid a circular import (this module depends on the Supabase client, which
+ * depends on env.ts).
  */
+import { firebaseAppCheckHeaders } from '@/services/firebase/appCheck';
 import { getSupabase } from './supabase';
 import { BACKEND_TOKEN, backendHeaders } from './env';
 
@@ -31,7 +36,21 @@ export async function resolveBackendToken(): Promise<string> {
   return BACKEND_TOKEN;
 }
 
-/** Backend request headers with the resolved bearer credential attached. */
+/**
+ * Backend request headers with independent identity and app-attestation signals.
+ * Caller-provided headers cannot select or spoof X-Firebase-AppCheck.
+ */
 export async function backendAuthHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
-  return backendHeaders(await resolveBackendToken(), extra);
+  const safeExtra = { ...(extra ?? {}) };
+  delete safeExtra['X-Firebase-AppCheck'];
+
+  const [token, appCheckHeaders] = await Promise.all([
+    resolveBackendToken(),
+    firebaseAppCheckHeaders(),
+  ]);
+
+  return backendHeaders(token, {
+    ...safeExtra,
+    ...appCheckHeaders,
+  });
 }
