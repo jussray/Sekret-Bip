@@ -40,7 +40,8 @@ test('founder repair mutates only canonical sekret-backend branch authority', ()
   assert.equal(targets.separateWorkerAuthorities.bip.mutationPolicy, 'preserve-until-exact-provider-binding-proven');
 });
 
-test('Pages audit remains read-only while trying only explicitly configured Cloudflare read credentials by capability', () => {
+test('Pages audit remains read-only, Production-bound, and uses only explicitly configured Cloudflare read credentials by capability', () => {
+  assert.match(auditWorkflow, /environment: Production/);
   assert.match(auditWorkflow, /CLOUDFLARE_WORKERS_BUILDS_API_TOKEN/);
   assert.match(auditWorkflow, /CLOUDFLARE_API_TOKEN/);
   assert.match(auditWorkflow, /CLOUDFLARE_PAGES_READ_API_TOKEN/);
@@ -66,10 +67,14 @@ test('read-only audit observes bip separately while keeping backend branch repai
   assert.match(workerVerifier, /mutationPerformed: false/);
 });
 
-test('Workers credential shape checks stay fail-closed before the capability probe', () => {
+test('Workers credential shape checks stay fail-closed while supporting user, account-owned, and legacy token verification', () => {
   assert.match(workerVerifier, /startsWith\('cfat_'\)/);
-  assert.match(workerVerifier, /workers-builds-account-token-unsupported/);
+  assert.match(workerVerifier, /account-prefixed/);
   assert.match(workerVerifier, /startsWith\('cfut_'\)/);
+  assert.match(workerVerifier, /user-prefixed/);
+  assert.match(workerVerifier, /legacy-opaque/);
+  assert.match(workerVerifier, /token-verify-account/);
+  assert.match(workerVerifier, /token-verify-user/);
   assert.match(workerVerifier, /token-leading-or-trailing-whitespace/);
   assert.match(workerVerifier, /token-bearer-prefix-stored/);
   assert.match(workerVerifier, /token-quoted-secret/);
