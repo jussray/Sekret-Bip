@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { main as reconcileMain } from './reconcile-cloudflare-app-domain.mjs';
 
 const EVIDENCE_PATH = 'artifacts/cloudflare-app-domain-routing-evidence.json';
-const PROTECTED_WORKERS = ['sekret', 'sekret-backend'];
+const PROTECTED_WORKERS = ['sekret-backend', 'sekret-backend-alpha'];
 
 function inputUrl(input) {
   if (typeof input === 'string') return input;
@@ -58,10 +58,6 @@ export function classifyObservedRequest(input, init = {}) {
   return { provider: 'external', operation: 'external-request', method };
 }
 
-export function appDomainApplyBlockReason(argv = []) {
-  return argv.includes('--apply') ? 'TWO_WORKER_TOPOLOGY_PROVIDER_READBACK_REQUIRED' : null;
-}
-
 function numericProviderCodes(payload) {
   return (payload?.errors || [])
     .map((item) => item?.code)
@@ -94,7 +90,7 @@ async function writeFailureReceipt(existing, observation, env = process.env) {
     pagesProject: env.BIP_APP_PAGES_PROJECT || 'sekret-bip',
     backendWorker: env.BIP_APP_BACKEND_WORKER || 'sekret-backend',
     protectedWorkers: PROTECTED_WORKERS,
-    topologyAuthority: 'provider-readback-required',
+    topologyAuthority: 'exact-host-binding-provider-readback-required',
     actions: [],
   };
 
@@ -118,23 +114,25 @@ async function writeFailureReceipt(existing, observation, env = process.env) {
   console.log(`FAILURE_EVIDENCE_WRITTEN path=${EVIDENCE_PATH} phase=${phase}`);
 }
 
-export async function run(argv = process.argv.slice(2), env = process.env) {
-  const blockedReason = appDomainApplyBlockReason(argv);
-  if (blockedReason) {
-    await writeFailureReceipt(
-      null,
+async function persistBindingGuardMetadata() {
+  const existing = await readExistingEvidence();
+  if (!existing) return;
+  await writeFile(
+    EVIDENCE_PATH,
+    `${JSON.stringify(
       {
-        provider: 'control-plane',
-        operation: 'two-worker-topology-guard',
-        method: null,
-        status: null,
-        providerCodes: [],
+        ...existing,
+        protectedWorkers: PROTECTED_WORKERS,
+        topologyAuthority: 'exact-host-binding-provider-readback-verified',
       },
-      env,
-    );
-    throw new Error(blockedReason);
-  }
+      null,
+      2,
+    )}\n`,
+    'utf8',
+  );
+}
 
+export async function run(argv = process.argv.slice(2), env = process.env) {
   const originalFetch = globalThis.fetch;
   let observation = {
     provider: 'none',
@@ -167,7 +165,14 @@ export async function run(argv = process.argv.slice(2), env = process.env) {
   };
 
   try {
-    return await reconcileMain(argv, env);
+    // The reconciler itself performs the narrow provider proof required before
+    // mutation: Pages must already own the exact hostname, Worker domains and
+    // routes are read live, foreign exact bindings fail closed, and every broad
+    // route fails closed regardless of owner. No global Worker inventory is
+    // required, so the alpha Worker remains outside mutation authority.
+    const result = await reconcileMain(argv, env);
+    if (argv.includes('--apply')) await persistBindingGuardMetadata();
+    return result;
   } catch (error) {
     const existing = await readExistingEvidence();
     try {

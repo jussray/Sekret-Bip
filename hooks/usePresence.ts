@@ -1,7 +1,7 @@
 // hooks/usePresence.ts
 // Se'kret Bip — Voice Bip Presence System
 //
-// The state machine behind Voice Bip's "I talked to Suhana" feel.
+// The state machine behind Voice Bip's "I talked to Raylene" feel.
 //
 //   idle ─── beginListening ─▶ listening ─── endListening ─▶ thinking
 //                                                              │

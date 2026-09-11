@@ -1,6 +1,17 @@
 name: Piper Voice Exact-Head Gate
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - worker/piper-tts.ts
+      - worker/index.ts
+      - services/piper-tts/**
+      - test/piper-tts.test.mjs
+      - docs/piper-voice-contract.md
+      - docs/piper-voice-contract-proof.md
+      - .github/workflows/piper-voice-exact-head.yml
   pull_request:
     branches:
       - main

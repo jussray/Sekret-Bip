@@ -1,7 +1,7 @@
 /**
  * Canonical theme and compatibility image map.
  *
- * Human companion assets are identity-locked to the approved Suhana, Sy,
+ * Human companion assets are identity-locked to the approved Raylene, Rylane,
  * and Night masters. State-specific keys remain stable so existing screens do
  * not need to change while matching emotional poses are regenerated.
  */
@@ -78,6 +78,11 @@ export const HOME_MESSAGES = [
   'Your mind deserves rest.',
   'Breathe slowly tonight.',
   'You made it through today.',
+];
+
+export const HEAVY_WORDS = [
+  'alone', 'hurt', 'tired', 'done', 'empty',
+  'cry', 'sad', 'scared', 'anxious', 'panic',
 ];
 
 export type VibeKey = 'soft' | 'rylane' | 'cloud' | 'night';

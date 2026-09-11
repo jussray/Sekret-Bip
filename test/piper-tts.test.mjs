@@ -13,9 +13,15 @@ test('Voice Bip has a Piper-first route and fallback path', () => {
   }
 });
 
-test('Piper client supports protected WAV synthesis', () => {
-  for (const token of ['PIPER_TTS_TOKEN', 'Authorization', 'synthesize', 'wav']) {
+test('Piper client supports protected WAV synthesis with a bounded request', () => {
+  for (const token of ['PIPER_TTS_TOKEN', 'Authorization', 'synthesize', 'wav', 'AbortSignal.timeout', 'PIPER_REQUEST_TIMEOUT_MS']) {
     assert.equal(client.includes(token), true);
+  }
+});
+
+test('Piper service fails closed without auth unless local bypass is explicit', () => {
+  for (const token of ['PIPER_API_TOKEN', 'PIPER_ALLOW_INSECURE_LOCAL', 'authentication is not configured', 'Bearer']) {
+    assert.equal(service.includes(token), true);
   }
 });
 

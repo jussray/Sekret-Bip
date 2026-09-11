@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {PRODUCTION_PROJECT_REF} from './verify-supabase-history-reconciliation-plan.mjs';
+
 export const CONTROL_ROOM_TEST_LEDGER_SCHEMA_VERSION = 1;
 
 const FAILURE_CONCLUSIONS = new Set([
@@ -34,6 +36,61 @@ function timestamp(value) {
 function checkKey(run) {
   const app = clean(run?.app?.slug) || clean(run?.app?.name) || 'unknown-app';
   return `${app}\u0000${clean(run?.name)}`;
+}
+
+function supabaseProjectRef(detailsUrl) {
+  const value = clean(detailsUrl);
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.hostname !== 'supabase.com') return null;
+    const match = url.pathname.match(/^\/dashboard\/project\/([a-z0-9]+)(?:\/|$)/i);
+    return match?.[1]?.toLowerCase() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function classifyProviderAuthority(run) {
+  const app = clean(run?.app?.slug) || clean(run?.app?.name) || 'unknown-app';
+  if (app !== 'supabase') {
+    return {
+      providerAuthority: 'not-applicable',
+      providerTarget: null,
+      expectedProviderTarget: null,
+      authorityDisposition: null,
+      blockReason: null,
+    };
+  }
+
+  const observedProjectRef = supabaseProjectRef(run?.details_url);
+  if (!observedProjectRef) {
+    return {
+      providerAuthority: 'unknown-target',
+      providerTarget: null,
+      expectedProviderTarget: PRODUCTION_PROJECT_REF,
+      authorityDisposition: 'blocked',
+      blockReason: 'supabase_project_unresolved',
+    };
+  }
+
+  if (observedProjectRef !== PRODUCTION_PROJECT_REF) {
+    return {
+      providerAuthority: 'foreign-target',
+      providerTarget: observedProjectRef,
+      expectedProviderTarget: PRODUCTION_PROJECT_REF,
+      authorityDisposition: 'blocked',
+      blockReason: 'supabase_project_mismatch',
+    };
+  }
+
+  return {
+    providerAuthority: 'canonical-target',
+    providerTarget: observedProjectRef,
+    expectedProviderTarget: PRODUCTION_PROJECT_REF,
+    authorityDisposition: null,
+    blockReason: null,
+  };
 }
 
 export function mapCheckState(run) {
@@ -77,6 +134,7 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
       completedAt: clean(run.completed_at) || null,
       detailsUrl: clean(run.details_url) || clean(run.html_url) || null,
       externalId: clean(run.external_id) || null,
+      ...classifyProviderAuthority(run),
     }))
     .sort((left, right) => left.name.localeCompare(right.name) || left.app.localeCompare(right.app));
 }
@@ -100,6 +158,16 @@ export function aggregateTestLedger(checks) {
   else if (counts.skipped > 0 || counts.unknown > 0) state = 'warning';
 
   return {state, counts};
+}
+
+export function classifyObservation({checks, oldEnough, fingerprint, previousFingerprint}) {
+  const list = Array.isArray(checks) ? checks : [];
+  const repeated = Boolean(oldEnough) && fingerprint !== '' && fingerprint === previousFingerprint;
+  if (!repeated) return 'observing';
+
+  if (list.some((check) => check.state === 'failed')) return 'decisive-failure';
+  if (!list.some((check) => check.state === 'queued' || check.state === 'running')) return 'stable';
+  return 'observing';
 }
 
 export function buildTestLedger({
@@ -142,14 +210,23 @@ export function assertLedgerMergeReady(ledger, outputPath = 'artifacts/control-r
     throw new Error(`No exact-head checks were discovered. Evidence: ${outputPath}`);
   }
 
-  if (ledger?.runner?.observerState !== 'stable') {
+  const foreignSupabase = Array.isArray(ledger?.checks)
+    ? ledger.checks.find((check) => check.providerAuthority === 'foreign-target' && check.app === 'supabase')
+    : null;
+  if (foreignSupabase) {
     throw new Error(
-      `Exact-head checks did not reach a stable terminal state before the observation window expired. Evidence: ${outputPath}`,
+      `Exact-head Supabase check is bound to a foreign project. Expected ${foreignSupabase.expectedProviderTarget}, observed ${foreignSupabase.providerTarget}. BLOCKED: external integration misbound. Evidence: ${outputPath}`,
     );
   }
 
   if (counts.failed > 0) {
     throw new Error(`Exact-head check failures remain. Evidence: ${outputPath}`);
+  }
+
+  if (ledger?.runner?.observerState !== 'stable') {
+    throw new Error(
+      `Exact-head checks did not reach a stable terminal state before the observation window expired. Evidence: ${outputPath}`,
+    );
   }
 
   if (counts.queued > 0 || counts.running > 0) {
@@ -233,9 +310,6 @@ export async function githubJson(url, token, options = {}) {
       });
 
       if (response.ok) {
-        // Reading/parsing the body is part of the provider operation. A socket
-        // reset or truncated body here should receive the same bounded retry as
-        // a transport failure during fetch().
         return await response.json();
       }
 
@@ -301,28 +375,27 @@ export async function observeExactHeadChecks(env = process.env) {
   }
 
   const startedAt = Date.now();
-  let stableTerminalPolls = 0;
   let previousFingerprint = '';
   let checks = [];
-  let reachedStableTerminal = false;
+  let observerState = 'observing';
 
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
     checks = selectLatestChecks(runs, sha, observerCheckName);
     writeLedger(outputPath, buildTestLedger({repository, sha, branch, runId, checks}));
 
-    const fingerprint = JSON.stringify(checks.map((check) => [check.app, check.name, check.state]));
-    const terminal = !checks.some((check) => check.state === 'queued' || check.state === 'running');
+    const fingerprint = JSON.stringify(checks.map((check) => [
+      check.app,
+      check.name,
+      check.state,
+      check.providerAuthority,
+      check.providerTarget,
+    ]));
     const oldEnough = Date.now() - startedAt >= minimumObservationMs;
-    stableTerminalPolls = terminal && oldEnough && fingerprint === previousFingerprint
-      ? stableTerminalPolls + 1
-      : 0;
+    observerState = classifyObservation({checks, oldEnough, fingerprint, previousFingerprint});
     previousFingerprint = fingerprint;
 
-    if (stableTerminalPolls >= 1) {
-      reachedStableTerminal = true;
-      break;
-    }
+    if (observerState !== 'observing') break;
     await sleep(pollMs);
   }
 
@@ -332,7 +405,7 @@ export async function observeExactHeadChecks(env = process.env) {
     branch,
     runId,
     checks,
-    observerState: reachedStableTerminal ? 'stable' : 'window-expired',
+    observerState: observerState === 'observing' ? 'window-expired' : observerState,
   });
   writeLedger(outputPath, ledger);
   assertLedgerMergeReady(ledger, outputPath);

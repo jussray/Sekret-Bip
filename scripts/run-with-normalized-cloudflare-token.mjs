@@ -3,6 +3,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const DEFAULT_ENV_NAME = 'CLOUDFLARE_API_TOKEN';
+const INVALID_TOKEN_TRANSPORT_ERROR = 'CLOUDFLARE_API_TOKEN_INVALID_TRANSPORT';
 
 export function normalizeCloudflareTokenTransport(value) {
   const raw = String(value ?? '');
@@ -42,6 +43,8 @@ export function runWithNormalizedCloudflareToken({
   const source = String(env[DEFAULT_ENV_NAME] ?? '');
   const { token, changed, nonAsciiRemaining } = normalizeCloudflareTokenTransport(source);
   console.error(`CLOUDFLARE_TOKEN_TRANSPORT_READY source=${DEFAULT_ENV_NAME} configured=${Boolean(source)} normalized=${changed} ascii=${!nonAsciiRemaining}`);
+  if (!token || nonAsciiRemaining) throw new Error(INVALID_TOKEN_TRANSPORT_ERROR);
+
   const result = spawn(process.execPath, [target, ...targetArgs], {
     cwd: process.cwd(),
     env: { ...env, [DEFAULT_ENV_NAME]: token },

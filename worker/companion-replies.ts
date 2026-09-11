@@ -8,7 +8,7 @@ export type CompanionId = 'raylene' | 'rylane' | 'cloud' | 'night' | 'sekret' | 
 
 export const COMPANION_REPLY_POOLS: Record<CompanionId, string[]> = {
 
-  // ─── Suhana — 100 replies ───────────────────────────────────────────────
+  // ─── Raylene — 100 replies ───────────────────────────────────────────────
   raylene: [
     // Greetings / openers
     "Hey! Random or did something actually happen?",
@@ -155,7 +155,7 @@ export const COMPANION_REPLY_POOLS: Record<CompanionId, string[]> = {
     "Okay nothing is fine. What's something you actually enjoy?",
   ],
 
-  // ─── Sy — 78 replies ─────────────────────────────────────────────────
+  // ─── Rylane — 78 replies ─────────────────────────────────────────────────
   rylane: [
     // Greetings
     "Yo, what's good?",

@@ -25,7 +25,7 @@ export interface CharacterSticker {
 const STICKER_BASE = { layer: 'sticker' as const, renderable: true, placeholder: false };
 
 export const STICKER_REGISTRY: CharacterSticker[] = [
-  // ── Suhana (19) ──────────────────────────────────────────────────────────
+  // ── Raylene (19) ──────────────────────────────────────────────────────────
   { ...STICKER_BASE, id: 'raylene-standing',     character: 'raylene', emotion: 'standing',     assetKey: 'rayStickerStanding',    assetPath: 'assets/images/stickers/raylene/raylene-sticker-standing.png',     tags: ['standing','raylene','neutral','confident','idle'], prod: true },
   { ...STICKER_BASE, id: 'raylene-lounging',     character: 'raylene', emotion: 'lounging',     assetKey: 'rayStickerLounging',    assetPath: 'assets/images/stickers/raylene/raylene-sticker-lounging.png',     tags: ['lounging','raylene','calm','relaxed'], prod: true },
   { ...STICKER_BASE, id: 'raylene-studying',     character: 'raylene', emotion: 'studying',     assetKey: 'rayStickerStudying',    assetPath: 'assets/images/stickers/raylene/raylene-sticker-studying.png',     tags: ['studying','raylene','focused','productive'], prod: true },
@@ -46,7 +46,7 @@ export const STICKER_REGISTRY: CharacterSticker[] = [
   { ...STICKER_BASE, id: 'raylene-pillow',       character: 'raylene', emotion: 'pillow',       assetKey: 'rayStickerPillow',      assetPath: 'assets/images/stickers/raylene/raylene-sticker-pillow.png',       tags: ['pillow','raylene','cozy','decorative'], prod: false },
   { ...STICKER_BASE, id: 'raylene-icon-cloud',   character: 'raylene', emotion: 'icon-cloud',   assetKey: 'rayStickerIconCloud',   assetPath: 'assets/images/stickers/raylene/raylene-sticker-icon-cloud.png',   tags: ['icon','cloud','raylene','decorative'], prod: false },
 
-  // ── Sy (19) ───────────────────────────────────────────────────────────
+  // ── Rylane (19) ───────────────────────────────────────────────────────────
   { ...STICKER_BASE, id: 'rylane-mini',          character: 'rylane', emotion: 'mini',          assetKey: 'rylStickerMini',        assetPath: 'assets/images/stickers/rylane/rylane-sticker-mini.png',        tags: ['mini','rylane','neutral','idle','cute'], prod: true },
   { ...STICKER_BASE, id: 'rylane-reading',       character: 'rylane', emotion: 'reading',       assetKey: 'rylStickerReading',     assetPath: 'assets/images/stickers/rylane/rylane-sticker-reading.png',     tags: ['reading','rylane','focused','reflective','journal','pages'], prod: true },
   { ...STICKER_BASE, id: 'rylane-phone',         character: 'rylane', emotion: 'phone',         assetKey: 'rylStickerPhone',       assetPath: 'assets/images/stickers/rylane/rylane-sticker-phone.png',       tags: ['phone','rylane','casual','tired','neutral'], prod: true },

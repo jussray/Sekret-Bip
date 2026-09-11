@@ -1,13 +1,11 @@
 import { isNamedCompanionId, type NamedCompanionId } from './companionIds';
 
-export type LegacyPersistedCompanionId = 'raylene' | 'rylane' | 'cloud' | 'night';
+export type LegacyPersistedCompanionId = 'soft' | 'raylene' | 'rylane' | 'cloud' | 'night';
 
 const LEGACY_TO_CANONICAL: Readonly<Record<string, NamedCompanionId>> = {
+  soft: 'suhana',
   raylene: 'suhana',
   rylane: 'sy',
-  // 'soft' is the oldest surviving alias for the warm twin. It predates the
-  // raylene/rylane ids and is still the key several pickers persist.
-  soft: 'suhana',
 };
 
 const CANONICAL_TO_LEGACY: Readonly<Record<NamedCompanionId, LegacyPersistedCompanionId>> = {

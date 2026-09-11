@@ -15,16 +15,24 @@ on:
       - 'config/founder-visual-authority.json'
       - 'supabase/migrations/**'
       - 'public/_headers'
+      - 'public/robots.txt'
+      - 'public/sitemap.xml'
+      - 'public/what-is-sekret-bip/**'
+      - 'public/how-it-works/**'
+      - 'public/privacy-and-safety/**'
       - 'wrangler.toml'
       - '.dev.vars.example'
       - 'scripts/verify-firewall-v10.mjs'
+      - 'scripts/reconcile-cloudflare-public-apex-access.mjs'
       - 'scripts/codeql-pr-alert-proof.mjs'
       - 'scripts/playwright-executable.mjs'
       - 'e2e/product-design-review.spec.ts'
+      - 'e2e/front-door-audience-switch.spec.ts'
       - 'e2e/calm-product-design.spec.ts'
       - 'e2e/room-canonical-display.spec.ts'
       - 'e2e/canonical-companion-identity.spec.ts'
       - 'e2e/guardrails.spec.ts'
+      - 'e2e/ai-search-discovery.spec.ts'
       - 'test/founder-visual-authority-contract.test.mjs'
       - 'test/product-design-workflow-contract.test.mjs'
       - 'test/room-intentions-hierarchy-contract.test.mjs'
@@ -42,6 +50,7 @@ on:
       - 'package-lock.json'
       - '.github/workflows/codeql-pr-alert-proof.yml'
       - '.github/workflows/founder-shield.yml'
+      - '.github/workflows/deploy-cloudflare.yml'
       - '.github/workflows/product-design-playwright-proof.yml'
   push:
     branches: [main]
@@ -96,7 +105,7 @@ jobs:
           CI: 'true'
           PLAYWRIGHT_ARTIFACT_DIR: artifacts/product-design-playwright
           EXPO_PUBLIC_ENABLE_FOUNDER_PREVIEW: 'true'
-        run: npx playwright test e2e/product-design-review.spec.ts e2e/calm-product-design.spec.ts e2e/room-canonical-display.spec.ts e2e/canonical-companion-identity.spec.ts e2e/guardrails.spec.ts --project=chromium
+        run: npx playwright test e2e/product-design-review.spec.ts e2e/front-door-audience-switch.spec.ts e2e/calm-product-design.spec.ts e2e/room-canonical-display.spec.ts e2e/canonical-companion-identity.spec.ts e2e/guardrails.spec.ts e2e/ai-search-discovery.spec.ts --project=chromium
 
       - name: Upload Product Design evidence
         if: always()

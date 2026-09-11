@@ -40,6 +40,12 @@ OPENAI_CHAT_MODEL = "gpt-4o"
 OPENAI_TTS_MODEL  = "gpt-4o-mini-tts"
 OPENAI_STT_MODEL  = "whisper-1"
 
+# Firebase App Check starts disabled. Moving this to `observe` or `enforce`
+# requires FIREBASE_PROJECT_NUMBER and FIREBASE_WEB_APP_ID to be configured
+# on the Worker and exact-runtime evidence for the intended client cohort.
+# `off` is the one-variable rollback to the pre-App-Check request path.
+FIREBASE_APPCHECK_MODE = "off"
+
 # `legacy` delegates voice requests to the previous Piper/OpenAI path.
 # `cloudflare-only` uses Aura for every voice request.
 # `hybrid` uses Aura by default and ElevenLabs only when precise timing is requested.

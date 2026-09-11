@@ -28,6 +28,7 @@ import {
 } from '@/utils/api';
 import { buildReplyRequest } from '@/services/ai/buildReplyRequest';
 import { buildOracleContext } from '@/services/oracleDiscovery';
+import { saveContinuation } from '@/features/retention/savedContinuation';
 
 type CompanionMeta = {
   label: string;
@@ -89,6 +90,7 @@ export default function EntryDetailRoute() {
   const [checkInMood, setCheckInMood] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replying, setReplying] = useState(false);
+  const [savedForLater, setSavedForLater] = useState(false);
   const audioCache = useRef<Record<string, string>>({});
 
   async function playReply() {
@@ -116,6 +118,15 @@ export default function EntryDetailRoute() {
   function togglePin() {
     if (!entry) return;
     patchJournalEntry(entry.id, { pinned: !entry.pinned });
+  }
+
+  async function handleSaveForLater() {
+    if (!entry) return;
+    await saveContinuation({
+      entryId: entry.id,
+      companionKey: entry.activeTab || entry.source,
+    });
+    setSavedForLater(true);
   }
 
   async function handleReply() {
@@ -234,6 +245,20 @@ export default function EntryDetailRoute() {
               <Text style={s.entryText}>{entry.text}</Text>
             </View>
           ) : null}
+
+          <TouchableOpacity
+            onPress={handleSaveForLater}
+            style={[s.saveLaterButton, { borderColor: `${companion.accent}35` }]}
+            accessibilityRole="button"
+            accessibilityLabel="Save this page so you can continue it later"
+          >
+            <Text style={[s.saveLaterText, { color: companion.accent }]}>
+              {savedForLater ? '✓ saved for later' : '↩ save for later'}
+            </Text>
+            <Text style={s.saveLaterSub}>
+              Room only remembers which page to reopen.
+            </Text>
+          </TouchableOpacity>
 
           {entry.sekretReply ? (
             <View style={[s.replyCard, { borderColor: `${companion.accent}25` }]}>
@@ -388,6 +413,19 @@ const s = StyleSheet.create({
   insightValue: { fontSize: 11, fontWeight: '900', textAlign: 'center' },
   pinHint: { alignSelf: 'center', paddingVertical: 10 },
   pinHintText: { color: '#504660', fontSize: 11 },
+  saveLaterButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  saveLaterText: { fontSize: 12, fontWeight: '900', letterSpacing: 0.3 },
+  saveLaterSub: { color: '#6b607a', fontSize: 10, lineHeight: 15, marginTop: 4, textAlign: 'center' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 24, borderTopWidth: 1 },
   composerInput: { flex: 1, color: '#f0eaf4', fontSize: 14, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', paddingHorizontal: 14, paddingVertical: 10, maxHeight: 100 },
   composerSend: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },

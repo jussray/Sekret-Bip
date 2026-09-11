@@ -4,6 +4,8 @@ import {
   aggregateTestLedger,
   assertLedgerMergeReady,
   buildTestLedger,
+  classifyObservation,
+  classifyProviderAuthority,
   githubJson,
   isRetryableGithubResponse,
   isRetryableGithubStatus,
@@ -12,6 +14,8 @@ import {
 } from '../scripts/control-room-test-ledger.mjs';
 
 const SHA = '22a5f0ba9d55eeb97d6aaa88e876f77a97e5a440';
+const BIP_SUPABASE = 'tbsevonvegdnlyjgplmm';
+const FOREIGN_SUPABASE = 'jvmbhralyktmdlvglrxk';
 
 function check(overrides = {}) {
   return {
@@ -51,6 +55,42 @@ test('maps provider states without false green', () => {
   assert.equal(mapCheckState(check({status: 'completed', conclusion: null})), 'unknown');
 });
 
+test('classifies Supabase check authority against the repository-owned project', () => {
+  const canonical = classifyProviderAuthority(check({
+    name: 'Supabase Preview',
+    app: {slug: 'supabase', name: 'Supabase'},
+    details_url: `https://supabase.com/dashboard/project/${BIP_SUPABASE}`,
+  }));
+  assert.deepEqual(canonical, {
+    providerAuthority: 'canonical-target',
+    providerTarget: BIP_SUPABASE,
+    expectedProviderTarget: BIP_SUPABASE,
+    authorityDisposition: null,
+    blockReason: null,
+  });
+
+  const foreign = classifyProviderAuthority(check({
+    name: 'Supabase Preview',
+    app: {slug: 'supabase', name: 'Supabase'},
+    details_url: `https://supabase.com/dashboard/project/${FOREIGN_SUPABASE}`,
+  }));
+  assert.deepEqual(foreign, {
+    providerAuthority: 'foreign-target',
+    providerTarget: FOREIGN_SUPABASE,
+    expectedProviderTarget: BIP_SUPABASE,
+    authorityDisposition: 'blocked',
+    blockReason: 'supabase_project_mismatch',
+  });
+
+  assert.deepEqual(classifyProviderAuthority(check()), {
+    providerAuthority: 'not-applicable',
+    providerTarget: null,
+    expectedProviderTarget: null,
+    authorityDisposition: null,
+    blockReason: null,
+  });
+});
+
 test('keeps every latest exact-head lane and excludes the observer', () => {
   const checks = selectLatestChecks([
     check({id: 1, name: 'Repository Truth Gate', completed_at: '2026-08-04T20:01:00Z'}),
@@ -70,12 +110,68 @@ test('keeps every latest exact-head lane and excludes the observer', () => {
   assert.equal(checks.every((item) => item.headSha === SHA), true);
 });
 
+test('selected foreign Supabase check records explicit blocked authority evidence', () => {
+  const checks = selectLatestChecks([
+    check({
+      name: 'Supabase Preview',
+      app: {slug: 'supabase', name: 'Supabase'},
+      conclusion: 'failure',
+      details_url: `https://supabase.com/dashboard/project/${FOREIGN_SUPABASE}`,
+    }),
+  ], SHA);
+
+  assert.equal(checks[0].state, 'failed');
+  assert.equal(checks[0].providerAuthority, 'foreign-target');
+  assert.equal(checks[0].providerTarget, FOREIGN_SUPABASE);
+  assert.equal(checks[0].expectedProviderTarget, BIP_SUPABASE);
+  assert.equal(checks[0].authorityDisposition, 'blocked');
+  assert.equal(checks[0].blockReason, 'supabase_project_mismatch');
+});
+
 test('aggregates failed, pending, warning, unknown, and passed distinctly', () => {
   assert.equal(aggregateTestLedger([]).state, 'unknown');
   assert.equal(aggregateTestLedger([{state: 'passed'}]).state, 'passed');
   assert.equal(aggregateTestLedger([{state: 'passed'}, {state: 'skipped'}]).state, 'warning');
   assert.equal(aggregateTestLedger([{state: 'running'}]).state, 'pending');
   assert.equal(aggregateTestLedger([{state: 'failed'}, {state: 'passed'}]).state, 'failed');
+});
+
+test('observation stops on a repeated decisive failure even when another check is still running', () => {
+  const checks = [{name: 'Supabase Preview', state: 'failed'}, {name: 'Production Witness', state: 'running'}];
+  const fingerprint = JSON.stringify(checks.map((item) => ['github-actions', item.name, item.state]));
+
+  assert.equal(classifyObservation({
+    checks,
+    oldEnough: true,
+    fingerprint,
+    previousFingerprint: fingerprint,
+  }), 'decisive-failure');
+  assert.equal(classifyObservation({
+    checks,
+    oldEnough: false,
+    fingerprint,
+    previousFingerprint: fingerprint,
+  }), 'observing');
+});
+
+test('observation requires all checks terminal before declaring stable success', () => {
+  const running = [{name: 'Playwright', state: 'running'}];
+  const runningFingerprint = JSON.stringify(running.map((item) => ['github-actions', item.name, item.state]));
+  assert.equal(classifyObservation({
+    checks: running,
+    oldEnough: true,
+    fingerprint: runningFingerprint,
+    previousFingerprint: runningFingerprint,
+  }), 'observing');
+
+  const passed = [{name: 'Playwright', state: 'passed'}];
+  const passedFingerprint = JSON.stringify(passed.map((item) => ['github-actions', item.name, item.state]));
+  assert.equal(classifyObservation({
+    checks: passed,
+    oldEnough: true,
+    fingerprint: passedFingerprint,
+    previousFingerprint: passedFingerprint,
+  }), 'stable');
 });
 
 test('builds a sanitized exact-SHA repository-local ledger', () => {
@@ -96,7 +192,7 @@ test('builds a sanitized exact-SHA repository-local ledger', () => {
   assert.equal(JSON.stringify(ledger).includes('token'), false);
 });
 
-test('fails closed when the observation window expires with a running exact-head check', () => {
+test('fails closed when the observation window expires with a running exact-head check and no decisive failure', () => {
   const checks = selectLatestChecks([
     check({name: 'Cloudflare Pages', status: 'in_progress', conclusion: null}),
   ], SHA);
@@ -113,6 +209,52 @@ test('fails closed when the observation window expires with a running exact-head
   assert.throws(
     () => assertLedgerMergeReady(ledger, 'artifacts/test-ledger.json'),
     /did not reach a stable terminal state/,
+  );
+});
+
+test('reports foreign Supabase binding before generic exact-head failure', () => {
+  const checks = selectLatestChecks([
+    check({
+      name: 'Supabase Preview',
+      app: {slug: 'supabase', name: 'Supabase'},
+      conclusion: 'failure',
+      details_url: `https://supabase.com/dashboard/project/${FOREIGN_SUPABASE}`,
+    }),
+  ], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip',
+    sha: SHA,
+    branch: 'main',
+    runId: '31984861035',
+    checks,
+    observerState: 'decisive-failure',
+  });
+
+  assert.equal(ledger.aggregate.state, 'failed');
+  assert.throws(
+    () => assertLedgerMergeReady(ledger),
+    new RegExp(`foreign project\\. Expected ${BIP_SUPABASE}, observed ${FOREIGN_SUPABASE}\\. BLOCKED: external integration misbound`),
+  );
+});
+
+test('reports decisive exact-head failures before generic observation timeout state', () => {
+  const checks = selectLatestChecks([
+    check({name: 'Supabase Preview', conclusion: 'failure'}),
+    check({id: 2, name: 'Production Witness', status: 'in_progress', conclusion: null}),
+  ], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip',
+    sha: SHA,
+    branch: 'main',
+    runId: '31984861035',
+    checks,
+    observerState: 'decisive-failure',
+  });
+
+  assert.equal(ledger.aggregate.state, 'failed');
+  assert.throws(
+    () => assertLedgerMergeReady(ledger),
+    /Exact-head check failures remain/,
   );
 });
 

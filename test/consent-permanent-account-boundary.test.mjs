@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const migrationPath = 'supabase/migrations/20260827060000_harden_consent_permanent_account_boundary.sql';
+const migrationPath = 'supabase/migrations/20260905213434_reconcile_consent_permanent_account_boundary.sql';
 const readMigration = () => readFile(new URL(`../${migrationPath}`, import.meta.url), 'utf8');
 const readConsentScreen = () => readFile(new URL('../app/(onboarding)/consent.tsx', import.meta.url), 'utf8');
+const readRepositoryTruthGate = () => readFile(new URL('../.github/workflows/repository-truth-gate.yml', import.meta.url), 'utf8');
 
 test('consent read policies reject anonymous-authenticated sessions', async () => {
   const sql = await readMigration();
@@ -42,4 +43,10 @@ test('consent RPC remains client-callable only behind in-function authorization'
 
   assert.match(sql, /revoke all on function public\.record_user_consent\(text,boolean,text\) from public, anon/);
   assert.match(sql, /grant execute on function public\.record_user_consent\(text,boolean,text\) to authenticated/);
+});
+
+test('repository truth keeps the current consent boundary contract in its exact-head gate', async () => {
+  const workflow = await readRepositoryTruthGate();
+
+  assert.match(workflow, /test\/consent-permanent-account-boundary\.test\.mjs/);
 });

@@ -28,7 +28,7 @@ function canonicalPagesProject() {
   };
 }
 
-test('Worker authority verifier selects a syntactically valid credential by the real Workers read capability', async () => {
+test('Worker authority verifier selects an active credential by token verification and the real Workers read capability', async () => {
   const originalFetch = globalThis.fetch;
   const envKeys = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_WORKERS_BUILDS_API_TOKEN','CLOUDFLARE_API_TOKEN','EVIDENCE_PATH','GITHUB_REF','GITHUB_SHA'];
   const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -53,20 +53,22 @@ test('Worker authority verifier selects a syntactically valid credential by the 
     const auth = String(options.headers?.Authorization || '').replace(/^Bearer /, '');
     assert.equal(auth, token);
     const text = String(url);
-    assert.equal(text.includes('/tokens/verify'), false);
+    if (text.includes('/user/tokens/verify')) {
+      return { ok: true, status: 200, json: async () => ({ success: true, result: { status: 'active' } }) };
+    }
     if (text.includes(`/accounts/${accountId}/workers/scripts`)) {
       return { ok: true, status: 200, json: async () => ({ success: true, result: Object.entries(tags).map(([id, tag]) => ({ id, tag })) }) };
     }
     if (text.endsWith(`/builds/workers/${tags.bip}/triggers`)) {
       return { ok: true, status: 200, json: async () => ({ success: true, result: [{ trigger_uuid:'bip-trigger', branch_includes:['main'], branch_excludes:[], build_command:'', deploy_command:'npm run deploy:bip', deleted_on:null }] }) };
     }
-    if (text.endsWith('/builds/workers/bip/builds?per_page=50')) {
+    if (text.endsWith(`/builds/workers/${tags.bip}/builds?per_page=50`)) {
       return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     }
     if (text.endsWith(`/builds/workers/${tags['sekret-backend']}/triggers`)) {
       return { ok: true, status: 200, json: async () => ({ success: true, result: [{ trigger_uuid:'prod-trigger', branch_includes:['main'], branch_excludes:[], build_command:'', deploy_command:'npm run deploy:api:production', deleted_on:null }] }) };
     }
-    if (text.endsWith('/builds/workers/sekret-backend/builds?per_page=50')) {
+    if (text.endsWith(`/builds/workers/${tags['sekret-backend']}/builds?per_page=50`)) {
       return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     }
     if (text.endsWith(`/builds/workers/${tags['sekret-backend-alpha']}/triggers`)) {
@@ -82,7 +84,10 @@ test('Worker authority verifier selects a syntactically valid credential by the 
     thrown = error;
   } finally {
     globalThis.fetch = originalFetch;
-    for (const key of envKeys) originalEnv[key] === undefined ? delete process.env[key] : process.env[key] = originalEnv[key];
+    for (const key of envKeys) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
   }
 
   try {
@@ -90,8 +95,13 @@ test('Worker authority verifier selects a syntactically valid credential by the 
     const receipt = JSON.parse(await readFile(evidencePath, 'utf8'));
     assert.equal(receipt.status, 'verified');
     assert.equal(receipt.credential.selectedSource, 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN');
-    assert.equal(receipt.credential.attempts[0]?.probe, 'workers-scripts');
-    assert.equal(receipt.credential.attempts[0]?.result, 'accepted');
+    assert.deepEqual(
+      receipt.credential.attempts.map(({ probe, result }) => ({ probe, result })),
+      [
+        { probe: 'token-verify-user', result: 'accepted' },
+        { probe: 'workers-scripts', result: 'accepted' },
+      ],
+    );
     assert.equal(receipt.workersAuthorityVerified, true);
   } finally {
     await rm(tempDir, { recursive: true, force: true });

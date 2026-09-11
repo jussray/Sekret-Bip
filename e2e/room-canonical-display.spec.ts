@@ -40,7 +40,7 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
     exact: true,
   });
   const returnButton = page.getByRole('button', {
-    name: 'Open your Bip return receipt and choose what you need',
+    name: 'Open your Bip return choices',
     exact: true,
   });
   const companionButton = page.getByRole('button', {

@@ -42,7 +42,10 @@ test('Production Smoke runs live Playwright only after verified current producti
   assert.match(content, /target\.conclusion === "skipped"/);
   assert.doesNotMatch(content, /!target \|\| target\.conclusion === "skipped"/);
   assert.match(content, /should_run=\$\{value\}/);
+  assert.match(content, /target\.status !== "completed"/);
   assert.match(content, /target\.conclusion !== "success"/);
+  assert.match(content, /target\.head_sha !== process\.env\.UPSTREAM_HEAD_SHA/);
+  assert.match(content, /does not belong to the release SHA/);
   assert.match(content, /UPSTREAM_HEAD_SHA !== process\.env\.WORKFLOW_HEAD_SHA/);
   assert.match(content, /WORKFLOW_HEAD_SHA !== process\.env\.CURRENT_MAIN/);
   assert.match(content, /steps\.upstream\.outputs\.should_run == 'true'/);

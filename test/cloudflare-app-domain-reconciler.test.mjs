@@ -166,7 +166,7 @@ test('backend health proof requires the canonical Worker identity', () => {
   assert.equal(backendHealthIdentityMatches(null, 'sekret-backend'), false);
 });
 
-test('production reconciler workflow runs safety checks on PRs and keeps provider mutation dispatch-only', () => {
+test('production reconciler binds mutation to the exact approved current-main SHA and rechecks immediately before apply', () => {
   const workflow = fs.readFileSync(
     new URL('../.github/workflows/reconcile-cloudflare-app-domain.yml', import.meta.url),
     'utf8',
@@ -175,20 +175,26 @@ test('production reconciler workflow runs safety checks on PRs and keeps provide
   assert.match(workflow, /pull_request:\s*\n\s+branches:\s*\[main\]/);
   assert.match(workflow, /push:\s*\n\s+branches:\s*\[main\]/);
   assert.match(workflow, /workflow_dispatch:\s*\n\s+inputs:/);
+  assert.match(workflow, /target_sha:/);
+  assert.match(workflow, /ref: \$\{\{ inputs\.target_sha \|\| github\.sha \}\}/);
   assert.match(workflow, /Verify focused route reconciler contract/);
   assert.match(workflow, /node --test test\/cloudflare-app-domain-reconciler\.test\.mjs/);
   assert.match(workflow, /apply:/);
   assert.match(workflow, /github\.event_name == 'workflow_dispatch' && inputs\.apply == true/);
   assert.doesNotMatch(workflow, /github\.event_name == 'push' \|\| inputs\.apply == true/);
   assert.doesNotMatch(workflow, /github\.event_name == 'pull_request' \|\| inputs\.apply == true/);
-  assert.match(workflow, /current_main/);
-  assert.match(workflow, /test "\$GITHUB_SHA" = "\$current_main"/);
+  assert.match(workflow, /TARGET_SHA: \$\{\{ inputs\.target_sha \}\}/);
+  assert.match(workflow, /test "\$actual" = "\$TARGET_SHA"/);
+  assert.match(workflow, /test "\$TARGET_SHA" = "\$current_main"/);
+  assert.match(workflow, /Re-verify exact approved main immediately before provider mutation/);
+  assert.match(workflow, /Main advanced after provider preflight; refusing stale Cloudflare mutation authority/);
   assert.match(workflow, /CLOUDFLARE_API_TOKEN/);
-  assert.match(
-    workflow,
-    /run-cloudflare-app-domain-reconcile-with-receipt\.mjs --apply/,
-  );
+  assert.match(workflow, /run-cloudflare-app-domain-reconcile-with-receipt\.mjs\s+--apply/);
   assert.match(workflow, /cloudflare-app-domain-routing-evidence/);
+  assert.match(workflow, /actions\/checkout@11d5960a326750d5838078e36cf38b85af677262/);
+  assert.match(workflow, /actions\/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020/);
+  assert.match(workflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.doesNotMatch(workflow, /(?:actions\/checkout|actions\/setup-node|actions\/upload-artifact)@v\d+/);
 });
 
 test('confirmed provider mutations are persisted before post-apply verification can fail', () => {

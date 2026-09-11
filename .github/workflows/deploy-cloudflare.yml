@@ -209,6 +209,9 @@ jobs:
             exit 1
           }
 
+      # Attack 2000 evidence rule: after exact-current-main trust is established,
+      # independent proof planes keep observing even when a sibling plane fails or stalls.
+      # A failed plane still fails the job; it no longer suppresses unrelated evidence.
       - name: Verify exact Supabase production schema contract
         id: supabase_schema
         if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
@@ -222,14 +225,6 @@ jobs:
         if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
         timeout-minutes: 5
         run: node scripts/probe-production-release-endpoints.mjs
-
-      - name: Wait for exact frontend and backend Worker checks plus release marker
-        id: cloudflare_release
-        if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
-        timeout-minutes: 35
-        env:
-          GITHUB_SHA: ${{ env.DEPLOYMENT_SHA }}
-        run: node scripts/verify-cloudflare-native-deploy.mjs
 
       - name: Verify backend health
         id: backend_health
@@ -263,11 +258,31 @@ jobs:
         timeout-minutes: 15
         run: npx playwright install --with-deps chromium
 
-      - name: Verify exact deployed frontend with Playwright
-        id: production_playwright
-        if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
+      - name: Observe public production browser journeys independently
+        id: production_browser_observation
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
         timeout-minutes: 30
-        run: npm run test:e2e:production
+        run: >-
+          npx playwright test
+          --config=playwright.production.config.ts
+          --grep-invert "production exposes the exact expected Pages and Worker release commit"
+
+      - name: Wait for exact frontend and backend Worker checks plus release marker
+        id: cloudflare_release
+        if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' && steps.release_transport.outcome == 'success' }}
+        timeout-minutes: 35
+        env:
+          GITHUB_SHA: ${{ env.DEPLOYMENT_SHA }}
+        run: node scripts/verify-cloudflare-native-deploy.mjs
+
+      - name: Verify exact deployed release identity with Playwright
+        id: production_playwright
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' && steps.cloudflare_release.outcome == 'success' }}
+        timeout-minutes: 10
+        run: >-
+          npx playwright test
+          --config=playwright.production.config.ts
+          --grep "production exposes the exact expected Pages and Worker release commit"
 
       - name: Upload deployment evidence
         id: upload_evidence
@@ -297,5 +312,5 @@ jobs:
           RELEASE_OBSERVATION_MODE: blocked
           VERIFICATION_JOB_STATUS: failure
           RELEASE_STEP_OUTCOMES: >-
-            {"trusted_target":"${{ steps.trusted_target.outcome }}","checkout":"${{ steps.checkout.outcome }}","exact_head":"${{ steps.exact_head.outcome }}","setup_node":"${{ steps.setup_node.outcome }}","install":"${{ steps.install.outcome }}","trusted_current_main":"${{ steps.trusted_current_main.outcome }}","cloudflare_release":"${{ steps.cloudflare_release.outcome }}","supabase_schema":"${{ steps.supabase_schema.outcome }}","release_transport":"${{ steps.release_transport.outcome }}","backend_health":"${{ steps.backend_health.outcome }}","supabase_health":"${{ steps.supabase_health.outcome }}","chromium":"${{ steps.chromium.outcome }}","production_playwright":"${{ steps.production_playwright.outcome }}","upload_evidence":"${{ steps.upload_evidence.outcome }}"}
+            {"trusted_target":"${{ steps.trusted_target.outcome }}","checkout":"${{ steps.checkout.outcome }}","exact_head":"${{ steps.exact_head.outcome }}","setup_node":"${{ steps.setup_node.outcome }}","install":"${{ steps.install.outcome }}","trusted_current_main":"${{ steps.trusted_current_main.outcome }}","cloudflare_release":"${{ steps.cloudflare_release.outcome }}","supabase_schema":"${{ steps.supabase_schema.outcome }}","release_transport":"${{ steps.release_transport.outcome }}","backend_health":"${{ steps.backend_health.outcome }}","supabase_health":"${{ steps.supabase_health.outcome }}","chromium":"${{ steps.chromium.outcome }}","production_browser_observation":"${{ steps.production_browser_observation.outcome }}","production_playwright":"${{ steps.production_playwright.outcome }}","upload_evidence":"${{ steps.upload_evidence.outcome }}"}
         run: node "$RUNNER_TEMP/sekret-publish-production-release-observation.mjs"

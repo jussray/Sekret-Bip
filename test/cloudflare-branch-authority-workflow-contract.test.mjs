@@ -47,7 +47,10 @@ test('Worker authority verifier rejects account-scoped Workers Builds token befo
   try { await import(`${workerVerifierUrl.href}?cfat-test=${Date.now()}`); } catch (error) { thrown = error; }
   finally {
     globalThis.fetch = originalFetch;
-    for (const key of envKeys) originalEnv[key] === undefined ? delete process.env[key] : process.env[key] = originalEnv[key];
+    for (const key of envKeys) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
   }
   try {
     assert.ok(thrown instanceof Error);
@@ -94,7 +97,10 @@ test('Worker authority verifier requires the dedicated user token and verifies m
   try { await import(`${workerVerifierUrl.href}?dedicated-test=${Date.now()}`); } catch (error) { thrown = error; }
   finally {
     globalThis.fetch = originalFetch;
-    for (const key of envKeys) originalEnv[key] === undefined ? delete process.env[key] : process.env[key] = originalEnv[key];
+    for (const key of envKeys) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
   }
   try {
     assert.equal(thrown, undefined);

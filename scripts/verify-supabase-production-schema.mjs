@@ -10,6 +10,12 @@ export const PRODUCTION_HISTORY_RUNTIME_ALIASES = Object.freeze({
   ...core.PRODUCTION_HISTORY_ALL_ACCEPTED_ALIASES,
   '20260822060000': '20260824004706',
   '20260824223800': '20260826065736',
+  '20260826012500': '20260905233953',
+  '20260827060000': '20260905234133',
+  '20260827061000': '20260905234009',
+  '20260827062000': '20260905234019',
+  '20260827063000': '20260905234039',
+  '20260831233000': '20260905234048',
   '20260901000500': '20260901000535',
 });
 
@@ -20,6 +26,37 @@ export const PRODUCTION_PGJWT_POLICY = Object.freeze({
   decision: 'retain',
   boundTo: 'supabase-dashboard:2026-08-20T21:51:28.984Z',
 });
+
+export function excludeProductionReceiptMarkers(
+  repositoryMigrations,
+  acceptedAliases = PRODUCTION_HISTORY_RUNTIME_ALIASES,
+) {
+  if (!Array.isArray(repositoryMigrations)) return repositoryMigrations;
+
+  const migrations = repositoryMigrations
+    .map((migration) => ({
+      ...migration,
+      version: core.normalizeSchemaVersion(migration?.version),
+      name: core.normalizeMigrationName(migration?.name),
+    }))
+    .sort((left, right) => String(left.version ?? '').localeCompare(String(right.version ?? '')));
+  const byVersion = new Map(
+    migrations
+      .filter((migration) => migration.version)
+      .map((migration) => [migration.version, migration]),
+  );
+  const receiptVersions = new Set();
+
+  for (const [canonicalVersion, receiptVersion] of Object.entries(acceptedAliases ?? {})) {
+    const canonical = byVersion.get(canonicalVersion);
+    const receipt = byVersion.get(receiptVersion);
+    if (!canonical || !receipt) continue;
+    if (!canonical.name || canonical.name !== receipt.name) continue;
+    receiptVersions.add(receiptVersion);
+  }
+
+  return migrations.filter((migration) => !receiptVersions.has(migration.version));
+}
 
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
@@ -125,6 +162,8 @@ function initialEvidence(config) {
     authorityFloorVersion: core.PRODUCTION_HISTORY_AUTHORITY_FLOOR,
     expectedVersion: null,
     liveMaxVersion: null,
+    providerHttpStatus: null,
+    schemaComparisonPerformed: false,
     pgjwtObserved: null,
     pgjwtInstalled: null,
     pgjwtVersion: null,
@@ -147,6 +186,29 @@ async function failWithEvidence(config, evidence, status, errorCode, error) {
   throw error;
 }
 
+export function classifyManagementApiHttpFailure(status) {
+  const httpStatus = Number(status);
+  if (httpStatus === 401) {
+    return {
+      status: 'provider-auth-failed',
+      errorCode: 'supabase_access_token_rejected',
+      message: 'Supabase Management API rejected SUPABASE_ACCESS_TOKEN with HTTP 401; production schema drift was not evaluated.',
+    };
+  }
+  if (httpStatus === 403) {
+    return {
+      status: 'provider-auth-failed',
+      errorCode: 'supabase_access_token_forbidden',
+      message: 'Supabase Management API denied SUPABASE_ACCESS_TOKEN with HTTP 403; production schema drift was not evaluated.',
+    };
+  }
+  return {
+    status: 'provider-query-failed',
+    errorCode: `management_api_http_${httpStatus}`,
+    message: `Supabase read-only production schema verification failed with HTTP ${httpStatus}.`,
+  };
+}
+
 export async function verifySupabaseProductionSchema(options = {}) {
   const config = options.config ?? core.configFromEnv(options.env);
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -155,16 +217,18 @@ export async function verifySupabaseProductionSchema(options = {}) {
   let expectedVersion;
   let repositoryMigrations;
   try {
+    const repositoryMigrationCandidates = options.repositoryMigrations
+      ?? await core.deriveRepositoryMigrationIdentities(config.migrationsDir);
+    repositoryMigrations = excludeProductionReceiptMarkers(repositoryMigrationCandidates);
+
     expectedVersion = options.expectedVersion
-      ?? await core.deriveRepositorySchemaVersion(config.migrationsDir);
+      ?? repositoryMigrations.at(-1)?.version
+      ?? null;
     expectedVersion = core.normalizeSchemaVersion(expectedVersion);
     if (!expectedVersion) {
       throw new Error('Expected Supabase schema version must be exactly 14 digits.');
     }
     evidence.expectedVersion = expectedVersion;
-
-    repositoryMigrations = options.repositoryMigrations
-      ?? await core.deriveRepositoryMigrationIdentities(config.migrationsDir);
   } catch (error) {
     await failWithEvidence(
       config,
@@ -197,14 +261,14 @@ export async function verifySupabaseProductionSchema(options = {}) {
   let response;
   try {
     response = await fetchImpl(
-      `https://api.supabase.com/v1/projects/${encodeURIComponent(config.projectRef)}/database/query/read-only`,
+      `https://api.supabase.com/v1/projects/${encodeURIComponent(config.projectRef)}/database/query`,
       {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${config.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query: buildReadOnlyQuery() }),
+        body: JSON.stringify({ query: buildReadOnlyQuery(), read_only: true }),
       },
     );
   } catch (error) {
@@ -214,6 +278,19 @@ export async function verifySupabaseProductionSchema(options = {}) {
       'provider-query-failed',
       'management_api_request_failed',
       error,
+    );
+  }
+
+  evidence.providerHttpStatus = Number.isInteger(response?.status) ? response.status : null;
+
+  if (!response.ok) {
+    const failure = classifyManagementApiHttpFailure(response.status);
+    await failWithEvidence(
+      config,
+      evidence,
+      failure.status,
+      failure.errorCode,
+      new Error(failure.message),
     );
   }
 
@@ -227,16 +304,6 @@ export async function verifySupabaseProductionSchema(options = {}) {
       'provider-query-failed',
       'management_api_response_read_failed',
       error,
-    );
-  }
-
-  if (!response.ok) {
-    await failWithEvidence(
-      config,
-      evidence,
-      'provider-query-failed',
-      `management_api_http_${response.status}`,
-      new Error(`Supabase read-only production schema verification failed with HTTP ${response.status}.`),
     );
   }
 
@@ -256,6 +323,7 @@ export async function verifySupabaseProductionSchema(options = {}) {
     );
   }
 
+  evidence.schemaComparisonPerformed = true;
   const evaluated = core.evaluateMigrationHistory({
     ...row,
     migration_history: migrationHistory,

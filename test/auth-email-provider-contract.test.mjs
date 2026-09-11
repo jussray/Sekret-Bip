@@ -11,23 +11,31 @@ test('production Auth email provider stays manual, exact-head, and main-only for
   assert.match(workflow, /apply:/);
   assert.match(workflow, /default:\s*false/);
   assert.match(workflow, /test \"\$GITHUB_REF_NAME\" = main/);
-  assert.match(workflow, /ref:\s*\$\{\{ inputs\.target_sha \}\}/);
-  assert.match(workflow, /EXPECTED_HEAD_SHA:\s*\$\{\{ inputs\.target_sha \}\}/);
+  assert.match(workflow, /ref:\s*\$\{\{ steps\.target\.outputs\.target_sha \}\}/);
+  assert.match(workflow, /EXPECTED_HEAD_SHA:\s*\$\{\{ steps\.target\.outputs\.target_sha \}\}/);
+  assert.doesNotMatch(workflow, /ref:\s*\$\{\{ inputs\.target_sha \}\}/);
 });
 
-test('dispatch contract rejects malformed or stale production target SHAs before checkout', () => {
-  assert.match(workflow, /Validate dispatch contract/);
+test('dispatch contract normalizes input and rejects malformed or stale production SHAs before checkout', () => {
+  assert.match(workflow, /Normalize and validate dispatch contract/);
+  assert.match(workflow, /TARGET_SHA_INPUT:\s*\$\{\{ inputs\.target_sha \}\}/);
   assert.match(workflow, /\^\[0-9a-fA-F\]\{40\}\$/);
+  assert.match(workflow, /target_sha=\"\$\{target_sha,,\}\"/);
+  assert.match(workflow, /printf 'target_sha=%s\\n' \"\$target_sha\" >> \"\$GITHUB_OUTPUT\"/);
   assert.match(workflow, /Pass apply as its own boolean input/);
   assert.match(workflow, /repos\/\$\{GITHUB_REPOSITORY\}\/commits\/main/);
   assert.match(workflow, /Production apply requires current main HEAD/);
-  assert.match(workflow, /if \[ \"\$TARGET_SHA\" != \"\$current_main\" \]; then/);
+  assert.match(workflow, /if \[ \"\$target_sha\" != \"\$current_main\" \]; then/);
 
-  const validation = workflow.indexOf('- name: Validate dispatch contract');
+  const validation = workflow.indexOf('- name: Normalize and validate dispatch contract');
   const checkout = workflow.indexOf('- name: Check out exact target');
   assert.notEqual(validation, -1);
   assert.notEqual(checkout, -1);
-  assert.ok(validation < checkout, 'dispatch validation must run before checkout consumes target_sha');
+  assert.ok(validation < checkout, 'dispatch validation must run before checkout consumes normalized target_sha');
+
+  const checkoutBlock = workflow.slice(checkout, workflow.indexOf('- name: Verify exact target'));
+  assert.match(checkoutBlock, /steps\.target\.outputs\.target_sha/);
+  assert.doesNotMatch(checkoutBlock, /inputs\.target_sha/);
 });
 
 test('production Auth email provider keeps confirmation enabled and secrets out of source', () => {

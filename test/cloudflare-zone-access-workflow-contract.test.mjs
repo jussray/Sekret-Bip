@@ -70,6 +70,7 @@ test('public front-door audit is exact-head, independently retained, read-only, 
 
   const accessStep = workflow.slice(accessProviderIndex, bindingProviderIndex);
   const bindingStep = workflow.slice(bindingProviderIndex, receiptGuardIndex);
+  const uploadStep = workflow.slice(uploadIndex, failClosedIndex);
   const auditJob = workflow.slice(workflow.indexOf('  audit:'), publisherIndex);
   const publisherJob = workflow.slice(publisherIndex);
 
@@ -81,6 +82,7 @@ test('public front-door audit is exact-head, independently retained, read-only, 
   assert.ok(bindingStep.includes('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_BINDING_READ_API_TOKEN }}'), 'binding read must use only the dedicated binding-read secret');
   assert.ok(!bindingStep.includes('CLOUDFLARE_ACCESS_API_TOKEN'), 'binding read must not receive the Access token');
   assert.ok(!bindingStep.includes('secrets.CLOUDFLARE_API_TOKEN'), 'binding read must not receive the repository-wide Cloudflare token');
+  assert.ok(uploadStep.includes("steps.receipt_guard.outcome == 'success'"), 'artifact upload must not publish a partial provider receipt set');
 
   assert.ok(publisherJob.includes('permissions:\n      contents: read\n      actions: read\n      issues: write'), 'ledger publisher must carry only GitHub evidence-publication permissions');
   assert.ok(publisherJob.includes("github.event_name != 'pull_request'"), 'ledger publisher must never run on pull_request');

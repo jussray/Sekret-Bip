@@ -1,6 +1,6 @@
 /**
  * Renders a Se'kret companion according to its canonical runtime contract.
- * Legacy Suhana/Sy keys remain compatibility aliases for Suhana/Sy.
+ * Legacy Raylene/Rylane keys remain compatibility aliases for Suhana/Sy.
  */
 import React, { useEffect, useRef } from 'react';
 import { Dimensions, Image } from 'react-native';

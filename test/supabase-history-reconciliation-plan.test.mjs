@@ -6,6 +6,7 @@ import {
   PENDING_SECURITY_MIGRATIONS,
   PRODUCTION_HISTORY_RECONCILIATION_PLAN,
   PRODUCTION_PROJECT_REF,
+  PRODUCTION_SECURITY_APPLY_RECEIPTS,
   validateReconciliationPlan,
 } from '../scripts/verify-supabase-history-reconciliation-plan.mjs';
 
@@ -17,6 +18,15 @@ const expectedPairs = [
   ['20260820214601', '20260820211200'],
   ['20260821073219', '20260821071500'],
   ['20260826065736', '20260824223800'],
+];
+
+const expectedSecurityReceipts = [
+  ['20260826012500', '20260905233953', 'pseudonymize_open_bip_author_ids'],
+  ['20260827060000', '20260905234133', 'harden_consent_permanent_account_boundary'],
+  ['20260827061000', '20260905234009', 'harden_economy_task_rpcs_permanent_accounts'],
+  ['20260827062000', '20260905234019', 'harden_legacy_circle_permanent_account_boundaries'],
+  ['20260827063000', '20260905234039', 'reconcile_reward_approval_live_and_replay'],
+  ['20260831233000', '20260905234048', 'private_self_task_visibility'],
 ];
 
 test('reconciliation plan is pinned to the canonical production project and exactly five pairs', () => {
@@ -68,7 +78,7 @@ test('the plan is evidence-only and carries zero mutation authority', () => {
   assert.equal(evidence.historyMutationAuthorized, false);
   assert.equal(evidence.securityApplyAuthorized, false);
   assert.equal(evidence.requiresFounderApprovalBeforeHistoryMutation, true);
-  assert.equal(evidence.requiresFounderApprovalBeforePendingSecurityApply, true);
+  assert.equal(evidence.requiresFounderApprovalBeforePendingSecurityApply, false);
 
   assert.doesNotMatch(script, /supabase\s+migration\s+repair/i);
   assert.doesNotMatch(script, /supabase\s+db\s+push/i);
@@ -77,14 +87,29 @@ test('the plan is evidence-only and carries zero mutation authority', () => {
   assert.doesNotMatch(script, /update\s+supabase_migrations/i);
 });
 
-test('three already-merged security migrations remain explicit pending-production gates', () => {
-  assert.deepEqual(PENDING_SECURITY_MIGRATIONS, [
-    '20260827060000_harden_consent_permanent_account_boundary.sql',
-    '20260827061000_harden_economy_task_rpcs_permanent_accounts.sql',
-    '20260827062000_harden_legacy_circle_permanent_account_boundaries.sql',
-  ]);
+test('production security repairs are receipt-bound and no longer mislabeled pending', () => {
+  const evidence = validateReconciliationPlan();
 
-  for (const filename of PENDING_SECURITY_MIGRATIONS) {
-    assert.equal(fs.existsSync(`supabase/migrations/${filename}`), true);
+  assert.deepEqual(PENDING_SECURITY_MIGRATIONS, []);
+  assert.equal(evidence.securityApplyObservedComplete, true);
+  assert.deepEqual(
+    PRODUCTION_SECURITY_APPLY_RECEIPTS.map((receipt) => [
+      receipt.canonicalVersion,
+      receipt.liveVersion,
+      receipt.canonicalName,
+    ]),
+    expectedSecurityReceipts,
+  );
+  assert.deepEqual(
+    evidence.recordedSecurityApplyReceipts.map((receipt) => [
+      receipt.canonicalVersion,
+      receipt.liveVersion,
+      receipt.canonicalName,
+    ]),
+    expectedSecurityReceipts,
+  );
+
+  for (const receipt of evidence.recordedSecurityApplyReceipts) {
+    assert.equal(fs.existsSync(`supabase/migrations/${receipt.canonicalFilename}`), true);
   }
 });

@@ -75,8 +75,16 @@ jobs:
               out("false");
               process.exit(0);
             }
+            if (target.status !== "completed") {
+              console.error(`Required upstream production verification job is ${target.status}, not completed.`);
+              process.exit(3);
+            }
             if (target.conclusion !== "success") {
               console.error(`Required upstream production verification job concluded ${target.conclusion}.`);
+              process.exit(3);
+            }
+            if (target.head_sha !== process.env.UPSTREAM_HEAD_SHA) {
+              console.error("Required upstream production verification job does not belong to the release SHA.");
               process.exit(3);
             }
             if (process.env.UPSTREAM_HEAD_SHA !== process.env.WORKFLOW_HEAD_SHA) {

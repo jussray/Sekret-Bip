@@ -2,6 +2,12 @@ import observedWorker from './observed-index';
 import emailRouter from './email-router';
 import { WORKER_RELEASE_SHA } from './release-identity.generated';
 import { authenticate, type AuthEnv, type Principal } from './auth';
+import {
+  firebaseAppCheckMode,
+  verifyFirebaseAppCheck,
+  type FirebaseAppCheckEnv,
+  type FirebaseAppCheckVerification,
+} from './firebase-app-check';
 import { emitWorkerTelemetry, type WorkerTelemetryEvent } from './telemetry';
 import { persistAuditEvent, type AuditPersistEnv } from './audit/persist-event';
 import { normalizeReplyActor, resolveRuntimeStyle } from './runtime-style';
@@ -22,7 +28,7 @@ interface WorkerVersionMetadata {
   timestamp: string;
 }
 
-interface Env extends AuthEnv, VoiceProviderEnv {
+interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv {
   ALLOWED_ORIGINS?: string;
   VOICE_PROVIDER_MODE?: 'legacy' | 'cloudflare-only' | 'hybrid';
   SEKRET_RATE_LIMITER?: RateLimit;
@@ -65,7 +71,7 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
     ...securityHeaders(),
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Firebase-AppCheck',
     'Access-Control-Max-Age': '600',
     Vary: 'Origin',
   };
@@ -112,6 +118,68 @@ function protectionUnavailable(cors: Record<string, string>): Response {
     { error: 'request protection temporarily unavailable', retryable: true },
     503,
     { ...cors, 'Retry-After': '30' },
+  );
+}
+
+function appCheckObservationStatus(result: FirebaseAppCheckVerification): number {
+  if (result.status === 'valid' || result.status === 'disabled') return 200;
+  if (result.status === 'verification_error') return 503;
+  return 401;
+}
+
+function observeAppCheck(
+  request: Request,
+  result: FirebaseAppCheckVerification,
+  mode: ReturnType<typeof firebaseAppCheckMode>,
+  started: number,
+): void {
+  const url = new URL(request.url);
+  const requestId = request.headers.get('CF-Ray') || undefined;
+  const event: WorkerTelemetryEvent = {
+    fingerprint: `worker_app_check_${result.status}`,
+    route: url.pathname,
+    method: request.method,
+    status: appCheckObservationStatus(result),
+    duration_ms: Date.now() - started,
+    provider: 'firebase',
+    operation: 'app_check',
+    error_name: result.reason,
+    request_id: requestId,
+    fallback_used: false,
+    retry_count: 0,
+    trace_id: requestId || crypto.randomUUID(),
+    policy_version: 'firebase-app-check-v1',
+    decision: mode === 'observe' || result.status === 'valid' ? 'allow' : 'block',
+    violation_codes: result.reason ? [`app_check_${result.reason}`] : undefined,
+  };
+  // Never log the bearer App Check token or decoded token body. Cloudflare
+  // receives only the privacy-safe verification classification and reason.
+  emitWorkerTelemetry(event);
+}
+
+function appCheckDenied(
+  result: FirebaseAppCheckVerification,
+  cors: Record<string, string>,
+): Response {
+  if (result.status === 'verification_error') {
+    return json(
+      {
+        error: 'app attestation verification temporarily unavailable',
+        code: result.reason ?? 'verification_error',
+        retryable: true,
+      },
+      503,
+      { ...cors, 'Retry-After': '30' },
+    );
+  }
+  return json(
+    {
+      error: 'app attestation required',
+      code: result.reason ?? 'app_check_failed',
+      retryable: false,
+    },
+    401,
+    cors,
   );
 }
 
@@ -300,6 +368,18 @@ export default {
       if (!auth.ok) {
         const denied = json({ error: auth.error }, auth.status, cors);
         return observeFrontDoorDenial(request, denied, env, ctx, started, 'worker_auth_failure');
+      }
+
+      const appCheckMode = firebaseAppCheckMode(env);
+      if (appCheckMode !== 'off') {
+        const appCheck = await verifyFirebaseAppCheck(request, env);
+        observeAppCheck(request, appCheck, appCheckMode, started);
+        if (
+          appCheckMode === 'invalid'
+          || (appCheckMode === 'enforce' && appCheck.status !== 'valid')
+        ) {
+          return appCheckDenied(appCheck, cors);
+        }
       }
 
       const limited = await enforceRateLimit(request, env, auth.principal, cors);

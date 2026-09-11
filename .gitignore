@@ -24,9 +24,6 @@ web-build/
 playwright-report/
 test-results/
 
-# ── Local script-run evidence (EVIDENCE_PATH defaults) ────────────────────
-artifacts/
-
 # ── Native build outputs ──────────────────────────────────────────────────
 android/
 ios/

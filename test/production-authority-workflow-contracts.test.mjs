@@ -53,6 +53,25 @@ test('Production Gate obeys the exact-head supply-chain and scheduler boundary i
   assert.match(content, /test\/production-authority-workflow-contracts\.test\.mjs/);
 });
 
+test('GitHub merge membrane evaluates untrusted PRs only from trusted base source', () => {
+  const content = workflow('github-merge-membrane.yml');
+
+  assertPinnedNodeWorkflow(content);
+  assertCancelsSupersededRuns(content);
+  assertKnownWorkingProofRunner(content);
+  assert.match(content, /\n  pull_request_target:\n/);
+  assert.doesNotMatch(content, /\n  pull_request:\n/);
+  assert.match(content, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(content, /TRUSTED_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(content, /ref: \$\{\{ env\.TRUSTED_BASE_SHA \}\}/);
+  assert.doesNotMatch(content, /ref: \$\{\{ env\.EXPECTED_HEAD_SHA \}\}/);
+  assert.match(content, /contents: read/);
+  assert.match(content, /checks: read/);
+  assert.match(content, /pull-requests: read/);
+  assert.doesNotMatch(content, /contents: write|pull-requests: write|actions: write/);
+  assert.match(content, /node scripts\/verify-github-merge-membrane\.mjs/);
+});
+
 test('Product Design proof uses a deterministic runner and cancels superseded UX evidence', () => {
   const content = workflow('product-design-playwright-proof.yml');
 

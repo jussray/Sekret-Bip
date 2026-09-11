@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 app = FastAPI(title="Se'kret Bip Piper TTS")
 VOICE_DIR = Path(os.environ.get("PIPER_VOICE_DIR", "/voices"))
 API_TOKEN = os.environ.get("PIPER_API_TOKEN", "").strip()
+ALLOW_INSECURE_LOCAL = os.environ.get("PIPER_ALLOW_INSECURE_LOCAL", "").strip().lower() in {"1", "true", "yes"}
 
 class SynthesisRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
@@ -17,7 +18,11 @@ class SynthesisRequest(BaseModel):
     format: str = "wav"
 
 def require_token(authorization: str | None) -> None:
-    if API_TOKEN and authorization != f"Bearer {API_TOKEN}":
+    if not API_TOKEN:
+        if ALLOW_INSECURE_LOCAL:
+            return
+        raise HTTPException(status_code=503, detail="Piper service authentication is not configured")
+    if authorization != f"Bearer {API_TOKEN}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 def resolve_model(voice: str) -> Path:

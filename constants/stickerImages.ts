@@ -5,7 +5,7 @@ import type { ImageSourcePropType } from 'react-native';
 // Metro bundler requires static require() calls — no dynamic paths.
 
 const STICKER_IMAGES: Record<string, ImageSourcePropType> = {
-  // ── Suhana (19) ─────────────────────────────────────────────────────────────
+  // ── Raylene (19) ─────────────────────────────────────────────────────────────
   'raylene-standing':     require('../assets/images/stickers/raylene/raylene-sticker-standing.png'),
   'raylene-lounging':     require('../assets/images/stickers/raylene/raylene-sticker-lounging.png'),
   'raylene-studying':     require('../assets/images/stickers/raylene/raylene-sticker-studying.png'),
@@ -26,7 +26,7 @@ const STICKER_IMAGES: Record<string, ImageSourcePropType> = {
   'raylene-pillow':       require('../assets/images/stickers/raylene/raylene-sticker-pillow.png'),
   'raylene-icon-cloud':   require('../assets/images/stickers/raylene/raylene-sticker-icon-cloud.png'),
 
-  // ── Sy (19) ──────────────────────────────────────────────────────────────
+  // ── Rylane (19) ──────────────────────────────────────────────────────────────
   'rylane-mini':          require('../assets/images/stickers/rylane/rylane-sticker-mini.png'),
   'rylane-reading':       require('../assets/images/stickers/rylane/rylane-sticker-reading.png'),
   'rylane-phone':         require('../assets/images/stickers/rylane/rylane-sticker-phone.png'),
