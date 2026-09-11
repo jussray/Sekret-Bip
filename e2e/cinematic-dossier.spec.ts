@@ -22,19 +22,41 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 async function expectRenderedImagesDecoded(targets: Locator, label: string) {
-  const unloaded = await targets.evaluateAll(nodes =>
-    nodes.flatMap(node => {
+  const unloaded = await targets.evaluateAll(nodes => {
+    const failures: Array<{
+      src: string | null;
+      complete: boolean | null;
+      naturalWidth: number | null;
+      naturalHeight: number | null;
+      reason: string | null;
+    }> = [];
+
+    for (const node of nodes) {
       const image = node instanceof HTMLImageElement ? node : node.querySelector('img');
-      if (!image) return [{ src: null, complete: null, reason: 'no rendered img descendant' }];
-      if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) return [];
-      return [{
-        src: image.currentSrc || image.src || null,
-        complete: image.complete,
-        naturalWidth: image.naturalWidth,
-        naturalHeight: image.naturalHeight,
-      }];
-    }),
-  );
+      if (!image) {
+        failures.push({
+          src: null,
+          complete: null,
+          naturalWidth: null,
+          naturalHeight: null,
+          reason: 'no rendered img descendant',
+        });
+        continue;
+      }
+
+      if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) {
+        failures.push({
+          src: image.currentSrc || image.src || null,
+          complete: image.complete,
+          naturalWidth: image.naturalWidth,
+          naturalHeight: image.naturalHeight,
+          reason: 'rendered img did not decode',
+        });
+      }
+    }
+
+    return failures;
+  });
 
   expect(unloaded, `Unloaded ${label}: ${JSON.stringify(unloaded)}`).toEqual([]);
 }
