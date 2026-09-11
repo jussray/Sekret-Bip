@@ -74,6 +74,76 @@ async function expectDossierMediaTruth(page: Page) {
   await expectRenderedImagesDecoded(characters, 'dossier canonical character images');
 }
 
+async function unclipBoardForEvidence(board: Locator) {
+  return board.evaluate(node => {
+    const changed: Array<{ selector: string; style: string | null }> = [];
+    let index = 0;
+    let current: HTMLElement | null = node as HTMLElement;
+
+    while (current && current !== document.documentElement) {
+      const computed = window.getComputedStyle(current);
+      const clipsVertically = ['auto', 'scroll', 'hidden', 'clip'].includes(computed.overflowY)
+        || ['auto', 'scroll', 'hidden', 'clip'].includes(computed.overflow);
+
+      if (clipsVertically && current.scrollHeight > current.clientHeight) {
+        const selector = `dossier-proof-unclip-${index++}`;
+        current.dataset.dossierProofUnclip = selector;
+        changed.push({ selector, style: current.getAttribute('style') });
+        current.style.setProperty('overflow', 'visible', 'important');
+        current.style.setProperty('overflow-y', 'visible', 'important');
+        current.style.setProperty('height', 'auto', 'important');
+        current.style.setProperty('max-height', 'none', 'important');
+        current.style.setProperty('flex', 'none', 'important');
+      }
+
+      current = current.parentElement;
+    }
+
+    return changed;
+  });
+}
+
+async function restoreBoardEvidenceClipping(page: Page, changed: Array<{ selector: string; style: string | null }>) {
+  await page.evaluate(entries => {
+    for (const entry of entries) {
+      const element = document.querySelector<HTMLElement>(`[data-dossier-proof-unclip="${entry.selector}"]`);
+      if (!element) continue;
+      if (entry.style === null) element.removeAttribute('style');
+      else element.setAttribute('style', entry.style);
+      delete element.dataset.dossierProofUnclip;
+    }
+  }, changed);
+}
+
+async function captureCompleteBoardEvidence(
+  page: Page,
+  board: Locator,
+  viewport: (typeof VIEWPORTS)[number],
+  testInfo: Parameters<Parameters<typeof test>[1]>[1],
+) {
+  const changed = await unclipBoardForEvidence(board);
+
+  try {
+    const boardBox = await board.boundingBox();
+    expect(boardBox, 'Complete dossier board must have measurable geometry').not.toBeNull();
+    expect(boardBox!.height, 'Complete dossier board must extend beyond the phone viewport').toBeGreaterThan(
+      viewport.name === 'mobile' ? viewport.height : 900,
+    );
+
+    const finalGate = page.getByTestId('cinematic-truth-strip');
+    const finalGateBox = await finalGate.boundingBox();
+    expect(finalGateBox, 'Truth strip must remain inside the complete-board evidence surface').not.toBeNull();
+    expect(finalGateBox!.y + finalGateBox!.height).toBeLessThanOrEqual(boardBox!.y + boardBox!.height + 1);
+
+    const boardScreenshot = await board.screenshot({ animations: 'disabled' });
+    const boardFilename = `cinematic-dossier-board-${viewport.name}.png`;
+    await fs.writeFile(path.join(ARTIFACT_DIR, boardFilename), boardScreenshot);
+    await testInfo.attach(boardFilename, { body: boardScreenshot, contentType: 'image/png' });
+  } finally {
+    await restoreBoardEvidenceClipping(page, changed);
+  }
+}
+
 for (const viewport of VIEWPORTS) {
   test(`Night cinematic evidence dossier renders on ${viewport.name}`, async ({ page }, testInfo) => {
     const consoleErrors: string[] = [];
@@ -111,10 +181,7 @@ for (const viewport of VIEWPORTS) {
     await fs.writeFile(path.join(ARTIFACT_DIR, viewportFilename), viewportScreenshot);
     await testInfo.attach(viewportFilename, { body: viewportScreenshot, contentType: 'image/png' });
 
-    const boardScreenshot = await board.screenshot({ animations: 'disabled' });
-    const boardFilename = `cinematic-dossier-board-${viewport.name}.png`;
-    await fs.writeFile(path.join(ARTIFACT_DIR, boardFilename), boardScreenshot);
-    await testInfo.attach(boardFilename, { body: boardScreenshot, contentType: 'image/png' });
+    await captureCompleteBoardEvidence(page, board, viewport, testInfo);
 
     expect(pageErrors, `Uncaught page errors: ${pageErrors.join('\n')}`).toEqual([]);
     expect(consoleErrors, `Console errors: ${consoleErrors.join('\n')}`).toEqual([]);
