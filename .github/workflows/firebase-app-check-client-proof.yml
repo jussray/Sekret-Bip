@@ -13,6 +13,7 @@ on:
       - src/utils/backendAuth.ts
       - test/firebase-app-check-client-contract.test.mjs
       - test/firebase-app-check-contract.test.mjs
+      - .github/workflows/firebase-client-lockfile.yml
       - .github/workflows/firebase-app-check-client-proof.yml
 
 permissions:
