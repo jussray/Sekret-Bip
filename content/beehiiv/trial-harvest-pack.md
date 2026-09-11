@@ -33,9 +33,11 @@ Do not optimize trial-only cosmetics.
    - The trial-only advantage is beehiiv's AI-from-newsletter creation tool. Existing published AI-created episodes and the RSS feed remain active after trial.
    - After trial, the Launch plan can still host one recorded podcast episode per month; do not confuse loss of the AI creation tool with loss of podcast hosting.
 
-3. **Run one lightweight welcome automation while the trial is active.**
-   - Preserve the logic below in this repository because the provider automation can become inactive after downgrade.
-   - Do not make the website signup path depend on the automation surviving.
+3. **Configure and enable the built-in welcome email.**
+   - Use the exact welcome copy in `publication-kit.md`.
+   - Preview desktop and mobile before enabling.
+   - The built-in single welcome email is the durable onboarding path because it is available on the free Launch plan.
+   - Do not make a paid automation part of the critical onboarding path.
 
 4. **Collect only low-sensitivity audience preferences through one short survey.**
    - Bind every answer to a custom field.
@@ -54,7 +56,8 @@ Do not optimize trial-only cosmetics.
    - acquisition-source totals where available;
    - Issue #001 delivered/open/click totals;
    - survey response count;
-   - automation enrollment/completion totals;
+   - welcome-email performance totals where available;
+   - optional automation enrollment/completion totals only if an automation experiment is actually run;
    - podcast public URL;
    - website/signup URL;
    - export filenames and local/private-storage location.
@@ -66,13 +69,15 @@ Do not optimize trial-only cosmetics.
 ### P1 — Keep because Launch can still use it
 
 - Keep the core newsletter, publication website, custom domain, and ordinary sends healthy.
+- Keep the built-in welcome email enabled and healthy.
 - Keep the normal signup flow healthy. A published signup flow can remain active on Launch, but a flow linked to a premium automation can be unlinked or become inactive after downgrade.
 - Keep the existing podcast RSS feed and published episode healthy.
 - Keep all canonical copy in this repository.
 - Keep free recommendation relationships only if they are genuinely relevant; they are not an expiry emergency.
 
-### P2 — Do not spend the trial on these
+### P2 — Optional or not worth blocking P0
 
+- Premium multi-step welcome automation: optional experiment only. Do not run it until the durable P0 gates are complete, and never enable it alongside the built-in welcome email for the same Signed Up path.
 - Paid recommendations: trial accounts can browse but cannot activate paid offers.
 - Ad Network: unavailable during trial.
 - Paid subscriptions: unavailable during trial.
@@ -134,6 +139,10 @@ Success copy:
 **Thank you. Your answers help shape the public newsletter. You can change your email preferences or unsubscribe anytime.**
 
 ## Automation asset — Welcome → useful idea → preference
+
+Status: OPTIONAL TRIAL EXPERIMENT / NOT CRITICAL PATH
+
+Preserve this logic in the repository even if it is never activated. The built-in welcome email is the durable default. If this paid automation is tested, choose it **instead of** the built-in welcome email during the short experiment, never alongside it, then restore the built-in welcome email before downgrade. Mark the automation gate `NOT_APPLICABLE` if there is no concrete reason to spend trial time on it.
 
 Automation name: **Se’kret Bip — First 5 Days**
 
@@ -231,8 +240,9 @@ Fill this with aggregate evidence only.
 | Issue #001 opens |  |  | beehiiv post report |
 | Issue #001 clicks |  |  | beehiiv post report |
 | Survey responses |  |  | beehiiv survey report |
-| Automation enrolled |  |  | beehiiv automation analytics |
-| Automation completed |  |  | beehiiv automation analytics |
+| Built-in welcome email enabled | no/yes |  | beehiiv Settings → Emails screenshot |
+| Automation enrolled | N/A unless tested |  | beehiiv automation analytics |
+| Automation completed | N/A unless tested |  | beehiiv automation analytics |
 | Podcast episode published | no/yes |  | public episode URL |
 | Podcast RSS captured | no/yes |  | RSS URL |
 | Website/signup live | no/yes |  | public URL |
@@ -267,22 +277,28 @@ Use this order so one incomplete premium feature cannot block a durable one.
 5. Publish the episode while the trial is active.
 6. Capture the episode URL and the public RSS feed URL.
 
-### Gate 4 — Audience preference evidence
+### Gate 4 — Durable welcome path and audience preference evidence
 
-1. Create the three custom fields exactly as named: `reader_role`, `primary_interest`, `preferred_cadence`.
-2. Build the three-question survey above using choice controls only.
-3. Publish the survey.
-4. Do not make the surviving Launch signup path depend on that survey.
+1. Configure the built-in welcome email from `publication-kit.md` under **Settings → Emails → Preset Emails**.
+2. Preview desktop and mobile.
+3. Enable the built-in welcome email.
+4. Create the three custom fields exactly as named: `reader_role`, `primary_interest`, `preferred_cadence`.
+5. Build the three-question survey above using choice controls only.
+6. Publish the survey.
+7. Do not make the surviving Launch signup path depend on that survey.
 
-### Gate 5 — Automation experiment
+### Gate 5 — Optional automation experiment
 
-1. Create **Se’kret Bip — First 5 Days**.
-2. Trigger on new newsletter subscription.
-3. No re-entry.
-4. Send welcome immediately.
-5. Delay 2 days, then send the useful-idea email.
-6. Delay 3 more days, then send the preference-survey email.
-7. Enroll only through a path you are willing to lose after downgrade.
+1. Run this gate only after the durable P0 gates are complete and only if there is a concrete experiment worth measuring.
+2. Never run the Signed Up automation while the built-in welcome email is enabled for the same path.
+3. If testing it, temporarily choose the automation instead of the built-in welcome email, then restore the built-in welcome email before downgrade.
+4. Create **Se’kret Bip — First 5 Days**.
+5. Trigger on new newsletter subscription.
+6. No re-entry.
+7. Send welcome immediately.
+8. Delay 2 days, then send the useful-idea email.
+9. Delay 3 more days, then send the preference-survey email.
+10. If skipped, record `NOT_APPLICABLE`; it must not block harvest completion.
 
 ### Gate 6 — First ownership export
 
@@ -302,7 +318,7 @@ Ticket subject:
 
 Ticket body:
 
-> I am currently using the Max trial and expect to remain on the free Launch plan when it ends. Before the trial closes, please confirm the post-trial behavior for this publication: (1) a published normal signup flow, (2) a signup flow linked to an automation, (3) existing automations and their analytics, (4) a published survey and its collected custom-field data, (5) an existing public podcast RSS feed and a published AI-created episode, and (6) access to Full Subscriber and All Posts exports after downgrade. I am not asking to preserve paid-only functionality; I want to know exactly what remains live, what becomes read-only or inactive, and what should be exported first. Please also confirm the exact trial-end date/time visible for this workspace if support can see it.
+> I am currently using the Max trial and expect to remain on the free Launch plan when it ends. Before the trial closes, please confirm the post-trial behavior for this publication: (1) the built-in single welcome email, (2) a published normal signup flow, (3) a signup flow linked to an automation, (4) existing automations and their analytics, (5) a published survey and its collected custom-field data, (6) an existing public podcast RSS feed and a published AI-created episode, and (7) access to Full Subscriber and All Posts exports after downgrade. I am not asking to preserve paid-only functionality; I want to know exactly what remains live, what becomes read-only or inactive, and what should be exported first. Please also confirm the exact trial-end date/time visible for this workspace if support can see it.
 
 Do not include subscriber data, secrets, private family information, or product-account data in the ticket.
 
@@ -312,7 +328,8 @@ Do not include subscriber data, secrets, private family information, or product-
 2. Repeat Full Subscribers and All Posts exports.
 3. Confirm the files are downloaded and recoverable.
 4. Capture current public post, signup, podcast episode, and RSS URLs.
-5. Record the provider support answer.
+5. Confirm the built-in welcome email is enabled for the surviving Launch path.
+6. Record the provider support answer.
 
 ## Downgrade test
 
@@ -320,10 +337,11 @@ Before calling the harvest complete, verify the public path that must remain aft
 
 1. public publication page loads;
 2. normal newsletter signup still works without depending on the premium automation;
-3. Issue #001 remains public;
-4. the published podcast episode and RSS feed still resolve;
-5. repository copy remains the canonical source for future migration;
-6. subscriber exports are recoverable from private storage.
+3. built-in welcome email remains configured for new subscribers;
+4. Issue #001 remains public;
+5. the published podcast episode and RSS feed still resolve;
+6. repository copy remains the canonical source for future migration;
+7. subscriber exports are recoverable from private storage.
 
 If any provider feature disappears, keep the promise and replace only the delivery mechanism.
 
