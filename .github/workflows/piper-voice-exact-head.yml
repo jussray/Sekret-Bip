@@ -108,7 +108,7 @@ jobs:
             services/piper-tts \
             2>&1 | tee piper-evidence/container-build.log
 
-      - name: Prove local Piper health, auth boundary, and synthesis
+      - name: Prove local Piper health, auth boundary, and Worker synthesis
         shell: bash
         run: |
           set -euo pipefail
@@ -165,31 +165,83 @@ jobs:
             | tee piper-evidence/auth-boundary.txt
           test "$UNAUTH_CODE" = '401'
 
-          AUTH_CODE="$(curl -sS \
-            -o piper-evidence/authenticated-synthesis.wav \
-            -w '%{http_code}' \
-            -H 'Content-Type: application/json' \
-            -H "Authorization: Bearer $TOKEN" \
-            --data '{"text":"Piper exact head proof.","voice":"en_US-amy-low","format":"wav"}' \
-            http://127.0.0.1:18080/synthesize)"
-          printf 'authenticated_status=%s\n' "$AUTH_CODE" \
-            | tee -a piper-evidence/auth-boundary.txt
-          test "$AUTH_CODE" = '200'
-          test -s piper-evidence/authenticated-synthesis.wav
+          rm -rf piper-evidence/worker-proof-js
+          ./node_modules/.bin/tsc worker/piper-tts.ts \
+            --outDir piper-evidence/worker-proof-js \
+            --rootDir worker \
+            --target ES2022 \
+            --module commonjs \
+            --moduleResolution node \
+            --lib ES2022,DOM \
+            --skipLibCheck \
+            2>&1 | tee piper-evidence/worker-compile.log
+
+          PIPER_PROOF_URL='http://127.0.0.1:18080' \
+          PIPER_PROOF_TOKEN="$TOKEN" \
+          node <<'JS' 2>&1 | tee piper-evidence/worker-integration.log
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const { synthesizeWithPiper } = require('./piper-evidence/worker-proof-js/piper-tts.js');
+
+          const companions = [
+            ['suhana', 'en_US-amy-medium'],
+            ['sy', 'en_US-ryan-medium'],
+            ['cloud', 'en_US-amy-low'],
+            ['night', 'en_US-lessac-low'],
+          ];
+
+          (async () => {
+            const unbound = await synthesizeWithPiper({
+              text: 'Piper rollback proof.',
+              characterId: 'cloud',
+              env: {},
+            });
+            assert.equal(unbound, null, 'removing the Piper binding must cleanly disable Piper');
+            console.log('unbound_piper_returns_null=true');
+
+            for (const [characterId, expectedVoice] of companions) {
+              const audio = await synthesizeWithPiper({
+                text: `Piper exact head proof for ${characterId}.`,
+                characterId,
+                env: {
+                  PIPER_TTS_URL: process.env.PIPER_PROOF_URL,
+                  PIPER_TTS_TOKEN: process.env.PIPER_PROOF_TOKEN,
+                },
+              });
+
+              assert.ok(audio, `${characterId} must return audio`);
+              assert.equal(audio.voice, expectedVoice, `${characterId} voice mapping`);
+              assert.ok(audio.contentType.startsWith('audio/'), `${characterId} content type`);
+
+              const wav = Buffer.from(audio.bytes);
+              assert.ok(wav.length > 44, `${characterId} WAV must contain audio data`);
+              assert.equal(wav.subarray(0, 4).toString('ascii'), 'RIFF', `${characterId} RIFF header`);
+              assert.equal(wav.subarray(8, 12).toString('ascii'), 'WAVE', `${characterId} WAVE header`);
+              fs.writeFileSync(`piper-evidence/worker-${characterId}.wav`, wav);
+              console.log(`${characterId}: voice=${audio.voice} bytes=${wav.length} contentType=${audio.contentType}`);
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          JS
 
           python - <<'PY' 2>&1 | tee piper-evidence/synthesis-contract.log
           import wave
           from pathlib import Path
 
-          audio = Path('piper-evidence/authenticated-synthesis.wav')
-          with wave.open(str(audio), 'rb') as wav:
-              frames = wav.getnframes()
-              rate = wav.getframerate()
-              channels = wav.getnchannels()
-              assert frames > 0
-              assert rate > 0
-              assert channels > 0
-          print(f'wav_bytes={audio.stat().st_size} frames={frames} rate={rate} channels={channels}')
+          expected = ('suhana', 'sy', 'cloud', 'night')
+          for character in expected:
+              audio = Path(f'piper-evidence/worker-{character}.wav')
+              assert audio.is_file() and audio.stat().st_size > 44, character
+              with wave.open(str(audio), 'rb') as wav:
+                  frames = wav.getnframes()
+                  rate = wav.getframerate()
+                  channels = wav.getnchannels()
+                  assert frames > 0
+                  assert rate > 0
+                  assert channels > 0
+              print(f'{character}: wav_bytes={audio.stat().st_size} frames={frames} rate={rate} channels={channels}')
           PY
 
       - name: Upload exact-head evidence
