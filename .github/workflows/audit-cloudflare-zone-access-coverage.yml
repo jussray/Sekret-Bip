@@ -36,14 +36,10 @@ env:
   CLOUDFLARE_API_HEALTH_URL: https://api.sekretbip.net/health
 
 jobs:
-  audit:
-    name: Audit Se’kret public front-door authority
+  contract:
+    name: Verify secretless public front-door audit contracts
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    outputs:
-      evidence_artifact_id: ${{ steps.evidence_upload.outputs.artifact-id }}
-      evidence_artifact_url: ${{ steps.evidence_upload.outputs.artifact-url }}
-      evidence_artifact_digest: ${{ steps.evidence_upload.outputs.artifact-digest }}
     steps:
       - name: Check out exact candidate
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
@@ -67,9 +63,39 @@ jobs:
       - name: Verify redacted public front-door audit contracts
         run: node --test test/cloudflare-zone-access-coverage-audit.test.mjs test/cloudflare-app-binding-authority-audit.test.mjs test/cloudflare-zone-access-workflow-contract.test.mjs
 
+  provider_audit:
+    name: Audit Se’kret public front-door authority
+    if: github.event_name != 'pull_request'
+    needs: contract
+    runs-on: ubuntu-latest
+    environment: Production
+    timeout-minutes: 10
+    outputs:
+      evidence_artifact_id: ${{ steps.evidence_upload.outputs.artifact-id }}
+      evidence_artifact_url: ${{ steps.evidence_upload.outputs.artifact-url }}
+      evidence_artifact_digest: ${{ steps.evidence_upload.outputs.artifact-digest }}
+    steps:
+      - name: Check out exact candidate for provider readback
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact provider head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node for provider readback
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
       - name: Require exact current main before Cloudflare secret use
         id: current_main_gate
-        if: github.event_name != 'pull_request'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -94,7 +120,6 @@ jobs:
       # or under-scoped; that failure must remain explicit and independently fixable.
       - name: Audit zone-scoped Access applications and policies
         id: access_audit
-        if: github.event_name != 'pull_request'
         continue-on-error: true
         env:
           CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
@@ -109,7 +134,7 @@ jobs:
       # still retains a sanitized fail-closed receipt for the exact head.
       - name: Audit public app Pages and Worker binding authority
         id: binding_audit
-        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' }}
+        if: ${{ always() && steps.current_main_gate.outcome == 'success' }}
         continue-on-error: true
         shell: bash
         env:
@@ -127,7 +152,7 @@ jobs:
 
       - name: Require redacted provider receipts before publication
         id: receipt_guard
-        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' }}
+        if: ${{ always() && steps.current_main_gate.outcome == 'success' }}
         shell: bash
         continue-on-error: true
         run: |
@@ -137,7 +162,7 @@ jobs:
 
       - name: Upload redacted public front-door evidence
         id: evidence_upload
-        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' && steps.receipt_guard.outcome == 'success' }}
+        if: ${{ always() && steps.current_main_gate.outcome == 'success' && steps.receipt_guard.outcome == 'success' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cloudflare-zone-access-coverage-${{ env.EXPECTED_HEAD_SHA }}
@@ -148,7 +173,7 @@ jobs:
           retention-days: 30
 
       - name: Fail closed after retaining provider evidence
-        if: ${{ always() && github.event_name != 'pull_request' && steps.current_main_gate.outcome == 'success' }}
+        if: ${{ always() && steps.current_main_gate.outcome == 'success' }}
         shell: bash
         env:
           ACCESS_OUTCOME: ${{ steps.access_audit.outcome }}
@@ -163,8 +188,8 @@ jobs:
 
   publish_receipt:
     name: Publish sanitized binding receipt to Se’kret P0 ledger
-    needs: audit
-    if: ${{ always() && github.event_name != 'pull_request' && needs.audit.outputs.evidence_artifact_id != '' }}
+    needs: provider_audit
+    if: ${{ always() && github.event_name != 'pull_request' && needs.provider_audit.outputs.evidence_artifact_id != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -175,7 +200,7 @@ jobs:
       - name: Download retained provider evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          artifact-ids: ${{ needs.audit.outputs.evidence_artifact_id }}
+          artifact-ids: ${{ needs.provider_audit.outputs.evidence_artifact_id }}
           path: retained-evidence
 
       - name: Set up Node for sanitized ledger publication
@@ -190,8 +215,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
           ISSUE_NUMBER: '925'
           EXPECTED_HEAD_SHA: ${{ github.sha }}
-          ARTIFACT_URL: ${{ needs.audit.outputs.evidence_artifact_url }}
-          ARTIFACT_DIGEST: ${{ needs.audit.outputs.evidence_artifact_digest }}
+          ARTIFACT_URL: ${{ needs.provider_audit.outputs.evidence_artifact_url }}
+          ARTIFACT_DIGEST: ${{ needs.provider_audit.outputs.evidence_artifact_digest }}
           RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
