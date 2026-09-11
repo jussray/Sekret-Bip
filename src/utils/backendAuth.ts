@@ -36,13 +36,26 @@ export async function resolveBackendToken(): Promise<string> {
   return BACKEND_TOKEN;
 }
 
+function withoutCallerControlledAuthorityHeaders(
+  extra?: Record<string, string>,
+): Record<string, string> {
+  const safeExtra = { ...(extra ?? {}) };
+  for (const key of Object.keys(safeExtra)) {
+    const normalized = key.toLowerCase();
+    if (normalized === 'authorization' || normalized === 'x-firebase-appcheck') {
+      delete safeExtra[key];
+    }
+  }
+  return safeExtra;
+}
+
 /**
  * Backend request headers with independent identity and app-attestation signals.
- * Caller-provided headers cannot select or spoof X-Firebase-AppCheck.
+ * Caller-provided headers cannot select or spoof Authorization or App Check,
+ * including alternate HTTP-header casing.
  */
 export async function backendAuthHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
-  const safeExtra = { ...(extra ?? {}) };
-  delete safeExtra['X-Firebase-AppCheck'];
+  const safeExtra = withoutCallerControlledAuthorityHeaders(extra);
 
   const [token, appCheckHeaders] = await Promise.all([
     resolveBackendToken(),
