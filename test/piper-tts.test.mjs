@@ -6,6 +6,7 @@ const worker = fs.readFileSync(new URL('../worker/index.ts', import.meta.url), '
 const client = fs.readFileSync(new URL('../worker/piper-tts.ts', import.meta.url), 'utf8');
 const service = fs.readFileSync(new URL('../services/piper-tts/server.py', import.meta.url), 'utf8');
 const dockerfile = fs.readFileSync(new URL('../services/piper-tts/Dockerfile', import.meta.url), 'utf8');
+const renderBlueprint = fs.readFileSync(new URL('../deploy/render/piper/render.yaml', import.meta.url), 'utf8');
 
 test('Voice Bip has a Piper-first route and fallback path', () => {
   for (const token of ['PIPER_TTS_URL', 'synthesizeWithPiper', 'voiceSource', 'piper', 'worker.fetch']) {
@@ -52,4 +53,29 @@ test('Piper service validates voice models and cleans temporary files', () => {
   for (const token of ['onnx', 'BackgroundTasks', 'missing_ok=True', 'FileResponse']) {
     assert.equal(service.includes(token), true);
   }
+});
+
+test('Render Piper canary remains bounded, authenticated, and manual-deploy only', () => {
+  for (const token of [
+    'name: sekret-bip-piper-canary',
+    'runtime: docker',
+    'plan: free',
+    'rootDir: services/piper-tts',
+    'dockerfilePath: ./Dockerfile',
+    'dockerContext: .',
+    'healthCheckPath: /health',
+    'autoDeployTrigger: off',
+    'numInstances: 1',
+    'maxShutdownDelaySeconds: 60',
+    'key: PORT',
+    'value: "8080"',
+    'key: PIPER_API_TOKEN',
+    'generateValue: true',
+    'key: PIPER_ALLOW_INSECURE_LOCAL',
+    'value: "false"',
+  ]) {
+    assert.equal(renderBlueprint.includes(token), true, `missing Render Piper invariant: ${token}`);
+  }
+
+  assert.equal(/PIPER_API_TOKEN\s*\n\s*value:/.test(renderBlueprint), false, 'Piper token must not be committed');
 });
