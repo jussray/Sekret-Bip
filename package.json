@@ -85,6 +85,7 @@
     "@vercel/analytics": "^2.0.1",
     "expo": "^56.0.12",
     "expo-av": "~16.0.8",
+    "expo-build-properties": "56.0.19",
     "expo-constants": "^56.0.18",
     "expo-file-system": "~56.0.8",
     "expo-font": "~56.0.7",
