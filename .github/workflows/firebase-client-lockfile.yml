@@ -1,0 +1,41 @@
+name: Firebase Client Lockfile Forge
+
+on:
+  push:
+    branches:
+      - feat/firebase-app-check-client
+    paths:
+      - package.json
+      - .github/workflows/firebase-client-lockfile.yml
+
+permissions:
+  contents: write
+
+jobs:
+  lockfile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact branch head
+        uses: actions/checkout@v4
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Generate package-lock only
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Commit generated package-lock
+        shell: bash
+        run: |
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already matches package.json"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          git commit -m "chore(firebase): sync native-prep package-lock"
+          git push origin HEAD:feat/firebase-app-check-client
