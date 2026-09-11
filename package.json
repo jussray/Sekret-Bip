@@ -79,6 +79,8 @@
     "@expo/metro-runtime": "~56.0.15",
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-firebase/app": "26.4.0",
+    "@react-native-firebase/app-check": "26.4.0",
     "@supabase/supabase-js": "2.74.0",
     "@vercel/analytics": "^2.0.1",
     "expo": "^56.0.12",
