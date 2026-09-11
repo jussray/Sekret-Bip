@@ -11,6 +11,7 @@ Purpose: prove the trial harvest actually happened without storing subscriber-le
 - Product/account authority: Se’kret Bip app, not beehiiv
 - Canonical content source: `content/beehiiv/publication-kit.md`
 - Operating plan: `content/beehiiv/trial-harvest-pack.md`
+- Plugin boundary: `content/beehiiv/plugin-boundary.md`
 
 ## Trial clock
 
@@ -60,12 +61,39 @@ Classification: `OPEN / NOT PUBLICLY VERIFIED`.
 
 This is a discovery baseline, not proof of absence. A beehiiv asset may exist without being indexed or discoverable by public search. Promote a public-asset gate to `VERIFIED` only from its direct public URL/provider state or browser evidence.
 
+## Authentication gate
+
+Live provider browser run: `71158dd4-8fa2-49c5-a626-29768e7f3665`
+
+- Run date: `2026-09-10 America/New_York`
+- Result: `BLOCKED — creator authentication required`
+- Provider mutation performed: `NO`
+- Billing mutation performed: `NO`
+- Password reset performed: `NO`
+- Publication/content mutation performed: `NO`
+
+The live browser reached beehiiv but could not authenticate the `sekretbip@gmail.com` creator account because no usable Beehiiv/Google credential was available in the browser profile or credential vault.
+
+A prior beehiiv account email proves this account has used Beehiiv's **Continue on desktop** creator handoff. That email states the handoff link expires after **5 minutes**. The only such message currently available in the connected inbox is from `2026-09-01`, so its token is expired and must not be stored or reused.
+
+Safe recovery path:
+
+1. obtain a fresh Beehiiv creator session through the user's normal login or a newly generated **Continue on desktop** handoff;
+2. do not paste, commit, log, or retain the handoff token;
+3. resume the same provider run order below after authentication;
+4. do not reset or change account credentials unless the founder explicitly authorizes that separate action.
+
+Classification: `VERIFIED BLOCKER / AUTHENTICATION ONLY`.
+
+This blocker is provider access, not a failure of the publication kit, plugin architecture, trial plan, or content assets.
+
 ## Live run order
 
 Mark each row only when the provider state is visible and capture the proof location.
 
 | Gate | State | Provider evidence | Timestamp |
 | --- | --- | --- | --- |
+| Beehiiv creator authentication | BLOCKED | live browser run `71158dd4-8fa2-49c5-a626-29768e7f3665`; fresh session required | 2026-09-10 |
 | Trial expiry captured | OPEN | beehiiv Billing/Plan screenshot or note |  |
 | Billing posture captured | OPEN | beehiiv Billing/Plan current/upcoming plan |  |
 | Issue #001 previewed desktop | OPEN | preview screenshot |  |
