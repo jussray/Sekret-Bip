@@ -26,7 +26,7 @@ export interface CinematicDossierShot {
   beat: string;
   camera: string;
   atmosphere: string;
-  image: ImageSourcePropType;
+  image?: ImageSourcePropType;
   scene: ImageSourcePropType;
   assetStatus?: string;
 }
@@ -69,7 +69,7 @@ function SceneFrame({
   testID,
 }: {
   scene: ImageSourcePropType;
-  character: ImageSourcePropType;
+  character?: ImageSourcePropType;
   characterLabel: string;
   hero?: boolean;
   testID: string;
@@ -84,13 +84,20 @@ function SceneFrame({
         accessibilityLabel={`${characterLabel} room scene`}
       />
       <View style={styles.sceneTint} />
-      <Image
-        testID={`${testID}-character`}
-        source={character}
-        style={hero ? styles.heroCharacter : styles.shotCharacter}
-        resizeMode="contain"
-        accessibilityLabel={characterLabel}
-      />
+      {character ? (
+        <Image
+          testID={`${testID}-character`}
+          source={character}
+          style={hero ? styles.heroCharacter : styles.shotCharacter}
+          resizeMode="contain"
+          accessibilityLabel={characterLabel}
+        />
+      ) : (
+        <View testID={`${testID}-pose-pending`} style={styles.posePending}>
+          <Text style={styles.posePendingKicker}>POSE NOT YET GENERATED</Text>
+          <Text style={styles.posePendingText}>Scene truth retained · canonical neutral remains the runtime fallback</Text>
+        </View>
+      )}
       <View style={hero ? styles.heroVignette : styles.shotVignette} />
     </View>
   );
@@ -245,6 +252,9 @@ const styles = StyleSheet.create({
   sceneTint: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(18,9,28,0.16)' },
   heroCharacter: { position: 'absolute', left: '8%', bottom: -6, width: '84%', height: '94%' },
   shotCharacter: { position: 'absolute', left: '18%', bottom: -8, width: '64%', height: '88%' },
+  posePending: { position: 'absolute', top: 14, right: 14, maxWidth: '56%', borderWidth: 1, borderColor: '#cbb6ff99', backgroundColor: '#120d13dd', paddingHorizontal: 9, paddingVertical: 7 },
+  posePendingKicker: { color: '#cbb6ff', fontSize: 7, fontWeight: '900', letterSpacing: 0.8 },
+  posePendingText: { color: '#f4ecd9', fontSize: 7, lineHeight: 10, fontWeight: '700', marginTop: 3 },
   heroVignette: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(8,4,13,0.08)' },
   shotVignette: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(8,4,13,0.12)' },
   heroStamp: { position: 'absolute', right: 10, bottom: 10, borderWidth: 2, paddingHorizontal: 8, paddingVertical: 5, transform: [{ rotate: '-3deg' }], backgroundColor: '#eee2c8dd' },
