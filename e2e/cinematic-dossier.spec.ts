@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page, type TestInfo } from '@playwright/test';
 
 const VIEWPORTS = [
   { name: 'mobile', width: 390, height: 844 },
@@ -119,7 +119,7 @@ async function captureCompleteBoardEvidence(
   page: Page,
   board: Locator,
   viewport: (typeof VIEWPORTS)[number],
-  testInfo: Parameters<Parameters<typeof test>[1]>[1],
+  testInfo: TestInfo,
 ) {
   const changed = await unclipBoardForEvidence(board);
 
