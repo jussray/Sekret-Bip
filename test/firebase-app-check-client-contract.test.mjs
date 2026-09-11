@@ -62,7 +62,10 @@ test('Supabase identity and Firebase attestation remain independent at one backe
 
   assert.match(backendAuth, /resolveBackendToken\(\)/);
   assert.match(backendAuth, /firebaseAppCheckHeaders\(\)/);
-  assert.match(backendAuth, /delete safeExtra\['X-Firebase-AppCheck'\]/);
+  assert.match(backendAuth, /key\.toLowerCase\(\)/);
+  assert.match(backendAuth, /normalized === 'authorization'/);
+  assert.match(backendAuth, /normalized === 'x-firebase-appcheck'/);
+  assert.match(backendAuth, /delete safeExtra\[key\]/);
   assert.match(backendAuth, /\.\.\.appCheckHeaders/);
   assert.doesNotMatch(client, /Authorization/);
   assert.doesNotMatch(client, /userId/);
