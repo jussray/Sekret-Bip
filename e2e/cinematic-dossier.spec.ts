@@ -88,7 +88,8 @@ for (const viewport of VIEWPORTS) {
     await page.goto('/cinematic-dossier', { waitUntil: 'networkidle' });
 
     await expect(page.getByTestId('cinematic-dossier-screen')).toBeVisible();
-    await expect(page.getByTestId('cinematic-evidence-board')).toBeVisible();
+    const board = page.getByTestId('cinematic-evidence-board');
+    await expect(board).toBeVisible();
     await expect(page.getByTestId('cinematic-dossier-hero')).toBeVisible();
     await expect(page.getByTestId('cinematic-shot-01')).toBeVisible();
     await expect(page.getByTestId('cinematic-shot-07')).toBeVisible();
@@ -104,10 +105,16 @@ for (const viewport of VIEWPORTS) {
     await expectNoHorizontalOverflow(page);
 
     await fs.mkdir(ARTIFACT_DIR, { recursive: true });
-    const screenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
-    const filename = `cinematic-dossier-${viewport.name}.png`;
-    await fs.writeFile(path.join(ARTIFACT_DIR, filename), screenshot);
-    await testInfo.attach(filename, { body: screenshot, contentType: 'image/png' });
+
+    const viewportScreenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
+    const viewportFilename = `cinematic-dossier-${viewport.name}.png`;
+    await fs.writeFile(path.join(ARTIFACT_DIR, viewportFilename), viewportScreenshot);
+    await testInfo.attach(viewportFilename, { body: viewportScreenshot, contentType: 'image/png' });
+
+    const boardScreenshot = await board.screenshot({ animations: 'disabled' });
+    const boardFilename = `cinematic-dossier-board-${viewport.name}.png`;
+    await fs.writeFile(path.join(ARTIFACT_DIR, boardFilename), boardScreenshot);
+    await testInfo.attach(boardFilename, { body: boardScreenshot, contentType: 'image/png' });
 
     expect(pageErrors, `Uncaught page errors: ${pageErrors.join('\n')}`).toEqual([]);
     expect(consoleErrors, `Console errors: ${consoleErrors.join('\n')}`).toEqual([]);
