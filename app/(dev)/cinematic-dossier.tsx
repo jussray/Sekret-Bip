@@ -57,11 +57,12 @@ export default function CinematicDossierPreviewRoute() {
       },
       shots: SHOT_BLUEPRINT.map((shot, index) => {
         const pose = poseAssets[index];
+        const generated = pose.entry.status === 'generated';
         return {
           ...shot,
-          image: pose.entry.source,
+          image: generated ? pose.entry.source : undefined,
           scene: NIGHT_SCENES[index],
-          assetStatus: pose.entry.status === 'generated' ? `GENERATED · ${pose.pose}` : `FALLBACK → NEUTRAL · ${pose.pose}`,
+          assetStatus: generated ? `GENERATED · ${pose.pose}` : `FALLBACK → NEUTRAL · ${pose.pose}`,
         };
       }),
       modules: [
@@ -114,7 +115,7 @@ export default function CinematicDossierPreviewRoute() {
         <Text style={styles.kicker}>FOUNDER VISUAL SYSTEM</Text>
         <Text style={styles.title}>Character bible + storyboard + evidence.</Text>
         <Text style={styles.subtitle}>
-          A reusable dossier grammar proved only against today’s production-authoritative Night vertical slice. Scene plates come from the Night Room art set; character states come from the canonical Night runtime registry; unavailable poses stay labeled as fallbacks.
+          A reusable dossier grammar proved only against today’s production-authoritative Night vertical slice. Scene plates come from the Night Room art set; character states come from the canonical Night runtime registry; unavailable poses stay labeled as fallbacks instead of being visually impersonated by neutral.
         </Text>
 
         <CinematicEvidenceBoard
