@@ -7,10 +7,16 @@ on:
     paths:
       - worker/piper-tts.ts
       - worker/index.ts
+      - worker/voice-entry.ts
+      - worker/voice-routing.ts
+      - worker/voice-providers.ts
       - services/piper-tts/**
       - test/piper-tts.test.mjs
+      - test/voice-provider-runtime.test.mjs
+      - docs/PIPER_TTS.md
       - docs/piper-voice-contract.md
       - docs/piper-voice-contract-proof.md
+      - wrangler.toml
       - .github/workflows/piper-voice-exact-head.yml
   pull_request:
     branches:
@@ -18,10 +24,16 @@ on:
     paths:
       - worker/piper-tts.ts
       - worker/index.ts
+      - worker/voice-entry.ts
+      - worker/voice-routing.ts
+      - worker/voice-providers.ts
       - services/piper-tts/**
       - test/piper-tts.test.mjs
+      - test/voice-provider-runtime.test.mjs
+      - docs/PIPER_TTS.md
       - docs/piper-voice-contract.md
       - docs/piper-voice-contract-proof.md
+      - wrangler.toml
       - .github/workflows/piper-voice-exact-head.yml
   workflow_dispatch:
 
@@ -41,7 +53,7 @@ jobs:
   verify-piper-contract:
     name: Exact head and Piper contract
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
 
     steps:
       - name: Check out exact pull-request head
@@ -70,19 +82,115 @@ jobs:
       - name: Install repository dependencies
         run: npm ci
 
-      - name: Run Piper contract tests
+      - name: Run Piper and current voice-routing contract tests
         shell: bash
         run: |
-          set -o pipefail
-          node --test test/piper-tts.test.mjs \
+          set -euo pipefail
+          node --test \
+            test/piper-tts.test.mjs \
+            test/voice-provider-runtime.test.mjs \
             2>&1 | tee piper-evidence/piper-contract.log
 
       - name: Validate Piper Python service syntax
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           python -m py_compile services/piper-tts/server.py \
             2>&1 | tee piper-evidence/python-syntax.log
+
+      - name: Build exact-head Piper container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --label "org.opencontainers.image.revision=$EXPECTED_HEAD_SHA" \
+            -t "sekret-piper:$EXPECTED_HEAD_SHA" \
+            services/piper-tts \
+            2>&1 | tee piper-evidence/container-build.log
+
+      - name: Prove local Piper health, auth boundary, and synthesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN='piper-exact-head-proof-token'
+          CONTAINER='sekret-piper-exact-head-proof'
+
+          cleanup() {
+            docker logs "$CONTAINER" > piper-evidence/container-runtime.log 2>&1 || true
+            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d \
+            --name "$CONTAINER" \
+            -p 127.0.0.1:18080:8080 \
+            -e "PIPER_API_TOKEN=$TOKEN" \
+            "sekret-piper:$EXPECTED_HEAD_SHA" \
+            > piper-evidence/container-id.txt
+
+          READY=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/health > piper-evidence/health.json; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY" = '1'
+
+          python - <<'PY' 2>&1 | tee piper-evidence/health-contract.log
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path('piper-evidence/health.json').read_text())
+          expected = {
+              'en_US-amy-medium',
+              'en_US-ryan-medium',
+              'en_US-amy-low',
+              'en_US-lessac-low',
+          }
+          observed = set(payload.get('voices') or [])
+          assert payload.get('ok') is True, payload
+          assert expected <= observed, {'expected': sorted(expected), 'observed': sorted(observed)}
+          print('canonical_voice_models=' + ','.join(sorted(expected)))
+          PY
+
+          UNAUTH_CODE="$(curl -sS \
+            -o piper-evidence/unauthenticated-synthesis.json \
+            -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data '{"text":"proof","voice":"en_US-amy-low","format":"wav"}' \
+            http://127.0.0.1:18080/synthesize || true)"
+          printf 'unauthenticated_status=%s\n' "$UNAUTH_CODE" \
+            | tee piper-evidence/auth-boundary.txt
+          test "$UNAUTH_CODE" = '401'
+
+          AUTH_CODE="$(curl -sS \
+            -o piper-evidence/authenticated-synthesis.wav \
+            -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            -H "Authorization: Bearer $TOKEN" \
+            --data '{"text":"Piper exact head proof.","voice":"en_US-amy-low","format":"wav"}' \
+            http://127.0.0.1:18080/synthesize)"
+          printf 'authenticated_status=%s\n' "$AUTH_CODE" \
+            | tee -a piper-evidence/auth-boundary.txt
+          test "$AUTH_CODE" = '200'
+          test -s piper-evidence/authenticated-synthesis.wav
+
+          python - <<'PY' 2>&1 | tee piper-evidence/synthesis-contract.log
+          import wave
+          from pathlib import Path
+
+          audio = Path('piper-evidence/authenticated-synthesis.wav')
+          with wave.open(str(audio), 'rb') as wav:
+              frames = wav.getnframes()
+              rate = wav.getframerate()
+              channels = wav.getnchannels()
+              assert frames > 0
+              assert rate > 0
+              assert channels > 0
+          print(f'wav_bytes={audio.stat().st_size} frames={frames} rate={rate} channels={channels}')
+          PY
 
       - name: Upload exact-head evidence
         if: always()
