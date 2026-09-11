@@ -26,6 +26,14 @@ test('beehiiv publication kit preserves the durable trial-harvest assets', () =>
   }
 });
 
+test('critical welcome path survives Launch and avoids duplicate sends', () => {
+  assert.match(kit, /built-in welcome email/i);
+  assert.match(kit, /free Launch plan/i);
+  assert.match(kit, /paid multi-step welcome automation as an optional experiment/i);
+  assert.match(kit, /do not enable both the built-in welcome email and a Signed Up welcome automation/i);
+  assert.doesNotMatch(kit, /welcome email or welcome automation/i);
+});
+
 test('beehiiv harvest pack preserves owned audience, automation, export, and evidence value', () => {
   for (const required of [
     '## Priority order',
