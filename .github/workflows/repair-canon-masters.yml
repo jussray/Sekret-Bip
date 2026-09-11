@@ -1,0 +1,108 @@
+name: Repair canonical character masters
+
+on:
+  push:
+    branches:
+      - ops/canon-master-binary-repair
+    paths:
+      - .github/workflows/repair-canon-masters.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout fresh main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Reacquire exact main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+          echo "base=$(git rev-parse HEAD)"
+
+      - name: Restore exact locked fingerprints
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p assets/images/companions/night assets/images/companions/raylene assets/images/companions/rylane
+
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/1caf84e5-bc89-4abf-be50-557922d5cf78.png' \
+            -o assets/images/companions/night/night-master.png
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/86013749-538c-421e-b976-772b04096f9f.png' \
+            -o assets/images/companions/raylene/raylene-master.png
+          curl -fL --retry 3 --retry-delay 2 \
+            'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/855a41c2-1a3d-4be0-85f3-771665777067.png' \
+            -o assets/images/companions/rylane/rylane-master.png
+
+          printf '%s  %s\n' \
+            '92bf386d0425003a0762d7f6e087720ab92d4a147d17ed8108c5dbeb14293830' 'assets/images/companions/night/night-master.png' \
+            '68983b98c37bf06b7e381109384471d0a03dbc645dc9228b12a8267644a32c0c' 'assets/images/companions/raylene/raylene-master.png' \
+            '115df61b36d82e8d9be1a729f3012fe6e6d23add2e2802c23a48c6627f77b0c8' 'assets/images/companions/rylane/rylane-master.png' \
+            | sha256sum -c -
+
+          test "$(stat -c%s assets/images/companions/night/night-master.png)" -eq 163472
+          test "$(stat -c%s assets/images/companions/raylene/raylene-master.png)" -eq 181307
+          test "$(stat -c%s assets/images/companions/rylane/rylane-master.png)" -eq 179326
+
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct
+          expected = {
+              'assets/images/companions/night/night-master.png': (296, 540),
+              'assets/images/companions/raylene/raylene-master.png': (332, 466),
+              'assets/images/companions/rylane/rylane-master.png': (296, 600),
+          }
+          sig = b'\x89PNG\r\n\x1a\n'
+          iend = b'\x00\x00\x00\x00IEND\xaeB`\x82'
+          for path, dims in expected.items():
+              data = Path(path).read_bytes()
+              assert data.startswith(sig), f'{path}: bad PNG signature'
+              assert data.endswith(iend), f'{path}: missing IEND / truncated PNG'
+              width, height = struct.unpack('>II', data[16:24])
+              assert (width, height) == dims, f'{path}: {(width, height)} != {dims}'
+              print(f'PASS {path} {width}x{height} {len(data)} bytes')
+          PY
+
+      - name: Focused canon contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test \
+            test/pages-companion-asset-contract.test.mjs \
+            test/companion-runtime-contracts.test.mjs \
+            test/sekret-bip-story-canon-contract.test.mjs
+
+      - name: Commit repair and fast-forward main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add \
+            assets/images/companions/night/night-master.png \
+            assets/images/companions/raylene/raylene-master.png \
+            assets/images/companions/rylane/rylane-master.png
+
+          if git diff --cached --quiet; then
+            echo 'Masters already match locked fingerprints; nothing to commit.'
+            exit 0
+          fi
+
+          git commit -m 'fix(canon): restore intact companion masters'
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
+          echo "repaired_head=$(git rev-parse HEAD)"
