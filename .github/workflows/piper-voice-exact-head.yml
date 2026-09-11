@@ -11,6 +11,7 @@ on:
       - worker/voice-routing.ts
       - worker/voice-providers.ts
       - services/piper-tts/**
+      - deploy/render/piper/**
       - test/piper-tts.test.mjs
       - test/voice-provider-runtime.test.mjs
       - docs/PIPER_TTS.md
@@ -28,6 +29,7 @@ on:
       - worker/voice-routing.ts
       - worker/voice-providers.ts
       - services/piper-tts/**
+      - deploy/render/piper/**
       - test/piper-tts.test.mjs
       - test/voice-provider-runtime.test.mjs
       - docs/PIPER_TTS.md
