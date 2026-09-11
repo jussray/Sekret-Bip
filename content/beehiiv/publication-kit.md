@@ -127,6 +127,8 @@ Boundary footer:
 
 ## 3. Welcome email
 
+Canonical delivery: use beehiiv’s **built-in welcome email** under **Settings → Emails → Preset Emails**. This is the durable critical onboarding path because beehiiv supports the single welcome email on the free Launch plan. Treat any paid multi-step welcome automation as an optional experiment, not a dependency. Do not enable both the built-in welcome email and a Signed Up welcome automation for the same subscriber path because that can send duplicate welcome messages.
+
 Subject: **Welcome to Se’kret Bip 🌙**
 
 Preheader: **Stories, tools, and better ways to start the conversation.**
@@ -278,7 +280,8 @@ Complete these inside beehiiv while the trial still exposes the tools:
 
 - [ ] Apply the website-builder prompt.
 - [ ] Save the reusable newsletter skeleton as the working template.
-- [ ] Add and test the welcome email or welcome automation.
+- [ ] Configure, preview on desktop/mobile, and enable the built-in welcome email from Section 3.
+- [ ] If testing a paid welcome automation, keep it optional and do not enable it alongside the built-in welcome email for the same Signed Up path.
 - [ ] Publish or schedule Issue #001 only after previewing desktop and mobile layouts.
 - [ ] Convert Issue #001 into the trial’s AI podcast workflow if available.
 - [ ] Capture an analytics baseline after the first real sends/visits.
