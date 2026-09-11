@@ -7,10 +7,16 @@ on:
     paths:
       - worker/piper-tts.ts
       - worker/index.ts
+      - worker/voice-entry.ts
+      - worker/voice-routing.ts
+      - worker/voice-providers.ts
       - services/piper-tts/**
       - test/piper-tts.test.mjs
+      - test/voice-provider-runtime.test.mjs
+      - docs/PIPER_TTS.md
       - docs/piper-voice-contract.md
       - docs/piper-voice-contract-proof.md
+      - wrangler.toml
       - .github/workflows/piper-voice-exact-head.yml
   pull_request:
     branches:
@@ -18,10 +24,16 @@ on:
     paths:
       - worker/piper-tts.ts
       - worker/index.ts
+      - worker/voice-entry.ts
+      - worker/voice-routing.ts
+      - worker/voice-providers.ts
       - services/piper-tts/**
       - test/piper-tts.test.mjs
+      - test/voice-provider-runtime.test.mjs
+      - docs/PIPER_TTS.md
       - docs/piper-voice-contract.md
       - docs/piper-voice-contract-proof.md
+      - wrangler.toml
       - .github/workflows/piper-voice-exact-head.yml
   workflow_dispatch:
 
@@ -41,7 +53,7 @@ jobs:
   verify-piper-contract:
     name: Exact head and Piper contract
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 25
 
     steps:
       - name: Check out exact pull-request head
@@ -70,19 +82,167 @@ jobs:
       - name: Install repository dependencies
         run: npm ci
 
-      - name: Run Piper contract tests
+      - name: Run Piper and current voice-routing contract tests
         shell: bash
         run: |
-          set -o pipefail
-          node --test test/piper-tts.test.mjs \
+          set -euo pipefail
+          node --test \
+            test/piper-tts.test.mjs \
+            test/voice-provider-runtime.test.mjs \
             2>&1 | tee piper-evidence/piper-contract.log
 
       - name: Validate Piper Python service syntax
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           python -m py_compile services/piper-tts/server.py \
             2>&1 | tee piper-evidence/python-syntax.log
+
+      - name: Build exact-head Piper container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --label "org.opencontainers.image.revision=$EXPECTED_HEAD_SHA" \
+            -t "sekret-piper:$EXPECTED_HEAD_SHA" \
+            services/piper-tts \
+            2>&1 | tee piper-evidence/container-build.log
+
+      - name: Prove local Piper health, auth boundary, and Worker synthesis
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN='piper-exact-head-proof-token'
+          CONTAINER='sekret-piper-exact-head-proof'
+
+          cleanup() {
+            docker logs "$CONTAINER" > piper-evidence/container-runtime.log 2>&1 || true
+            docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          docker run -d \
+            --name "$CONTAINER" \
+            -p 127.0.0.1:18080:8080 \
+            -e "PIPER_API_TOKEN=$TOKEN" \
+            "sekret-piper:$EXPECTED_HEAD_SHA" \
+            > piper-evidence/container-id.txt
+
+          READY=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:18080/health > piper-evidence/health.json; then
+              READY=1
+              break
+            fi
+            sleep 2
+          done
+          test "$READY" = '1'
+
+          python - <<'PY' 2>&1 | tee piper-evidence/health-contract.log
+          import json
+          from pathlib import Path
+
+          payload = json.loads(Path('piper-evidence/health.json').read_text())
+          expected = {
+              'en_US-amy-medium',
+              'en_US-ryan-medium',
+              'en_US-amy-low',
+              'en_US-lessac-low',
+          }
+          observed = set(payload.get('voices') or [])
+          assert payload.get('ok') is True, payload
+          assert expected <= observed, {'expected': sorted(expected), 'observed': sorted(observed)}
+          print('canonical_voice_models=' + ','.join(sorted(expected)))
+          PY
+
+          UNAUTH_CODE="$(curl -sS \
+            -o piper-evidence/unauthenticated-synthesis.json \
+            -w '%{http_code}' \
+            -H 'Content-Type: application/json' \
+            --data '{"text":"proof","voice":"en_US-amy-low","format":"wav"}' \
+            http://127.0.0.1:18080/synthesize || true)"
+          printf 'unauthenticated_status=%s\n' "$UNAUTH_CODE" \
+            | tee piper-evidence/auth-boundary.txt
+          test "$UNAUTH_CODE" = '401'
+
+          rm -rf piper-evidence/worker-proof-js
+          ./node_modules/.bin/tsc worker/piper-tts.ts \
+            --outDir piper-evidence/worker-proof-js \
+            --rootDir worker \
+            --target ES2022 \
+            --module commonjs \
+            --moduleResolution node \
+            --lib ES2022,DOM \
+            --skipLibCheck \
+            2>&1 | tee piper-evidence/worker-compile.log
+
+          PIPER_PROOF_URL='http://127.0.0.1:18080' \
+          PIPER_PROOF_TOKEN="$TOKEN" \
+          node <<'JS' 2>&1 | tee piper-evidence/worker-integration.log
+          const assert = require('node:assert/strict');
+          const fs = require('node:fs');
+          const { synthesizeWithPiper } = require('./piper-evidence/worker-proof-js/piper-tts.js');
+
+          const companions = [
+            ['suhana', 'en_US-amy-medium'],
+            ['sy', 'en_US-ryan-medium'],
+            ['cloud', 'en_US-amy-low'],
+            ['night', 'en_US-lessac-low'],
+          ];
+
+          (async () => {
+            const unbound = await synthesizeWithPiper({
+              text: 'Piper rollback proof.',
+              characterId: 'cloud',
+              env: {},
+            });
+            assert.equal(unbound, null, 'removing the Piper binding must cleanly disable Piper');
+            console.log('unbound_piper_returns_null=true');
+
+            for (const [characterId, expectedVoice] of companions) {
+              const audio = await synthesizeWithPiper({
+                text: `Piper exact head proof for ${characterId}.`,
+                characterId,
+                env: {
+                  PIPER_TTS_URL: process.env.PIPER_PROOF_URL,
+                  PIPER_TTS_TOKEN: process.env.PIPER_PROOF_TOKEN,
+                },
+              });
+
+              assert.ok(audio, `${characterId} must return audio`);
+              assert.equal(audio.voice, expectedVoice, `${characterId} voice mapping`);
+              assert.ok(audio.contentType.startsWith('audio/'), `${characterId} content type`);
+
+              const wav = Buffer.from(audio.bytes);
+              assert.ok(wav.length > 44, `${characterId} WAV must contain audio data`);
+              assert.equal(wav.subarray(0, 4).toString('ascii'), 'RIFF', `${characterId} RIFF header`);
+              assert.equal(wav.subarray(8, 12).toString('ascii'), 'WAVE', `${characterId} WAVE header`);
+              fs.writeFileSync(`piper-evidence/worker-${characterId}.wav`, wav);
+              console.log(`${characterId}: voice=${audio.voice} bytes=${wav.length} contentType=${audio.contentType}`);
+            }
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
+          JS
+
+          python - <<'PY' 2>&1 | tee piper-evidence/synthesis-contract.log
+          import wave
+          from pathlib import Path
+
+          expected = ('suhana', 'sy', 'cloud', 'night')
+          for character in expected:
+              audio = Path(f'piper-evidence/worker-{character}.wav')
+              assert audio.is_file() and audio.stat().st_size > 44, character
+              with wave.open(str(audio), 'rb') as wav:
+                  frames = wav.getnframes()
+                  rate = wav.getframerate()
+                  channels = wav.getnchannels()
+                  assert frames > 0
+                  assert rate > 0
+                  assert channels > 0
+              print(f'{character}: wav_bytes={audio.stat().st_size} frames={frames} rate={rate} channels={channels}')
+          PY
 
       - name: Upload exact-head evidence
         if: always()
