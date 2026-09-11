@@ -5,6 +5,7 @@ import test from 'node:test';
 const signupSource = fs.readFileSync('app/(auth)/signup.tsx', 'utf8');
 const loginSource = fs.readFileSync('app/(auth)/login.tsx', 'utf8');
 const helperSource = fs.readFileSync('src/features/auth/emailConfirmation.ts', 'utf8');
+const passwordRecoveryHelperSource = fs.readFileSync('src/features/auth/passwordRecovery.ts', 'utf8');
 const forgotPasswordSource = fs.readFileSync('app/(auth)/forgot-password.tsx', 'utf8');
 const resetPasswordSource = fs.readFileSync('app/(auth)/reset-password.tsx', 'utf8');
 
@@ -37,9 +38,20 @@ test('redirects use the public web route and Expo native deep link', () => {
 
 test('forgot-password and reset-password preserve the recovery flow', () => {
   assert.match(forgotPasswordSource, /auth\.resetPasswordForEmail\(/);
-  assert.match(forgotPasswordSource, /redirectTo: recoveryRedirectUrl\(\)/);
+  assert.match(forgotPasswordSource, /redirectTo: recoveryRedirectUrl\(preferredSide\)/);
   assert.match(forgotPasswordSource, /If an account matches that email/);
   assert.match(resetPasswordSource, /parseRecoveryUrl/);
   assert.match(resetPasswordSource, /auth\.updateUser\(\{ password \}\)/);
   assert.match(resetPasswordSource, /passwordReset=1/);
+});
+
+test('password recovery preserves teen or parent entry-side continuity', () => {
+  assert.match(loginSource, /authRoute\('\/\(auth\)\/forgot-password', preferredSide\)/);
+  assert.match(forgotPasswordSource, /useLocalSearchParams<\{ side\?: string \}>/);
+  assert.match(forgotPasswordSource, /buildRecoveryRedirectUrl\(\{ webOrigin: window\.location\.origin, side \}\)/);
+  assert.match(passwordRecoveryHelperSource, /if \(options\.side\) target\.searchParams\.set\('side', options\.side\)/);
+  assert.match(resetPasswordSource, /useLocalSearchParams<\{ side\?: string \}>/);
+  assert.match(resetPasswordSource, /scrubRecoveryUrl\(preferredSide\)/);
+  assert.match(resetPasswordSource, /authRoute\('\/\(auth\)\/login', preferredSide, 'passwordReset=1'\)/);
+  assert.match(resetPasswordSource, /authRoute\('\/\(auth\)\/forgot-password', preferredSide\)/);
 });
