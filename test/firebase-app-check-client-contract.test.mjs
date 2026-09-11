@@ -21,11 +21,17 @@ test('App Check client dependencies and Expo plugins stay narrowly scoped', () =
   const pkg = JSON.parse(read('package.json'));
   const appJson = JSON.parse(read('app.json'));
   const pluginNames = appJson.expo.plugins.map((entry) => Array.isArray(entry) ? entry[0] : entry);
+  const buildProperties = appJson.expo.plugins.find(
+    (entry) => Array.isArray(entry) && entry[0] === 'expo-build-properties',
+  );
 
   assert.equal(pkg.dependencies['@react-native-firebase/app'], '26.4.0');
   assert.equal(pkg.dependencies['@react-native-firebase/app-check'], '26.4.0');
+  assert.equal(pkg.dependencies['expo-build-properties'], '56.0.19');
   assert.ok(pluginNames.includes('@react-native-firebase/app'));
   assert.ok(pluginNames.includes('@react-native-firebase/app-check'));
+  assert.ok(buildProperties, 'Expo build properties must carry the RNFirebase iOS framework prerequisite');
+  assert.equal(buildProperties[1]?.ios?.useFrameworks, 'static');
 
   for (const prohibited of [
     '@react-native-firebase/auth',
