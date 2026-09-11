@@ -6,9 +6,11 @@ import test from 'node:test';
 const kitPath = path.join(process.cwd(), 'content', 'beehiiv', 'publication-kit.md');
 const harvestPath = path.join(process.cwd(), 'content', 'beehiiv', 'trial-harvest-pack.md');
 const receiptPath = path.join(process.cwd(), 'content', 'beehiiv', 'provider-run-receipt.md');
+const pluginBoundaryPath = path.join(process.cwd(), 'content', 'beehiiv', 'plugin-boundary.md');
 const kit = fs.readFileSync(kitPath, 'utf8');
 const harvest = fs.readFileSync(harvestPath, 'utf8');
 const receipt = fs.readFileSync(receiptPath, 'utf8');
+const pluginBoundary = fs.readFileSync(pluginBoundaryPath, 'utf8');
 
 test('beehiiv publication kit preserves the durable trial-harvest assets', () => {
   for (const required of [
@@ -75,6 +77,16 @@ test('beehiiv provider run receipt makes provider execution auditable', () => {
   assert.match(receipt, /Allowed state values: `OPEN`, `VERIFIED`, `BLOCKED`, `NOT_APPLICABLE`/);
 });
 
+test('beehiiv is an optional plugin and cannot become system authority', () => {
+  assert.match(pluginBoundary, /Beehiiv is an optional edge plugin/i);
+  assert.match(pluginBoundary, /Chief AI, PromptOS, and Sol/);
+  assert.match(pluginBoundary, /not a main system, operating system, reasoning authority, governance authority, continuity authority, identity authority, or product\/account authority/i);
+  assert.match(pluginBoundary, /Beehiiv is downstream of intent and authority/i);
+  assert.match(pluginBoundary, /provider results return as evidence rather than authority/i);
+  assert.match(pluginBoundary, /Beehiiv can be removed without redesigning the main systems/i);
+  assert.match(pluginBoundary, /replace only the delivery mechanism/i);
+});
+
 test('beehiiv remains a distribution layer rather than product or private-data authority', () => {
   assert.match(kit, /Distribution layer: beehiiv/);
   assert.match(kit, /Product\/account authority: Se’kret Bip app, not beehiiv/);
@@ -87,7 +99,7 @@ test('beehiiv remains a distribution layer rather than product or private-data a
 });
 
 test('public publication copy does not invite sensitive disclosure or make clinical promises', () => {
-  const combined = `${kit}\n${harvest}\n${receipt}`;
+  const combined = `${kit}\n${harvest}\n${receipt}\n${pluginBoundary}`;
   const forbidden = [
     /reply with your secret/i,
     /send us your private story/i,
@@ -104,7 +116,7 @@ test('public publication copy does not invite sensitive disclosure or make clini
 });
 
 test('beehiiv content contains no obvious provider credential material', () => {
-  const combined = `${kit}\n${harvest}\n${receipt}`;
+  const combined = `${kit}\n${harvest}\n${receipt}\n${pluginBoundary}`;
   const forbidden = [
     /\bsk-[A-Za-z0-9_-]{12,}\b/,
     /BEEHIIV_API_KEY\s*=/i,
