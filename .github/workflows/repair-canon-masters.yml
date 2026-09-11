@@ -85,7 +85,7 @@ jobs:
             test/companion-runtime-contracts.test.mjs \
             test/sekret-bip-story-canon-contract.test.mjs
 
-      - name: Commit repair and fast-forward main
+      - name: Commit repair to PR branch
         shell: bash
         run: |
           set -euo pipefail
@@ -104,5 +104,5 @@ jobs:
           git commit -m 'fix(canon): restore intact companion masters'
           git fetch origin main
           git rebase origin/main
-          git push origin HEAD:main
-          echo "repaired_head=$(git rev-parse HEAD)"
+          git push origin HEAD:refs/heads/fix/canonical-master-binary-repair
+          echo "repair_branch_head=$(git rev-parse HEAD)"
