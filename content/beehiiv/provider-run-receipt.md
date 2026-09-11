@@ -102,11 +102,15 @@ Mark each row only when the provider state is visible and capture the proof loca
 | AI podcast generated from Issue #001 | OPEN | provider episode editor screenshot |  |
 | `The First Sentence` published | OPEN | public episode URL; public discovery baseline currently negative |  |
 | Podcast RSS captured | OPEN | RSS URL |  |
+| Built-in welcome email configured | OPEN | Settings → Emails → Preset Emails screenshot |  |
+| Built-in welcome email previewed desktop | OPEN | preview screenshot |  |
+| Built-in welcome email previewed mobile | OPEN | preview screenshot |  |
+| Built-in welcome email enabled | OPEN | enabled-toggle screenshot |  |
 | Preference survey published | OPEN | public/provider survey URL |  |
 | `reader_role` mapping verified | OPEN | survey/custom-field screenshot |  |
 | `primary_interest` mapping verified | OPEN | survey/custom-field screenshot |  |
 | `preferred_cadence` mapping verified | OPEN | survey/custom-field screenshot |  |
-| `Se’kret Bip — First 5 Days` activated | OPEN | automation screenshot |  |
+| `Se’kret Bip — First 5 Days` automation experiment | NOT_APPLICABLE | optional paid experiment; not required for critical Launch path | 2026-09-10 |
 | First Full Subscribers export downloaded | OPEN | private-storage filename only |  |
 | First All Posts export downloaded | OPEN | private-storage filename only |  |
 | Support ticket submitted | OPEN | ticket ID only |  |
@@ -134,18 +138,27 @@ Allowed state values: `OPEN`, `VERIFIED`, `BLOCKED`, `NOT_APPLICABLE`.
 - RSS URL: `PENDING`
 - Published at: `PENDING`
 
+### Built-in welcome email
+
+- Subject: **Welcome to Se’kret Bip 🌙**
+- Configured: `PENDING`
+- Desktop preview: `PENDING`
+- Mobile preview: `PENDING`
+- Enabled: `PENDING`
+
 ### Survey
 
 - Title: **What should Se’kret Bip send you?**
 - Survey URL or provider identifier: `PENDING`
 - Responses: `PENDING`
 
-### Automation
+### Optional automation experiment
 
 - Name: **Se’kret Bip — First 5 Days**
-- Activated at: `PENDING`
-- Enrolled: `PENDING`
-- Completed: `PENDING`
+- State: `NOT_APPLICABLE unless intentionally tested after durable P0 gates`
+- Activated at: `N/A`
+- Enrolled: `N/A`
+- Completed: `N/A`
 
 ## Export receipts
 
@@ -179,12 +192,13 @@ I’m preparing Se’kret Bip for the end of its current trial and want to verif
 
 Could you please confirm for this publication:
 
-1. whether an AI-generated podcast episode that is published before the trial ends remains publicly available after downgrade to Launch;
-2. whether the existing podcast RSS feed remains active after downgrade;
-3. whether automations created during the trial become inactive on Launch;
-4. whether a survey created during the trial remains published or becomes unavailable on Launch;
-5. whether custom-field values collected from subscribers remain included in a Full Subscribers export;
-6. whether the normal publication website and standard newsletter signup remain available on Launch without depending on the premium automation.
+1. whether the built-in single welcome email remains available and enabled after downgrade to Launch;
+2. whether an AI-generated podcast episode that is published before the trial ends remains publicly available after downgrade to Launch;
+3. whether the existing podcast RSS feed remains active after downgrade;
+4. whether automations created during the trial become inactive on Launch;
+5. whether a survey created during the trial remains published or becomes unavailable on Launch;
+6. whether custom-field values collected from subscribers remain included in a Full Subscribers export;
+7. whether the normal publication website and standard newsletter signup remain available on Launch without depending on the premium automation.
 
 I’m not asking for an upgrade recommendation. I only need the exact post-trial behavior so I can preserve the publication correctly.
 
@@ -202,10 +216,11 @@ Run after the plan changes or at the earliest point the Launch behavior can be v
 
 1. Public publication homepage loads.
 2. Newsletter signup can be completed without requiring a premium automation.
-3. Issue #001 still loads publicly.
-4. `The First Sentence` episode still loads publicly.
-5. RSS feed still resolves.
-6. No premium-only page is required for the critical public path.
+3. Built-in welcome email remains configured for new subscribers.
+4. Issue #001 still loads publicly.
+5. `The First Sentence` episode still loads publicly.
+6. RSS feed still resolves.
+7. No premium-only page is required for the critical public path.
 
 Record screenshots or trace locations, not subscriber PII.
 
@@ -214,10 +229,11 @@ Record screenshots or trace locations, not subscriber PII.
 The beehiiv trial harvest is complete only when:
 
 - both public content assets are live;
+- the built-in welcome email is configured, previewed on desktop/mobile, and enabled;
 - the three audience preference fields were tested;
-- the automation logic has been exercised while available;
+- the optional automation logic is preserved in the repository and its provider gate is either `VERIFIED` if intentionally tested or `NOT_APPLICABLE` if skipped;
 - first and final exports were downloaded into private storage;
 - the provider downgrade behavior is either verified directly or documented as an explicit remaining risk;
 - the public post-downgrade path has browser evidence.
 
-If one gate fails, mark it `BLOCKED`, record the evidence, preserve the durable assets, and replace only the delivery mechanism.
+If one required gate fails, mark it `BLOCKED`, record the evidence, preserve the durable assets, and replace only the delivery mechanism. An optional automation experiment must never block completion.
