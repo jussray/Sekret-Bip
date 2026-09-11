@@ -21,12 +21,19 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(Math.max(metrics.html, metrics.body)).toBeLessThanOrEqual(metrics.viewport + 1);
 }
 
-async function expectImagesDecoded(images: Locator, label: string) {
-  const unloaded = await images.evaluateAll(nodes =>
-    nodes
-      .map(node => node as HTMLImageElement)
-      .filter(image => !image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0)
-      .map(image => ({ src: image.currentSrc || image.src, complete: image.complete })),
+async function expectRenderedImagesDecoded(targets: Locator, label: string) {
+  const unloaded = await targets.evaluateAll(nodes =>
+    nodes.flatMap(node => {
+      const image = node instanceof HTMLImageElement ? node : node.querySelector('img');
+      if (!image) return [{ src: null, complete: null, reason: 'no rendered img descendant' }];
+      if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) return [];
+      return [{
+        src: image.currentSrc || image.src || null,
+        complete: image.complete,
+        naturalWidth: image.naturalWidth,
+        naturalHeight: image.naturalHeight,
+      }];
+    }),
   );
 
   expect(unloaded, `Unloaded ${label}: ${JSON.stringify(unloaded)}`).toEqual([]);
@@ -41,8 +48,8 @@ async function expectDossierMediaTruth(page: Page) {
   await expect(characters).toHaveCount(2);
   await expect(pendingPoses).toHaveCount(6);
 
-  await expectImagesDecoded(scenes, 'dossier scene images');
-  await expectImagesDecoded(characters, 'dossier canonical character images');
+  await expectRenderedImagesDecoded(scenes, 'dossier scene images');
+  await expectRenderedImagesDecoded(characters, 'dossier canonical character images');
 }
 
 for (const viewport of VIEWPORTS) {
