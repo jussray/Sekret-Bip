@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 
 const VIEWPORTS = [
   { name: 'mobile', width: 390, height: 844 },
@@ -21,10 +21,7 @@ async function expectNoHorizontalOverflow(page: Page) {
   expect(Math.max(metrics.html, metrics.body)).toBeLessThanOrEqual(metrics.viewport + 1);
 }
 
-async function expectDossierImagesDecoded(page: Page) {
-  const images = page.locator('img');
-  await expect.poll(async () => images.count()).toBeGreaterThanOrEqual(16);
-
+async function expectImagesDecoded(images: Locator, label: string) {
   const unloaded = await images.evaluateAll(nodes =>
     nodes
       .map(node => node as HTMLImageElement)
@@ -32,7 +29,20 @@ async function expectDossierImagesDecoded(page: Page) {
       .map(image => ({ src: image.currentSrc || image.src, complete: image.complete })),
   );
 
-  expect(unloaded, `Unloaded dossier images: ${JSON.stringify(unloaded)}`).toEqual([]);
+  expect(unloaded, `Unloaded ${label}: ${JSON.stringify(unloaded)}`).toEqual([]);
+}
+
+async function expectDossierMediaTruth(page: Page) {
+  const scenes = page.locator('[data-testid$="-scene"]');
+  const characters = page.locator('[data-testid$="-character"]');
+  const pendingPoses = page.locator('[data-testid$="-pose-pending"]');
+
+  await expect(scenes).toHaveCount(8);
+  await expect(characters).toHaveCount(2);
+  await expect(pendingPoses).toHaveCount(6);
+
+  await expectImagesDecoded(scenes, 'dossier scene images');
+  await expectImagesDecoded(characters, 'dossier canonical character images');
 }
 
 for (const viewport of VIEWPORTS) {
@@ -61,7 +71,7 @@ for (const viewport of VIEWPORTS) {
     await expect(page.getByText('FALLBACK → NEUTRAL · listening', { exact: true })).toBeVisible();
     await expect(page.getByText('GENERATED · neutral', { exact: true })).toBeVisible();
 
-    await expectDossierImagesDecoded(page);
+    await expectDossierMediaTruth(page);
     await expectNoHorizontalOverflow(page);
 
     await fs.mkdir(ARTIFACT_DIR, { recursive: true });
