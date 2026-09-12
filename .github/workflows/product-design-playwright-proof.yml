@@ -31,6 +31,7 @@ on:
       - 'e2e/calm-product-design.spec.ts'
       - 'e2e/room-canonical-display.spec.ts'
       - 'e2e/canonical-companion-identity.spec.ts'
+      - 'e2e/cinematic-dossier.spec.ts'
       - 'e2e/guardrails.spec.ts'
       - 'e2e/ai-search-discovery.spec.ts'
       - 'test/founder-visual-authority-contract.test.mjs'
@@ -105,7 +106,7 @@ jobs:
           CI: 'true'
           PLAYWRIGHT_ARTIFACT_DIR: artifacts/product-design-playwright
           EXPO_PUBLIC_ENABLE_FOUNDER_PREVIEW: 'true'
-        run: npx playwright test e2e/product-design-review.spec.ts e2e/front-door-audience-switch.spec.ts e2e/calm-product-design.spec.ts e2e/room-canonical-display.spec.ts e2e/canonical-companion-identity.spec.ts e2e/guardrails.spec.ts e2e/ai-search-discovery.spec.ts --project=chromium
+        run: npx playwright test e2e/product-design-review.spec.ts e2e/front-door-audience-switch.spec.ts e2e/calm-product-design.spec.ts e2e/room-canonical-display.spec.ts e2e/canonical-companion-identity.spec.ts e2e/cinematic-dossier.spec.ts e2e/guardrails.spec.ts e2e/ai-search-discovery.spec.ts --project=chromium
 
       - name: Upload Product Design evidence
         if: always()
