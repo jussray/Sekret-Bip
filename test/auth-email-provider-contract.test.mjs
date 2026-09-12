@@ -48,6 +48,13 @@ test('production Auth email provider keeps confirmation enabled and secrets out 
   assert.match(script, /\(pass\|secret\|token\|key\)/i);
 });
 
+test('production Auth email provider stays on the canonical Resend domain', () => {
+  assert.match(workflow, /AUTH_SMTP_ADMIN_EMAIL:\s*invite@sekretbip\.net/);
+  assert.match(script, /smtp_admin_email: env\('AUTH_SMTP_ADMIN_EMAIL', 'invite@sekretbip\.net'\)/);
+  assert.doesNotMatch(workflow, /sekretbip\.com/);
+  assert.doesNotMatch(script, /sekretbip\.com/);
+});
+
 test('provider receipt is redacted and records rollback evidence', () => {
   assert.match(script, /auth-email-provider-receipt\.json/);
   assert.match(script, /before: redact\(before\)/);

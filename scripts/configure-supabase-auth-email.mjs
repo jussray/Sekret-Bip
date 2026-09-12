@@ -47,7 +47,7 @@ function desiredConfig({ smtpPass }) {
     external_email_enabled: true,
     mailer_secure_email_change_enabled: true,
     mailer_autoconfirm: false,
-    smtp_admin_email: env('AUTH_SMTP_ADMIN_EMAIL', 'invite@mail.sekretbip.com'),
+    smtp_admin_email: env('AUTH_SMTP_ADMIN_EMAIL', 'invite@sekretbip.net'),
     smtp_host: env('AUTH_SMTP_HOST', 'smtp.resend.com'),
     smtp_port: Number(env('AUTH_SMTP_PORT', '465')),
     smtp_user: env('AUTH_SMTP_USER', 'resend'),
