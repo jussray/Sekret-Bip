@@ -231,7 +231,8 @@ jobs:
               --apply
           else
             echo 'CLOUDFLARE_APP_DOMAIN_TOKEN_TRANSPORT_INVALID_RETAINING_RECEIPT'
-            CLOUDFLARE_API_TOKEN='' \
+            BIP_PROVIDER_BLOCK_CLASSIFICATION='BLOCKED_CLOUDFLARE_TOKEN_TRANSPORT' \
+              CLOUDFLARE_API_TOKEN='' \
               node scripts/run-cloudflare-app-domain-reconcile-with-receipt.mjs --apply
             exit 1
           fi
