@@ -166,7 +166,7 @@ test('backend health proof requires the canonical Worker identity', () => {
   assert.equal(backendHealthIdentityMatches(null, 'sekret-backend'), false);
 });
 
-test('production reconciler binds mutation to the exact approved current-main SHA and rechecks immediately before apply', () => {
+test('production reconciler binds mutation to bounded authority, exact current main, and an immediate pre-apply recheck', () => {
   const workflow = fs.readFileSync(
     new URL('../.github/workflows/reconcile-cloudflare-app-domain.yml', import.meta.url),
     'utf8',
@@ -179,11 +179,16 @@ test('production reconciler binds mutation to the exact approved current-main SH
   assert.match(workflow, /ref: \$\{\{ inputs\.target_sha \|\| github\.sha \}\}/);
   assert.match(workflow, /Verify focused route reconciler contract/);
   assert.match(workflow, /node --test test\/cloudflare-app-domain-reconciler\.test\.mjs/);
-  assert.match(workflow, /apply:/);
-  assert.match(workflow, /github\.event_name == 'workflow_dispatch' && inputs\.apply == true/);
+  assert.match(workflow, /Resolve bounded apply authority/);
+  assert.match(workflow, /\$GITHUB_EVENT_NAME" == 'workflow_dispatch'/);
+  assert.match(workflow, /\$GITHUB_EVENT_NAME" == 'push'/);
+  assert.match(workflow, /BIP_APP_RECONCILE_APPROVAL_FILE/);
+  assert.match(workflow, /git diff-tree --no-commit-id --name-only -r HEAD/);
+  assert.match(workflow, /approvedParentSha/);
+  assert.match(workflow, /One-shot provider approval is stale or replayed/);
   assert.doesNotMatch(workflow, /github\.event_name == 'push' \|\| inputs\.apply == true/);
   assert.doesNotMatch(workflow, /github\.event_name == 'pull_request' \|\| inputs\.apply == true/);
-  assert.match(workflow, /TARGET_SHA: \$\{\{ inputs\.target_sha \}\}/);
+  assert.match(workflow, /TARGET_SHA: \$\{\{ steps\.apply_authority\.outputs\.approved_target \}\}/);
   assert.match(workflow, /test "\$actual" = "\$TARGET_SHA"/);
   assert.match(workflow, /test "\$TARGET_SHA" = "\$current_main"/);
   assert.match(workflow, /Re-verify exact approved main immediately before provider mutation/);
