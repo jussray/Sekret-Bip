@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { START_MARKER, END_MARKER, SCHEMA, isCurrentCompareStatus, classifyCompareStatus, assertExpectedHead, continuityBaseObservation, replaceManagedBlock, continuityBlock, collectRolloverOrder, sameRepositoryPull, continuityObservationEligible } from '../scripts/pr-continuity.mjs';
+import { START_MARKER, END_MARKER, SCHEMA, isCurrentCompareStatus, classifyCompareStatus, classifyUpdateBranchFailure, assertExpectedHead, continuityBaseObservation, replaceManagedBlock, continuityBlock, collectRolloverOrder, sameRepositoryPull, continuityObservationEligible } from '../scripts/pr-continuity.mjs';
 const repo='jussray/example';const baseRepo={full_name:repo};function pr(number,baseRef,headRef,state='open',headRepo=baseRepo){return{number,state,base:{ref:baseRef,repo:baseRepo},head:{ref:headRef,repo:headRepo}};}
 test('AT01 identical base/head is current ancestry',()=>assert.equal(isCurrentCompareStatus('identical'),true));
 test('AT02 ahead head is current ancestry',()=>assert.equal(isCurrentCompareStatus('ahead'),true));
@@ -27,4 +27,7 @@ test('AT22 base movement during continuity observation fails closed',()=>assert.
 test('AT23 missing live base observation fails closed',()=>assert.throws(()=>continuityBaseObservation('a'.repeat(40),'',''),/LIVE_BASE_SHA_REQUIRED/));
 test('AT24 fork is ineligible for continuity ancestry observation',()=>assert.equal(continuityObservationEligible(pr(1,'main','fork','open',{full_name:'other/repo'}),repo),false));
 test('AT25 same-repository pull is eligible for continuity ancestry observation',()=>assert.equal(continuityObservationEligible(pr(1,'main','feature'),repo),true));
+test('AT26 workflow permission refusal is classified as authority block',()=>assert.equal(classifyUpdateBranchFailure(403,'refusing to allow a GitHub App to create or update workflow .github/workflows/x.yml without workflows permission'),'BLOCKED_WORKFLOW_AUTHORITY'));
+test('AT27 other provider 403 remains a provider authority block',()=>assert.equal(classifyUpdateBranchFailure(403,'Resource not accessible by integration'),'BLOCKED_PROVIDER_AUTHORITY'));
+test('AT28 conflict response remains conflict/race classification',()=>assert.equal(classifyUpdateBranchFailure(422,'merge conflict'),'BLOCKED_CONFLICT_OR_RACE'));
 test('schema remains stable',()=>assert.equal(SCHEMA,'juss/pr-continuity@v1'));
