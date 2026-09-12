@@ -506,7 +506,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         deleteScope: 'exact-host Worker domain/route only',
         wildcardPolicy: 'fail-closed for every broad route regardless of owner',
         pagesPrecondition: 'target domain must already be active on canonical Pages project',
-        applyAuthority: 'workflow_dispatch with apply=true only',
+        applyAuthority: 'bounded workflow_dispatch or one-shot parent-bound repository approval',
         evidenceArtifact: EVIDENCE_PATH,
       },
       null,
@@ -522,7 +522,7 @@ const invokedDirectly =
   process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 
 if (invokedDirectly) {
-  main().catch(() => {
+  main().catch((error) => {
     console.error('CLOUDFLARE_APP_DOMAIN_RECONCILIATION_FAILED');
     process.exitCode = 1;
   });
