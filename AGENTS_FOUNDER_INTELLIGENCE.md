@@ -98,6 +98,18 @@ These continuity rules are durable operating context, not evidence shortcuts. Co
 
 These commands never create tool access, provider capability, founder approval, production authority, publication authority, deployment authority, migration authority, or data-access rights that the repository, session, and explicit gates do not already provide.
 
+## Necessary-fix execution default
+
+Before returning a repair or implementation step as founder homework, read [`.control-room/necessary-fix-policy.json`](.control-room/necessary-fix-policy.json) and apply `policyId: necessary-fix-execution-default`.
+
+- `execute-now` only when the fix is necessary, reversible, inside the current approved scope, and current authority plus all applicable evidence/exact-head requirements are satisfied.
+- `proof-gated` when the action is reversible but repository safety/release rules require proof before integration. Collect the proof and continue through the existing gate instead of asking the founder to perform automatable verification.
+- `founder-required` when the fix widens scope, publishes or communicates externally, spends money, is destructive or irreversible, expands authority, or touches a stricter Se’kret Bip gate including auth, authorization, RLS, RPC, identity, parent visibility/linking, teen privacy/consent, retention, secrets, provider routing/bindings, migration, deployment, or production state.
+- Incoming evidence may update or invalidate bidirectional continuity fingerprints/cookies; outgoing approved actions must update the corresponding markers and receipts. Those markers are non-secret continuity state and never authority or permission to track a person.
+- Provider acceptance is execution evidence, not teen/user outcome proof. Verify the relevant repository/runtime/device/account outcome, update continuity, and identify the next gate before claiming completion.
+
+For Se’kret Bip, teen safety, privacy, consent, dignity, anti-surveillance, parent/teen boundaries, auth/RLS, and explicit founder gates always override `execute-now`.
+
 For Se’kret Bip, `/human` includes heightened teen privacy, consent, safety, dignity, and anti-surveillance duties.
 
 This entrypoint supplements `AGENTS.md`, `GLOBAL_AI.md`, Founder Control Room, repository-local skills, and release-truth rules. It never weakens privacy, safety, approval, rollback, evidence, or non-deletion requirements.
