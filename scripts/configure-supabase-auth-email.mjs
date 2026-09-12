@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const API_BASE = 'https://api.supabase.com/v1';
+const RESEND_API_BASE = 'https://api.resend.com';
 
 function env(name, fallback = '') {
   const value = process.env[name];
@@ -40,6 +41,48 @@ async function request(projectRef, accessToken, options = {}) {
     throw new Error(`Supabase Auth config ${options.method ?? 'GET'} failed (${response.status}): ${message}`);
   }
   return payload;
+}
+
+function senderDomain(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  const at = normalized.lastIndexOf('@');
+  if (at <= 0 || at === normalized.length - 1) {
+    throw new Error(`AUTH_SMTP_ADMIN_EMAIL must be a valid email address; got ${JSON.stringify(email)}`);
+  }
+  return normalized.slice(at + 1);
+}
+
+async function assertResendDomainVerified(apiKey, email) {
+  const domainName = senderDomain(email);
+  const response = await fetch(`${RESEND_API_BASE}/domains?limit=100`, {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      accept: 'application/json',
+    },
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const message = payload?.message || payload?.name || response.statusText;
+    throw new Error(`RESEND_DOMAIN_PREFLIGHT_FAILED (${response.status}): ${message}`);
+  }
+
+  const domains = Array.isArray(payload?.data) ? payload.data : [];
+  const domain = domains.find((entry) => String(entry?.name || '').toLowerCase() === domainName);
+  if (!domain) {
+    throw new Error(`RESEND_DOMAIN_NOT_FOUND ${domainName}`);
+  }
+  if (domain.status !== 'verified') {
+    throw new Error(`RESEND_DOMAIN_NOT_VERIFIED ${domainName}: status=${domain.status ?? 'unknown'}`);
+  }
+  if (domain.capabilities?.sending === 'disabled') {
+    throw new Error(`RESEND_DOMAIN_SENDING_DISABLED ${domainName}`);
+  }
+
+  return {
+    name: domainName,
+    status: domain.status,
+    sending: domain.capabilities?.sending ?? 'unknown',
+  };
 }
 
 function desiredConfig({ smtpPass }) {
@@ -115,6 +158,7 @@ async function main() {
   const accessToken = required('SUPABASE_ACCESS_TOKEN');
   const smtpPass = required('RESEND_API_KEY');
   const desired = desiredConfig({ smtpPass });
+  const resendDomain = await assertResendDomainVerified(smtpPass, desired.smtp_admin_email);
 
   const before = await request(projectRef, accessToken);
   await request(projectRef, accessToken, { method: 'PATCH', body: desired });
@@ -127,6 +171,7 @@ async function main() {
     provider: 'resend-smtp',
     confirmationRequired: true,
     productionMutation: true,
+    resendDomain,
     before: redact(before),
     after: redact(after),
     rollback: {
