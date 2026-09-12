@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { hydrateAccountProfile, type AccountProfile, type AccountSide } from '@/features/identity/accountProfile';
+import { fetchProfessionalBridgeCapability } from '@/services/bridgeFamilyVisitService';
 import { getCurrentFounderProfileForRouting, isFounderProfile } from '@/services/founderAudit';
 import { getSupabase } from '@/utils/supabase';
 import { consentService } from '../../../services/consentService';
@@ -12,6 +13,7 @@ export interface PostAuthBootstrapResult {
   profile: AccountProfile | null;
   accountSide: AccountSide;
   requiredConsentsComplete: boolean;
+  professionalBridgeAvailable: boolean;
   nextRoute: string;
 }
 
@@ -29,11 +31,13 @@ function routeForBootstrap(
   side: AccountSide,
   profile: AccountProfile | null,
   requiredConsentsComplete: boolean,
+  professionalBridgeAvailable: boolean,
 ): string {
   if (!requiredConsentsComplete) return `/(onboarding)/consent?side=${side}`;
   if (!profile?.onboardingComplete) {
     return side === 'parent' ? '/(onboarding)/parent-setup' : '/(onboarding)/name';
   }
+  if (side === 'parent' && professionalBridgeAvailable) return '/bridge-family-visit';
   return '/';
 }
 
@@ -43,25 +47,20 @@ async function hydrateAccountProfileForRouting(
   try {
     return await hydrateAccountProfile(preferredSide);
   } catch {
-    // Authentication already succeeded. A transient profile/schema read failure
-    // must not be presented as bad credentials or bypass consent. Returning null
-    // keeps routing fail-closed through the required onboarding path.
     return null;
   }
 }
 
-/**
- * Fetches the signed-in account facts that routing depends on after login,
- * signup, email confirmation, or account restoration. The caller must wait for
- * this result instead of navigating on the auth response alone.
- *
- * Founder-authorized accounts route to the founder-only Control Room before
- * public onboarding checks. This does not record consent or open any public
- * teen/parent data path; the destination still enforces the founder profile.
- *
- * Root boot may pass a profile it already hydrated from Supabase so the durable
- * profile is fetched once. Auth screens omit it and use the canonical hydrator.
- */
+async function resolveProfessionalBridgeAvailability(
+  accountSide: AccountSide,
+  profile: AccountProfile | null,
+  requiredConsentsComplete: boolean,
+): Promise<boolean> {
+  if (accountSide !== 'parent' || !profile?.onboardingComplete || !requiredConsentsComplete) return false;
+  const capability = await fetchProfessionalBridgeCapability();
+  return capability.ok && capability.value?.verificationStatus === 'verified';
+}
+
 export async function fetchPostAuthBootstrap(
   preferredSide?: AccountSide | null,
   prehydratedProfile?: AccountProfile | null,
@@ -86,6 +85,7 @@ export async function fetchPostAuthBootstrap(
       profile: prehydratedProfile ?? null,
       accountSide,
       requiredConsentsComplete: false,
+      professionalBridgeAvailable: false,
       nextRoute: '/(dev)/control-room',
     };
   }
@@ -99,12 +99,23 @@ export async function fetchPostAuthBootstrap(
   await AsyncStorage.setItem(ONBOARDING_SIDE_KEY, accountSide);
   await consentService.load(user.id);
   const requiredConsentsComplete = consentService.hasCompletedOnboarding();
+  const professionalBridgeAvailable = await resolveProfessionalBridgeAvailability(
+    accountSide,
+    profile,
+    requiredConsentsComplete,
+  );
 
   return {
     userId: user.id,
     profile,
     accountSide,
     requiredConsentsComplete,
-    nextRoute: routeForBootstrap(accountSide, profile, requiredConsentsComplete),
+    professionalBridgeAvailable,
+    nextRoute: routeForBootstrap(
+      accountSide,
+      profile,
+      requiredConsentsComplete,
+      professionalBridgeAvailable,
+    ),
   };
 }

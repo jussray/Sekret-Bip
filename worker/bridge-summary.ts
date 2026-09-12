@@ -1,4 +1,5 @@
 import type { Principal } from './auth';
+import { handleBridgeFamilyVisitSummaryGenerate } from './bridge-family-visit';
 import { getModels } from './config/models';
 import {
   BRIDGE_JSON_SCHEMA,
@@ -27,10 +28,13 @@ interface BridgeSummaryEnv extends BridgeSummaryStoreEnv {
    * wrangler.toml — changeable without an app release, unlike the client flag.
    */
   BRIDGE_SUMMARIES_ROLLOUT?: string;
+  /** Family Visit Mode has a separate server-side rollout membrane. */
+  BRIDGE_FAMILY_VISITS_ROLLOUT?: string;
 }
 
 interface BridgeSummaryRequestBody {
   requestId?: unknown;
+  sessionId?: unknown;
 }
 
 const BRIDGE_SYSTEM_PROMPT = `
@@ -144,6 +148,7 @@ async function generateSummary(env: BridgeSummaryEnv, snippets: string[]): Promi
 }
 
 export async function handleBridgeSummaryGenerate(request: Request, env: BridgeSummaryEnv, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const familyVisitRequest = request.clone();
   let body: BridgeSummaryRequestBody;
   try {
     body = await request.json() as BridgeSummaryRequestBody;
@@ -151,8 +156,13 @@ export async function handleBridgeSummaryGenerate(request: Request, env: BridgeS
     return json({ error: 'Invalid JSON' }, 400, cors);
   }
 
+  const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
   const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : '';
-  if (!requestId) return json({ error: 'requestId is required' }, 400, cors);
+  if (sessionId) {
+    if (requestId) return json({ error: 'Provide either requestId or sessionId, not both.' }, 400, cors);
+    return handleBridgeFamilyVisitSummaryGenerate(familyVisitRequest, env, principal, cors);
+  }
+  if (!requestId) return json({ error: 'requestId or sessionId is required' }, 400, cors);
 
   let userId = '';
   const store = createBridgeSummaryStore(env);
