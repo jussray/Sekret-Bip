@@ -26,7 +26,7 @@ env:
   AUTH_SMTP_HOST: smtp.resend.com
   AUTH_SMTP_PORT: '465'
   AUTH_SMTP_USER: resend
-  AUTH_SMTP_ADMIN_EMAIL: invite@mail.sekretbip.com
+  AUTH_SMTP_ADMIN_EMAIL: invite@sekretbip.net
   AUTH_SMTP_SENDER_NAME: Se'kret Bip
 
 jobs:
