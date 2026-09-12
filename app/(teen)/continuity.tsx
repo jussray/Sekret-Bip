@@ -3,10 +3,13 @@ import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAppContext } from '@/context/AppContext';
+import { resolveVisibleIdentity } from '@/features/sekret/identityContract';
 
 export default function ContinuityRoute() {
   const { entries, moodHistory, selectedSekret } = useAppContext();
-  const companion = selectedSekret ? selectedSekret[0].toUpperCase() + selectedSekret.slice(1) : 'Raylene';
+  // Title-casing the stored id would render the pre-cutover names
+  // ('Raylene'/'Rylane'); resolve through the canonical display map instead.
+  const companion = selectedSekret ? resolveVisibleIdentity(selectedSekret) : 'Suhana';
 
   return (
     <View style={styles.root}>

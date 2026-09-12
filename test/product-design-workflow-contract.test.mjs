@@ -48,6 +48,7 @@ test('Product Design proof remains exact-head and failure-preserving', () => {
     'e2e/guardrails.spec.ts',
     'test/founder-visual-authority-contract.test.mjs',
     'test/pages-companion-asset-contract.test.mjs',
+    'test/companion-display-name-canon.test.mjs',
   ]) {
     assert.ok(workflow.includes(required), `missing Product Design workflow contract: ${required}`);
   }

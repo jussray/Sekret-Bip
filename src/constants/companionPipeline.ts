@@ -19,8 +19,8 @@ export const PIPELINE_VERSION = '2.0';
 
 /** Human-readable display names for the locked teen companions. */
 export const COMPANION_DISPLAY_NAMES: Record<TeenCompanion, string> = {
-  raylene: 'Raylene',
-  rylane: 'Rylane',
+  raylene: 'Suhana',
+  rylane: 'Sy',
   night: 'Night',
 };
 
@@ -103,7 +103,7 @@ Strict requirements:
 - No text, labels, or additional objects.
 - One character only.
 
-Style consistency is critical. This must look like it belongs in the same set as the existing Raylene, Night, and Rylane neutral images.`;
+Style consistency is critical. This must look like it belongs in the same set as the existing Suhana, Night, and Sy neutral images.`;
 
 /**
  * Builds the ready-to-paste generation prompt for one companion + pose, with the

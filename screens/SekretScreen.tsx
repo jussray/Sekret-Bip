@@ -5,7 +5,7 @@
 // SEKRET_PROFILES fallback, and personality-aware replies. Adds:
 //   • Time-of-day Room backdrop via getRoomBg(character, time)
 //   • Mood-tinted glow (happy/sad/angry/tired/calm)
-//   • Per-character copy: Raylene, Rylane, Cloud, Night each have distinct
+//   • Per-character copy: Suhana, Sy, Cloud, Night each have distinct
 //     heroSub / stickyLine / sendLabel / placeholder / greeting
 //   • Stagger entrance fade-ins, breath loop on profile emoji
 //   • Scrapbook sticky-note quiet line
@@ -28,8 +28,8 @@ import type { OracleProfile } from '../services/oracleDiscovery';
 
 // ── Profiles (keep in sync with index.tsx SEKRET_PROFILES) ─────────────────
 const SEKRET_PROFILES: Record<string, any> = {
-  soft:   { name: 'Raylene',        emoji: '🌸', title: 'Favorite Older Sister', vibe: 'Funny, warm, protective, and impossible to fool.', greeting: 'friend... 😭 okay, what happened?' },
-  rylane: { name: 'Rylane',         emoji: '⚡', title: 'Loyal Bro',            vibe: 'Quiet loyalty. Keeps it real. Never talks down.',   greeting: "Aight, what\'s actually on your mind? No fake 'I'm fine'." },
+  soft:   { name: 'Suhana',        emoji: '🌸', title: 'Favorite Older Sister', vibe: 'Funny, warm, protective, and impossible to fool.', greeting: 'friend... 😭 okay, what happened?' },
+  rylane: { name: 'Sy',         emoji: '⚡', title: 'Loyal Bro',            vibe: 'Quiet loyalty. Keeps it real. Never talks down.',   greeting: "Aight, what\'s actually on your mind? No fake 'I'm fine'." },
   cloud:  { name: "Cloud Se'kret",  emoji: '☁️', title: 'Quiet Observer',      vibe: 'Notices. Waits. Rarely pushes.',                    greeting: 'something feels different today.' },
   night:  { name: "Night Se'kret",  emoji: '🌙', title: 'The Light Left On',   vibe: 'Presence. Not conversation.',                       greeting: 'rough night?' },
 };
@@ -92,7 +92,7 @@ function copyFor(profileKey: string, profileName: string): CharacterCopy {
     default:
       return {
         heroTitle:   'Drop a Bip 💜',
-        heroSub:     "Say it how you'd text it. Raylene can take it.",
+        heroSub:     "Say it how you'd text it. Suhana can take it.",
         stickyLine:  'no polished version. what actually happened?',
         sendLabel:   'Send 💜',
         placeholder: `Talk to ${profileName}…`,

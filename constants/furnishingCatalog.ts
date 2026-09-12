@@ -9,7 +9,7 @@
  * Items that are ready show `available: true`.
  *
  * Sourced from visual inventory of the four Avatar Room bg images:
- * Raylene (cozy purple bedroom), Rylane (dark city setup),
+ * Suhana (cozy purple bedroom), Sy (dark city setup),
  * Cloud (brain dump creative space), Night (late-night thinker den).
  */
 
@@ -102,7 +102,7 @@ export const FURNISH_CATALOG: FurnishItem[] = [
   // String / fairy lights
   item('fairy-lights',   'Fairy String Lights','✨',   'lighting', 'night',   null, ['lights', 'fairy', 'night', 'cozy']),
 
-  // Cloud lamp plush (on Raylene's bed)
+  // Cloud lamp plush (on Suhana's bed)
   item('cloud-lamp',     'Cloud Lamp Plush',   '☁️',  'lighting', 'raylene',
     IMAGES.cloudSleepy, // closest existing asset — sleepy cloud
     ['cloud', 'lamp', 'plush', 'cozy', 'raylene']),
@@ -129,9 +129,9 @@ export const FURNISH_CATALOG: FurnishItem[] = [
   item('sticky-thoughts','Cloud Thoughts Wall','🌫️',  'decor', 'cloud',       null, ['sticky', 'cloud', 'thoughts', 'brain-dump']),
 
   // Character art / photo pins
-  item('char-art-raylene', 'Raylene Photo',   '💜',  'decor', 'raylene',
+  item('char-art-raylene', 'Suhana Photo',   '💜',  'decor', 'raylene',
     IMAGES.rayleneNeutral, ['photo', 'raylene', 'wall', 'art']),
-  item('char-art-rylane',  'Rylane Photo',    '⚡',  'decor', 'rylane',
+  item('char-art-rylane',  'Sy Photo',    '⚡',  'decor', 'rylane',
     IMAGES.rylaneNeutral, ['photo', 'rylane', 'wall', 'art']),
   item('char-art-cloud',   'Cloud Photo',     '☁️',  'decor', 'cloud',
     IMAGES.cloudAvatarNeutral, ['photo', 'cloud', 'wall', 'art']),

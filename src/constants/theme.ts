@@ -37,7 +37,7 @@ export const SEKRET_PROFILES: Record<string, SekretProfile> = {
     greeting: "Hey love. I'm here. Tell me what's on your mind.",
   },
   rylane: {
-    name: 'Rylane', emoji: '⚡', title: 'Loyal Bro',
+    name: 'Sy', emoji: '⚡', title: 'Loyal Bro',
     vibe: 'Quiet loyalty. Keeps it real. Never talks down.',
     greeting: "Aight, I'm here. What's been heavy?",
   },
