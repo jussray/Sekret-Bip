@@ -5,20 +5,24 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/reconcile-cloudflare-app-domain.yml'
+      - '.control-room/provider-mutation-approvals/cloudflare-app-domain.json'
       - 'scripts/reconcile-cloudflare-app-domain.mjs'
       - 'scripts/run-cloudflare-app-domain-reconcile-with-receipt.mjs'
       - 'scripts/run-with-normalized-cloudflare-token.mjs'
       - 'test/cloudflare-app-domain-reconciler.test.mjs'
       - 'test/cloudflare-app-domain-failure-receipt.test.mjs'
+      - 'test/cloudflare-app-domain-approval-gate.test.mjs'
   push:
     branches: [main]
     paths:
       - '.github/workflows/reconcile-cloudflare-app-domain.yml'
+      - '.control-room/provider-mutation-approvals/cloudflare-app-domain.json'
       - 'scripts/reconcile-cloudflare-app-domain.mjs'
       - 'scripts/run-cloudflare-app-domain-reconcile-with-receipt.mjs'
       - 'scripts/run-with-normalized-cloudflare-token.mjs'
       - 'test/cloudflare-app-domain-reconciler.test.mjs'
       - 'test/cloudflare-app-domain-failure-receipt.test.mjs'
+      - 'test/cloudflare-app-domain-approval-gate.test.mjs'
   workflow_dispatch:
     inputs:
       target_sha:
@@ -46,6 +50,7 @@ env:
   BIP_APP_BACKEND_WORKER: sekret-backend
   BIP_APP_URL: https://app.sekretbip.net
   BIP_API_HEALTH_URL: https://api.sekretbip.net/health
+  BIP_APP_RECONCILE_APPROVAL_FILE: .control-room/provider-mutation-approvals/cloudflare-app-domain.json
 
 jobs:
   reconcile:
@@ -57,7 +62,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
           ref: ${{ inputs.target_sha || github.sha }}
-          fetch-depth: 1
+          fetch-depth: 2
           persist-credentials: false
 
       - name: Set up Node
@@ -66,18 +71,89 @@ jobs:
           node-version: '24'
 
       - name: Verify focused route reconciler contract
-        run: node --test test/cloudflare-app-domain-reconciler.test.mjs test/cloudflare-app-domain-failure-receipt.test.mjs
+        run: node --test test/cloudflare-app-domain-reconciler.test.mjs test/cloudflare-app-domain-failure-receipt.test.mjs test/cloudflare-app-domain-approval-gate.test.mjs
 
       - name: Show non-destructive plan
         run: node scripts/reconcile-cloudflare-app-domain.mjs
 
+      - name: Resolve bounded apply authority
+        id: apply_authority
+        shell: bash
+        env:
+          DISPATCH_APPLY: ${{ inputs.apply || false }}
+          DISPATCH_TARGET_SHA: ${{ inputs.target_sha || '' }}
+        run: |
+          set -euo pipefail
+
+          apply=false
+          authority_source=none
+          approved_target=''
+
+          if [[ "$GITHUB_EVENT_NAME" == 'workflow_dispatch' && "$DISPATCH_APPLY" == 'true' ]]; then
+            [[ "$DISPATCH_TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+              echo 'workflow_dispatch target_sha must be a lowercase 40-character commit SHA.' >&2
+              exit 1
+            }
+            apply=true
+            authority_source=workflow_dispatch
+            approved_target="$DISPATCH_TARGET_SHA"
+          elif [[ "$GITHUB_EVENT_NAME" == 'push' ]]; then
+            changed_paths="$(git diff-tree --no-commit-id --name-only -r HEAD)"
+            if printf '%s\n' "$changed_paths" | grep -Fxq "$BIP_APP_RECONCILE_APPROVAL_FILE"; then
+              test -f "$BIP_APP_RECONCILE_APPROVAL_FILE" || {
+                echo 'Approval path changed but approval receipt is missing.' >&2
+                exit 1
+              }
+
+              approval_json="$(node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+
+          const file = process.env.BIP_APP_RECONCILE_APPROVAL_FILE;
+          const approval = JSON.parse(fs.readFileSync(file, 'utf8'));
+          const expected = {
+            schemaVersion: 1,
+            operation: 'restore-pages-ownership',
+            hostname: 'app.sekretbip.net',
+            pagesProject: 'sekret-bip',
+            backendWorker: 'sekret-backend',
+            approved: true,
+          };
+          for (const [key, value] of Object.entries(expected)) {
+            if (approval[key] !== value) throw new Error(`approval ${key} mismatch`);
+          }
+          if (!/^[0-9a-f]{40}$/.test(approval.approvedParentSha ?? '')) {
+            throw new Error('approval approvedParentSha must be a lowercase 40-character SHA');
+          }
+          process.stdout.write(JSON.stringify({approvedParentSha: approval.approvedParentSha}));
+          NODE
+              )"
+
+              approved_parent="$(printf '%s' "$approval_json" | node -e "let body='';process.stdin.on('data',c=>body+=c);process.stdin.on('end',()=>process.stdout.write(JSON.parse(body).approvedParentSha));")"
+              actual_parent="$(git rev-parse HEAD^)"
+              printf 'approval_parent=%s\nactual_parent=%s\n' "$approved_parent" "$actual_parent"
+              test "$approved_parent" = "$actual_parent" || {
+                echo 'One-shot provider approval is stale or replayed; parent SHA does not match.' >&2
+                exit 1
+              }
+
+              apply=true
+              authority_source=one-shot-parent-bound-repository-approval
+              approved_target="$(git rev-parse HEAD)"
+            fi
+          fi
+
+          printf 'apply=%s\nauthority_source=%s\napproved_target=%s\n' "$apply" "$authority_source" "$approved_target"
+          printf 'apply=%s\n' "$apply" >> "$GITHUB_OUTPUT"
+          printf 'authority_source=%s\n' "$authority_source" >> "$GITHUB_OUTPUT"
+          printf 'approved_target=%s\n' "$approved_target" >> "$GITHUB_OUTPUT"
+
       - name: Require exact approved current main before provider secret use
-        if: github.event_name == 'workflow_dispatch' && inputs.apply == true
+        if: steps.apply_authority.outputs.apply == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          TARGET_SHA: ${{ inputs.target_sha }}
+          TARGET_SHA: ${{ steps.apply_authority.outputs.approved_target }}
         run: |
           set -euo pipefail
           [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || {
@@ -103,7 +179,7 @@ jobs:
           }
 
       - name: Require Cloudflare credentials before approved apply
-        if: github.event_name == 'workflow_dispatch' && inputs.apply == true
+        if: steps.apply_authority.outputs.apply == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -119,12 +195,12 @@ jobs:
           }
 
       - name: Re-verify exact approved main immediately before provider mutation
-        if: github.event_name == 'workflow_dispatch' && inputs.apply == true
+        if: steps.apply_authority.outputs.apply == 'true'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
-          TARGET_SHA: ${{ inputs.target_sha }}
+          TARGET_SHA: ${{ steps.apply_authority.outputs.approved_target }}
         run: |
           set -euo pipefail
           current_main="$({
@@ -141,7 +217,7 @@ jobs:
           }
 
       - name: Reconcile live app hostname ownership
-        if: github.event_name == 'workflow_dispatch' && inputs.apply == true
+        if: steps.apply_authority.outputs.apply == 'true'
         shell: bash
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -161,7 +237,7 @@ jobs:
           fi
 
       - name: Upload Cloudflare route evidence
-        if: github.event_name == 'workflow_dispatch' && inputs.apply == true && always()
+        if: steps.apply_authority.outputs.apply == 'true' && always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: cloudflare-app-domain-routing-evidence-${{ github.run_id }}
