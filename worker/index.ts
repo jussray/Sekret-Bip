@@ -194,7 +194,7 @@ function withPublicActorMetadata(
   style: RuntimeStyleContract,
 ): Record<string, unknown> {
   const next = { ...data };
-  if (style.internalHonorIdentity || style.actorId === 'sekret') {
+  if (style.internalHonorIdentities?.length || style.internalHonorIdentity || style.actorId === 'sekret') {
     delete next.actorId;
     delete next.characterId;
     return next;
@@ -243,12 +243,22 @@ function prepareStyledReply(
   const identity = resolveRuntimeIdentity(body.characterId ?? body.personality);
   if (!identity) return { error: 'unsupported characterId' };
 
-  const { actorId, internalHonorIdentity } = identity;
+  const {
+    actorId,
+    internalHonorIdentity,
+    internalHonorIdentities,
+    legacyOracleBridge,
+  } = identity;
   const surface = normalizeReplySurface(body.surface ?? body.context);
   const mismatch = validateActorSurface(actorId, surface);
   if (mismatch) return { error: mismatch };
 
-  const style = resolveRuntimeStyle(actorId, internalHonorIdentity);
+  const style = resolveRuntimeStyle(
+    actorId,
+    internalHonorIdentity,
+    internalHonorIdentities,
+    legacyOracleBridge,
+  );
   const priorPhaseInstruction = typeof body.phaseInstruction === 'string' ? body.phaseInstruction.trim() : '';
   const styleInstruction = buildRuntimeStyleInstruction(style);
   const styledBody: Record<string, unknown> = {
@@ -301,10 +311,20 @@ async function handleStyledVoice(
   ).trim();
   if (!text) return json({ error: 'reply is required' }, 400, cors);
 
-  const identity = resolveRuntimeIdentity(body.characterId);
+  const identity = resolveRuntimeIdentity(body.characterId ?? body.personality);
   if (!identity) return json({ error: 'unsupported characterId' }, 400, cors);
-  const { actorId, internalHonorIdentity } = identity;
-  const style = resolveRuntimeStyle(actorId, internalHonorIdentity);
+  const {
+    actorId,
+    internalHonorIdentity,
+    internalHonorIdentities,
+    legacyOracleBridge,
+  } = identity;
+  const style = resolveRuntimeStyle(
+    actorId,
+    internalHonorIdentity,
+    internalHonorIdentities,
+    legacyOracleBridge,
+  );
 
   if (env.PIPER_TTS_URL?.trim()) {
     try {
