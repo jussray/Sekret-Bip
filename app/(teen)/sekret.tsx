@@ -29,7 +29,7 @@ import {
 } from '@/constants/theme';
 import type { PersonalityId } from '@/types';
 
-const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'oracle'];
+const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night'];
 
 const TEEN_SHORTCUTS = [
   { label: 'Write It Out', emoji: '✏️', route: TEEN_ROUTES.pages },
