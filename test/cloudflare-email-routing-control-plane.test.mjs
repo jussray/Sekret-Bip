@@ -95,9 +95,11 @@ test('email routing workflow is manual, secrets-backed, token-type-aware, and re
 
   assert.match(workflow, /normalizeCloudflareTokenTransport/);
   assert.match(workflow, /BLOCKED_CLOUDFLARE_TOKEN_TRANSPORT/);
+  assert.match(workflow, /BLOCKED_CLOUDFLARE_TOKEN_MISSING/);
   assert.match(workflow, /phase:\s*'preflight-failed-before-mutation'/);
   assert.match(workflow, /mutationState:\s*'not-reachable'/);
   assert.match(workflow, /CLOUDFLARE_EMAIL_TOKEN_TRANSPORT_INVALID_RETAINING_RECEIPT/);
+  assert.match(workflow, /CLOUDFLARE_EMAIL_TOKEN_MISSING_RETAINING_RECEIPT/);
   assert.match(workflow, /artifacts\/cloudflare-resend-dns-evidence\.json/);
 
   assert.match(reconciler, /\/user\/tokens\/verify/);
