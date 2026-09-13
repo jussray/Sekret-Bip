@@ -43,10 +43,22 @@ test('workflow consumes repository approval only when the approval file changed 
   assert.match(workflow, /One-shot provider approval is stale or replayed/);
 });
 
-test('secret-backed app-domain mutation is bound to the Production environment', () => {
+test('pull requests validate exact head without entering Production mutation authority', () => {
   assert.match(
     workflow,
-    /reconcile:\n\s+name: Restore Pages ownership of app\.sekretbip\.net\n\s+runs-on: ubuntu-latest\n\s+environment: Production/,
+    /validate:\n\s+name: Validate app-domain reconciliation contract\n\s+if: github\.event_name == 'pull_request'\n\s+runs-on: ubuntu-latest/,
+  );
+  assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  const validateBlock = workflow.match(/  validate:\n([\s\S]*?)\n  reconcile:/)?.[1] ?? '';
+  assert.doesNotMatch(validateBlock, /environment: Production/);
+  assert.doesNotMatch(validateBlock, /secrets\./);
+  assert.doesNotMatch(validateBlock, /--apply/);
+});
+
+test('secret-backed app-domain mutation excludes pull requests and remains bound to Production', () => {
+  assert.match(
+    workflow,
+    /reconcile:\n\s+name: Restore Pages ownership of app\.sekretbip\.net\n\s+if: github\.event_name != 'pull_request'\n\s+runs-on: ubuntu-latest\n\s+environment: Production/,
   );
 });
 
