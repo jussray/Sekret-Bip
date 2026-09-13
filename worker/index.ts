@@ -6,8 +6,8 @@ import { getModels } from './config/models';
 import {
   buildRuntimeStyleInstruction,
   enforceRuntimeStyleResponse,
-  normalizeReplyActor,
   normalizeReplySurface,
+  resolveRuntimeIdentity,
   resolveRuntimeStyle,
   validateActorSurface,
   type ReplyActorId,
@@ -188,6 +188,19 @@ function styleMetadata(style: RuntimeStyleContract): Record<string, unknown> {
   return enforceRuntimeStyleResponse({}, style);
 }
 
+function withPublicActorMetadata(
+  data: Record<string, unknown>,
+  style: RuntimeStyleContract,
+): Record<string, unknown> {
+  const next = { ...data };
+  if (style.internalHonorIdentity || style.actorId === 'sekret') {
+    delete next.actorId;
+    delete next.characterId;
+    return next;
+  }
+  return { ...next, characterId: style.actorId };
+}
+
 /**
  * `sekret-reply.ts` sets its own wildcard CORS headers on every response it
  * builds. Routes delegated to it verbatim (anything not reshaped by
@@ -210,11 +223,10 @@ async function rewriteStyledJsonResponse(
   try {
     const data = await response.json() as Record<string, unknown>;
     const styled = enforceRuntimeStyleResponse(data, style);
-    return json({
+    return json(withPublicActorMetadata({
       ...styled,
-      characterId: style.actorId,
       styleDecision: styled.styleRepaired ? 'repair' : 'allow',
-    }, response.status, cors);
+    }, style), response.status, cors);
   } catch {
     return json({ error: 'invalid delegated response' }, 502, cors);
   }
@@ -224,14 +236,15 @@ function prepareStyledReply(
   request: Request,
   body: Record<string, unknown>,
 ): { request: Request; style: RuntimeStyleContract } | { error: string } {
-  const actorId = normalizeReplyActor(body.characterId ?? body.personality);
-  if (!actorId) return { error: 'characterId must be suhana, sy, cloud, night, sekret, or parentCoach' };
+  const identity = resolveRuntimeIdentity(body.characterId ?? body.personality);
+  if (!identity) return { error: 'unsupported characterId' };
 
+  const { actorId, internalHonorIdentity } = identity;
   const surface = normalizeReplySurface(body.surface ?? body.context);
   const mismatch = validateActorSurface(actorId, surface);
   if (mismatch) return { error: mismatch };
 
-  const style = resolveRuntimeStyle(actorId);
+  const style = resolveRuntimeStyle(actorId, internalHonorIdentity);
   const priorPhaseInstruction = typeof body.phaseInstruction === 'string' ? body.phaseInstruction.trim() : '';
   const styleInstruction = buildRuntimeStyleInstruction(style);
   const styledBody: Record<string, unknown> = {
@@ -284,24 +297,24 @@ async function handleStyledVoice(
   ).trim();
   if (!text) return json({ error: 'reply is required' }, 400, cors);
 
-  const actorId = normalizeReplyActor(body.characterId);
-  if (!actorId) return json({ error: 'characterId must be suhana, sy, cloud, night, sekret, or parentCoach' }, 400, cors);
-  const style = resolveRuntimeStyle(actorId);
+  const identity = resolveRuntimeIdentity(body.characterId);
+  if (!identity) return json({ error: 'unsupported characterId' }, 400, cors);
+  const { actorId, internalHonorIdentity } = identity;
+  const style = resolveRuntimeStyle(actorId, internalHonorIdentity);
 
   if (env.PIPER_TTS_URL?.trim()) {
     try {
       const audio = await synthesizeWithPiper({ text, characterId: actorId as PiperCharacterId, env });
       if (audio) {
-        return json({
+        return json(withPublicActorMetadata({
           ...styleMetadata(style),
           audioBase64: toBase64(audio.bytes),
           contentType: audio.contentType,
-          characterId: actorId,
           voiceSource: 'piper',
           voiceId: audio.voice,
           aiGenerated: true,
           styleDecision: 'allow',
-        }, 200, cors);
+        }, style), 200, cors);
       }
     } catch (error) {
       console.error('[sekret/voice:piper]', error);
@@ -334,16 +347,15 @@ async function handleStyledVoice(
   if (!response.ok) return json({ error: 'tts failed' }, 502, cors);
 
   const bytes = new Uint8Array(await response.arrayBuffer());
-  return json({
+  return json(withPublicActorMetadata({
     ...styleMetadata(style),
     audioBase64: toBase64(bytes),
     contentType: `audio/${format === 'mp3' ? 'mpeg' : format}`,
-    characterId: actorId,
     voiceSource: selectedVoice.source,
     aiGenerated: true,
     model,
     styleDecision: 'allow',
-  }, 200, cors);
+  }, style), 200, cors);
 }
 
 export default {
@@ -416,11 +428,10 @@ export default {
           detectedIntent: 'greeting',
           usedGreetingVariant: false,
         }, prepared.style);
-        return json({
+        return json(withPublicActorMetadata({
           ...styled,
-          characterId: prepared.style.actorId,
           styleDecision: styled.styleRepaired ? 'repair' : 'allow',
-        }, 200, cors);
+        }, prepared.style), 200, cors);
       }
 
       const delegated = await worker.fetch(
