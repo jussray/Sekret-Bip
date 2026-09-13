@@ -58,6 +58,18 @@ export function classifyObservedRequest(input, init = {}) {
   return { provider: 'external', operation: 'external-request', method };
 }
 
+export function classifyFailureState(observation, env = process.env) {
+  const explicit = String(env.BIP_PROVIDER_BLOCK_CLASSIFICATION || '').trim();
+  if (explicit) return explicit;
+
+  if (observation?.provider === 'cloudflare') return 'BLOCKED_CLOUDFLARE_PROVIDER';
+  if (observation?.provider === 'runtime') return 'BLOCKED_RUNTIME_VERIFICATION';
+  if (observation?.provider === 'none' && observation?.operation === 'startup') {
+    return 'BLOCKED_PROVIDER_PREFLIGHT';
+  }
+  return 'BLOCKED_PROVIDER_OR_RUNTIME';
+}
+
 function numericProviderCodes(payload) {
   return (payload?.errors || [])
     .map((item) => item?.code)
@@ -83,6 +95,7 @@ async function writeFailureReceipt(existing, observation, env = process.env) {
         : 'preflight-failed-before-mutation';
   const mutationState =
     actions.length > 0 ? 'confirmed' : hadExistingReceipt ? 'none-confirmed' : 'not-reachable';
+  const classification = classifyFailureState(observation, env);
 
   const base = existing || {
     zone: env.BIP_APP_ZONE || 'sekretbip.net',
@@ -100,10 +113,11 @@ async function writeFailureReceipt(existing, observation, env = process.env) {
     `${JSON.stringify(
       {
         ...base,
-        schemaVersion: 3,
+        schemaVersion: 4,
         generatedAt: new Date().toISOString(),
         phase,
         mutationState,
+        classification,
         failure: observation,
       },
       null,
@@ -111,7 +125,9 @@ async function writeFailureReceipt(existing, observation, env = process.env) {
     )}\n`,
     'utf8',
   );
-  console.log(`FAILURE_EVIDENCE_WRITTEN path=${EVIDENCE_PATH} phase=${phase}`);
+  console.log(
+    `FAILURE_EVIDENCE_WRITTEN path=${EVIDENCE_PATH} phase=${phase} classification=${classification}`,
+  );
 }
 
 async function persistBindingGuardMetadata() {

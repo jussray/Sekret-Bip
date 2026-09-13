@@ -25,7 +25,7 @@ const COMPANION_META: Record<string, { label: string; accent: string; emoji: str
   cloud:   { label: 'Cloud',   accent: '#8ed9e7', emoji: '☁️' },
   night:   { label: 'Night',   accent: '#9a8ee8', emoji: '🌙' },
   me:      { label: 'Me',      accent: '#b8a9c9', emoji: '🪞' },
-  oracle:  { label: 'Oracle',  accent: '#c7b87a', emoji: '🔮' },
+  oracle:  { label: 'Joseema', accent: '#c7b87a', emoji: '🔮' },
 };
 
 const COMPANION_FILTER_ALL = 'all';
