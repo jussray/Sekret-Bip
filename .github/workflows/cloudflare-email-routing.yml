@@ -136,5 +136,5 @@ jobs:
             artifacts/cloudflare-email-routing-evidence.json
             artifacts/cloudflare-resend-dns-evidence.json
             artifacts/cloudflare-email-token-preflight-evidence.json
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 30
