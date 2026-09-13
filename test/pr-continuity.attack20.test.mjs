@@ -1,7 +1,9 @@
+import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { START_MARKER, END_MARKER, SCHEMA, isCurrentCompareStatus, classifyCompareStatus, classifyUpdateBranchFailure, assertExpectedHead, continuityBaseObservation, replaceManagedBlock, continuityBlock, collectRolloverOrder, sameRepositoryPull, continuityObservationEligible } from '../scripts/pr-continuity.mjs';
 const repo='jussray/example';const baseRepo={full_name:repo};function pr(number,baseRef,headRef,state='open',headRepo=baseRepo){return{number,state,base:{ref:baseRef,repo:baseRepo},head:{ref:headRef,repo:headRepo}};}
+const continuityWorkflow = fs.readFileSync(new URL('../.github/workflows/pr-continuity.yml', import.meta.url), 'utf8');
 test('AT01 identical base/head is current ancestry',()=>assert.equal(isCurrentCompareStatus('identical'),true));
 test('AT02 ahead head is current ancestry',()=>assert.equal(isCurrentCompareStatus('ahead'),true));
 test('AT03 behind head fails stale',()=>assert.equal(classifyCompareStatus('behind'),'STALE_BASE'));
@@ -30,4 +32,5 @@ test('AT25 same-repository pull is eligible for continuity ancestry observation'
 test('AT26 workflow permission refusal is classified as authority block',()=>assert.equal(classifyUpdateBranchFailure(403,'refusing to allow a GitHub App to create or update workflow .github/workflows/x.yml without workflows permission'),'BLOCKED_WORKFLOW_AUTHORITY'));
 test('AT27 other provider 403 remains a provider authority block',()=>assert.equal(classifyUpdateBranchFailure(403,'Resource not accessible by integration'),'BLOCKED_PROVIDER_AUTHORITY'));
 test('AT28 conflict response remains conflict/race classification',()=>assert.equal(classifyUpdateBranchFailure(422,'merge conflict'),'BLOCKED_CONFLICT_OR_RACE'));
+test('AT29 full open-PR rollover is explicit-only, never automatic on main push',()=>{assert.doesNotMatch(continuityWorkflow,/\n\s*push:\s*\n\s*branches:\s*\[main\]/);assert.match(continuityWorkflow,/github\.event_name == 'workflow_dispatch'/);assert.doesNotMatch(continuityWorkflow,/github\.event_name == 'push'/);});
 test('schema remains stable',()=>assert.equal(SCHEMA,'juss/pr-continuity@v1'));
