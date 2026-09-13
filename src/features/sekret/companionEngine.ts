@@ -21,7 +21,7 @@ import type { CompanionReplySource } from '@/contracts/sekretApi';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type CompanionId = SekretCharacterId; // 'suhana' | 'sy' | 'cloud' | 'night' | 'sekret'
+export type CompanionId = SekretCharacterId; // 'suhana' | 'sy' | 'cloud' | 'night' | internal 'sekret'
 export type { SekretAvatarState };
 
 export type CompanionSurface =
@@ -62,7 +62,7 @@ export interface CompanionReplyResult {
 }
 
 export interface CompanionProfile {
-  id: CompanionId;
+  id: Exclude<CompanionId, 'sekret'>;
   name: string;
   emoji: string;
   title: string;
@@ -75,10 +75,10 @@ export interface CompanionProfile {
 }
 
 // ── Companion profiles ─────────────────────────────────────────────────────────
-// Unified display config across all surfaces.
-// Greetings and first-chat intros come from companionCurriculum.
+// Unified display config across user-facing surfaces. Internal honor identities
+// deliberately do not have display profiles here.
 
-export const COMPANION_PROFILES: Record<CompanionId, CompanionProfile> = {
+export const COMPANION_PROFILES: Record<Exclude<CompanionId, 'sekret'>, CompanionProfile> = {
   suhana: {
     id:          'suhana',
     name:        'Suhana',
@@ -119,20 +119,15 @@ export const COMPANION_PROFILES: Record<CompanionId, CompanionProfile> = {
     greeting:    COMPANION_CURRICULUM.night.greeting,
     accentColor: '#c4b5fd',
   },
-  sekret: {
-    id:          'sekret',
-    name:        "Se'kret",
-    emoji:       '✨',
-    title:       'Inner Oracle',
-    vibe:        'Reflects your patterns back to you without exposing private memory.',
-    firstChatIntro: "I'm Se'kret, your human-shaped AI continuity guide. I notice patterns without making you feel watched. Start anywhere.",
-    greeting:    "I've been listening. There's a pattern here. Want to look at it together?",
-    accentColor: '#fbbf24',
-  },
 };
 
+function isPublicCompanionId(id: CompanionId): id is Exclude<CompanionId, 'sekret'> {
+  return id === 'suhana' || id === 'sy' || id === 'cloud' || id === 'night';
+}
+
 // ── Companion ID normalizer ────────────────────────────────────────────────────
-// Handles old keys: 'soft'/'raylene' → 'suhana', 'rylane'/'bro' → 'sy', 'oracle' → 'sekret'.
+// This app-facing normalizer exists for legacy persisted visible companion keys.
+// Internal-honor compatibility is owned by the Worker identity boundary.
 
 export function toCompanionId(value: string): CompanionId {
   return normalizeSekretCharacter(value);
@@ -201,7 +196,9 @@ export async function sendCompanionMessage(
 
 export function getCompanionGreeting(id: CompanionId, options: { firstChat?: boolean } = {}): string {
   const companionId = normalizeSekretCharacter(id);
-  const profile = COMPANION_PROFILES[companionId] ?? COMPANION_PROFILES.suhana;
+  const profile = isPublicCompanionId(companionId)
+    ? COMPANION_PROFILES[companionId]
+    : COMPANION_PROFILES.suhana;
   return options.firstChat ? profile.firstChatIntro : profile.greeting;
 }
 
