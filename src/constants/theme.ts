@@ -32,22 +32,22 @@ export const THEME_PACKS: Record<string, Theme> = {
 
 export const SEKRET_PROFILES: Record<string, SekretProfile> = {
   soft: {
-    name: "Se'kret", emoji: '🌸', title: 'Soft Big Sis',
+    name: 'Suhana', emoji: '🌸', title: 'Soft Big Sis',
     vibe: 'Warm, expressive, protective, and real.',
     greeting: "Hey love. I'm here. Tell me what's on your mind.",
   },
   rylane: {
-    name: 'Rylane', emoji: '⚡', title: 'Loyal Bro',
+    name: 'Sy', emoji: '⚡', title: 'Loyal Bro',
     vibe: 'Quiet loyalty. Keeps it real. Never talks down.',
     greeting: "Aight, I'm here. What's been heavy?",
   },
   cloud: {
-    name: "Cloud Se'kret", emoji: '☁️', title: 'Quiet Comfort',
+    name: 'Cloud', emoji: '☁️', title: 'Quiet Comfort',
     vibe: 'Soft, calm, low-pressure presence.',
     greeting: 'No pressure. We can just sit here for a minute.',
   },
   night: {
-    name: "Night Se'kret", emoji: '🌙', title: 'Late-Night Listener',
+    name: 'Night', emoji: '🌙', title: 'Late-Night Listener',
     vibe: 'Minimal words, calm energy, safe space.',
     greeting: "I'm here. You don't gotta explain perfectly.",
   },
