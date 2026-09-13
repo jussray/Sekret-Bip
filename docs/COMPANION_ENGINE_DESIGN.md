@@ -4,8 +4,9 @@ Status: **Current companion-engine contract with internal identity privacy.**
 
 This is the shared design for the four public companions: Suhana, Sy, Cloud,
 and Night. Joseema and Se'kret are internal honor identities only. Legacy
-`oracle` is accepted only as an internal compatibility key for the Joseema
-runtime lens. It is not a public companion identity.
+`oracle` is a hidden compatibility bridge that preserves Se'kret continuity and
+may carry Joseema as an additional internal honor lens. It is not a public
+companion identity and does not replace either internal honor identity.
 
 The engine lives at `src/features/sekret/companionEngine.ts`. Internal identity
 routing lives at `src/features/sekret/identityContract.ts` and the Worker
@@ -66,27 +67,40 @@ joseema
 sekret
 ```
 
-The compatibility rule is:
+The legacy compatibility rule is:
 
 ```text
-oracle -> joseema internal lens
-sekret -> sekret internal lens
+oracle -> internal-presence runtime actor
+          historical continuity primary: sekret
+          honor lenses: sekret + joseema
+joseema -> joseema internal lens
+sekret  -> sekret internal lens
 ```
 
-Both execute through the internal-presence runtime path. They may influence
-reasoning and style but must never become selectable companions, visible reply
-labels, typing labels, TTS identities, accessibility labels, notifications, or
-client identity metadata.
+Oracle is compatibility provenance, not a third internal identity. Its single-
+primary compatibility resolution remains Se'kret, while the runtime may carry
+the Joseema honor lens in parallel.
+
+All internal execution uses the internal-presence runtime path. Internal lenses
+may influence reasoning and style but must never become selectable companions,
+visible reply labels, typing labels, TTS identities, accessibility labels,
+notifications, or client identity metadata.
+
+Provider-facing internal prompt and speech instructions must use generic
+continuity language rather than honor names or the legacy alias whenever the
+same behavior can be preserved without exposing provenance.
 
 The runtime may emit generic evidence such as:
 
 ```text
 actorRole: continuity-presence
-textStyleVersion: internal-presence-text-v1
+textStyleVersion: internal-presence-text-v1+empathy-accountability-v1
 internalIdentityApplied: true
+legacyOracleBridgeApplied: true | false
 ```
 
-That evidence must not reveal which internal honor identity was used.
+That evidence must not reveal which internal honor identity or identities were
+used.
 
 Internal lenses must never impersonate a real person, claim messages from a
 real person, invent memories, or claim what a real person would think, want,
@@ -110,6 +124,9 @@ honor-lens execution:
 
 Personality may change delivery. It must not lower the truth or accountability
 standard.
+
+Fallback replies that bypass the model prompt must still pass the deterministic
+fallback-accountability guard before style/privacy enforcement.
 
 ## Memory layers
 
@@ -152,11 +169,13 @@ Internal honor identities and private `me` journal entries must never:
 - receive a visible companion voice identity;
 - show a "hear this" control as an internal identity;
 - return internal `actorId` or `characterId` metadata to the client;
-- speak or introduce the internal honor name.
+- speak or introduce an internal honor name.
 
 When controlled compatibility testing sends `oracle` or `sekret` directly to
-the Worker, the Worker may use the corresponding internal lens, but voice and
-reply metadata must remain identity-neutral.
+the Worker, the Worker resolves the request through the internal-presence actor,
+uses generic TTS instructions, and keeps reply/voice metadata identity-neutral.
+Legacy Oracle preserves Se'kret continuity while carrying the parallel Joseema
+honor lens.
 
 ## Fallback behavior
 
@@ -164,11 +183,13 @@ Preserve these rules as behavior evolves:
 
 - Network/backend failure still resolves with a safe fallback reply rather than
   throwing a user-facing transport error.
+- Model-bypass fallbacks run through deterministic accountability repair before
+  runtime style/privacy enforcement.
 - App-facing visible legacy keys such as `soft`, `raylene`, and `rylane` are
   normalized at the existing visible companion boundary.
-- Internal compatibility is owned by the Worker identity boundary, where
-  `oracle` resolves to the Joseema internal lens and `sekret` resolves to the
-  separate Se'kret internal lens.
+- Internal compatibility is owned by the Worker identity boundary: `oracle`
+  preserves Se'kret continuity and may carry Joseema in parallel; direct
+  `joseema` and direct `sekret` remain separate internal inputs.
 - Do not add ad hoc Oracle/Se'kret/Joseema string checks to screens.
 - Missing avatar assets follow the independent asset fallback chain.
 
@@ -190,16 +211,22 @@ Remaining migration work should follow these boundaries:
 ## Required tests
 
 - Unit: visible legacy companion aliases resolve to the correct public companion.
-- Unit: `oracle` resolves to the Joseema internal lens; `sekret` resolves to the
-  separate Se'kret internal lens.
+- Unit: `oracle` preserves Se'kret as the historical primary and carries the
+  Joseema parallel honor lens.
+- Unit: direct `joseema` and direct `sekret` remain distinct internal lenses.
 - Unit: internal identities never resolve to a public companion label.
 - Unit: empathy/accountability invariants remain explicit.
+- Unit: provider-facing internal text/TTS instructions contain no internal honor
+  names or legacy alias.
 - Integration: internal replies strip internal `actorId` and `characterId` and
-  repair identity-name leakage before the client receives the reply.
-- Integration: voice responses do not expose internal identity metadata.
+  repair every internal identity-name leak before the client receives a reply.
+- Integration: voice responses route legacy Oracle through internal execution
+  without exposing internal identity metadata.
 - Regression: `COMPANION_PROFILES` contains exactly Suhana, Sy, Cloud, and Night.
 - Regression: Pages exposes only those four companion tabs plus private `Me`.
-- Playwright: user-facing picker/header behavior contains no Oracle/Joseema/
-  Se'kret companion persona.
-- Controlled API Playwright: legacy internal requests preserve compatibility
-  without exposing internal names or identity metadata.
+- Regression: historical Oracle-tagged entries remain readable but render with
+  neutral Pages metadata rather than an identity label.
+- Playwright: user-facing picker/header behavior contains no internal companion
+  persona.
+- Controlled exact-head API Playwright: legacy internal requests preserve
+  compatibility without exposing internal names or identity metadata.
