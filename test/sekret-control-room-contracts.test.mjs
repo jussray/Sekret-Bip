@@ -76,11 +76,20 @@ after(() => {
   fs.rmSync(tempDir, { recursive: true, force: true });
 });
 
-test('Oracle and Se’kret resolve to the visible Se’kret identity', () => {
-  assert.equal(identity.getVisibleIdentity(), "Se'kret");
-  assert.equal(identity.resolveVisibleIdentity('oracle'), "Se'kret");
-  assert.equal(identity.resolveVisibleIdentity('sekret'), "Se'kret");
-  assert.equal(identity.resolveVisibleIdentity('unknown-internal-value'), "Se'kret");
+test('internal honor identities never resolve to a public companion label', () => {
+  assert.equal(identity.getVisibleIdentity(), null);
+  assert.equal(identity.resolveVisibleIdentity('oracle'), null);
+  assert.equal(identity.resolveVisibleIdentity('joseema'), null);
+  assert.equal(identity.resolveVisibleIdentity('sekret'), null);
+  assert.equal(identity.resolveVisibleIdentity('unknown-internal-value'), null);
+});
+
+test('legacy Oracle belongs to the Joseema internal lens while Se’kret remains distinct', () => {
+  assert.equal(identity.resolveInternalHonorIdentity('oracle'), 'joseema');
+  assert.equal(identity.resolveInternalHonorIdentity('joseema'), 'joseema');
+  assert.equal(identity.resolveInternalHonorIdentity('sekret'), 'sekret');
+  assert.equal(identity.resolveInternalHonorIdentity('secret'), 'sekret');
+  assert.equal(identity.resolveInternalHonorIdentity('suhana'), null);
 });
 
 test('named companions keep their own visible identities', () => {
@@ -94,29 +103,34 @@ test('named companions keep their own visible identities', () => {
   assert.equal(identity.resolveVisibleIdentity('rylane'), 'Sy');
 });
 
-test('Oracle leaks are detected and rejected', () => {
+test('legacy Oracle leaks are detected and rejected', () => {
   assert.equal(identity.containsOracleLeak('Oracle is typing…'), true);
-  assert.equal(identity.containsOracleLeak("Se'kret is typing…"), false);
+  assert.equal(identity.containsOracleLeak('Suhana is typing…'), false);
   assert.throws(
     () => identity.assertNoOracleLeak('Talk to Oracle'),
     /must not expose Oracle/,
   );
-  assert.doesNotThrow(() => identity.assertNoOracleLeak("Se'kret replied"));
+  assert.doesNotThrow(() => identity.assertNoOracleLeak('Suhana replied'));
 });
 
-test('visible and suppressed Se’kret surfaces have unambiguous semantics', () => {
-  assert.equal(identity.isSekretVisibleSurface('sekret-chat'), true);
+test('internal identities are suppressed on every user-facing identity surface', () => {
+  assert.equal(identity.isSekretVisibleSurface('sekret-chat'), false);
   assert.equal(identity.isSekretVisibleSurface('companion-picker'), false);
+  assert.equal(identity.shouldSuppressInternalIdentity('companion-picker'), true);
+  assert.equal(identity.shouldSuppressInternalIdentity('companion-chat'), true);
+  assert.equal(identity.shouldSuppressInternalIdentity('reply-header'), true);
+  assert.equal(identity.shouldSuppressInternalIdentity('tts'), true);
+  assert.equal(identity.shouldSuppressInternalIdentity('accessibility'), true);
   assert.equal(identity.shouldSuppressSekretIdentity('companion-picker'), true);
-  assert.equal(identity.shouldSuppressSekretIdentity('sekret-chat'), false);
 });
 
-test('named companion registry excludes Se’kret', () => {
+test('named companion registry contains exactly the four public companions', () => {
   assert.deepEqual(
     [...styleProfiles.NAMED_COMPANION_IDS],
     ['suhana', 'sy', 'cloud', 'night'],
   );
   assert.equal(styleProfiles.isNamedCompanionId('sekret'), false);
+  assert.equal(styleProfiles.isNamedCompanionId('joseema'), false);
   assert.equal(styleProfiles.getNamedCompanionStyleProfiles().length, 4);
   assert.ok(
     styleProfiles
@@ -125,24 +139,24 @@ test('named companion registry excludes Se’kret', () => {
   );
 });
 
-test('Se’kret has a continuity-presence profile, not a companion profile', () => {
-  const sekret = styleProfiles.getStyleProfile('sekret');
-  assert.equal(sekret.role, 'continuity-presence');
-  assert.equal(sekret.questionBudget, 0);
-  assert.ok(sekret.forbiddenPhrases.includes('Oracle'));
+test('Se’kret style remains an internal implementation profile, not a companion profile', () => {
+  const internalPresence = styleProfiles.getStyleProfile('sekret');
+  assert.equal(internalPresence.role, 'continuity-presence');
+  assert.equal(internalPresence.questionBudget, 0);
+  assert.ok(internalPresence.forbiddenPhrases.includes('Oracle'));
 });
 
-test('style engine uses separate builders for companions and Se’kret presence', () => {
+test('style engine uses separate builders for companions and internal presence', () => {
   const suhana = styleEngine.buildCompanionStyleRequest('suhana');
   assert.equal(suhana.role, 'named-companion');
   assert.equal(suhana.constraints.maxQuestions, 1);
   assert.match(suhana.systemPromptAddendum, /at most one direct question/i);
 
-  const sekret = styleEngine.buildSekretPresenceStyleRequest();
-  assert.equal(sekret.styleId, 'sekret');
-  assert.equal(sekret.role, 'continuity-presence');
-  assert.equal(sekret.constraints.maxQuestions, 0);
-  assert.match(sekret.systemPromptAddendum, /Ask no direct questions/i);
+  const internalPresence = styleEngine.buildSekretPresenceStyleRequest();
+  assert.equal(internalPresence.styleId, 'sekret');
+  assert.equal(internalPresence.role, 'continuity-presence');
+  assert.equal(internalPresence.constraints.maxQuestions, 0);
+  assert.match(internalPresence.systemPromptAddendum, /Ask no direct questions/i);
 
   assert.throws(
     () => styleEngine.buildCompanionStyleRequest('sekret'),
