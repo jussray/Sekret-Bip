@@ -120,7 +120,7 @@ jobs:
             tokenAsciiAfterNormalization: !result.nonAsciiRemaining,
             records: [],
           };
-          await writeFile('artifacts/cloudflare-resend-dns-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
+          await writeFile('artifacts/cloudflare-email-token-preflight-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
           console.error(marker);
           NODE
 
@@ -135,5 +135,6 @@ jobs:
           path: |
             artifacts/cloudflare-email-routing-evidence.json
             artifacts/cloudflare-resend-dns-evidence.json
+            artifacts/cloudflare-email-token-preflight-evidence.json
           if-no-files-found: warn
           retention-days: 30
