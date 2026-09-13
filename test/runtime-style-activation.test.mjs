@@ -69,11 +69,23 @@ const runtimePath = compile(
 const runtime = await import(pathToFileURL(runtimePath).href);
 const runtimeSource = fs.readFileSync(path.join(root, 'worker/runtime-style.ts'), 'utf8');
 const indexSource = fs.readFileSync(path.join(root, 'worker/index.ts'), 'utf8');
+const voiceEntrySource = fs.readFileSync(path.join(root, 'worker/voice-entry.ts'), 'utf8');
 const observedSource = fs.readFileSync(path.join(root, 'worker/observed-index.ts'), 'utf8');
+const pickerSource = fs.readFileSync(path.join(root, 'app/(teen)/sekret.tsx'), 'utf8');
+const historySource = fs.readFileSync(path.join(root, 'app/(teen)/pages/history.tsx'), 'utf8');
+const detailSource = fs.readFileSync(path.join(root, 'app/(teen)/pages/[id].tsx'), 'utf8');
 
 const suhana = runtime.resolveRuntimeStyle('suhana');
 const joseema = runtime.resolveRuntimeStyle('sekret', 'joseema');
 const sekret = runtime.resolveRuntimeStyle('sekret', 'sekret');
+const oracleResolution = runtime.resolveRuntimeIdentity('oracle');
+assert.ok(oracleResolution);
+const oracle = runtime.resolveRuntimeStyle(
+  oracleResolution.actorId,
+  oracleResolution.internalHonorIdentity,
+  oracleResolution.internalHonorIdentities,
+  oracleResolution.legacyOracleBridge,
+);
 const parentCoach = runtime.resolveRuntimeStyle('parentCoach');
 
 after(() => {
@@ -93,20 +105,28 @@ test('runtime actor normalization preserves visible aliases without substring gu
   assert.equal(runtime.normalizeReplyActor(''), null);
 });
 
-test('internal honor compatibility keeps Joseema and Se’kret distinct', () => {
+test('legacy Oracle preserves Se’kret continuity and carries Joseema in parallel', () => {
   assert.deepEqual(runtime.resolveRuntimeIdentity('oracle'), {
     actorId: 'sekret',
-    internalHonorIdentity: 'joseema',
+    internalHonorIdentity: 'sekret',
+    internalHonorIdentities: ['sekret', 'joseema'],
+    legacyOracleBridge: true,
   });
   assert.deepEqual(runtime.resolveRuntimeIdentity('joseema'), {
     actorId: 'sekret',
     internalHonorIdentity: 'joseema',
+    internalHonorIdentities: ['joseema'],
+    legacyOracleBridge: false,
   });
   assert.deepEqual(runtime.resolveRuntimeIdentity('sekret'), {
     actorId: 'sekret',
     internalHonorIdentity: 'sekret',
+    internalHonorIdentities: ['sekret'],
+    legacyOracleBridge: false,
   });
   assert.deepEqual(runtime.resolveRuntimeIdentity('suhana'), { actorId: 'suhana' });
+  assert.equal(oracle.legacyOracleBridge, true);
+  assert.deepEqual(oracle.internalHonorIdentities, ['sekret', 'joseema']);
 });
 
 test('parent coaching cannot cross the teen-facing actor/surface boundary', () => {
@@ -124,11 +144,13 @@ test('named companions and internal lenses resolve versioned style contracts', (
   assert.equal(suhana.maxQuestions, 1);
   assert.equal(suhana.internalHonorIdentity, undefined);
 
-  for (const style of [joseema, sekret]) {
+  for (const style of [joseema, sekret, oracle]) {
     assert.equal(style.role, 'continuity-presence');
     assert.equal(style.textStyleVersion, 'internal-presence-text-v1+empathy-accountability-v1');
     assert.equal(style.speechStyleVersion, 'internal-presence-speech-v1');
     assert.equal(style.maxQuestions, 0);
+    assert.doesNotMatch(style.systemPromptAddendum, /\b(?:oracle|joseema|se[’']?kret)\b/i);
+    assert.doesNotMatch(style.speechInstructions, /\b(?:oracle|joseema|se[’']?kret)\b/i);
   }
   assert.equal(joseema.internalHonorIdentity, 'joseema');
   assert.equal(sekret.internalHonorIdentity, 'sekret');
@@ -138,19 +160,20 @@ test('named companions and internal lenses resolve versioned style contracts', (
   assert.match(parentCoach.speechInstructions, /parent-coach delivery/i);
 });
 
-test('internal honor prompt is code-only and cannot impersonate a real person', () => {
-  for (const style of [joseema, sekret]) {
+test('internal honor prompt is generic, code-only, and cannot impersonate a real person', () => {
+  for (const style of [joseema, sekret, oracle]) {
     const instruction = runtime.buildRuntimeStyleInstruction(style);
     assert.match(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
     assert.match(instruction, /internal presence, not a selectable companion/i);
-    assert.match(instruction, /Never show, name, speak, label, or introduce this identity/i);
+    assert.match(instruction, /Never show, name, speak, label, or introduce an internal honor identity/i);
     assert.match(instruction, /Never impersonate a real person/i);
     assert.match(instruction, /invent memories/i);
     assert.match(instruction, /what a real person would think, want, approve, or say/i);
     assert.match(instruction, /Ask no direct questions/);
-    assert.doesNotMatch(instruction, /Actor: joseema/i);
-    assert.doesNotMatch(instruction, /Actor: sekret/i);
     assert.match(instruction, /Actor: internal-presence/i);
+    assert.doesNotMatch(instruction, /\bOracle\b/i);
+    assert.doesNotMatch(instruction, /\bJoseema\b/i);
+    assert.doesNotMatch(instruction, /\bSe[’']?kret\b/i);
   }
 });
 
@@ -218,12 +241,16 @@ test('parent coach remains outside the teen companion empathy contract', () => {
   assert.doesNotMatch(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
 });
 
-test('Worker resolves internal identity before delegation and strips public actor metadata', () => {
+test('Worker resolves the full internal lens set before delegation and strips public actor metadata', () => {
   const resolveIndex = indexSource.indexOf('resolveRuntimeIdentity(body.characterId ?? body.personality)');
-  const styleIndex = indexSource.indexOf('resolveRuntimeStyle(actorId, internalHonorIdentity)');
+  const pluralIndex = indexSource.indexOf('internalHonorIdentities');
+  const legacyIndex = indexSource.indexOf('legacyOracleBridge');
+  const styleIndex = indexSource.indexOf('resolveRuntimeStyle(');
   const rewriteIndex = indexSource.indexOf('characterId: actorId');
   const privacyIndex = indexSource.indexOf('withPublicActorMetadata');
   assert.ok(resolveIndex >= 0, 'Worker must resolve request identity');
+  assert.ok(pluralIndex > resolveIndex, 'Worker must carry all internal honor lenses');
+  assert.ok(legacyIndex > resolveIndex, 'Worker must carry legacy Oracle bridge evidence');
   assert.ok(styleIndex > resolveIndex, 'Worker must resolve style after identity resolution');
   assert.ok(rewriteIndex > styleIndex, 'Worker may delegate only the execution actor after style resolution');
   assert.ok(privacyIndex >= 0, 'Worker must strip internal actor metadata before returning data');
@@ -242,37 +269,24 @@ test('Worker applies fallback accountability before runtime style enforcement', 
   assert.match(indexSource, /fallbackAccountabilityRepaired === true/);
 });
 
-test('Joseema internal output is repaired without exposing identity metadata', () => {
+test('every internal name is repaired without exposing identity metadata', () => {
   const result = runtime.enforceRuntimeStyleResponse({
-    reply: 'Joseema noticed a pattern. What feels true? Is there more?',
+    reply: "Oracle said Joseema and Se'kret noticed a pattern. What feels true?",
     characterId: 'sekret',
     actorId: 'sekret',
     replySource: 'openai',
-  }, joseema);
+  }, oracle);
 
-  assert.equal(result.reply, 'I noticed a pattern. What feels true. Is there more.');
+  assert.doesNotMatch(String(result.reply), /\bOracle\b/i);
+  assert.doesNotMatch(String(result.reply), /\bJoseema\b/i);
+  assert.doesNotMatch(String(result.reply), /\bSe[’']?kret\b/i);
   assert.equal(result.actorId, undefined);
   assert.equal(result.characterId, undefined);
   assert.equal(result.actorRole, 'continuity-presence');
   assert.equal(result.questionBudget, 0);
   assert.equal(result.internalIdentityApplied, true);
+  assert.equal(result.legacyOracleBridgeApplied, true);
   assert.equal(result.styleRepaired, true);
-  assert.ok(result.styleViolationCodes.includes('style_internal_identity_leak'));
-  assert.ok(result.styleViolationCodes.includes('style_question_budget'));
-});
-
-test('Se’kret internal output is repaired without exposing identity metadata', () => {
-  const result = runtime.enforceRuntimeStyleResponse({
-    reply: "Se'kret noticed a pattern. What feels true?",
-    characterId: 'sekret',
-    actorId: 'sekret',
-    replySource: 'openai',
-  }, sekret);
-
-  assert.equal(result.reply, 'I noticed a pattern. What feels true.');
-  assert.equal(result.actorId, undefined);
-  assert.equal(result.characterId, undefined);
-  assert.equal(result.internalIdentityApplied, true);
   assert.ok(result.styleViolationCodes.includes('style_internal_identity_leak'));
   assert.ok(result.styleViolationCodes.includes('style_question_budget'));
 });
@@ -299,6 +313,25 @@ test('named companion output keeps one question and repairs extras', () => {
   assert.deepEqual(result.styleViolationCodes, ['style_question_budget']);
 });
 
+test('voice front door resolves legacy Oracle through canonical internal execution', () => {
+  assert.match(voiceEntrySource, /resolveRuntimeIdentity\(body\.characterId \?\? body\.personality\)/);
+  assert.match(voiceEntrySource, /internalHonorIdentities/);
+  assert.match(voiceEntrySource, /legacyOracleBridge/);
+  assert.match(voiceEntrySource, /characterId: actorId as CharacterId/);
+  assert.match(voiceEntrySource, /internalIdentityApplied: internal/);
+  assert.match(voiceEntrySource, /legacyOracleBridgeApplied: style\.legacyOracleBridge === true/);
+});
+
+test('active UI exposes only the four selectable companions while old records fail closed', () => {
+  assert.match(pickerSource, /PERSONALITY_ORDER: PersonalityId\[\] = \['raylene', 'rylane', 'cloud', 'night'\]/);
+  assert.doesNotMatch(pickerSource, /PERSONALITY_ORDER[^;]*oracle/s);
+  assert.doesNotMatch(historySource, /oracle\s*:\s*\{\s*label:\s*['"]Oracle['"]/i);
+  assert.doesNotMatch(historySource, /COMPANION_FILTERS[^;]*oracle/s);
+  assert.doesNotMatch(detailSource, /oracle\s*:\s*\{\s*label:\s*['"]Oracle['"]/i);
+  assert.match(historySource, /label: 'Pages'/);
+  assert.match(detailSource, /label: 'Pages'/);
+});
+
 test('production Worker wrapper injects, enforces, voices, and returns style evidence', () => {
   assert.match(indexSource, /buildRuntimeStyleInstruction/);
   assert.match(indexSource, /phaseInstruction:/);
@@ -311,6 +344,8 @@ test('production Worker wrapper injects, enforces, voices, and returns style evi
   assert.match(runtimeSource, /EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION/);
   assert.match(runtimeSource, /EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION/);
   assert.match(runtimeSource, /resolveRuntimeIdentity/);
+  assert.match(runtimeSource, /INTERNAL_AI_BOUNDARY_INSTRUCTION/);
+  assert.match(runtimeSource, /INTERNAL_SYSTEM_PROMPT_ADDENDUM/);
 });
 
 test('observed Worker forwards generic style evidence without needing internal names', () => {
