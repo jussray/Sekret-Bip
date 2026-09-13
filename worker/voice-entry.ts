@@ -10,7 +10,7 @@ import {
 } from './firebase-app-check';
 import { emitWorkerTelemetry, type WorkerTelemetryEvent } from './telemetry';
 import { persistAuditEvent, type AuditPersistEnv } from './audit/persist-event';
-import { normalizeReplyActor, resolveRuntimeStyle } from './runtime-style';
+import { resolveRuntimeIdentity, resolveRuntimeStyle } from './runtime-style';
 import { selectVoiceRoute, type CharacterId } from './voice-routing';
 import { synthesizeRoutedVoice, type VoiceProviderEnv } from './voice-providers';
 
@@ -152,8 +152,6 @@ function observeAppCheck(
     decision: mode === 'observe' || result.status === 'valid' ? 'allow' : 'block',
     violation_codes: result.reason ? [`app_check_${result.reason}`] : undefined,
   };
-  // Never log the bearer App Check token or decoded token body. Cloudflare
-  // receives only the privacy-safe verification classification and reason.
   emitWorkerTelemetry(event);
 }
 
@@ -269,10 +267,15 @@ async function handleVoice(
   ).trim();
   if (!text) return json({ error: 'reply is required' }, 400, cors);
 
-  const actorId = normalizeReplyActor(body.characterId ?? body.personality);
-  if (!actorId) {
-    return json({ error: 'characterId must be suhana, sy, cloud, night, sekret, or parentCoach' }, 400, cors);
-  }
+  const identity = resolveRuntimeIdentity(body.characterId ?? body.personality);
+  if (!identity) return json({ error: 'unsupported characterId' }, 400, cors);
+
+  const {
+    actorId,
+    internalHonorIdentity,
+    internalHonorIdentities,
+    legacyOracleBridge,
+  } = identity;
 
   const mode = env.VOICE_PROVIDER_MODE ?? 'legacy';
   if (mode === 'legacy') {
@@ -280,21 +283,25 @@ async function handleVoice(
     return withSecurityHeaders(response, cors);
   }
 
-  const requestedCharacter = typeof body.characterId === 'string'
-    ? body.characterId.trim().toLowerCase() as CharacterId
-    : actorId as CharacterId;
   const route = selectVoiceRoute({
-    characterId: requestedCharacter,
+    characterId: actorId as CharacterId,
     requiresPreciseLipSync: mode === 'hybrid' && requiresPreciseLipSync(body),
   });
+  const style = resolveRuntimeStyle(
+    actorId,
+    internalHonorIdentity,
+    internalHonorIdentities,
+    legacyOracleBridge,
+  );
+  const internal = Boolean(style.internalHonorIdentities?.length || style.internalHonorIdentity || actorId === 'sekret');
+  const publicActorMetadata = internal ? {} : { characterId: route.canonicalCharacterId };
 
   try {
     const result = await synthesizeRoutedVoice(route, text, env);
-    const style = resolveRuntimeStyle(actorId);
     return json({
+      ...publicActorMetadata,
       audioBase64: result.audioBase64,
       contentType: result.contentType,
-      characterId: route.canonicalCharacterId,
       actorRole: style.role,
       voiceProvider: result.provider,
       primaryVoiceProvider: result.primaryProvider,
@@ -308,6 +315,8 @@ async function handleVoice(
       speechStyleVersion: style.speechStyleVersion,
       questionBudget: style.maxQuestions,
       styleDecision: 'allow',
+      internalIdentityApplied: internal,
+      legacyOracleBridgeApplied: style.legacyOracleBridge === true,
     }, 200, cors);
   } catch (error) {
     console.error('[voice-entry:synthesis]', {
@@ -317,11 +326,13 @@ async function handleVoice(
       error: error instanceof Error ? error.message : 'unknown',
     });
     return json({
+      ...publicActorMetadata,
       error: 'voice synthesis unavailable',
-      characterId: route.canonicalCharacterId,
       voiceProvider: route.provider,
       fallbackProvider: route.fallbackProvider,
       usedFallback: Boolean(route.fallbackProvider),
+      internalIdentityApplied: internal,
+      legacyOracleBridgeApplied: style.legacyOracleBridge === true,
     }, 502, cors);
   }
 }
