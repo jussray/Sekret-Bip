@@ -839,7 +839,7 @@ export default function TeenPagesRoute() {
         {/* Loop nudge: companion suggested Comfort after heavy reply */}
         {comfortNudge && !saving && (
           <View style={s.nudgeWrap}>
-            <Text style={[s.nudgeText, { color: companion.accent }]}> 
+            <Text style={[s.nudgeText, { color: companion.accent }]}>
               {companion.name} thinks Comfort might help right now
             </Text>
             <View style={s.nudgeRow}>
