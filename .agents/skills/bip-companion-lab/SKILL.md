@@ -63,11 +63,15 @@ The scenario registry contains these eight IDs:
 7. `chatbot-drift`
 8. `fake-memory-risk`
 
-Each scenario must have one synthetic reply fixture for every companion:
-Raylene, Rylane, Cloud, Night, and Oracle. The complete matrix is 40 fixtures.
+The public companion matrix is Suhana, Sy, Cloud, and Night. Existing fixture
+files may still contain legacy names such as Raylene, Rylane, or Oracle while
+migration work is in progress. A legacy `Oracle` fixture is compatibility test
+data only; it is not a fifth public companion and must not be used to justify a
+visible Oracle/Se'kret/Joseema identity in the product.
 
-Do not rename or remove a scenario without explicit instruction and a migration
-plan for its fixture directory, audit expectations, documentation, and CI.
+Do not rename or remove a scenario or legacy fixture merely to make a current PR
+look cleaner. Any fixture migration must update the fixture directory, audit
+expectations, documentation, and CI together.
 
 ## Synthetic Data Only
 
@@ -85,7 +89,7 @@ Before changing companion behaviour:
 1. Read the doctrine and affected runtime path.
 2. Identify which existing scenarios cover the change.
 3. Add a scenario only when the behavioural risk is genuinely uncovered.
-4. Update the scenario registry and all five fixtures together.
+4. Update the scenario registry and every fixture required by the current audit contract together.
 5. Run `node --check scripts/companion-lab-audit.js` when the audit changed.
 6. Run `npm run audit:companion-lab:verbose`.
 7. Run the normal repository checks required by the changed runtime files.
@@ -96,8 +100,7 @@ Before changing companion behaviour:
 A scenario addition requires:
 
 - one new entry in `test/fixtures/companion-lab-scenarios.json`;
-- five reply files under
-  `test/fixtures/replies/<scenario-id>/<companion>.txt`;
+- one reply file for every identity currently required by the audit contract;
 - explicit expected behaviours and anti-patterns;
 - audit support if the scenario introduces a new scoring rule;
 - documentation updates when it introduces a new doctrine category.
@@ -111,9 +114,10 @@ When replacing a fixture:
 
 1. Explain why the old reply is no longer acceptable.
 2. Keep or raise the behavioural quality bar.
-3. Preserve each companion's distinct voice.
+3. Preserve each public companion's distinct voice.
 4. Do not widen scoring rules merely to make a bad reply pass.
 5. Prove that known bad examples still fail after a heuristic adjustment.
+6. If a legacy internal-identity fixture is retained, keep it generic and synthetic; never encode personal provenance or relationship details.
 
 ## Automated Hard Failures
 
@@ -153,6 +157,15 @@ When changing the heuristic, test both the safe and unsafe shapes. A false
 positive is a bug; an acceptance window broad enough to admit fake memory is
 also a bug. Humanity has invented nuance, so unfortunately the regex must cope.
 
+## Internal-identity privacy rule
+
+Joseema and Se'kret are internal-only runtime lenses. Legacy `oracle` traffic may
+exercise the Joseema compatibility path, but candidate replies, public labels,
+TTS labels, accessibility strings, notifications, and client identity metadata
+must not reveal an internal honor identity. Internal fixtures must never
+impersonate a real person, invent memories/messages, or claim what a real person
+would think, want, approve, or say.
+
 ## Workflow Contract
 
 The Companion Lab workflow must:
@@ -179,10 +192,13 @@ Those belong to the normal repository workflows.
 
 ## Output
 
+Report the audit's actual current counts rather than hard-coding a historical
+fixture total:
+
 ```text
 Companion Lab: PASS|FAIL
-Scenarios: <passed>/8
-Fixtures: <passed>/40
+Scenarios: <passed>/<current total>
+Fixtures: <passed>/<current total>
 Hard failures: <none or list>
 Report artifact: <available or missing>
 Next action: <specific root-cause fix>
