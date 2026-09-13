@@ -93,20 +93,22 @@ async function installFakeSession(page: Page, profile: Profile) {
   return () => interceptedRequests;
 }
 
+const founderProfile: Profile = {
+  user_id: USER_ID,
+  email: user.email,
+  role: 'founder',
+  can_view_audits: true,
+  can_manage_app: true,
+  exclude_from_analytics: true,
+};
+
 test.describe('Founder Operator access boundary', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
   });
 
   test('verified founder profile opens the Founder Operator surface', async ({ page }, testInfo) => {
-    const interceptedCount = await installFakeSession(page, {
-      user_id: USER_ID,
-      email: user.email,
-      role: 'founder',
-      can_view_audits: true,
-      can_manage_app: true,
-      exclude_from_analytics: true,
-    });
+    const interceptedCount = await installFakeSession(page, founderProfile);
 
     await page.goto('/control-room');
 
@@ -141,5 +143,35 @@ test.describe('Founder Operator access boundary', () => {
     await expect(page.getByRole('button', { name: 'Operations', exact: true })).toHaveCount(0);
     expect(interceptedCount()).toBeGreaterThan(0);
     await page.screenshot({ path: testInfo.outputPath('non-founder-locked.png'), fullPage: true });
+  });
+
+  test('Prompt OS voice audit preserves isolated language and warns only on clustered drift', async ({ page }, testInfo) => {
+    const interceptedCount = await installFakeSession(page, founderProfile);
+
+    await page.goto('/control-room');
+    await expect(page.getByText('FOUNDER CONTROL ROOM', { exact: true })).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole('button', { name: 'Prompt OS', exact: true }).click();
+    await expect(page.getByText('Prompt OS', { exact: true }).last()).toBeVisible();
+    await page.getByText('quality', { exact: true }).click();
+
+    await expect(page.getByText('Voice Integrity Audit', { exact: true })).toBeVisible();
+    await expect(page.getByText(/does not infer authorship and never blocks on one isolated style marker/i)).toBeVisible();
+
+    const draft = page.getByPlaceholder('Paste an avatar draft to audit');
+    await draft.fill('The tapestry hung beside the kitchen door.');
+    await expect(page.getByText(/Isolated style marker observed/i)).toBeVisible();
+    await expect(page.getByText('Authorship inference: not-supported', { exact: true })).toBeVisible();
+
+    await draft.fill('The tapestry felt vibrant, pivotal, intricate, and enduring.');
+    await expect(page.getByText(/Voice-density warning/i)).toBeVisible();
+    await expect(page.getByText('Authorship inference: not-supported', { exact: true })).toBeVisible();
+    expect(interceptedCount()).toBeGreaterThan(0);
+
+    const hasHorizontalOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
+    );
+    expect(hasHorizontalOverflow).toBe(false);
+    await page.screenshot({ path: testInfo.outputPath('voice-integrity-density-proof.png'), fullPage: true });
   });
 });

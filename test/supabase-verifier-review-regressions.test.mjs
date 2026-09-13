@@ -44,30 +44,35 @@ test('malformed live migration versions fail closed instead of disappearing', ()
   }
 });
 
-test('accepted alias rejects a mismatched embedded canonical timestamp', () => {
+test('accepted alias rejects a mismatched embedded timestamp', () => {
   const required = [{
     version: '20260806024500',
     name: 'harden_uos_set_updated_at_search_path',
   }];
 
-  const evaluated = evaluateMigrationHistory(
-    historyRow([{
-      version: '20260808073044',
-      name: '19990101000000_harden_uos_set_updated_at_search_path',
-    }]),
-    required,
-  );
+  for (const name of [
+    '19990101000000_harden_uos_set_updated_at_search_path',
+    '20260806024500_harden_uos_set_updated_at_search_path',
+  ]) {
+    const evaluated = evaluateMigrationHistory(
+      historyRow([{
+        version: '20260808073044',
+        name,
+      }]),
+      required,
+    );
 
-  assert.equal(evaluated.verified, false);
-  assert.deepEqual(evaluated.missingCanonicalVersions, ['20260806024500']);
-  assert.deepEqual(evaluated.acceptedAliasVersions, []);
-  assert.deepEqual(evaluated.unexpectedRecentVersions, [{
-    liveVersion: '20260808073044',
-    name: '19990101000000_harden_uos_set_updated_at_search_path',
-  }]);
+    assert.equal(evaluated.verified, false);
+    assert.deepEqual(evaluated.missingCanonicalVersions, ['20260806024500']);
+    assert.deepEqual(evaluated.acceptedAliasVersions, []);
+    assert.deepEqual(evaluated.unexpectedRecentVersions, [{
+      liveVersion: '20260808073044',
+      name,
+    }]);
+  }
 });
 
-test('accepted alias still permits evidenced suffix-only and matching-prefix receipts', () => {
+test('accepted alias permits evidenced suffix-only and matching-live-prefix receipts', () => {
   const required = [{
     version: '20260806024500',
     name: 'harden_uos_set_updated_at_search_path',
@@ -75,7 +80,7 @@ test('accepted alias still permits evidenced suffix-only and matching-prefix rec
 
   for (const name of [
     'harden_uos_set_updated_at_search_path',
-    '20260806024500_harden_uos_set_updated_at_search_path',
+    '20260808073044_harden_uos_set_updated_at_search_path',
   ]) {
     const evaluated = evaluateMigrationHistory(
       historyRow([{ version: '20260808073044', name }]),

@@ -6,6 +6,9 @@ User-agent: *
 Disallow: /
 Allow: /$
 Allow: /auth.md$
+Allow: /what-is-sekret-bip/
+Allow: /how-it-works/
+Allow: /privacy-and-safety/
 Allow: /robots.txt$
 Allow: /sitemap.xml$
 

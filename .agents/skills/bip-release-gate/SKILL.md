@@ -22,6 +22,38 @@ Classify every possible gate as:
 
 An untriggered workflow is not automatically passed. A green check from an older SHA is not current evidence.
 
+## Attack 2000 falsification layer
+
+Attack 2000 is mandatory for merge, beta, controlled production mutation, and public-release decisions. It is an adversarial depth contract, not a literal claim that 2,000 tests executed.
+
+For every consequential release claim, record:
+
+- **CLAIM** — the exact thing being asserted;
+- **SUBJECT** — exact repository head, release target, runtime/provider identity, or other immutable proof subject;
+- **AUTHORITY** — who/what can authorize the transition and what that authority does not permit;
+- **EVIDENCE** — the current observations that support the claim;
+- **FALSIFIER** — the smallest observation that would force the claim to be withdrawn;
+- **RESULT** — PASS, HOLD, or FAIL;
+- **ROLLBACK** — the smallest safe reversal or forward-fix path.
+
+Attack the selected claim across the applicable truth planes rather than counting arbitrary test cases. At minimum, try to falsify with:
+
+- exact head or trusted base movement;
+- missing, pending, skipped, cancelled, or failed required checks;
+- same-name checks emitted by an untrusted app;
+- user-visible Playwright that did not actually execute when applicable;
+- production source/runtime identity mismatch;
+- Supabase migration-history, schema, RLS, or runtime contradiction;
+- Cloudflare Pages/Worker/provider readback contradiction;
+- stale evidence, stale continuity, or predecessor success being reused as current proof;
+- authority scope drift, replay, or a non-authorizing receipt being treated as permission;
+- rollback that cannot be attributed safely;
+- newer live evidence contradicting repository or historical evidence.
+
+Attack 2000 may only preserve or reduce confidence. It never manufactures merge, deploy, publication, spending, deletion, auth, or provider authority. A failed verification can be a successful Attack 2000 outcome when it correctly prevents a false success claim.
+
+The GitHub merge membrane implements the source-side Attack 2000 slice for exact-head machine evidence. Full beta/public-release Attack 2000 additionally requires the applicable provider, runtime, Supabase, browser, privacy, and rollback planes below.
+
 ## Step 0 — Discover, do not assume
 
 Inspect current workflows, diff, exact HEAD, branch protection, current `wrangler.toml`, active Worker/client contracts, and live provider evidence when deployment truth matters.

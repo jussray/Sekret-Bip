@@ -46,14 +46,84 @@ export const PRODUCTION_HISTORY_RECONCILIATION_PLAN = Object.freeze([
   }),
 ]);
 
-export const PENDING_SECURITY_MIGRATIONS = Object.freeze([
-  '20260827060000_harden_consent_permanent_account_boundary.sql',
-  '20260827061000_harden_economy_task_rpcs_permanent_accounts.sql',
-  '20260827062000_harden_legacy_circle_permanent_account_boundaries.sql',
+export const PRODUCTION_SECURITY_APPLY_RECEIPTS = Object.freeze([
+  Object.freeze({
+    canonicalVersion: '20260826012500',
+    canonicalName: 'pseudonymize_open_bip_author_ids',
+    liveVersion: '20260905233953',
+  }),
+  Object.freeze({
+    canonicalVersion: '20260827060000',
+    canonicalName: 'harden_consent_permanent_account_boundary',
+    liveVersion: '20260905234133',
+  }),
+  Object.freeze({
+    canonicalVersion: '20260827061000',
+    canonicalName: 'harden_economy_task_rpcs_permanent_accounts',
+    liveVersion: '20260905234009',
+  }),
+  Object.freeze({
+    canonicalVersion: '20260827062000',
+    canonicalName: 'harden_legacy_circle_permanent_account_boundaries',
+    liveVersion: '20260905234019',
+  }),
+  Object.freeze({
+    canonicalVersion: '20260827063000',
+    canonicalName: 'reconcile_reward_approval_live_and_replay',
+    liveVersion: '20260905234039',
+  }),
+  Object.freeze({
+    canonicalVersion: '20260831233000',
+    canonicalName: 'private_self_task_visibility',
+    liveVersion: '20260905234048',
+  }),
 ]);
+
+export const PENDING_SECURITY_MIGRATIONS = Object.freeze([]);
 
 function canonicalFilename(pair) {
   return `${pair.canonicalVersion}_${pair.canonicalName}.sql`;
+}
+
+function validateSecurityApplyReceipts(receipts = PRODUCTION_SECURITY_APPLY_RECEIPTS) {
+  const expected = new Map(
+    PRODUCTION_SECURITY_APPLY_RECEIPTS.map((receipt) => [
+      `${receipt.canonicalVersion}:${receipt.liveVersion}`,
+      receipt,
+    ]),
+  );
+  const seenCanonical = new Set();
+  const seenLive = new Set();
+
+  if (!Array.isArray(receipts) || receipts.length !== PRODUCTION_SECURITY_APPLY_RECEIPTS.length) {
+    throw new Error(`Supabase production security apply receipt set must contain exactly ${PRODUCTION_SECURITY_APPLY_RECEIPTS.length} receipts.`);
+  }
+
+  for (const receipt of receipts) {
+    if (!VERSION.test(receipt?.canonicalVersion ?? '') || !VERSION.test(receipt?.liveVersion ?? '')) {
+      throw new Error('Every security apply receipt version must be exactly 14 digits.');
+    }
+    if (!receipt.canonicalName) {
+      throw new Error('Every security apply receipt requires the canonical migration name.');
+    }
+    if (seenCanonical.has(receipt.canonicalVersion) || seenLive.has(receipt.liveVersion)) {
+      throw new Error('Security apply receipts must be one-to-one.');
+    }
+    seenCanonical.add(receipt.canonicalVersion);
+    seenLive.add(receipt.liveVersion);
+
+    const pinned = expected.get(`${receipt.canonicalVersion}:${receipt.liveVersion}`);
+    if (!pinned || pinned.canonicalName !== receipt.canonicalName) {
+      throw new Error(`Unrecognized Supabase security apply receipt: ${receipt.canonicalVersion}:${receipt.liveVersion}.`);
+    }
+
+    const canonicalPath = path.join(MIGRATIONS_ROOT, canonicalFilename(receipt));
+    if (!fs.existsSync(canonicalPath)) {
+      throw new Error(`Applied production security migration is missing from repository truth: ${canonicalFilename(receipt)}.`);
+    }
+  }
+
+  return receipts.map((receipt) => ({ ...receipt, canonicalFilename: canonicalFilename(receipt) }));
 }
 
 export function validateReconciliationPlan(plan = PRODUCTION_HISTORY_RECONCILIATION_PLAN) {
@@ -100,23 +170,21 @@ export function validateReconciliationPlan(plan = PRODUCTION_HISTORY_RECONCILIAT
     }
   }
 
-  for (const filename of PENDING_SECURITY_MIGRATIONS) {
-    if (!fs.existsSync(path.join(MIGRATIONS_ROOT, filename))) {
-      throw new Error(`Pending production security migration is missing from repository truth: ${filename}.`);
-    }
-  }
+  const recordedSecurityApplyReceipts = validateSecurityApplyReceipts();
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     projectRef: PRODUCTION_PROJECT_REF,
     pairCount: plan.length,
     pairs: plan.map((pair) => ({ ...pair, canonicalFilename: canonicalFilename(pair) })),
+    recordedSecurityApplyReceipts,
     pendingSecurityMigrations: [...PENDING_SECURITY_MIGRATIONS],
+    securityApplyObservedComplete: PENDING_SECURITY_MIGRATIONS.length === 0,
     mutatesProduction: false,
     historyMutationAuthorized: false,
     securityApplyAuthorized: false,
     requiresFounderApprovalBeforeHistoryMutation: true,
-    requiresFounderApprovalBeforePendingSecurityApply: true,
+    requiresFounderApprovalBeforePendingSecurityApply: PENDING_SECURITY_MIGRATIONS.length > 0,
     verified: true,
   };
 }

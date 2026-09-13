@@ -3,11 +3,11 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 import {
-  appDomainApplyBlockReason,
+  classifyFailureState,
   classifyObservedRequest,
 } from '../scripts/run-cloudflare-app-domain-reconcile-with-receipt.mjs';
 
-test('sanitized request classification identifies Cloudflare preflight operations without URLs or secrets', () => {
+test('sanitized request classification identifies only the provider operations needed by exact-host reconciliation', () => {
   assert.deepEqual(
     classifyObservedRequest(
       'https://api.cloudflare.com/client/v4/accounts/account-1/pages/projects/sekret-bip/domains',
@@ -36,15 +36,55 @@ test('sanitized request classification identifies Cloudflare preflight operation
   );
 });
 
-test('stale one-worker apply path is blocked until provider readback pins the two-worker topology', () => {
-  assert.equal(appDomainApplyBlockReason([]), null);
+test('failure classification preserves explicit provider-bridge blockers and safe fallbacks', () => {
+  const startup = {
+    provider: 'none',
+    operation: 'startup',
+    method: null,
+    status: null,
+    providerCodes: [],
+  };
   assert.equal(
-    appDomainApplyBlockReason(['--apply']),
-    'TWO_WORKER_TOPOLOGY_PROVIDER_READBACK_REQUIRED',
+    classifyFailureState(startup, {
+      BIP_PROVIDER_BLOCK_CLASSIFICATION: 'BLOCKED_CLOUDFLARE_TOKEN_TRANSPORT',
+    }),
+    'BLOCKED_CLOUDFLARE_TOKEN_TRANSPORT',
+  );
+  assert.equal(classifyFailureState(startup, {}), 'BLOCKED_PROVIDER_PREFLIGHT');
+  assert.equal(
+    classifyFailureState({ provider: 'cloudflare', operation: 'zone-read' }, {}),
+    'BLOCKED_CLOUDFLARE_PROVIDER',
+  );
+  assert.equal(
+    classifyFailureState({ provider: 'runtime', operation: 'app-runtime-probe' }, {}),
+    'BLOCKED_RUNTIME_VERIFICATION',
   );
 });
 
-test('failure wrapper persists a safe receipt and never serializes caught exception text', () => {
+test('wrapper delegates authority to the reconciler exact-host binding proof and reports current authority truth', () => {
+  const wrapper = fs.readFileSync(
+    new URL('../scripts/run-cloudflare-app-domain-reconcile-with-receipt.mjs', import.meta.url),
+    'utf8',
+  );
+  const reconciler = fs.readFileSync(
+    new URL('../scripts/reconcile-cloudflare-app-domain.mjs', import.meta.url),
+    'utf8',
+  );
+
+  assert.doesNotMatch(wrapper, /\/workers\/scripts/);
+  assert.doesNotMatch(wrapper, /TWO_WORKER_TOPOLOGY_PROVIDER_READBACK/);
+  assert.match(wrapper, /exact-host-binding-provider-readback-verified/);
+  assert.match(wrapper, /sekret-backend-alpha/);
+
+  assert.match(reconciler, /FOREIGN_APP_DOMAIN_BINDING/);
+  assert.match(reconciler, /BROAD_WORKER_ROUTE_REQUIRES_MANUAL_REVIEW/);
+  assert.match(reconciler, /target domain must already be active on canonical Pages project/);
+  assert.match(reconciler, /exact-host Worker domain\/route only/);
+  assert.match(reconciler, /bounded workflow_dispatch or one-shot parent-bound repository approval/);
+  assert.doesNotMatch(reconciler, /workflow_dispatch with apply=true only/);
+});
+
+test('failure wrapper persists a classified safe receipt and never serializes caught exception text', () => {
   const wrapper = fs.readFileSync(
     new URL('../scripts/run-cloudflare-app-domain-reconcile-with-receipt.mjs', import.meta.url),
     'utf8',
@@ -52,14 +92,17 @@ test('failure wrapper persists a safe receipt and never serializes caught except
 
   assert.match(wrapper, /preflight-failed-before-mutation/);
   assert.match(wrapper, /mutationState/);
+  assert.match(wrapper, /classification/);
   assert.match(wrapper, /providerCodes/);
   assert.match(wrapper, /FAILURE_EVIDENCE_WRITTEN/);
-  assert.match(wrapper, /two-worker-topology-guard/);
+  assert.match(wrapper, /BLOCKED_CLOUDFLARE_PROVIDER/);
+  assert.match(wrapper, /BLOCKED_RUNTIME_VERIFICATION/);
+  assert.match(wrapper, /exact-host-binding-provider-readback-required/);
   assert.match(wrapper, /protectedWorkers: PROTECTED_WORKERS/);
   assert.doesNotMatch(wrapper, /error\.message|String\(error\)|payload\?\.errors[^\n]*message/);
 });
 
-test('workflow uses the receipt wrapper and fails if evidence is missing', () => {
+test('workflow retains a classified receipt on invalid token transport and keeps strict normalization for valid apply', () => {
   const workflow = fs.readFileSync(
     new URL('../.github/workflows/reconcile-cloudflare-app-domain.yml', import.meta.url),
     'utf8',
@@ -67,7 +110,14 @@ test('workflow uses the receipt wrapper and fails if evidence is missing', () =>
 
   assert.match(
     workflow,
-    /node scripts\/run-cloudflare-app-domain-reconcile-with-receipt\.mjs --apply/,
+    /node scripts\/run-with-normalized-cloudflare-token\.mjs\s+\\\s+scripts\/run-cloudflare-app-domain-reconcile-with-receipt\.mjs\s+\\\s+--apply/s,
+  );
+  assert.match(workflow, /normalizeCloudflareTokenTransport/);
+  assert.match(workflow, /CLOUDFLARE_APP_DOMAIN_TOKEN_TRANSPORT_INVALID_RETAINING_RECEIPT/);
+  assert.match(workflow, /BIP_PROVIDER_BLOCK_CLASSIFICATION='BLOCKED_CLOUDFLARE_TOKEN_TRANSPORT'/);
+  assert.match(
+    workflow,
+    /CLOUDFLARE_API_TOKEN=''\s+\\\s+node scripts\/run-cloudflare-app-domain-reconcile-with-receipt\.mjs --apply/s,
   );
   assert.match(workflow, /cloudflare-app-domain-failure-receipt\.test\.mjs/);
   assert.match(workflow, /if-no-files-found: error/);
