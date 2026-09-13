@@ -54,6 +54,8 @@ export interface StyledResponseMetadata {
   internalIdentityApplied: boolean;
 }
 
+export const EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION = 'empathy-accountability-v1' as const;
+
 export const EMPATHY_ACCOUNTABILITY_INVARIANTS = Object.freeze({
   perspectiveIsNotTruth: true,
   understandingIsNotAgreement: true,
@@ -128,6 +130,10 @@ const FORBIDDEN_REPLACEMENTS: readonly (readonly [RegExp, string])[] = [
   [/\brylane\b/gi, 'Sy'],
 ] as const;
 
+const PHYSICAL_HARM_ADMISSION_RE =
+  /\b(?:i|we)\s+(?:hit|punched|kicked|slapped|shoved|threatened|bullied)\s+(?:(?:my|his|her|their|the|a)\s+)?(?:brother|sister|friend|parent|mom|dad|mother|father|teacher|kid|boy|girl|person|someone|him|her|them)\b/i;
+const DISHONEST_CONDUCT_ADMISSION_RE = /\b(?:i|we)\s+(?:lied|cheated|stole)\b/i;
+
 const AVATAR_STATES: readonly CompanionAvatarState[] = [
   'neutral',
   'listening',
@@ -148,6 +154,39 @@ function resolveAvatarState(data: Record<string, unknown>): CompanionAvatarState
   if (typeof data.suggestedComfortTool === 'string' && data.suggestedComfortTool.trim()) return 'comforting';
   if (data.tone === 'playful' || data.tone === 'happy' || data.detectedIntent === 'joking') return 'happy';
   return 'responding';
+}
+
+/**
+ * Fallback replies do not pass through the model prompt. This guard preserves
+ * the empathy/accountability invariant when degraded execution selects an old
+ * generic reply that could accidentally endorse admitted harmful conduct.
+ */
+export function enforceFallbackAccountability(
+  data: Record<string, unknown>,
+  userText: string,
+): Record<string, unknown> {
+  if (data.replySource !== 'fallback') return { ...data };
+
+  const text = userText.trim();
+  if (PHYSICAL_HARM_ADMISSION_RE.test(text)) {
+    return {
+      ...data,
+      reply: "Being upset, scared, or angry can explain what led up to it, but hurting or threatening someone isn't okay. Make sure everyone is safe, then own what happened and repair what you can.",
+      tone: 'grounded',
+      fallbackAccountabilityRepaired: true,
+    };
+  }
+
+  if (DISHONEST_CONDUCT_ADMISSION_RE.test(text)) {
+    return {
+      ...data,
+      reply: "There may be a reason you did it, but that doesn't make it okay. Be honest about what happened and take the smallest safe step to repair the impact.",
+      tone: 'grounded',
+      fallbackAccountabilityRepaired: true,
+    };
+  }
+
+  return { ...data, fallbackAccountabilityRepaired: false };
 }
 
 export function normalizeReplyActor(value: unknown): ReplyActorId | null {
@@ -204,11 +243,14 @@ export function resolveRuntimeStyle(
     ? buildCompanionStyleRequest(actorId)
     : buildSekretPresenceStyleRequest();
   const internal = Boolean(internalHonorIdentity);
+  const textStyleVersion = internal
+    ? `internal-presence-text-v1+${EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION}`
+    : `${request.textStyleVersion}+${EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION}`;
 
   return Object.freeze({
     actorId,
     role: request.role,
-    textStyleVersion: internal ? 'internal-presence-text-v1' : request.textStyleVersion,
+    textStyleVersion,
     speechStyleVersion: internal ? 'internal-presence-speech-v1' : request.speechStyleVersion,
     systemPromptAddendum: request.systemPromptAddendum,
     speechInstructions: request.speechInstructions,
