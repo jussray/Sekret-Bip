@@ -39,7 +39,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cloudflare-app-domain-routing-production
+  group: ${{ github.event_name == 'pull_request' && format('cloudflare-app-domain-pr-{0}', github.event.pull_request.number) || 'cloudflare-app-domain-routing-production' }}
   cancel-in-progress: false
 
 env:
