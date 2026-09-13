@@ -115,8 +115,14 @@ async function selectPagesCredential(env, accountId, projectName) {
   }
 
   const providerStatus = Number(lastError?.providerStatus);
+  const providerCodes = Array.isArray(lastError?.providerCodes)
+    ? lastError.providerCodes.filter((code) => Number.isInteger(code))
+    : [];
   const suffix = Number.isInteger(providerStatus) ? ` Last provider status: ${providerStatus}.` : '';
-  throw new Error(`No configured Cloudflare token can read Pages project ${projectName}.${suffix}`);
+  const error = new Error(`No configured Cloudflare token can read Pages project ${projectName}.${suffix}`);
+  error.providerStatus = Number.isInteger(providerStatus) ? providerStatus : null;
+  error.providerCodes = providerCodes;
+  throw error;
 }
 
 function parseArgs(argv) {
@@ -135,6 +141,61 @@ function parseArgs(argv) {
   return parsed;
 }
 
+function configuredCredentialSources(env) {
+  return [
+    env.CLOUDFLARE_PAGES_READ_API_TOKEN ? 'CLOUDFLARE_PAGES_READ_API_TOKEN' : null,
+    env.CLOUDFLARE_API_TOKEN ? 'CLOUDFLARE_API_TOKEN' : null,
+    env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN ? 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN' : null,
+  ].filter(Boolean);
+}
+
+async function retainPreReadFailure({
+  output,
+  env,
+  projectName,
+  expectedBranch,
+  expectedRepoOwner,
+  expectedRepoName,
+  expectedCanonicalDomain,
+  code,
+  error,
+}) {
+  const providerStatus = Number(error?.providerStatus);
+  const providerCodes = Array.isArray(error?.providerCodes)
+    ? error.providerCodes.filter((providerCode) => Number.isInteger(providerCode))
+    : [];
+  const receipt = {
+    schemaVersion: 3,
+    generatedAt: new Date().toISOString(),
+    mode: 'read-only',
+    mutationPerformed: false,
+    status: 'blocked',
+    credentialSource: null,
+    credentialConfiguredSources: configuredCredentialSources(env),
+    project: projectName,
+    expectedProductionBranch: expectedBranch,
+    expectedRepoOwner,
+    expectedRepoName,
+    expectedCanonicalDomain,
+    observed: null,
+    fingerprint: null,
+    verified: false,
+    failures: [code],
+    expectedSnapshotFingerprint: null,
+    snapshotMatched: null,
+    failure: {
+      code,
+      message: error instanceof Error ? error.message : String(error),
+      providerStatus: Number.isInteger(providerStatus) ? providerStatus : null,
+      providerCodes,
+    },
+  };
+
+  await mkdir(path.dirname(output), { recursive: true });
+  await writeFile(output, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+  return receipt;
+}
+
 export async function verifyPagesBranchAuthority({ argv = [], env = process.env } = {}) {
   const { output, expectSnapshot } = parseArgs(argv);
   const accountId = clean(env.CLOUDFLARE_ACCOUNT_ID);
@@ -144,9 +205,40 @@ export async function verifyPagesBranchAuthority({ argv = [], env = process.env 
   const expectedRepoName = clean(env.CLOUDFLARE_PAGES_REPO_NAME) || DEFAULT_REPO_NAME;
   const expectedCanonicalDomain = clean(env.CLOUDFLARE_PAGES_CANONICAL_DOMAIN) || DEFAULT_CANONICAL_DOMAIN;
 
-  if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required for Pages readback.');
+  if (!accountId) {
+    const error = new Error('CLOUDFLARE_ACCOUNT_ID is required for Pages readback.');
+    await retainPreReadFailure({
+      output,
+      env,
+      projectName,
+      expectedBranch,
+      expectedRepoOwner,
+      expectedRepoName,
+      expectedCanonicalDomain,
+      code: 'configuration-missing',
+      error,
+    });
+    throw error;
+  }
 
-  const credential = await selectPagesCredential(env, accountId, projectName);
+  let credential;
+  try {
+    credential = await selectPagesCredential(env, accountId, projectName);
+  } catch (error) {
+    await retainPreReadFailure({
+      output,
+      env,
+      projectName,
+      expectedBranch,
+      expectedRepoOwner,
+      expectedRepoName,
+      expectedCanonicalDomain,
+      code: configuredCredentialSources(env).length === 0 ? 'credential-not-configured' : 'credential-read-failed',
+      error,
+    });
+    throw error;
+  }
+
   const verdict = evaluatePagesBranchAuthority(credential.project, {
     expectedProject: projectName,
     expectedBranch,

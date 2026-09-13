@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: sekret-bip-piper-canary
+    runtime: docker
+    plan: free
+    rootDir: services/piper-tts
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    numInstances: 1
+    maxShutdownDelaySeconds: 60
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: PIPER_API_TOKEN
+        generateValue: true
+      - key: PIPER_ALLOW_INSECURE_LOCAL
+        value: "false"

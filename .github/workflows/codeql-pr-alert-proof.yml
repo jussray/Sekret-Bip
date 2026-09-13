@@ -19,6 +19,7 @@ on:
       - '.github/workflows/founder-shield.yml'
       - '.github/workflows/product-design-playwright-proof.yml'
       - '.github/workflows/codeql-pr-alert-proof.yml'
+      - '.github/workflows/pr-continuity.yml'
 
 permissions:
   contents: read

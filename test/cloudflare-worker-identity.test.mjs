@@ -41,7 +41,10 @@ test('Wrangler targets the canonical Worker and leaves production routing provid
 });
 
 test('production verification proves the exact Worker and Pages release', () => {
-  assert.ok(workflow.includes('npm run test:e2e:production'));
+  assert.ok(workflow.includes('npx playwright test'));
+  assert.ok(workflow.includes('--config=playwright.production.config.ts'));
+  assert.ok(workflow.includes('--grep-invert "production exposes the exact expected Pages and Worker release commit"'));
+  assert.ok(workflow.includes('--grep "production exposes the exact expected Pages and Worker release commit"'));
   assert.ok(workflow.includes('scripts/verify-cloudflare-native-deploy.mjs'));
   assert.ok(workflow.includes('scripts/publish-production-release-observation.mjs'));
   assert.ok(workflow.includes(`${PRODUCTION_WORKER_URL}/health`));

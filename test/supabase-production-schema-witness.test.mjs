@@ -35,7 +35,7 @@ const REQUIRED_HISTORY_FIXTURES = [
 
 const ACCEPTED_LIVE_RECEIPTS = [
   { version: '20260806020640', name: 'extend_auth_profile_sync_identity' },
-  { version: '20260808073044', name: '20260806024500_harden_uos_set_updated_at_search_path' },
+  { version: '20260808073044', name: '20260808073044_harden_uos_set_updated_at_search_path' },
   { version: '20260808221720', name: 'reconcile_safety_alert_runtime_schema' },
   { version: '20260808222306', name: 'lock_safety_alert_table_grants' },
   { version: '20260813222648', name: 'founder_owned_auth_identity' },
@@ -318,11 +318,13 @@ test('production verifier derives repo head, uses read-only Management API, and 
   assert.equal(evidence.verified, true);
   assert.equal(evidence.expectedVersion, CURRENT_MAIN_SCHEMA_HEAD);
   assert.equal(evidence.liveMaxVersion, CURRENT_MAIN_SCHEMA_HEAD);
-  assert.match(observedUrl, /\/database\/query\/read-only$/);
+  assert.match(observedUrl, /\/database\/query$/);
   assert.equal(observedOptions.method, 'POST');
   assert.match(observedOptions.headers.Authorization, /^Bearer /);
-  assert.match(observedOptions.body, /supabase_migrations\.schema_migrations/);
-  assert.match(observedOptions.body, /jsonb_agg/);
+  const observedBody = JSON.parse(observedOptions.body);
+  assert.equal(observedBody.read_only, true);
+  assert.match(observedBody.query, /supabase_migrations\.schema_migrations/);
+  assert.match(observedBody.query, /jsonb_agg/);
 
   const retained = fs.readFileSync(evidencePath, 'utf8');
   assert.doesNotMatch(retained, /secret-token-for-test/);

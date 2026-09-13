@@ -17,7 +17,7 @@ const terminal = new Set(['success', 'fail', 'skipped', 'cancelled', 'terminated
 const active = (rows) => (Array.isArray(rows) ? rows : []).filter((row) => !row?.deleted_on);
 
 const receipt = {
-  schemaVersion: 11,
+  schemaVersion: 12,
   generatedAt: new Date().toISOString(),
   trustedGitRef: process.env.GITHUB_REF || null,
   trustedGitSha: process.env.GITHUB_SHA || null,
@@ -112,34 +112,36 @@ function inspectToken(rawValue, source) {
   if (/^Bearer\s+/i.test(rawValue)) return { ok: false, source, shape: 'invalid', code: 'token-bearer-prefix-stored' };
   if (/^["']|["']$/.test(rawValue)) return { ok: false, source, shape: 'invalid', code: 'token-quoted-secret' };
   if (/^[A-Z_][A-Z0-9_]*=/.test(rawValue)) return { ok: false, source, shape: 'invalid', code: 'token-variable-assignment-stored' };
-  if (rawValue.startsWith('cfat_')) return { ok: false, source, shape: 'account-scoped', code: 'workers-builds-account-token-unsupported' };
 
   return {
     ok: true,
     source,
-    shape: rawValue.startsWith('cfut_') ? 'user-prefixed' : 'legacy-opaque',
+    shape: rawValue.startsWith('cfat_') ? 'account-prefixed' : rawValue.startsWith('cfut_') ? 'user-prefixed' : 'legacy-opaque',
     token: rawValue,
   };
 }
 
-async function verifyApiToken(inspected) {
+async function verifyApiTokenAt(inspected, owner) {
+  const accountOwned = owner === 'account';
+  const providerPath = accountOwned ? `/accounts/${accountId}/tokens/verify` : '/user/tokens/verify';
+  const probe = accountOwned ? 'token-verify-account' : 'token-verify-user';
   let response;
   try {
-    response = await fetch(`${API}/user/tokens/verify`, {
+    response = await fetch(`${API}${providerPath}`, {
       headers: { Authorization: `Bearer ${inspected.token}`, 'Content-Type': 'application/json' },
     });
   } catch {
     receipt.credential.attempts.push({
       source: inspected.source,
       shape: inspected.shape,
-      probe: 'token-verify-user',
+      probe,
       result: 'request-failed',
       failureCode: 'provider-request-failed',
     });
     return {
       ok: false,
       code: 'token-verify-request-failed',
-      message: `${inspected.source} could not be verified before provider response.`,
+      message: `${inspected.source} could not be verified as a Cloudflare ${owner} API token before provider response.`,
       shape: inspected.shape,
       providerStatus: null,
       providerCode: null,
@@ -155,7 +157,7 @@ async function verifyApiToken(inspected) {
   receipt.credential.attempts.push({
     source: inspected.source,
     shape: inspected.shape,
-    probe: 'token-verify-user',
+    probe,
     result: verified ? 'accepted' : 'rejected',
     providerStatus: response.status,
     providerCode,
@@ -166,7 +168,7 @@ async function verifyApiToken(inspected) {
     return {
       ok: false,
       code: 'token-not-active-or-invalid',
-      message: `${inspected.source} is not an active Cloudflare user API token; verify status ${response.status}${providerCode === null ? '' : ` code ${providerCode}`}.`,
+      message: `${inspected.source} is not an active Cloudflare ${owner} API token; verify status ${response.status}${providerCode === null ? '' : ` code ${providerCode}`}.`,
       shape: inspected.shape,
       providerStatus: response.status,
       providerCode,
@@ -174,7 +176,24 @@ async function verifyApiToken(inspected) {
     };
   }
 
-  return { ok: true };
+  return { ok: true, owner };
+}
+
+async function verifyApiToken(inspected) {
+  if (inspected.shape === 'account-prefixed') return verifyApiTokenAt(inspected, 'account');
+  if (inspected.shape === 'user-prefixed') return verifyApiTokenAt(inspected, 'user');
+
+  const userResult = await verifyApiTokenAt(inspected, 'user');
+  if (userResult.ok) return userResult;
+
+  const accountResult = await verifyApiTokenAt(inspected, 'account');
+  if (accountResult.ok) return accountResult;
+
+  return {
+    ...accountResult,
+    code: 'token-not-active-or-invalid',
+    message: `${inspected.source} is not an active Cloudflare user or account API token.`,
+  };
 }
 
 async function probeWorkersRead(rawValue, source) {

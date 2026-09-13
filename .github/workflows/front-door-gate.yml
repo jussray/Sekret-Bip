@@ -13,6 +13,8 @@ on:
       - constants/vibeColors.ts
       - test/dual-front-door-contract.test.mjs
       - test/front-door-motion-contract.test.mjs
+      - test/mobile-entry-performance-contract.test.mjs
+      - src/context/VerificationContext.tsx
       - src/middleware/auth.ts
       - src/utils/supabase.ts
       - scripts/playwright-executable.mjs
@@ -80,6 +82,7 @@ jobs:
           node --test \
             test/dual-front-door-contract.test.mjs \
             test/front-door-motion-contract.test.mjs \
+            test/mobile-entry-performance-contract.test.mjs \
             2>&1 | tee gate-evidence/front-door-contracts.log
 
       - name: Compare TypeScript diagnostics with base

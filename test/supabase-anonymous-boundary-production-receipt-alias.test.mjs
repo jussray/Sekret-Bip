@@ -109,7 +109,7 @@ test('circle policy live receipt represents only the matching canonical migratio
       live_max_version: CIRCLE_POLICY_LIVE_VERSION,
       migration_history: [{
         version: CIRCLE_POLICY_LIVE_VERSION,
-        name: `${CIRCLE_POLICY_CANONICAL_VERSION}_${CIRCLE_POLICY_MIGRATION_NAME}`,
+        name: `${CIRCLE_POLICY_LIVE_VERSION}_${CIRCLE_POLICY_MIGRATION_NAME}`,
       }],
     },
     [{ version: CIRCLE_POLICY_CANONICAL_VERSION, name: CIRCLE_POLICY_MIGRATION_NAME }],
@@ -132,7 +132,7 @@ test('circle policy alias fails closed when the embedded receipt name differs', 
       live_max_version: CIRCLE_POLICY_LIVE_VERSION,
       migration_history: [{
         version: CIRCLE_POLICY_LIVE_VERSION,
-        name: `${CIRCLE_POLICY_CANONICAL_VERSION}_different_migration`,
+        name: `${CIRCLE_POLICY_LIVE_VERSION}_different_migration`,
       }],
     },
     [{ version: CIRCLE_POLICY_CANONICAL_VERSION, name: CIRCLE_POLICY_MIGRATION_NAME }],
@@ -144,7 +144,7 @@ test('circle policy alias fails closed when the embedded receipt name differs', 
   assert.deepEqual(evaluated.missingCanonicalVersions, [CIRCLE_POLICY_CANONICAL_VERSION]);
   assert.deepEqual(evaluated.unexpectedRecentVersions, [{
     liveVersion: CIRCLE_POLICY_LIVE_VERSION,
-    name: `${CIRCLE_POLICY_CANONICAL_VERSION}_different_migration`,
+    name: `${CIRCLE_POLICY_LIVE_VERSION}_different_migration`,
   }]);
 });
 
@@ -159,7 +159,10 @@ test('reopen-reminders live receipt represents only the matching canonical migra
   const evaluated = evaluateMigrationHistory(
     {
       live_max_version: REOPEN_LIVE_VERSION,
-      migration_history: [{ version: REOPEN_LIVE_VERSION, name: REOPEN_MIGRATION_NAME }],
+      migration_history: [{
+        version: REOPEN_LIVE_VERSION,
+        name: `${REOPEN_LIVE_VERSION}_${REOPEN_MIGRATION_NAME}`,
+      }],
     },
     [{ version: REOPEN_CANONICAL_VERSION, name: REOPEN_MIGRATION_NAME }],
     undefined,
@@ -172,6 +175,28 @@ test('reopen-reminders live receipt represents only the matching canonical migra
     canonicalVersion: REOPEN_CANONICAL_VERSION,
     liveVersion: REOPEN_LIVE_VERSION,
     name: REOPEN_MIGRATION_NAME,
+  }]);
+});
+
+test('reopen-reminders alias fails closed when the embedded timestamp contradicts the live version', () => {
+  const evaluated = evaluateMigrationHistory(
+    {
+      live_max_version: REOPEN_LIVE_VERSION,
+      migration_history: [{
+        version: REOPEN_LIVE_VERSION,
+        name: `${REOPEN_CANONICAL_VERSION}_${REOPEN_MIGRATION_NAME}`,
+      }],
+    },
+    [{ version: REOPEN_CANONICAL_VERSION, name: REOPEN_MIGRATION_NAME }],
+    undefined,
+    PRODUCTION_HISTORY_RUNTIME_ALIASES,
+  );
+
+  assert.equal(evaluated.verified, false);
+  assert.deepEqual(evaluated.missingCanonicalVersions, [REOPEN_CANONICAL_VERSION]);
+  assert.deepEqual(evaluated.unexpectedRecentVersions, [{
+    liveVersion: REOPEN_LIVE_VERSION,
+    name: `${REOPEN_CANONICAL_VERSION}_${REOPEN_MIGRATION_NAME}`,
   }]);
 });
 

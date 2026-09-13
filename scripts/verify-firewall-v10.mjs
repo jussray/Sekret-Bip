@@ -78,7 +78,10 @@ require(/name = "sekret-backend"/.test(wrangler), 'wrangler Worker name must mat
 require(/main = "worker\/voice-entry\.ts"/.test(wrangler), 'voice-entry.ts must remain the authoritative Worker front door');
 require(/\[\[ratelimits\]\][\s\S]*name = "SEKRET_RATE_LIMITER"[\s\S]*namespace_id = "1001"[\s\S]*simple = \{ limit = 60, period = 10 \}/.test(wrangler), 'Cloudflare rate-limit binding must use first-class Wrangler ratelimits syntax');
 require(!/\[\[unsafe\.bindings\]\][\s\S]*type = "ratelimit"/.test(wrangler), 'legacy unsafe ratelimit binding syntax must not return');
-require(/^pattern = "api\.sekretbip\.net"$/m.test(wrangler), 'api.sekretbip.net custom domain must remain exactly bound in repo config');
+require(/^workers_dev = false$/m.test(wrangler), 'production Worker must not expose a workers.dev hostname');
+require(!/^\s*route\s*=/m.test(wrangler), 'provider-managed api.sekretbip.net ownership must not be replaced by a single repo-managed route');
+require(!/^\s*routes\s*=/m.test(wrangler), 'provider-managed api.sekretbip.net ownership must not be replaced by repo-managed routes');
+require(!/^\s*\[\[routes\]\]\s*$/m.test(wrangler), 'provider-managed api.sekretbip.net ownership must not be replaced by Wrangler route blocks');
 
 require(/SEKRET_AUTH_MODE\?: 'required' \| 'dev-open'/.test(auth), 'auth mode contract is missing');
 require(/const devOpen = env\.SEKRET_AUTH_MODE === 'dev-open'/.test(auth), 'dev-open must be explicit');
@@ -113,4 +116,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Founder Shield verified: repo controls are enforced and live Cloudflare claims remain explicitly unverified.');
+console.log('Founder Shield verified: repo controls are enforced; provider-managed custom-domain ownership and live Cloudflare controls remain separate proof authorities.');

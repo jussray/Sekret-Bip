@@ -6,13 +6,14 @@ import path from 'node:path';
 const root = process.cwd();
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 
-test('Bip Energy fade keeps the intentional bounded contract', () => {
+test('legacy Bip Energy fade remains bounded history but is not a teen return trigger', () => {
   const restoreMigration = read('supabase/migrations/20260714045500_restore_intentional_bip_energy_fade.sql');
   const finalMigration = read('supabase/migrations/20260714051500_align_bip_energy_with_bip_events.sql');
   const ledger = read('src/features/activity/ledger.ts');
   const energyService = read('src/features/activity/bipEnergy.ts');
   const overlay = read('components/retention/BipReturnOverlay.tsx');
 
+  // Preserve migration lineage and the bounded legacy contract for audit/rollback.
   assert.match(finalMigration, /v_days_away <= 1/);
   assert.match(finalMigration, /least\(v_balance, least\(5, greatest\(1, v_days_away - 1\)\)\)/);
   assert.match(finalMigration, /on conflict do nothing/);
@@ -25,13 +26,15 @@ test('Bip Energy fade keeps the intentional bounded contract', () => {
   assert.match(finalMigration, /event_type not in \('app_opened', 'streak_milestone'\)/);
   assert.doesNotMatch(finalMigration, /from public\.activity_events/);
   assert.match(restoreMigration, /when 'streak_milestone' then 3/);
-  assert.match(ledger, /void applyBipEnergyFade\(\)/);
-  assert.match(ledger, /Bip Tickets and redeemed room items[\s\S]*never removed/);
   assert.match(energyService, /let inFlightCheck/);
   assert.match(energyService, /if \(inFlightCheck\) return inFlightCheck/);
   assert.match(energyService, /cachedUserId === user\.id/);
-  assert.match(overlay, /await applyBipEnergyFade\(\)/);
-  assert.doesNotMatch(ledger, /disabled_no_guilt_retention/);
+
+  // Humane return UX does not invoke inactivity decay or advertise absence loss.
+  assert.doesNotMatch(ledger, /applyBipEnergyFade/);
+  assert.doesNotMatch(overlay, /applyBipEnergyFade|loadUnseenBipEnergyAdjustment|markBipEnergyAdjustmentSeen/);
+  assert.doesNotMatch(overlay, /Bip Energy faded|days away|streak resets/);
+  assert.match(ledger, /Teen return UX does not subtract points for time away/);
 });
 
 test('Room and History use meaningful return value rather than streak shame', () => {
@@ -42,8 +45,9 @@ test('Room and History use meaningful return value rather than streak shame', ()
   const receipts = read('src/features/retention/meaningfulReturn.ts');
 
   assert.match(roomRoute, /BipReturnOverlay/);
-  assert.match(overlay, /Bip Energy faded a little/);
-  assert.match(overlay, /Bip Tickets, redeemed rewards, and unlocked room items stay yours/);
+  assert.match(overlay, /Your check-ins stay part of your story, even after time away/);
+  assert.match(overlay, /without asking you to show up every day/);
+  assert.doesNotMatch(overlay, /perfect streak|streak resets|Bip Energy faded/);
   assert.match(historyRoute, /MeaningfulHistoryScreen/);
   assert.doesNotMatch(historyRoute, /streakDays=/);
   assert.match(historyScreen, /days you checked in this month/);

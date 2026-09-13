@@ -1,6 +1,8 @@
 export const PASSWORD_RECOVERY_PATH = '/reset-password';
 export const PASSWORD_MIN_LENGTH = 8;
 
+export type RecoveryAccountSide = 'teen' | 'parent';
+
 export type RecoveryUrlResult =
   | {
       kind: 'tokens';
@@ -37,14 +39,19 @@ export function validateRecoveryEmail(value: string): string | null {
 export function buildRecoveryRedirectUrl(options: {
   webOrigin?: string | null;
   nativeUrl?: string | null;
+  side?: RecoveryAccountSide;
 }): string {
   const webOrigin = options.webOrigin?.trim();
-  if (webOrigin) return new URL(PASSWORD_RECOVERY_PATH, webOrigin).toString();
-
   const nativeUrl = options.nativeUrl?.trim();
-  if (nativeUrl) return nativeUrl;
+  const target = webOrigin
+    ? new URL(PASSWORD_RECOVERY_PATH, webOrigin)
+    : nativeUrl
+      ? new URL(nativeUrl)
+      : null;
 
-  throw new Error('A web origin or native recovery URL is required.');
+  if (!target) throw new Error('A web origin or native recovery URL is required.');
+  if (options.side) target.searchParams.set('side', options.side);
+  return target.toString();
 }
 
 function collectParams(url: string): URLSearchParams {

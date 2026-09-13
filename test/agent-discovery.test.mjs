@@ -17,18 +17,26 @@ test('robots.txt exposes only exact public discovery paths', () => {
   assert.match(robots, /^Disallow: \/$/m);
   assert.match(robots, /^Allow: \/\$$/m);
   assert.match(robots, /^Allow: \/auth\.md\$$/m);
+  assert.match(robots, /^Allow: \/what-is-sekret-bip\/$/m);
+  assert.match(robots, /^Allow: \/how-it-works\/$/m);
+  assert.match(robots, /^Allow: \/privacy-and-safety\/$/m);
   assert.match(robots, /^Allow: \/robots\.txt\$$/m);
   assert.match(robots, /^Allow: \/sitemap\.xml\$$/m);
   assert.match(robots, /^Sitemap: https:\/\/sekretbip\.net\/sitemap\.xml$/m);
 });
 
-test('sitemap.xml contains only the canonical public landing page', () => {
+test('sitemap.xml contains exactly the canonical public discovery pages', () => {
   const sitemap = read('public/sitemap.xml');
   const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]);
 
   assert.match(sitemap, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
   assert.match(sitemap, /<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
-  assert.deepEqual(locations, ['https://sekretbip.net/']);
+  assert.deepEqual(locations, [
+    'https://sekretbip.net/',
+    'https://sekretbip.net/what-is-sekret-bip/',
+    'https://sekretbip.net/how-it-works/',
+    'https://sekretbip.net/privacy-and-safety/',
+  ]);
 });
 
 test('auth.md does not advertise external-agent user delegation', () => {
