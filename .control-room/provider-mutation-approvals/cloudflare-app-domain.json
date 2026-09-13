@@ -5,7 +5,7 @@
   "pagesProject": "sekret-bip",
   "backendWorker": "sekret-backend",
   "approved": true,
-  "approvedParentSha": "441d7910204f5d5c30a330e00bf1bb22f4c0f768",
+  "approvedParentSha": "79b4b81dd32f5703c663ad117dae1d7e0ec26c42",
   "authority": "founder-approved-chat",
   "continuity": "one-shot-parent-bound",
   "note": "Approved to execute the existing bounded Pages ownership repair only. This does not authorize API-route changes, Access weakening, secret changes, Supabase mutation, or broader traffic changes."
