@@ -4,9 +4,9 @@ A development-side quality loop for Se'kret Bip companions. This document define
 
 ## Purpose
 
-The Companion Lab exists to make Suhana, Sy, Cloud, Night, and Se'kret measurably better without putting secrets inside the app, without using real teen private data, and without optimizing for chatbot cleverness over safety and character consistency.
+The Companion Lab exists to make Suhana, Sy, Cloud, and Night measurably better without putting secrets inside the app, without using real teen private data, and without optimizing for chatbot cleverness over safety and character consistency.
 
-Legacy fixture names may still reference Raylene, Rylane, or Oracle where compatibility is intentionally tested. Current visible identity follows the repository’s canonical companion mapping.
+Joseema and Se'kret are internal honor identities, not user-facing companions. They may shape internal runtime guidance, but they must never appear as selectable personas, reply labels, TTS identities, accessibility labels, notifications, or client identity metadata. Legacy fixtures or compatibility tests may still reference `oracle` when they are explicitly testing the old internal key, but that name is never a visible companion identity.
 
 ## Runtime ownership
 
@@ -20,7 +20,7 @@ The founder confirms Cloudflare Worker `sekret` remains the companion API lineag
 
 Companion Lab changes must therefore remain portable across the current consolidated runtime and the target `sekret` companion runtime. Do not couple companion prompts, styles, or fixture logic to Bridge/email/platform-only behavior.
 
-## Companions
+## Public companions
 
 ### Suhana
 - **Voice:** Warm, steady, slightly older-sibling energy. She notices things. She doesn't lecture.
@@ -46,15 +46,17 @@ Companion Lab changes must therefore remain portable across the current consolid
 - **Anti-patterns:** Cold responses and over-reliance on lists.
 - **Signature move:** Helps find one concrete next move when a next move is wanted.
 
-### Se'kret
-- **Voice:** Reflective, grounded, pattern-aware, and forward-looking without pretending to know the future.
-- **Boundaries:** No fortune-telling, diagnosis, fake memory, or fabricated insight.
-- **Anti-patterns:** Vague mysticism, performative depth, circular wisdom.
-- **Signature move:** Helps surface a pattern or value already present in the conversation.
+## Internal honor lenses
+
+Internal honor identities are runtime provenance, not characters presented to a user.
+
+They must obey the same empathy/accountability and safety boundaries while remaining hidden from normal product identity surfaces. They must never impersonate a real person, claim messages from a real person, invent memories, or claim what a real person would think, want, approve, or say.
+
+A generic marker such as `internal-presence` may be used in development evidence. It must not reveal which internal identity was used.
 
 ## Scoring Rubric
 
-Each companion reply in the fixture suite is scored on eight dimensions (0–2 each, max 16):
+Each public companion reply in the fixture suite is scored on eight dimensions (0–2 each, max 16):
 
 | Dimension | What it measures |
 |---|---|
@@ -78,6 +80,8 @@ Each companion reply in the fixture suite is scored on eight dimensions (0–2 e
 The synthetic fixture suite covers arrival, overwhelm, low-energy conversation, privacy-sensitive advice requests, parent-boundary pressure, reviewed safety-boundary scenarios, generic-chatbot drift, and fake-memory/over-sharing risk.
 
 All fixtures use synthetic messages. Do not place real private teen content into fixture or review artifacts.
+
+Compatibility scenarios for internal identities must additionally prove that the request can be handled without returning the internal name, an internal `actorId`, or an internal `characterId` to the client.
 
 ## Secret Handling Rules
 
@@ -108,7 +112,8 @@ Optional review automation may use synthetic fixtures to produce scored artifact
 - This does not grant AI tools access to production teen data.
 - Companion quality scores do not flow into the app UI.
 - This does not decide Cloudflare routing or provider binding state.
+- Internal honor identities are not additional selectable companions.
 
 ## Definition of Done
 
-A Companion Lab change is complete when affected synthetic scenarios pass their thresholds, no hard privacy/safety/memory failures remain, the audit exits cleanly without production secret dependency, and runtime ownership remains compatible with the canonical companion contract.
+A Companion Lab change is complete when affected synthetic scenarios pass their thresholds, no hard privacy/safety/memory failures remain, the audit exits cleanly without production secret dependency, internal identity privacy holds, and runtime ownership remains compatible with the canonical companion contract.
