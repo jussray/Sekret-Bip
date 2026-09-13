@@ -13,7 +13,7 @@
 //   ✓ AI reply voice playback via fetchSekretVoice
 //   ✓ Supabase sync via onSave / patchJournalEntry
 //   ✓ sekretReply persisted via patchJournalEntry(id, { sekretReply })
-//   ✓ Me = private non-AI journaling, Oracle = guided discovery
+//   ✓ Me = private non-AI journaling
 //   ✗ NO sekret:chat:history:* storage — entries are the only truth
 
 import React, {
@@ -89,12 +89,11 @@ const COMPANIONS = [
   { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure' },
   { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady'    },
   { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages'     },
-  { id: 'oracle',  name: 'Oracle',  accent: '#c7b87a', vibe: 'guided discovery'  },
 ] as const;
 
 type CompanionId = (typeof COMPANIONS)[number]['id'];
 
-// Companions that map directly to SekretCharacterId (excludes 'me' and 'oracle')
+// Companions that map directly to SekretCharacterId (excludes 'me')
 type AiCompanionId = 'raylene' | 'rylane' | 'cloud' | 'night';
 
 function isAiTab(id: CompanionId): id is AiCompanionId {
@@ -132,12 +131,6 @@ const PROMPTS: Record<string, string[]> = {
     "Write something you haven't been able to say.",
     "This page is yours alone.",
     "What's really going on?",
-  ],
-  oracle: [
-    "What pattern keeps showing up in your life?",
-    "If your gut had a voice today, what would it say?",
-    "What are you avoiding discovering?",
-    "What question are you afraid to answer honestly?",
   ],
 };
 
@@ -218,7 +211,7 @@ function inferState(state: SekretAvatarState, mood?: string, tone?: string): Sek
 
 // ─── Companion unlock thresholds (points required, matches TIERS) ─────────────
 const COMPANION_UNLOCK_PTS: Record<CompanionId, number> = {
-  raylene: 0, me: 0, oracle: 0,
+  raylene: 0, me: 0,
   rylane: 50, cloud: 150, night: 350,
 };
 
@@ -649,13 +642,13 @@ export default function TeenPagesRoute() {
             activeOpacity={unlocked ? 0.7 : 1}
             style={[s.tab, active && { borderColor: c.accent, backgroundColor: `${c.accent}18` }, !unlocked && s.tabLocked]}
           >
-            {c.id !== 'me' && c.id !== 'oracle' ? (
+            {c.id !== 'me' ? (
               <Image
                 source={avatarImage(c.id as SekretCharacterId, active ? avatarState : 'neutral')}
                 style={[s.tabImg, !unlocked && { opacity: 0.3 }]}
               />
             ) : (
-              <Text style={[s.tabEmoji, !unlocked && { opacity: 0.3 }]}>{c.id === 'me' ? '🪞' : '🔮'}</Text>
+              <Text style={[s.tabEmoji, !unlocked && { opacity: 0.3 }]}>🪞</Text>
             )}
             {unlocked ? (
               <Text style={[s.tabName, active && { color: c.accent }]}>{c.name}</Text>
@@ -807,7 +800,7 @@ export default function TeenPagesRoute() {
                 resizeMode="contain"
               />
             ) : (
-              <Text style={s.headerModeIcon}>{activeTab === 'me' ? '🪞' : '🔮'}</Text>
+              <Text style={s.headerModeIcon}>🪞</Text>
             )}
           </View>
         </View>
@@ -825,7 +818,7 @@ export default function TeenPagesRoute() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={s.emptyState}>
-              <Text style={s.emptyEmoji}>{activeTab === 'me' ? '🪞' : activeTab === 'oracle' ? '🔮' : '💜'}</Text>
+              <Text style={s.emptyEmoji}>{activeTab === 'me' ? '🪞' : '💜'}</Text>
               <Text style={[s.emptyTitle, { color: companion.accent }]}>
                 {companion.name === 'Me' ? 'Your private pages' : `Start talking to ${companion.name}`}
               </Text>
