@@ -30,7 +30,9 @@ Activate whenever work touches:
 ```text
 Suhana / Sy / Cloud / Night = the only user-facing companion identities
 Joseema / Se'kret = internal honor identities only
-oracle = legacy compatibility key for the Joseema internal lens
+oracle = hidden legacy compatibility bridge
+         historical continuity primary: sekret
+         internal honor lenses: sekret + joseema
 ```
 
 Internal honor identities may influence runtime reasoning and style, but they are
@@ -57,8 +59,13 @@ Legacy internal key   = oracle
 ```
 
 Legacy normalization may accept `oracle`, but it must resolve only inside the
-runtime to the Joseema internal lens. `sekret` resolves to the separate Se'kret
-internal lens. Neither may resolve to a public companion display label.
+runtime. Oracle preserves Se'kret as its historical continuity anchor and may
+carry Joseema as an additional internal honor lens in parallel. It is not a
+third honor identity and does not replace either internal honor identity.
+
+Direct `joseema` resolves to the Joseema internal lens. Direct `sekret` resolves
+to the Se'kret internal lens. None may resolve to a public companion display
+label.
 
 Unknown internal identity values fail closed to no display identity, never to a
 named companion and never to an internal name.
@@ -74,11 +81,14 @@ Internal honor identities must not cross into:
 - notifications or accessibility labels;
 - archives rendered as companion identity;
 - public/client `actorId` or `characterId` response metadata;
-- routine client-derived telemetry identity fields.
+- routine client-derived telemetry identity fields;
+- provider-facing prompt or speech instructions when generic internal presence
+  instructions can carry the same behavior without exposing provenance.
 
-The runtime may use a generic marker such as `internal-presence` or a generic
-style version for evidence. That marker must not reveal which internal honor
-identity was applied.
+The runtime may use generic markers such as `internal-presence`,
+`internalIdentityApplied`, or `legacyOracleBridgeApplied` for evidence. Those
+markers must not reveal which internal honor identity or identities were
+applied.
 
 Internal honor identities must never be used to impersonate a real person,
 claim messages from a real person, invent memories, or state what a real person
@@ -87,12 +97,17 @@ would think, want, approve, or say.
 ## Required checks
 
 - `resolveVisibleIdentity()` returns labels only for named companions.
-- `resolveInternalHonorIdentity('oracle')` resolves to the Joseema internal lens.
+- `resolveInternalHonorIdentities('oracle')` returns Se'kret continuity plus the
+  Joseema parallel lens.
+- `resolveInternalHonorIdentity('oracle')` returns the historical primary,
+  Se'kret, for single-primary compatibility callers.
 - Joseema and Se'kret remain distinct internal lenses.
 - `assertNoOracleLeak()` protects legacy compatibility leakage.
 - `shouldSuppressInternalIdentity()` covers every user-facing identity surface.
 - Keep `joseema`, `sekret`, and `oracle` out of named companion picker arrays.
 - Keep internal identities out of reply/voice client metadata.
+- Keep internal honor names and the legacy alias out of generic provider-facing
+  internal prompt/TTS instructions.
 - Preserve the named companion's own label when that companion is speaking.
 - Preserve old stored IDs where compatibility is required; do not mutate user data merely to rename a runtime concept.
 
@@ -122,12 +137,14 @@ return { actorId: 'sekret' } // for an internal-honor reply
 
 - focused identity contract tests;
 - runtime tests proving internal identity is applied but not serialized;
+- regression proving Oracle preserves Se'kret continuity while carrying the
+  Joseema parallel honor lens;
 - repository search showing no newly introduced visible internal-identity strings;
 - Companion Lab or equivalent candidate-reply check;
 - text and TTS identity consistency proof when voice is touched;
 - user-visible Playwright for picker/header changes;
-- controlled API Playwright for internal runtime compatibility when credentials are available;
-- privacy review for logs and analytics.
+- controlled exact-head API Playwright for internal runtime compatibility;
+- privacy review for logs, analytics, provider prompt input, and TTS metadata.
 
 ## Required with
 
