@@ -522,7 +522,7 @@ const invokedDirectly =
   process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 
 if (invokedDirectly) {
-  main().catch((error) => {
+  main().catch(() => {
     console.error('CLOUDFLARE_APP_DOMAIN_RECONCILIATION_FAILED');
     process.exitCode = 1;
   });
