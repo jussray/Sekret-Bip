@@ -51,12 +51,12 @@ test('production Auth email provider keeps confirmation enabled and secrets out 
 test('production Auth email provider stays on the canonical Resend domain', () => {
   assert.match(workflow, /AUTH_SMTP_ADMIN_EMAIL:\s*invite@sekretbip\.net/);
   assert.match(script, /smtp_admin_email: env\('AUTH_SMTP_ADMIN_EMAIL', 'invite@sekretbip\.net'\)/);
-  assert.doesNotMatch(workflow, /sekretbip\.com/);
-  assert.doesNotMatch(script, /sekretbip\.com/);
+  assert.ok(!workflow.includes('sekretbip.com'));
+  assert.ok(!script.includes('sekretbip.com'));
 });
 
 test('production apply refuses unverified or sending-disabled Resend domains before Supabase mutation', () => {
-  assert.match(script, /https:\/\/api\.resend\.com/);
+  assert.ok(script.includes('https://api.resend.com'));
   assert.match(script, /\/domains\?limit=100/);
   assert.match(script, /RESEND_DOMAIN_NOT_FOUND/);
   assert.match(script, /RESEND_DOMAIN_NOT_VERIFIED/);
