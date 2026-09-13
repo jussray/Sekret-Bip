@@ -1,11 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 
 const apiOrigin = process.env.SEKRET_E2E_API_ORIGIN?.trim().replace(/\/$/, '');
 const bearerToken = process.env.SEKRET_E2E_BEARER_TOKEN?.trim();
 const requestOrigin = process.env.SEKRET_E2E_ORIGIN?.trim() || 'https://app.sekretbip.net';
 
 async function assertInternalReplyPrivacy(
-  request: Parameters<Parameters<typeof test>[1]>[0]['request'],
+  request: APIRequestContext,
   characterId: 'oracle' | 'sekret',
 ) {
   const response = await request.post(`${apiOrigin}/api/sekret/reply`, {
@@ -41,7 +41,7 @@ test.describe('internal honor runtime privacy', () => {
     'Controlled live proof requires SEKRET_E2E_API_ORIGIN and SEKRET_E2E_BEARER_TOKEN.',
   );
 
-  test('legacy Oracle input reaches the Joseema internal lens without exposing identity', async ({ request }) => {
+  test('legacy Oracle input reaches the internal compatibility lens without exposing identity', async ({ request }) => {
     await assertInternalReplyPrivacy(request, 'oracle');
   });
 
