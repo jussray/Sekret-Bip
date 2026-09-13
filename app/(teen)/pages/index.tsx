@@ -13,7 +13,7 @@
 //   ✓ AI reply voice playback via fetchSekretVoice
 //   ✓ Supabase sync via onSave / patchJournalEntry
 //   ✓ sekretReply persisted via patchJournalEntry(id, { sekretReply })
-//   ✓ Me = private non-AI journaling, Oracle = guided discovery
+//   ✓ Me = private non-AI journaling, Joseema = guided discovery (legacy id: oracle)
 //   ✗ NO sekret:chat:history:* storage — entries are the only truth
 
 import React, {
@@ -89,7 +89,7 @@ const COMPANIONS = [
   { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure' },
   { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady'    },
   { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages'     },
-  { id: 'oracle',  name: 'Oracle',  accent: '#c7b87a', vibe: 'guided discovery'  },
+  { id: 'oracle',  name: 'Joseema', accent: '#c7b87a', vibe: 'guided discovery'  },
 ] as const;
 
 type CompanionId = (typeof COMPANIONS)[number]['id'];
