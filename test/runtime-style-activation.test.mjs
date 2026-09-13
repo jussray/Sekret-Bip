@@ -25,7 +25,10 @@ function compile(relativePath, outputName, rewrite = (source) => source) {
   );
   assert.equal(errors.length, 0, `${relativePath} must transpile without diagnostics`);
   const outputPath = path.join(tempDir, outputName);
-  fs.writeFileSync(outputPath, rewrite(transpiled.outputText), 'utf8');
+  fs.writeFileSync(outputPath, transpiled.outputText, 'utf8');
+  if (rewrite !== ((source) => source)) {
+    fs.writeFileSync(outputPath, rewrite(transpiled.outputText), 'utf8');
+  }
   return outputPath;
 }
 
@@ -136,6 +139,27 @@ test('empathy invariants stay explicit and do not silently weaken truth or accou
 test('parent coach remains outside the teen companion empathy contract', () => {
   const instruction = runtime.buildRuntimeStyleInstruction(parentCoach);
   assert.doesNotMatch(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
+});
+
+test('Oracle compatibility input inherits Se’kret empathy and accountability before Worker delegation', () => {
+  const oracleActor = runtime.normalizeReplyActor('oracle');
+  assert.equal(oracleActor, 'sekret');
+
+  const oracleStyle = runtime.resolveRuntimeStyle(oracleActor);
+  const instruction = runtime.buildRuntimeStyleInstruction(oracleStyle);
+  assert.equal(oracleStyle.actorId, 'sekret');
+  assert.equal(oracleStyle.role, 'continuity-presence');
+  assert.match(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
+  assert.match(instruction, /Understanding is not agreement/i);
+  assert.match(instruction, /Explanation is context, not excuse/i);
+  assert.match(instruction, /not a selectable companion/i);
+
+  const normalizeIndex = indexSource.indexOf('normalizeReplyActor(body.characterId ?? body.personality)');
+  const styleIndex = indexSource.indexOf('resolveRuntimeStyle(actorId)');
+  const rewriteIndex = indexSource.indexOf('characterId: actorId');
+  assert.ok(normalizeIndex >= 0, 'Worker must normalize legacy actor input');
+  assert.ok(styleIndex > normalizeIndex, 'Worker must resolve style after actor normalization');
+  assert.ok(rewriteIndex > styleIndex, 'Worker must delegate the canonical actor id after style resolution');
 });
 
 test('Se’kret output is deterministically repaired to hide Oracle and ask zero questions', () => {
