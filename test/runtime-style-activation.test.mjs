@@ -117,15 +117,16 @@ test('parent coaching cannot cross the teen-facing actor/surface boundary', () =
 });
 
 test('named companions and internal lenses resolve versioned style contracts', () => {
+  assert.equal(runtime.EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION, 'empathy-accountability-v1');
   assert.equal(suhana.role, 'named-companion');
-  assert.equal(suhana.textStyleVersion, 'suhana-text-v1');
+  assert.equal(suhana.textStyleVersion, 'suhana-text-v1+empathy-accountability-v1');
   assert.equal(suhana.speechStyleVersion, 'suhana-speech-v1');
   assert.equal(suhana.maxQuestions, 1);
   assert.equal(suhana.internalHonorIdentity, undefined);
 
   for (const style of [joseema, sekret]) {
     assert.equal(style.role, 'continuity-presence');
-    assert.equal(style.textStyleVersion, 'internal-presence-text-v1');
+    assert.equal(style.textStyleVersion, 'internal-presence-text-v1+empathy-accountability-v1');
     assert.equal(style.speechStyleVersion, 'internal-presence-speech-v1');
     assert.equal(style.maxQuestions, 0);
   }
@@ -184,6 +185,34 @@ test('empathy invariants stay explicit and do not silently weaken truth or accou
   });
 });
 
+test('fallback replies enforce accountability even when the model is unavailable', () => {
+  const guarded = runtime.enforceFallbackAccountability({
+    reply: "That's okay. We can just vibe.",
+    tone: 'casual',
+    replySource: 'fallback',
+  }, 'I hit my brother honestly');
+
+  assert.equal(guarded.fallbackAccountabilityRepaired, true);
+  assert.match(String(guarded.reply), /hurting or threatening someone isn't okay/i);
+  assert.match(String(guarded.reply), /own what happened/i);
+  assert.doesNotMatch(String(guarded.reply), /that's okay/i);
+
+  const styled = runtime.enforceRuntimeStyleResponse(guarded, suhana);
+  assert.equal(styled.fallbackAccountabilityRepaired, true);
+  assert.equal(styled.styleEnforced, true);
+});
+
+test('fallback accountability does not rewrite ordinary degraded replies', () => {
+  const guarded = runtime.enforceFallbackAccountability({
+    reply: 'No rush. Start wherever feels okay.',
+    tone: 'casual',
+    replySource: 'fallback',
+  }, 'I had a rough day');
+
+  assert.equal(guarded.reply, 'No rush. Start wherever feels okay.');
+  assert.equal(guarded.fallbackAccountabilityRepaired, false);
+});
+
 test('parent coach remains outside the teen companion empathy contract', () => {
   const instruction = runtime.buildRuntimeStyleInstruction(parentCoach);
   assert.doesNotMatch(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
@@ -198,6 +227,19 @@ test('Worker resolves internal identity before delegation and strips public acto
   assert.ok(styleIndex > resolveIndex, 'Worker must resolve style after identity resolution');
   assert.ok(rewriteIndex > styleIndex, 'Worker may delegate only the execution actor after style resolution');
   assert.ok(privacyIndex >= 0, 'Worker must strip internal actor metadata before returning data');
+});
+
+test('Worker applies fallback accountability before runtime style enforcement', () => {
+  const delegatedGuard = indexSource.indexOf('enforceFallbackAccountability(data, userText)');
+  const delegatedStyle = indexSource.indexOf('enforceRuntimeStyleResponse(guarded, style)');
+  const localGuard = indexSource.indexOf('enforceFallbackAccountability({');
+  const localStyle = indexSource.indexOf('enforceRuntimeStyleResponse(guarded, prepared.style)');
+  assert.ok(delegatedGuard >= 0, 'delegated fallback responses must be accountability-checked');
+  assert.ok(delegatedStyle > delegatedGuard, 'delegated accountability guard must run before style enforcement');
+  assert.ok(localGuard >= 0, 'local no-provider fallback must be accountability-checked');
+  assert.ok(localStyle > localGuard, 'local accountability guard must run before style enforcement');
+  assert.match(indexSource, /rewriteStyledJsonResponse\(delegated, prepared\.style, userText, cors\)/);
+  assert.match(indexSource, /fallbackAccountabilityRepaired === true/);
 });
 
 test('Joseema internal output is repaired without exposing identity metadata', () => {
@@ -260,12 +302,14 @@ test('named companion output keeps one question and repairs extras', () => {
 test('production Worker wrapper injects, enforces, voices, and returns style evidence', () => {
   assert.match(indexSource, /buildRuntimeStyleInstruction/);
   assert.match(indexSource, /phaseInstruction:/);
+  assert.match(indexSource, /enforceFallbackAccountability/);
   assert.match(indexSource, /enforceRuntimeStyleResponse/);
   assert.match(indexSource, /instructions: style\.speechInstructions/);
   assert.match(indexSource, /styleDecision/);
   assert.match(indexSource, /withPublicActorMetadata/);
   assert.match(runtimeSource, /parentCoach actor requires the parentCoach surface/);
   assert.match(runtimeSource, /EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION/);
+  assert.match(runtimeSource, /EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION/);
   assert.match(runtimeSource, /resolveRuntimeIdentity/);
 });
 
