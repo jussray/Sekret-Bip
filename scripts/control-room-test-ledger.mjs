@@ -33,6 +33,11 @@ function timestamp(value) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function checkRunId(value) {
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : -1;
+}
+
 function checkKey(run) {
   const app = clean(run?.app?.slug) || clean(run?.app?.name) || 'unknown-app';
   return `${app}\u0000${clean(run?.name)}`;
@@ -118,7 +123,15 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
     const current = selected.get(key);
     const currentTime = timestamp(current?.completed_at ?? current?.started_at);
     const candidateTime = timestamp(run.completed_at ?? run.started_at);
-    if (!current || candidateTime >= currentTime) selected.set(key, run);
+    const currentId = checkRunId(current?.id);
+    const candidateId = checkRunId(run.id);
+    if (
+      !current
+      || candidateTime > currentTime
+      || (candidateTime === currentTime && candidateId > currentId)
+    ) {
+      selected.set(key, run);
+    }
   }
 
   return [...selected.values()]

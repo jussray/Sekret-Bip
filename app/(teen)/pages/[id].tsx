@@ -43,7 +43,7 @@ const COMPANION_META: Record<string, CompanionMeta> = {
   cloud:   { label: 'Cloud',   accent: '#8ed9e7', emoji: '☁️', avatarId: 'cloud'   },
   night:   { label: 'Night',   accent: '#9a8ee8', emoji: '🌙', avatarId: 'night'   },
   me:      { label: 'Me',      accent: '#b8a9c9', emoji: '🪞', avatarId: null },
-  oracle:  { label: 'Oracle',  accent: '#c7b87a', emoji: '🔮', avatarId: null },
+  oracle:  { label: 'Joseema', accent: '#c7b87a', emoji: '🔮', avatarId: null },
 };
 
 const AI_COMPANIONS = new Set<SekretCharacterId>(['suhana', 'sy', 'cloud', 'night']);
