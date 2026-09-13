@@ -55,6 +55,7 @@ export function classifyEndpointProbe(evidence) {
   }
   if (evidence?.accessBlockPage === true) return 'cloudflare-access-intercepted';
   if (evidence?.jsonState === 'fetch-error') return 'fetch-error';
+  if (evidence?.status === 405) return 'method-not-allowed';
   if (evidence?.ok !== true) return 'http-error';
   if (evidence?.jsonState !== 'ok') return 'invalid-json';
   return 'ok';
@@ -164,14 +165,23 @@ export async function collectProductionReleaseEndpointEvidence({
     frontend.classification === 'cloudflare-access-intercepted' ? 'frontend' : null,
     backend.classification === 'cloudflare-access-intercepted' ? 'backend' : null,
   ].filter(Boolean);
+  const blockedByRuntime = [
+    frontend.classification === 'method-not-allowed' ? 'frontend' : null,
+  ].filter(Boolean);
 
   return {
-    version: 3,
+    version: 4,
     observedAt: new Date().toISOString(),
     expectedSha: safeString(expectedSha)?.toLowerCase() ?? null,
-    status: blockedByAccess.length > 0 ? 'cloudflare-access-intercepted' : 'observed',
+    status:
+      blockedByAccess.length > 0
+        ? 'cloudflare-access-intercepted'
+        : blockedByRuntime.length > 0
+          ? 'frontend-runtime-mismatch'
+          : 'observed',
     accessServiceAuthConfigured: accessAuth.configured,
     blockedByAccess,
+    blockedByRuntime,
     frontend,
     backend,
   };
@@ -183,45 +193,76 @@ export function writeProductionReleaseEndpointEvidence(evidence, evidencePath = 
   return evidencePath;
 }
 
-export function buildCloudflareAccessBlockerEvidence(evidence) {
+function buildTransportBlockerEvidence(evidence, readinessState, blockedSurfaces) {
   const expectedSha = safeString(evidence?.expectedSha)?.toLowerCase() ?? null;
   return {
-    version: 5,
+    version: 6,
     commitSha: expectedSha,
     expectedSha,
     status: 'failed',
     complete: false,
-    readinessState: 'cloudflare-access-intercepted',
+    readinessState,
     observerError: null,
     transportBlocker: {
-      status: 'cloudflare-access-intercepted',
+      status: readinessState,
       accessServiceAuthConfigured: evidence?.accessServiceAuthConfigured === true,
-      blockedSurfaces: Array.isArray(evidence?.blockedByAccess) ? [...evidence.blockedByAccess] : [],
+      blockedSurfaces,
       frontendClassification: safeString(evidence?.frontend?.classification),
+      frontendStatus: Number.isInteger(evidence?.frontend?.status) ? evidence.frontend.status : null,
       backendClassification: safeString(evidence?.backend?.classification),
+      backendStatus: Number.isInteger(evidence?.backend?.status) ? evidence.backend.status : null,
     },
     checkSummary: {missing: [], pending: [], failed: [], unsuccessful: []},
     requiredChecks: {},
     pagesRelease: {commitSha: null, expectedSha, complete: false},
     workerRuntime: {
       expectedSha,
-      releaseSha: null,
+      releaseSha: safeString(evidence?.backend?.releaseSha),
       versionId: null,
       versionTag: null,
-      healthOk: false,
+      healthOk: evidence?.backend?.healthOk === true,
       complete: false,
     },
   };
+}
+
+export function buildCloudflareAccessBlockerEvidence(evidence) {
+  return buildTransportBlockerEvidence(
+    evidence,
+    'cloudflare-access-intercepted',
+    Array.isArray(evidence?.blockedByAccess) ? [...evidence.blockedByAccess] : [],
+  );
+}
+
+export function buildFrontendRuntimeBlockerEvidence(evidence) {
+  return buildTransportBlockerEvidence(
+    evidence,
+    'frontend-runtime-mismatch',
+    Array.isArray(evidence?.blockedByRuntime) ? [...evidence.blockedByRuntime] : ['frontend'],
+  );
+}
+
+function writeCloudflareBlockerEvidence(
+  blocker,
+  evidencePath = process.env.CLOUDFLARE_EVIDENCE_PATH ?? DEFAULT_CLOUDFLARE_EVIDENCE_PATH,
+) {
+  fs.mkdirSync(path.dirname(evidencePath), {recursive: true});
+  fs.writeFileSync(evidencePath, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8');
+  return evidencePath;
 }
 
 export function writeCloudflareAccessBlockerEvidence(
   evidence,
   evidencePath = process.env.CLOUDFLARE_EVIDENCE_PATH ?? DEFAULT_CLOUDFLARE_EVIDENCE_PATH,
 ) {
-  const blocker = buildCloudflareAccessBlockerEvidence(evidence);
-  fs.mkdirSync(path.dirname(evidencePath), {recursive: true});
-  fs.writeFileSync(evidencePath, `${JSON.stringify(blocker, null, 2)}\n`, 'utf8');
-  return evidencePath;
+  return writeCloudflareBlockerEvidence(buildCloudflareAccessBlockerEvidence(evidence), evidencePath);
+}
+
+export function writeFrontendRuntimeBlockerEvidence(
+  evidence,
+  evidencePath = process.env.CLOUDFLARE_EVIDENCE_PATH ?? DEFAULT_CLOUDFLARE_EVIDENCE_PATH,
+) {
+  return writeCloudflareBlockerEvidence(buildFrontendRuntimeBlockerEvidence(evidence), evidencePath);
 }
 
 async function main() {
@@ -233,6 +274,11 @@ async function main() {
   if (evidence.status === 'cloudflare-access-intercepted') {
     writeCloudflareAccessBlockerEvidence(evidence);
     throw new Error(`CLOUDFLARE_ACCESS_INTERCEPTED surfaces=${evidence.blockedByAccess.join(',')}`);
+  }
+
+  if (evidence.status === 'frontend-runtime-mismatch') {
+    writeFrontendRuntimeBlockerEvidence(evidence);
+    throw new Error(`FRONTEND_RUNTIME_MISMATCH classification=${evidence.frontend.classification} status=${evidence.frontend.status}`);
   }
 }
 
