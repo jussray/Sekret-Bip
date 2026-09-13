@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   buildCloudflareAccessBlockerEvidence,
+  buildFrontendRuntimeBlockerEvidence,
   classifyEndpointProbe,
   collectProductionReleaseEndpointEvidence,
   probeJsonEndpoint,
@@ -30,7 +31,7 @@ test('production verification runs after relevant main pushes', () => {
   assert.match(workflow, /playwright\.production\.config\.ts/);
 });
 
-test('Attack 2000 observes independent production planes before long release convergence', () => {
+test('Attack 2000 preserves independent provider receipts but suppresses doomed browser work after a deterministic transport blocker', () => {
   const schema = workflowStep('Verify exact Supabase production schema contract');
   const transport = workflowStep('Record safe frontend and backend transport evidence');
   const backend = workflowStep('Verify backend health');
@@ -44,11 +45,13 @@ test('Attack 2000 observes independent production planes before long release con
     assert.match(step, /steps\.trusted_current_main\.outcome == 'success'/);
   }
 
-  assert.doesNotMatch(backend, /steps\.cloudflare_release\.outcome/);
-  assert.doesNotMatch(supabaseRuntime, /steps\.backend_health\.outcome/);
-  assert.doesNotMatch(chromium, /steps\.supabase_health\.outcome/);
+  assert.doesNotMatch(backend, /steps\.release_transport\.outcome|steps\.cloudflare_release\.outcome/);
+  assert.doesNotMatch(supabaseRuntime, /steps\.release_transport\.outcome|steps\.backend_health\.outcome/);
+  assert.match(chromium, /steps\.release_transport\.outcome == 'success'/);
+  assert.doesNotMatch(chromium, /steps\.supabase_health\.outcome|steps\.supabase_schema\.outcome/);
 
   assert.match(browserObservation, /steps\.chromium\.outcome == 'success'/);
+  assert.match(browserObservation, /steps\.release_transport\.outcome == 'success'/);
   assert.doesNotMatch(
     browserObservation,
     /steps\.supabase_schema\.outcome|steps\.cloudflare_release\.outcome|steps\.backend_health\.outcome|steps\.supabase_health\.outcome/,
@@ -57,7 +60,7 @@ test('Attack 2000 observes independent production planes before long release con
 
   const browserIndex = workflow.indexOf('      - name: Observe public production browser journeys independently');
   const convergenceIndex = workflow.indexOf('      - name: Wait for exact frontend and backend Worker checks plus release marker');
-  assert.ok(browserIndex >= 0 && convergenceIndex > browserIndex, 'browser observation must run before the long release-convergence wait');
+  assert.ok(browserIndex >= 0 && convergenceIndex > browserIndex, 'browser observation must remain before long release convergence when transport is usable');
 
   assert.match(cloudflareRelease, /steps\.trusted_current_main\.outcome == 'success'/);
   assert.match(cloudflareRelease, /steps\.release_transport\.outcome == 'success'/);
@@ -86,6 +89,7 @@ test('production release transport evidence may inspect Access HTML but never re
   assert.match(releaseProbe, /jsonState/);
   assert.match(releaseProbe, /releaseSha/);
   assert.match(releaseProbe, /CLOUDFLARE_ACCESS_INTERCEPTED/);
+  assert.match(releaseProbe, /FRONTEND_RUNTIME_MISMATCH/);
   assert.doesNotMatch(releaseProbe, /bodyText/);
   assert.doesNotMatch(releaseProbe, /set-cookie|authorization/i);
 
@@ -110,7 +114,7 @@ test('production release transport evidence may inspect Access HTML but never re
   assert.doesNotMatch(JSON.stringify(evidence), /PRIVATE_SENTINEL|<html>|cdn-cgi\/access\/login/);
 });
 
-test('release transport probe classifies non-OK responses without reading their bodies', async () => {
+test('release transport probe classifies generic non-OK responses without reading their bodies', async () => {
   let jsonCalled = false;
   const evidence = await probeJsonEndpoint('https://api.sekretbip.net/health', {
     fetchImpl: async () => ({
@@ -132,6 +136,74 @@ test('release transport probe classifies non-OK responses without reading their 
   assert.equal(evidence.jsonState, 'skipped-non-ok');
   assert.equal(evidence.releaseSha, null);
   assert.equal(evidence.classification, 'http-error');
+});
+
+test('frontend 405 is classified as a deterministic wrong-runtime blocker without reading the body', async () => {
+  let jsonCalled = false;
+  const evidence = await probeJsonEndpoint('https://app.sekretbip.net/.well-known/sekret-release.json', {
+    fetchImpl: async () => ({
+      ok: false,
+      status: 405,
+      url: 'https://app.sekretbip.net/.well-known/sekret-release.json',
+      redirected: false,
+      headers: {get: () => 'application/json'},
+      json: async () => {
+        jsonCalled = true;
+        return {error: 'private-body-must-not-be-read'};
+      },
+    }),
+  });
+
+  assert.equal(jsonCalled, false);
+  assert.equal(evidence.status, 405);
+  assert.equal(evidence.jsonState, 'skipped-non-ok');
+  assert.equal(evidence.classification, 'method-not-allowed');
+  assert.equal('responseBody' in evidence, false);
+});
+
+test('production endpoint evidence promotes frontend 405 into a separate runtime-mismatch receipt while preserving backend truth', async () => {
+  const expectedSha = '582f123f0ccdf177158c6b5052e47ecafd640250';
+  const fetchImpl = async (url) => {
+    const hostname = new URL(url).hostname;
+    if (hostname === 'app.sekretbip.net') {
+      return {
+        ok: false,
+        status: 405,
+        url: String(url),
+        redirected: false,
+        headers: {get: () => 'application/json'},
+        json: async () => ({error: 'must-not-be-read'}),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      url: String(url),
+      redirected: false,
+      headers: {get: () => 'application/json'},
+      json: async () => ({ok: true, releaseSha: expectedSha}),
+    };
+  };
+
+  const evidence = await collectProductionReleaseEndpointEvidence({expectedSha, fetchImpl});
+  assert.equal(evidence.version, 4);
+  assert.equal(evidence.status, 'frontend-runtime-mismatch');
+  assert.deepEqual(evidence.blockedByRuntime, ['frontend']);
+  assert.equal(evidence.frontend.classification, 'method-not-allowed');
+  assert.equal(evidence.backend.classification, 'ok');
+  assert.equal(evidence.backend.releaseSha, expectedSha);
+
+  const blocker = buildFrontendRuntimeBlockerEvidence(evidence);
+  assert.equal(blocker.version, 6);
+  assert.equal(blocker.status, 'failed');
+  assert.equal(blocker.complete, false);
+  assert.equal(blocker.readinessState, 'frontend-runtime-mismatch');
+  assert.deepEqual(blocker.transportBlocker.blockedSurfaces, ['frontend']);
+  assert.equal(blocker.transportBlocker.frontendClassification, 'method-not-allowed');
+  assert.equal(blocker.transportBlocker.frontendStatus, 405);
+  assert.equal(blocker.transportBlocker.backendClassification, 'ok');
+  assert.equal(blocker.workerRuntime.releaseSha, expectedSha);
+  assert.equal(blocker.workerRuntime.healthOk, true);
 });
 
 test('release transport probe retains only public identity fields from JSON', async () => {
@@ -194,12 +266,12 @@ test('production evidence identifies every surface intercepted by Cloudflare Acc
     fetchImpl,
   });
 
-  assert.equal(evidence.version, 3);
+  assert.equal(evidence.version, 4);
   assert.equal(evidence.status, 'cloudflare-access-intercepted');
   assert.deepEqual(evidence.blockedByAccess, ['frontend', 'backend']);
 });
 
-test('Access interception is promoted into the retained v5 blocker receipt evidence', () => {
+test('Access interception is promoted into the retained v6 blocker receipt evidence', () => {
   const expectedSha = '388cd65958cc6d80d9f0ef791a31b9737d325e89';
   const blocker = buildCloudflareAccessBlockerEvidence({
     expectedSha,
@@ -209,7 +281,7 @@ test('Access interception is promoted into the retained v5 blocker receipt evide
     backend: {classification: 'cloudflare-access-intercepted'},
   });
 
-  assert.equal(blocker.version, 5);
+  assert.equal(blocker.version, 6);
   assert.equal(blocker.commitSha, expectedSha);
   assert.equal(blocker.status, 'failed');
   assert.equal(blocker.complete, false);
