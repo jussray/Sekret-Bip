@@ -55,6 +55,14 @@ test('pull requests validate exact head without entering Production mutation aut
   assert.doesNotMatch(validateBlock, /--apply/);
 });
 
+test('pull-request validation cannot be queued behind Production mutation concurrency', () => {
+  assert.match(
+    workflow,
+    /group: \$\{\{ github\.event_name == 'pull_request' && format\('cloudflare-app-domain-pr-\{0\}', github\.event\.pull_request\.number\) \|\| 'cloudflare-app-domain-routing-production' \}\}/,
+  );
+  assert.match(workflow, /cancel-in-progress: false/);
+});
+
 test('secret-backed app-domain mutation excludes pull requests and remains bound to Production', () => {
   assert.match(
     workflow,
