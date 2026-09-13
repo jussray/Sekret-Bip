@@ -85,7 +85,7 @@ jobs:
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: node scripts/run-with-normalized-cloudflare-token.mjs scripts/reconcile-cloudflare-resend-dns.mjs --apply
 
-      - name: Retain invalid Cloudflare token transport receipt
+      - name: Retain Cloudflare token preflight failure receipt
         if: >-
           always() &&
           ((github.event_name == 'workflow_dispatch' && inputs.apply == true) ||
@@ -99,6 +99,13 @@ jobs:
           const source = String(process.env.CLOUDFLARE_API_TOKEN ?? '');
           const result = normalizeCloudflareTokenTransport(source);
           if (result.token && !result.nonAsciiRemaining) process.exit(0);
+          const configured = Boolean(source);
+          const classification = configured
+            ? 'BLOCKED_CLOUDFLARE_TOKEN_TRANSPORT'
+            : 'BLOCKED_CLOUDFLARE_TOKEN_MISSING';
+          const marker = configured
+            ? 'CLOUDFLARE_EMAIL_TOKEN_TRANSPORT_INVALID_RETAINING_RECEIPT'
+            : 'CLOUDFLARE_EMAIL_TOKEN_MISSING_RETAINING_RECEIPT';
           await mkdir('artifacts', { recursive: true });
           const evidence = {
             schemaVersion: 2,
@@ -107,14 +114,14 @@ jobs:
             deletes: false,
             phase: 'preflight-failed-before-mutation',
             mutationState: 'not-reachable',
-            classification: 'BLOCKED_CLOUDFLARE_TOKEN_TRANSPORT',
-            tokenConfigured: Boolean(source),
+            classification,
+            tokenConfigured: configured,
             tokenNormalized: result.changed,
             tokenAsciiAfterNormalization: !result.nonAsciiRemaining,
             records: [],
           };
           await writeFile('artifacts/cloudflare-resend-dns-evidence.json', `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
-          console.error('CLOUDFLARE_EMAIL_TOKEN_TRANSPORT_INVALID_RETAINING_RECEIPT');
+          console.error(marker);
           NODE
 
       - name: Upload Cloudflare email evidence
