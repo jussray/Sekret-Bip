@@ -19,7 +19,7 @@ test('public front-door audit keeps PR contracts secretless and Production provi
     'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020',
     'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
     'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093',
-    'CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}',
+    'CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_READ_API_TOKEN }}',
     'CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_BINDING_READ_API_TOKEN }}',
     'scripts/audit-cloudflare-app-binding-authority.mjs',
     'test/cloudflare-app-binding-authority-audit.test.mjs',
@@ -65,10 +65,12 @@ test('public front-door audit keeps PR contracts secretless and Production provi
   assert.ok(providerJob.includes('needs: contract'), 'provider readback must wait for the secretless contract job');
   assert.ok(providerJob.includes('environment: Production'), 'provider readback must resolve Production environment secrets');
 
-  const accessTokenIndex = providerJob.indexOf('CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}');
+  const accessTokenIndex = providerJob.indexOf('CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_READ_API_TOKEN }}');
   const bindingTokenIndex = providerJob.indexOf('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_BINDING_READ_API_TOKEN }}');
-  assert.ok(accessTokenIndex >= 0 && bindingTokenIndex >= 0, 'Access and binding audits must each receive their dedicated credential');
+  assert.ok(accessTokenIndex >= 0 && bindingTokenIndex >= 0, 'Access and binding audits must each receive their dedicated read credential');
   assert.ok(accessTokenIndex < bindingTokenIndex, 'Access and binding credentials must remain independently scoped to their audit steps');
+  assert.ok(!providerJob.includes('secrets.CLOUDFLARE_ACCESS_WRITE_API_TOKEN'), 'automatic provider readback must never receive Production Access write authority');
+  assert.ok(!providerJob.includes('secrets.CLOUDFLARE_ACCESS_API_TOKEN'), 'automatic provider readback must not depend on the legacy ambiguous Access secret name');
   assert.ok(!providerJob.includes('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}'), 'public front-door audit must never receive the repository-wide Cloudflare token');
 
   const mainGateIndex = providerJob.indexOf('- name: Require exact current main before Cloudflare secret use');
@@ -90,6 +92,8 @@ test('public front-door audit keeps PR contracts secretless and Production provi
   const uploadStep = providerJob.slice(uploadIndex, failClosedIndex);
 
   assert.ok(accessStep.includes('continue-on-error: true'), 'Access failure must not prevent independent binding evidence');
+  assert.ok(accessStep.includes('CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_READ_API_TOKEN }}'), 'Access read must use only the dedicated Access-read secret');
+  assert.ok(!accessStep.includes('CLOUDFLARE_ACCESS_WRITE_API_TOKEN'), 'Access read must not receive write authority');
   assert.ok(bindingStep.includes('always()'), 'binding read must survive an earlier independent Access audit failure');
   assert.ok(bindingStep.includes("steps.current_main_gate.outcome == 'success'"), 'binding read must remain blocked unless exact-current-main gate succeeded');
   assert.ok(bindingStep.includes('continue-on-error: true'), 'binding failure must still allow receipt retention and artifact upload');

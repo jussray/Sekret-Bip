@@ -83,7 +83,9 @@ jobs:
       - name: Audit matching Cloudflare Access applications and organization state
         if: github.event_name != 'pull_request'
         env:
-          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          # Map the dedicated read-only GitHub secret into the auditor's stable
+          # internal variable. Production write authority must never enter this job.
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_READ_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/audit-cloudflare-access-coverage.mjs
 

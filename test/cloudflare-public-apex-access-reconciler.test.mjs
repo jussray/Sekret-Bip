@@ -180,6 +180,16 @@ test('provider mutation is founder-gated behind the protected Production environ
   assert.match(workflowSource, /test "\$EXPECTED_MAIN_SHA" = "\$GITHUB_SHA"/);
 });
 
+test('Production mutation uses write-only Access authority and never consumes read authority', () => {
+  assert.match(
+    workflowSource,
+    /CLOUDFLARE_ACCESS_API_TOKEN:\s*\$\{\{ secrets\.CLOUDFLARE_ACCESS_WRITE_API_TOKEN \}\}/,
+  );
+  assert.doesNotMatch(workflowSource, /secrets\.CLOUDFLARE_ACCESS_READ_API_TOKEN/);
+  assert.doesNotMatch(workflowSource, /secrets\.CLOUDFLARE_ACCESS_API_TOKEN/);
+  assert.match(workflowSource, /CLOUDFLARE_ACCESS_WRITE_API_TOKEN is not configured/);
+});
+
 test('browser setup finishes before final current-main revalidation and provider mutation', () => {
   assert.match(workflowSource, /Install Chromium for anonymous production proof/);
   assert.match(workflowSource, /Revalidate exact current main immediately before mutation/);
