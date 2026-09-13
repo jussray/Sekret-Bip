@@ -61,6 +61,7 @@ test('production Auth email provider stays on the canonical Resend domain', () =
   assert.deepEqual(workflowAdminEmailLines, ['AUTH_SMTP_ADMIN_EMAIL: invite@sekretbip.net']);
   assert.deepEqual(scriptAdminEmailLines, [
     "smtp_admin_email: env('AUTH_SMTP_ADMIN_EMAIL', 'invite@sekretbip.net'),",
+    'smtp_admin_email: config.smtp_admin_email,',
   ]);
 });
 
