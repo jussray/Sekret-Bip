@@ -6,7 +6,9 @@
  * reasoning, but they must never become selectable companions, reply labels,
  * TTS identities, accessibility labels, notifications, or client metadata.
  *
- * `oracle` is a legacy compatibility key for the Joseema internal lens only.
+ * `oracle` is a hidden legacy compatibility bridge. Historically it resolves
+ * through Se'kret continuity and may also carry the Joseema honor lens. It is
+ * never a public companion identity and never replaces either honor identity.
  */
 
 import {
@@ -21,6 +23,14 @@ export const INTERNAL_HONOR_IDENTITIES = Object.freeze(['joseema', 'sekret'] as 
 export type InternalHonorIdentity = (typeof INTERNAL_HONOR_IDENTITIES)[number];
 
 export const LEGACY_INTERNAL_REASONING_NAME = 'Oracle' as const;
+
+export const LEGACY_ORACLE_CONTINUITY = Object.freeze({
+  key: 'oracle' as const,
+  visible: false as const,
+  runtimeActor: 'sekret' as const,
+  historicalPrimary: 'sekret' as const,
+  honorLenses: Object.freeze(['sekret', 'joseema'] as const),
+});
 
 export type InternalAiIdentity =
   | NamedCompanionId
@@ -48,41 +58,41 @@ const INTERNAL_IDENTITY_SUPPRESSED_SURFACES = new Set<string>([
   'notification',
   'accessibility',
   'archive',
-  // Legacy surface names remain suppressed during migration.
   'sekret-chat',
   'sekret-archive',
 ]);
 
-/**
- * Resolve an internal-only identity without making it displayable.
- * Legacy `oracle` belongs to the Joseema lens. Se'kret remains distinct.
- */
-export function resolveInternalHonorIdentity(value: unknown): InternalHonorIdentity | null {
+function normalizeInternalIdentityKey(value: unknown): string | null {
   if (typeof value !== 'string') return null;
-  const raw = value.trim().toLowerCase().replace(/[’']/g, '').replace(/[\s_-]+/g, '');
-  if (raw === 'oracle' || raw === 'joseema') return 'joseema';
-  if (raw === 'sekret' || raw === 'secret') return 'sekret';
-  return null;
+  return value.trim().toLowerCase().replace(/[’']/g, '').replace(/[\s_-]+/g, '');
+}
+
+export function resolveInternalHonorIdentities(value: unknown): readonly InternalHonorIdentity[] {
+  const raw = normalizeInternalIdentityKey(value);
+  if (!raw) return Object.freeze([] as InternalHonorIdentity[]);
+  if (raw === 'oracle') return LEGACY_ORACLE_CONTINUITY.honorLenses;
+  if (raw === 'joseema') return Object.freeze(['joseema'] as const);
+  if (raw === 'sekret' || raw === 'secret') return Object.freeze(['sekret'] as const);
+  return Object.freeze([] as InternalHonorIdentity[]);
+}
+
+export function resolveInternalHonorIdentity(value: unknown): InternalHonorIdentity | null {
+  return resolveInternalHonorIdentities(value)[0] ?? null;
+}
+
+export function isLegacyOracleIdentity(value: unknown): boolean {
+  return normalizeInternalIdentityKey(value) === 'oracle';
 }
 
 export function isInternalHonorIdentity(value: unknown): value is InternalHonorIdentity {
   return value === 'joseema' || value === 'sekret';
 }
 
-/**
- * Resolve a value for user-facing companion display.
- * Internal and unknown identities fail closed to `null`, never to another
- * companion and never to an internal name.
- */
 export function resolveVisibleIdentity(identity: string): string | null {
   const canonical = migratePersistedCompanionId(identity);
   return canonical ? COMPANION_DISPLAY_NAMES[canonical] : null;
 }
 
-/**
- * Kept for migration callers that previously requested a direct Se'kret label.
- * Internal honor identities deliberately have no public companion label.
- */
 export function getVisibleIdentity(): null {
   return null;
 }
@@ -91,7 +101,6 @@ export function containsOracleLeak(value: string): boolean {
   return value.toLowerCase().includes(LEGACY_INTERNAL_REASONING_NAME.toLowerCase());
 }
 
-/** Throw when constructed user-facing copy exposes the legacy internal key. */
 export function assertNoOracleLeak(displayValue: string): void {
   if (containsOracleLeak(displayValue)) {
     throw new Error(
@@ -100,15 +109,10 @@ export function assertNoOracleLeak(displayValue: string): void {
   }
 }
 
-/** True for every surface where internal honor identities must stay hidden. */
 export function shouldSuppressInternalIdentity(surfaceId: string): boolean {
   return INTERNAL_IDENTITY_SUPPRESSED_SURFACES.has(surfaceId);
 }
 
-/**
- * Compatibility aliases for older callers. Se'kret is no longer a public
- * companion identity on any surface.
- */
 export function isSekretVisibleSurface(_surfaceId: string): boolean {
   return false;
 }
