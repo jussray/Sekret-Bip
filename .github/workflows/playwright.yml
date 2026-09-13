@@ -2,12 +2,22 @@ name: Playwright Smoke and Guardrails
 
 on:
   workflow_dispatch:
+    inputs:
+      expected_head_sha:
+        description: Exact commit SHA to prove
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+  SEKRET_E2E_API_ORIGIN: ${{ vars.SEKRET_E2E_API_ORIGIN }}
+  SEKRET_E2E_ORIGIN: ${{ vars.SEKRET_E2E_ORIGIN }}
+  SEKRET_E2E_BEARER_TOKEN: ${{ secrets.SEKRET_E2E_BEARER_TOKEN }}
+  SEKRET_E2E_REQUIRE_INTERNAL_HONOR_PROOF: 'true'
 
 jobs:
   smoke:
@@ -15,8 +25,26 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      - name: Check out current workflow head
+      - name: Check out exact proof subject
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify exact proof subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Validate controlled runtime proof configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${SEKRET_E2E_API_ORIGIN:-}" || { echo 'SEKRET_E2E_API_ORIGIN repository variable is required'; exit 1; }
+          test -n "${SEKRET_E2E_BEARER_TOKEN:-}" || { echo 'SEKRET_E2E_BEARER_TOKEN repository secret is required'; exit 1; }
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -33,7 +61,12 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
+      - name: Prove internal honor runtime against controlled API
+        run: npx playwright test e2e/internal-honor-runtime.spec.ts --project=chromium
+
       - name: Run Playwright smoke and guardrail tests
+        env:
+          SEKRET_E2E_REQUIRE_INTERNAL_HONOR_PROOF: 'false'
         run: npx playwright test
 
       - name: Verify founder-preview Comfort and Cloud routes
@@ -43,7 +76,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-${{ env.EXPECTED_HEAD_SHA }}
           path: |
             playwright-report/
             playwright-report-founder-preview/
