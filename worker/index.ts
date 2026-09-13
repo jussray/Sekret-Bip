@@ -5,6 +5,7 @@ import { handleBridgeSummaryGenerate } from './bridge-summary';
 import { getModels } from './config/models';
 import {
   buildRuntimeStyleInstruction,
+  enforceFallbackAccountability,
   enforceRuntimeStyleResponse,
   normalizeReplySurface,
   resolveRuntimeIdentity,
@@ -216,16 +217,19 @@ function withCors(response: Response, cors: Record<string, string>): Response {
 async function rewriteStyledJsonResponse(
   response: Response,
   style: RuntimeStyleContract,
+  userText: string,
   cors: Record<string, string>,
 ): Promise<Response> {
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('application/json')) return response;
   try {
     const data = await response.json() as Record<string, unknown>;
-    const styled = enforceRuntimeStyleResponse(data, style);
+    const guarded = enforceFallbackAccountability(data, userText);
+    const styled = enforceRuntimeStyleResponse(guarded, style);
+    const repaired = styled.styleRepaired || styled.fallbackAccountabilityRepaired === true;
     return json(withPublicActorMetadata({
       ...styled,
-      styleDecision: styled.styleRepaired ? 'repair' : 'allow',
+      styleDecision: repaired ? 'repair' : 'allow',
     }, style), response.status, cors);
   } catch {
     return json({ error: 'invalid delegated response' }, 502, cors);
@@ -418,7 +422,7 @@ export default {
         const options = CHARACTER_FALLBACKS[prepared.style.actorId];
         const start = stableHash(`${prepared.style.actorId}:${userText.toLowerCase()}`) % options.length;
         console.error('[sekret/reply] OPENAI_API_KEY is not configured, serving fallback');
-        const styled = enforceRuntimeStyleResponse({
+        const guarded = enforceFallbackAccountability({
           reply: options[start],
           tone: prepared.style.actorId === 'parentCoach' ? 'grounded' : 'casual',
           safetyFlag: false,
@@ -427,10 +431,12 @@ export default {
           replySource: 'fallback',
           detectedIntent: 'greeting',
           usedGreetingVariant: false,
-        }, prepared.style);
+        }, userText);
+        const styled = enforceRuntimeStyleResponse(guarded, prepared.style);
+        const repaired = styled.styleRepaired || styled.fallbackAccountabilityRepaired === true;
         return json(withPublicActorMetadata({
           ...styled,
-          styleDecision: styled.styleRepaired ? 'repair' : 'allow',
+          styleDecision: repaired ? 'repair' : 'allow',
         }, prepared.style), 200, cors);
       }
 
@@ -439,7 +445,7 @@ export default {
         env as { OPENAI_API_KEY: string },
         principal,
       );
-      return rewriteStyledJsonResponse(delegated, prepared.style, cors);
+      return rewriteStyledJsonResponse(delegated, prepared.style, userText, cors);
     }
 
     const fallback = await worker.fetch(request, env as { OPENAI_API_KEY: string }, principal);
