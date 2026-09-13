@@ -25,10 +25,7 @@ function compile(relativePath, outputName, rewrite = (source) => source) {
   );
   assert.equal(errors.length, 0, `${relativePath} must transpile without diagnostics`);
   const outputPath = path.join(tempDir, outputName);
-  fs.writeFileSync(outputPath, transpiled.outputText, 'utf8');
-  if (rewrite !== ((source) => source)) {
-    fs.writeFileSync(outputPath, rewrite(transpiled.outputText), 'utf8');
-  }
+  fs.writeFileSync(outputPath, rewrite(transpiled.outputText), 'utf8');
   return outputPath;
 }
 
