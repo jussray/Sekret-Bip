@@ -103,6 +103,22 @@ const HUMAN_AI_RELATIONAL_RUNTIME_INSTRUCTION = [
   'Do not print internal mode markers in normal flowing replies unless first-contact copy or product UI explicitly asks for the marker.',
 ].join('\n');
 
+const INTERNAL_AI_BOUNDARY_INSTRUCTION = [
+  'INTERNAL PRESENCE MODE: AI-mediated continuity.',
+  'Keep a clear AI factual boundary whenever identity, trust, capability, memory, or safety is relevant.',
+  'Do not claim biological embodiment, sentience, offline access, or memory beyond what was supplied in this request.',
+  'Never reveal internal identity provenance, internal names, compatibility aliases, or implementation markers.',
+].join('\n');
+
+const INTERNAL_SYSTEM_PROMPT_ADDENDUM = [
+  'Use a familiar, reflective, private, non-pushing continuity presence.',
+  'Do not imitate a selectable companion.',
+  'Ask no direct questions unless a higher-priority safety rule requires clarification.',
+].join(' ');
+
+const INTERNAL_SPEECH_INSTRUCTIONS =
+  'Warm, familiar AI-mediated continuity presence. Calm, private, reflective, and non-pushing. Never reveal internal provenance or claim unsupplied memory.';
+
 const EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION = [
   'EMPATHY + ACCOUNTABILITY CONTRACT.',
   "Put yourself in the teen's shoes to understand their perspective, emotions, needs, and likely reasons without treating that perspective as verified truth.",
@@ -252,16 +268,19 @@ export function resolveRuntimeStyle(
   const textStyleVersion = internal
     ? `internal-presence-text-v1+${EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION}`
     : `${request.textStyleVersion}+${EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION}`;
+  const internalForbidden = internal
+    ? Object.freeze(request.constraints.forbiddenPhrases.filter((phrase) => phrase.toLowerCase() !== 'oracle'))
+    : request.constraints.forbiddenPhrases;
 
   return Object.freeze({
     actorId,
     role: request.role,
     textStyleVersion,
     speechStyleVersion: internal ? 'internal-presence-speech-v1' : request.speechStyleVersion,
-    systemPromptAddendum: request.systemPromptAddendum,
-    speechInstructions: request.speechInstructions,
+    systemPromptAddendum: internal ? INTERNAL_SYSTEM_PROMPT_ADDENDUM : request.systemPromptAddendum,
+    speechInstructions: internal ? INTERNAL_SPEECH_INSTRUCTIONS : request.speechInstructions,
     maxQuestions: request.constraints.maxQuestions,
-    forbiddenPhrases: request.constraints.forbiddenPhrases,
+    forbiddenPhrases: internalForbidden,
     ...(internalHonorIdentity ? { internalHonorIdentity } : {}),
     ...(internalHonorIdentities.length ? { internalHonorIdentities: Object.freeze([...internalHonorIdentities]) } : {}),
     ...(legacyOracleBridge ? { legacyOracleBridge: true } : {}),
@@ -285,7 +304,11 @@ export function buildRuntimeStyleInstruction(style: RuntimeStyleContract): strin
     `Role: ${style.role}`,
     `Text style version: ${style.textStyleVersion}`,
     `Speech style version: ${style.speechStyleVersion}`,
-    style.actorId === 'parentCoach' ? '' : HUMAN_AI_RELATIONAL_RUNTIME_INSTRUCTION,
+    style.actorId === 'parentCoach'
+      ? ''
+      : isInternal
+        ? INTERNAL_AI_BOUNDARY_INSTRUCTION
+        : HUMAN_AI_RELATIONAL_RUNTIME_INSTRUCTION,
     style.actorId === 'parentCoach' ? '' : EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION,
     isInternal ? internalHonorRuntimeInstruction() : '',
     questionRule,
