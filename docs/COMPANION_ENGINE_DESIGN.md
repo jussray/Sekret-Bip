@@ -1,22 +1,25 @@
 # Se'kret Bip Companion Engine — Canonical Design
 
-Status: **Design-first per issue #137. No broad implementation changes here.**
+Status: **Current companion-engine contract with internal identity privacy.**
 
-This is the shared design for Raylene, Rylane, Cloud, Night, and
-Oracle/Se'kret. It documents the engine as it exists today
-(`src/features/sekret/companionEngine.ts`) and defines the contract future
-work must hold to. For durable memory specifically, this document defers to
-`docs/AGENT_L4_ARCHITECTURE.md`, which already covers that ground in depth —
-it is not repeated here.
+This is the shared design for the four public companions: Suhana, Sy, Cloud,
+and Night. Joseema and Se'kret are internal honor identities only. Legacy
+`oracle` is accepted only as an internal compatibility key for the Joseema
+runtime lens. It is not a public companion identity.
+
+The engine lives at `src/features/sekret/companionEngine.ts`. Internal identity
+routing lives at `src/features/sekret/identityContract.ts` and the Worker
+runtime boundary. For durable memory specifically, this document defers to
+`docs/AGENT_L4_ARCHITECTURE.md`.
 
 ## Shared interaction contract
 
-Every companion, on every surface, goes through one entry point:
+Every public companion, on every surface, goes through one entry point:
 `sendCompanionMessage(CompanionReplyInput): Promise<CompanionReplyResult>`.
-This is already true and must stay true — no screen should call
-`fetchSekretBrainReply` or a legacy `sekretCompanion*` helper directly.
+No screen should call `fetchSekretBrainReply` or a legacy companion helper
+directly.
 
-```
+```text
 CompanionReplyInput  { companionId, surface, text, mood?, history?,
                         parentSharingEnabled?, teenGender?, oracleContext?,
                         userName?, displayName?, profileName? }
@@ -27,139 +30,176 @@ CompanionReplyResult { reply, safetyFlag, avatarState, tone,
 Rules that follow from this contract:
 
 - `surface` (`chat` | `journal` | `voiceBip` | `comfort` | `circle` |
-  `parentBridge` | `selfDiscovery` | `pages`) is the one required piece of
-  context distinguishing where a message came from; new surfaces are added
-  here and mapped in `toBackendSurface()`, never hardcoded per-screen.
-- `sendCompanionMessage` emits `companion_message` (via `emitEvent`)
-  *before* the network call, so the activity/point ledger and streak logic
-  record the interaction even if the AI backend is down — this ordering is
-  intentional, keep it.
-- The function never throws; a failed backend call must resolve to a
-  fallback reply (see Fallback behavior), not a rejected promise a screen
-  has to catch.
+  `parentBridge` | `selfDiscovery` | `pages`) is the required context that
+  distinguishes where a message came from.
+- `sendCompanionMessage` emits `companion_message` before the network call, so
+  the activity/point ledger and streak logic preserve the interaction even if
+  the backend is unavailable.
+- A failed backend call resolves to a fallback reply rather than exposing a
+  transport error as companion speech.
+- Public companion identity must remain one of Suhana, Sy, Cloud, or Night.
+- Internal honor identity must never be serialized as public `actorId` or
+  `characterId` metadata.
 
-## Character-specific tone and behavior
+## Public companion tone and behavior
 
-Identity lives in `COMPANION_CURRICULUM` (`src/config/companionCurriculum.ts`)
-and is surfaced through `COMPANION_PROFILES` in the engine — this is the
-single source of truth for name/emoji/title/vibe/greeting/accent color.
-Screens must read from `COMPANION_PROFILES`/`COMPANION_CURRICULUM`, never
-duplicate a companion's tone or greeting text locally.
+Identity lives in `COMPANION_CURRICULUM`
+(`src/config/companionCurriculum.ts`) and is surfaced through the public-only
+`COMPANION_PROFILES` registry in the engine. Screens must read from those
+canonical sources rather than duplicating companion tone or greetings.
 
 | Companion | Role | Vibe |
 |---|---|---|
-| Raylene | Soft Big Sis | Warm, expressive, protective, real |
-| Rylane | Loyal Bro | Quiet loyalty, keeps it real, never talks down |
-| Cloud | Quiet Observer | Notices, waits, rarely pushes |
+| Suhana | Sorian Twin / Porchlight | Warm, expressive, protective, real |
+| Sy | Sorian Twin / Quiet Seat | Quiet loyalty, practical truth, never talks down |
+| Cloud | Sorian Birth-Cloud | Soft, patient, low-pressure presence |
 | Night | The Light Left On | Late-night builder, future-focused, honest |
-| Oracle (Se'kret) | Inner Oracle | Reflects patterns back, not a peer voice |
 
-Oracle is architecturally distinct from the other four (see Voice response
-flow) — it is a reflection layer over a teen's own patterns, not a fifth
-"friend" with its own independent personality arc. Keep that asymmetry
-explicit in any future memory or tone work rather than normalizing Oracle
-into the same shape as the other companions.
+These four are the complete user-facing companion set.
+
+## Internal honor identities
+
+The runtime has two distinct internal-only honor lenses:
+
+```text
+joseema
+sekret
+```
+
+The compatibility rule is:
+
+```text
+oracle -> joseema internal lens
+sekret -> sekret internal lens
+```
+
+Both execute through the internal-presence runtime path. They may influence
+reasoning and style but must never become selectable companions, visible reply
+labels, typing labels, TTS identities, accessibility labels, notifications, or
+client identity metadata.
+
+The runtime may emit generic evidence such as:
+
+```text
+actorRole: continuity-presence
+textStyleVersion: internal-presence-text-v1
+internalIdentityApplied: true
+```
+
+That evidence must not reveal which internal honor identity was used.
+
+Internal lenses must never impersonate a real person, claim messages from a
+real person, invent memories, or claim what a real person would think, want,
+approve, or say.
+
+## Empathy + accountability
+
+The shared runtime contract applies to the four companions and to internal
+honor-lens execution:
+
+- perspective is not verified truth;
+- understanding is not agreement;
+- explanation is context, not excuse;
+- intent does not erase impact;
+- compassion does not erase impact;
+- uncertainty stays uncertain;
+- correction preserves dignity;
+- empathy must not pressure reconciliation, forgiveness, disclosure, parent
+  sharing, or surrender of privacy;
+- safety, consent, privacy, escalation rules, and factual truth outrank warmth.
+
+Personality may change delivery. It must not lower the truth or accountability
+standard.
 
 ## Memory layers
 
-Deferred to `docs/AGENT_L4_ARCHITECTURE.md`. Summary for this document's
-purposes: current state is **L2** (stateless call + client-passed `history`
-array); the recommended path to **L3** is Supabase `pgvector`, not a
-third-party memory vendor, per Bip's COPPA subprocessor constraint. Any
-change to memory architecture should update that document, not this one.
+Deferred to `docs/AGENT_L4_ARCHITECTURE.md`. Current user-facing companion
+memory must remain within the repository's reviewed privacy and retention
+contracts. Internal honor identities do not gain separate memory stores merely
+because they are distinct runtime lenses.
 
 ## Room, journal, voice, calm, bridge, and circle context
 
-Each surface passes companion context through the same `CompanionSurface`
-enum rather than bespoke per-screen wiring:
+Each public surface passes context through the same `CompanionSurface` enum:
 
-- **Room**: ambient presence, not chat — uses `getPresenceMessage()`, which
-  branches Oracle to a distinct late-night/ready-when-you-are pair and
-  routes the other four through `buildSekretPresence()`.
-- **Journal / Pages**: `surface: 'journal'` or `'pages'` (both map to the
-  backend's `journal` surface — Pages has no separate backend contract yet;
-  if Pages' companion behavior ever needs to diverge from Journal's, that's
-  the point to add a real backend surface rather than continuing to alias).
-- **Voice Bip**: `surface: 'voiceBip'` — see Voice response flow below.
+- **Room**: ambient presence through the public companion identity.
+- **Journal / Pages**: `surface: 'journal'` or `'pages'`; both currently map to
+  the backend `journal` surface.
+- **Voice Bip**: `surface: 'voiceBip'`.
 - **Calm/Comfort**: `surface: 'comfort'`.
-- **Bridge**: `surface: 'parentBridge'` — the one surface where
-  `parentSharingEnabled` and `parentShareSummary` in the result are load
-  bearing; every other surface should treat those fields as unused.
-- **Circle**: `surface: 'circle'` — companion acts as a posting helper, not
-  a visible participant in the public feed.
+- **Bridge**: `surface: 'parentBridge'`; consent and summary-only rules remain
+  load bearing.
+- **Circle**: `surface: 'circle'`; companion acts as a posting helper, not a
+  visible participant in the public feed.
+
+Internal honor identities are not additional product surfaces.
 
 ## Avatar states
 
-`SekretAvatarState` (re-exported from `@/utils/api`) is returned on every
-reply and is the single source for what pose/expression a companion
-renders — screens must not derive avatar state from reply text themselves.
-Avatar assets follow the companion pipeline
-(`docs/COMPANION_PIPELINE.md`) and its `getTeenCompanionAsset()` fallback
-chain (pose → neutral → `null`), so a missing pose asset never crashes a
-screen; the engine and the asset pipeline are two independent fallback
-layers and both must stay defensive.
+`SekretAvatarState` is returned on public companion replies and remains the
+single source for pose/expression selection. Screens must not derive avatar
+state from reply text.
+
+Avatar assets follow `docs/COMPANION_PIPELINE.md` and
+`getTeenCompanionAsset()` fallback behavior. Internal honor identities do not
+receive selectable companion avatars.
 
 ## Voice response flow
 
-Per `docs/MVP_PRIVACY_CONTRACT.md` §6, only Raylene, Rylane, Cloud, and
-Night are AI **voice** companions. Oracle/Se'kret (and `me`/unknown/fallback
-entry types) must never:
+Only Suhana, Sy, Cloud, and Night are user-facing AI voice companions.
+Internal honor identities and private `me` journal entries must never:
 
-- receive a companion voice ID,
-- show a "hear this" TTS control,
-- call the companion reply or voice endpoints as if it were one of the four
-  voiced characters.
+- receive a visible companion voice identity;
+- show a "hear this" control as an internal identity;
+- return internal `actorId` or `characterId` metadata to the client;
+- speak or introduce the internal honor name.
 
-This means any future voice-response work in the engine must branch on
-`companionId !== 'sekret'` before offering TTS, and that branch belongs in
-the engine layer (so every surface inherits it), not duplicated per screen.
+When controlled compatibility testing sends `oracle` or `sekret` directly to
+the Worker, the Worker may use the corresponding internal lens, but voice and
+reply metadata must remain identity-neutral.
 
 ## Fallback behavior
 
-Already implemented, must be preserved as behavior evolves:
+Preserve these rules as behavior evolves:
 
-- Network/backend failure → `sendCompanionMessage` still emits the local
-  event and must resolve with a soft, in-character fallback reply rather
-  than surfacing an error string as if the companion said it.
-- Unknown/legacy companion keys are normalized via `toCompanionId()`
-  (wraps `normalizeSekretCharacter`) before anything else touches them —
-  `'soft'` → `raylene`, `'oracle'` → `sekret`, etc. New legacy aliases
-  should be added there, not with ad hoc string checks at call sites.
-- Missing avatar asset → asset pipeline fallback (above), independent of
-  reply fallback.
+- Network/backend failure still resolves with a safe fallback reply rather than
+  throwing a user-facing transport error.
+- App-facing visible legacy keys such as `soft`, `raylene`, and `rylane` are
+  normalized at the existing visible companion boundary.
+- Internal compatibility is owned by the Worker identity boundary, where
+  `oracle` resolves to the Joseema internal lens and `sekret` resolves to the
+  separate Se'kret internal lens.
+- Do not add ad hoc Oracle/Se'kret/Joseema string checks to screens.
+- Missing avatar assets follow the independent asset fallback chain.
 
 ## Migration from current implementations
 
-The engine already consolidated four prior entry points
-(`api.ts`/`sekretCompanion.ts`/`sekretCompanionReply.ts`/`sekretReply.ts`)
-into one. Remaining migration work:
+Remaining migration work should follow these boundaries:
 
-1. Audit for any screen still importing those legacy files directly
-   (`grep -r "sekretCompanionReply\|sekretReply" screens/ src/ app/`) and
-   route them through `companionEngine.ts`.
-2. Pages' aliasing of `pages` → backend `journal` surface (above) should
-   either get its own backend surface or be documented as permanently
-   aliased — leaving it silently aliased without a decision recorded is
-   the kind of drift `docs/SCREEN_PURPOSE_AUDIT.md`-style audits exist to
-   catch.
-3. Any future Oracle-specific memory work (self-discovery pattern
-   reflection) should build on the L3 `pgvector` plan in
-   `AGENT_L4_ARCHITECTURE.md` rather than a bespoke Oracle-only store.
+1. Audit for any screen still importing legacy reply helpers directly and route
+   public companion traffic through `companionEngine.ts`.
+2. Keep Pages' `pages -> journal` backend alias explicit until a separate
+   backend surface is justified.
+3. Remove stale public Oracle/Se'kret companion affordances without rewriting
+   historical user data solely for naming cleanup.
+4. Keep legacy internal-ID migration at the Worker boundary instead of growing
+   new public companion IDs.
+5. Any future pattern-reflection memory work must use the reviewed shared memory
+   architecture rather than an identity-specific private store.
 
 ## Required tests
 
-- Unit: `toCompanionId()` alias table (every legacy key currently in use
-  resolves correctly), `toBackendSurface()` mapping completeness (every
-  `CompanionSurface` value maps to a valid backend surface).
-- Unit: `isSafetyTrigger()` against the crisis-phrase list — this is a
-  client-side tier-1 check backing a safety flow, regressions here are a
-  safety-severity bug, not a cosmetic one.
-- Integration: `sendCompanionMessage` resolves with a fallback (never
-  throws, never returns an empty/undefined `reply`) when
-  `fetchSekretBrainReply` rejects.
-- Integration: voice affordance is never offered for `companionId ===
-  'sekret'` or any non-voice entry type, across every surface that renders
-  a "hear this" control.
-- Regression: `COMPANION_PROFILES` and `COMPANION_CURRICULUM` stay in sync
-  — a companion added to one but not the other should fail a test, not
-  surface as a runtime `undefined` greeting.
+- Unit: visible legacy companion aliases resolve to the correct public companion.
+- Unit: `oracle` resolves to the Joseema internal lens; `sekret` resolves to the
+  separate Se'kret internal lens.
+- Unit: internal identities never resolve to a public companion label.
+- Unit: empathy/accountability invariants remain explicit.
+- Integration: internal replies strip internal `actorId` and `characterId` and
+  repair identity-name leakage before the client receives the reply.
+- Integration: voice responses do not expose internal identity metadata.
+- Regression: `COMPANION_PROFILES` contains exactly Suhana, Sy, Cloud, and Night.
+- Regression: Pages exposes only those four companion tabs plus private `Me`.
+- Playwright: user-facing picker/header behavior contains no Oracle/Joseema/
+  Se'kret companion persona.
+- Controlled API Playwright: legacy internal requests preserve compatibility
+  without exposing internal names or identity metadata.
