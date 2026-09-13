@@ -43,6 +43,13 @@ test('workflow consumes repository approval only when the approval file changed 
   assert.match(workflow, /One-shot provider approval is stale or replayed/);
 });
 
+test('secret-backed app-domain mutation is bound to the Production environment', () => {
+  assert.match(
+    workflow,
+    /reconcile:\n\s+name: Restore Pages ownership of app\.sekretbip\.net\n\s+runs-on: ubuntu-latest\n\s+environment: Production/,
+  );
+});
+
 test('all provider mutation steps remain gated by resolved bounded authority', () => {
   const gate = "if: steps.apply_authority.outputs.apply == 'true'";
   assert.ok(workflow.split(gate).length - 1 >= 5);
