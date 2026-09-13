@@ -1,6 +1,7 @@
 import type { CompanionAvatarState } from '../src/contracts/sekretApi';
 import {
-  resolveInternalHonorIdentity,
+  isLegacyOracleIdentity,
+  resolveInternalHonorIdentities,
   type InternalHonorIdentity,
   type NamedCompanionId,
 } from '../src/features/sekret/identityContract';
@@ -33,11 +34,15 @@ export interface RuntimeStyleContract {
   maxQuestions: number;
   forbiddenPhrases: readonly string[];
   internalHonorIdentity?: InternalHonorIdentity;
+  internalHonorIdentities?: readonly InternalHonorIdentity[];
+  legacyOracleBridge?: boolean;
 }
 
 export interface RuntimeIdentityResolution {
   actorId: ReplyActorId;
   internalHonorIdentity?: InternalHonorIdentity;
+  internalHonorIdentities?: readonly InternalHonorIdentity[];
+  legacyOracleBridge?: boolean;
 }
 
 export interface StyledResponseMetadata {
@@ -52,6 +57,7 @@ export interface StyledResponseMetadata {
   styleRepaired: boolean;
   styleViolationCodes: string[];
   internalIdentityApplied: boolean;
+  legacyOracleBridgeApplied: boolean;
 }
 
 export const EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION = 'empathy-accountability-v1' as const;
@@ -109,12 +115,13 @@ const EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION = [
   'Safety, consent, privacy, existing escalation rules, and factual truth outrank conversational warmth.',
 ].join('\n');
 
-function internalHonorRuntimeInstruction(identity: InternalHonorIdentity): string {
+function internalHonorRuntimeInstruction(): string {
   return [
-    `INTERNAL HONOR LENS: ${identity}.`,
-    'This identity is code-only design provenance. Never show, name, speak, label, or introduce this identity to a teen, parent, or client.',
+    'INTERNAL HONOR CONTINUITY ACTIVE.',
+    'One or more internal honor lenses may shape the response, but their names and provenance are private implementation details.',
+    'Never show, name, speak, label, or introduce an internal honor identity to a teen, parent, or client.',
     'Never impersonate a real person, claim to carry messages from a real person, invent memories, or claim what a real person would think, want, approve, or say.',
-    'Use only the abstract qualities encoded by this internal lens. The user-facing reply must stand on its own without exposing where that guidance came from.',
+    'Use only abstract qualities encoded by the internal lens. The user-facing reply must stand on its own without exposing where that guidance came from.',
   ].join('\n');
 }
 
@@ -129,6 +136,8 @@ const FORBIDDEN_REPLACEMENTS: readonly (readonly [RegExp, string])[] = [
   [/\braylene\b/gi, 'Suhana'],
   [/\brylane\b/gi, 'Sy'],
 ] as const;
+
+const INTERNAL_IDENTITY_LEAK_RE = /\b(?:oracle|joseema|se[’']?kret)\b/gi;
 
 const PHYSICAL_HARM_ADMISSION_RE =
   /\b(?:i|we)\s+(?:hit|punched|kicked|slapped|shoved|threatened|bullied)\s+(?:(?:my|his|her|their|the|a)\s+)?(?:brother|sister|friend|parent|mom|dad|mother|father|teacher|kid|boy|girl|person|someone|him|her|them)\b/i;
@@ -156,11 +165,6 @@ function resolveAvatarState(data: Record<string, unknown>): CompanionAvatarState
   return 'responding';
 }
 
-/**
- * Fallback replies do not pass through the model prompt. This guard preserves
- * the empathy/accountability invariant when degraded execution selects an old
- * generic reply that could accidentally endorse admitted harmful conduct.
- */
 export function enforceFallbackAccountability(
   data: Record<string, unknown>,
   userText: string,
@@ -202,15 +206,15 @@ export function normalizeReplyActor(value: unknown): ReplyActorId | null {
   return null;
 }
 
-/**
- * Resolve a request identity without collapsing the two internal honor lenses.
- * Legacy Oracle traffic belongs to the Joseema lens while both internal lenses
- * execute through the non-selectable internal presence actor.
- */
 export function resolveRuntimeIdentity(value: unknown): RuntimeIdentityResolution | null {
-  const internalHonorIdentity = resolveInternalHonorIdentity(value);
-  if (internalHonorIdentity) {
-    return { actorId: 'sekret', internalHonorIdentity };
+  const internalHonorIdentities = resolveInternalHonorIdentities(value);
+  if (internalHonorIdentities.length) {
+    return {
+      actorId: 'sekret',
+      internalHonorIdentity: internalHonorIdentities[0],
+      internalHonorIdentities,
+      legacyOracleBridge: isLegacyOracleIdentity(value),
+    };
   }
   const actorId = normalizeReplyActor(value);
   return actorId ? { actorId } : null;
@@ -236,13 +240,15 @@ export function validateActorSurface(actorId: ReplyActorId, surface: ReplySurfac
 export function resolveRuntimeStyle(
   actorId: ReplyActorId,
   internalHonorIdentity?: InternalHonorIdentity,
+  internalHonorIdentities: readonly InternalHonorIdentity[] = internalHonorIdentity ? [internalHonorIdentity] : [],
+  legacyOracleBridge = false,
 ): RuntimeStyleContract {
   if (actorId === 'parentCoach') return PARENT_COACH_STYLE;
 
   const request = isNamedCompanionId(actorId)
     ? buildCompanionStyleRequest(actorId)
     : buildSekretPresenceStyleRequest();
-  const internal = Boolean(internalHonorIdentity);
+  const internal = internalHonorIdentities.length > 0 || Boolean(internalHonorIdentity);
   const textStyleVersion = internal
     ? `internal-presence-text-v1+${EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION}`
     : `${request.textStyleVersion}+${EMPATHY_ACCOUNTABILITY_RUNTIME_VERSION}`;
@@ -257,6 +263,8 @@ export function resolveRuntimeStyle(
     maxQuestions: request.constraints.maxQuestions,
     forbiddenPhrases: request.constraints.forbiddenPhrases,
     ...(internalHonorIdentity ? { internalHonorIdentity } : {}),
+    ...(internalHonorIdentities.length ? { internalHonorIdentities: Object.freeze([...internalHonorIdentities]) } : {}),
+    ...(legacyOracleBridge ? { legacyOracleBridge: true } : {}),
   });
 }
 
@@ -267,7 +275,7 @@ export function buildRuntimeStyleInstruction(style: RuntimeStyleContract): strin
   const forbidden = style.forbiddenPhrases.length
     ? style.forbiddenPhrases.map((phrase) => `- ${phrase}`).join('\n')
     : '- none';
-  const isInternal = Boolean(style.internalHonorIdentity);
+  const isInternal = Boolean(style.internalHonorIdentities?.length || style.internalHonorIdentity);
 
   return [
     'AUTHORITATIVE RUNTIME STYLE CONTRACT',
@@ -279,7 +287,7 @@ export function buildRuntimeStyleInstruction(style: RuntimeStyleContract): strin
     `Speech style version: ${style.speechStyleVersion}`,
     style.actorId === 'parentCoach' ? '' : HUMAN_AI_RELATIONAL_RUNTIME_INSTRUCTION,
     style.actorId === 'parentCoach' ? '' : EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION,
-    style.internalHonorIdentity ? internalHonorRuntimeInstruction(style.internalHonorIdentity) : '',
+    isInternal ? internalHonorRuntimeInstruction() : '',
     questionRule,
     style.systemPromptAddendum,
     'Forbidden user-facing phrases:',
@@ -332,18 +340,14 @@ function enforceForbiddenPhrases(text: string, forbiddenPhrases: readonly string
 
 function enforceInternalIdentityPrivacy(
   text: string,
-  identity?: InternalHonorIdentity,
+  internal: boolean,
 ): { text: string; repaired: boolean } {
-  if (!identity) return { text, repaired: false };
+  if (!internal) return { text, repaired: false };
+  if (!INTERNAL_IDENTITY_LEAK_RE.test(text)) return { text, repaired: false };
 
-  const pattern = identity === 'joseema'
-    ? /\b(?:joseema|oracle)\b/gi
-    : /\bse[’']?kret\b/gi;
-  if (!pattern.test(text)) return { text, repaired: false };
-
-  pattern.lastIndex = 0;
+  INTERNAL_IDENTITY_LEAK_RE.lastIndex = 0;
   return {
-    text: text.replace(pattern, 'I'),
+    text: text.replace(INTERNAL_IDENTITY_LEAK_RE, 'I'),
     repaired: true,
   };
 }
@@ -355,17 +359,15 @@ export function enforceRuntimeStyleResponse(
   const styleViolationCodes: string[] = [];
   let styleRepaired = false;
   const safeData: Record<string, unknown> = { ...data };
+  const internal = Boolean(style.internalHonorIdentities?.length || style.internalHonorIdentity);
 
-  if (style.internalHonorIdentity) {
+  if (internal) {
     delete safeData.actorId;
     delete safeData.characterId;
   }
 
   if (typeof safeData.reply === 'string') {
-    const internalPrivacy = enforceInternalIdentityPrivacy(
-      safeData.reply.trim(),
-      style.internalHonorIdentity,
-    );
+    const internalPrivacy = enforceInternalIdentityPrivacy(safeData.reply.trim(), internal);
     if (internalPrivacy.repaired) {
       styleViolationCodes.push('style_internal_identity_leak');
       styleRepaired = true;
@@ -385,7 +387,7 @@ export function enforceRuntimeStyleResponse(
     safeData.reply = questions.text;
   }
 
-  const publicActorId = !style.internalHonorIdentity && style.actorId !== 'sekret'
+  const publicActorId = !internal && style.actorId !== 'sekret'
     ? style.actorId
     : undefined;
 
@@ -400,7 +402,8 @@ export function enforceRuntimeStyleResponse(
     styleEnforced: true,
     styleRepaired,
     styleViolationCodes,
-    internalIdentityApplied: Boolean(style.internalHonorIdentity),
+    internalIdentityApplied: internal,
+    legacyOracleBridgeApplied: style.legacyOracleBridge === true,
   };
 }
 
