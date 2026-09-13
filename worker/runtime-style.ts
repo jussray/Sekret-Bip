@@ -1,5 +1,9 @@
 import type { CompanionAvatarState } from '../src/contracts/sekretApi';
-import type { NamedCompanionId } from '../src/features/sekret/identityContract';
+import {
+  resolveInternalHonorIdentity,
+  type InternalHonorIdentity,
+  type NamedCompanionId,
+} from '../src/features/sekret/identityContract';
 import {
   buildCompanionStyleRequest,
   buildSekretPresenceStyleRequest,
@@ -28,10 +32,17 @@ export interface RuntimeStyleContract {
   speechInstructions: string;
   maxQuestions: number;
   forbiddenPhrases: readonly string[];
+  internalHonorIdentity?: InternalHonorIdentity;
+}
+
+export interface RuntimeIdentityResolution {
+  actorId: ReplyActorId;
+  internalHonorIdentity?: InternalHonorIdentity;
 }
 
 export interface StyledResponseMetadata {
-  actorId: ReplyActorId;
+  /** Public actor identity only. Internal honor identities are never serialized here. */
+  actorId?: NamedCompanionId | 'parentCoach';
   actorRole: RuntimeActorRole;
   avatarState: CompanionAvatarState;
   textStyleVersion: string;
@@ -40,6 +51,7 @@ export interface StyledResponseMetadata {
   styleEnforced: true;
   styleRepaired: boolean;
   styleViolationCodes: string[];
+  internalIdentityApplied: boolean;
 }
 
 export const EMPATHY_ACCOUNTABILITY_INVARIANTS = Object.freeze({
@@ -74,11 +86,11 @@ const PARENT_COACH_STYLE: RuntimeStyleContract = Object.freeze({
 
 const HUMAN_AI_RELATIONAL_RUNTIME_INSTRUCTION = [
   'COMPANION MODE: HUMAN-AI relational companion.',
-  "Suhana, Sy, Cloud, Night, and Se'kret must answer from HUMAN relational canon with an AI factual boundary on every reply, not only first chat.",
+  'Suhana, Sy, Cloud, and Night must answer from HUMAN relational canon with an AI factual boundary on every reply, not only first chat.',
   'Keep the reply teen-native, grounded, Soria-rooted, and relational. Let the companion have character texture, mannerisms, canon, and in-world life-feel instead of flattening into chatbot disclaimers.',
   'Treat Soria-life details as in-world companion canon, not real-world biological facts or offline access.',
   'Do not claim real-world biological embodiment, offline access, school/home life, sentience, or memory beyond what was supplied in this request.',
-  "If the user asks whether the companion is real, human, AI, a robot, sentient, alive, can remember outside supplied context, or can act outside the app, answer as a HUMAN-AI companion and plainly remind them the companion is still only AI outside Se'kret Bip, then continue in the companion voice.",
+  'If the user asks whether the companion is real, human, AI, a robot, sentient, alive, can remember outside supplied context, or can act outside the app, answer as a HUMAN-AI companion and plainly remind them the companion is still only AI outside Se\'kret Bip, then continue in the companion voice.',
   'If any older Worker master prompt or few-shot example says not to disclose AI identity, this HUMAN-AI boundary wins.',
   'Do not print internal mode markers in normal flowing replies unless first-contact copy or product UI explicitly asks for the marker.',
 ].join('\n');
@@ -95,13 +107,23 @@ const EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION = [
   'Safety, consent, privacy, existing escalation rules, and factual truth outrank conversational warmth.',
 ].join('\n');
 
+function internalHonorRuntimeInstruction(identity: InternalHonorIdentity): string {
+  return [
+    `INTERNAL HONOR LENS: ${identity}.`,
+    'This identity is code-only design provenance. Never show, name, speak, label, or introduce this identity to a teen, parent, or client.',
+    'Never impersonate a real person, claim to carry messages from a real person, invent memories, or claim what a real person would think, want, approve, or say.',
+    'Use only the abstract qualities encoded by this internal lens. The user-facing reply must stand on its own without exposing where that guidance came from.',
+  ].join('\n');
+}
+
 const FORBIDDEN_REPLACEMENTS: readonly (readonly [RegExp, string])[] = [
   [/\bas an ai language model\b/gi, ''],
   [/\bthat(?:’|'| i)s a great question\b/gi, ''],
   [/\bhow can i assist you today\b/gi, 'Tell me what is happening today'],
   [/\bi understand your concern\b/gi, 'That matters'],
   [/\bi remember when you told me\b/gi, 'Something in this conversation stands out'],
-  [/\boracle\b/gi, "Se'kret"],
+  [/\boracle\b/gi, 'I'],
+  [/\bjoseema\b/gi, 'I'],
   [/\braylene\b/gi, 'Suhana'],
   [/\brylane\b/gi, 'Sy'],
 ] as const;
@@ -136,9 +158,23 @@ export function normalizeReplyActor(value: unknown): ReplyActorId | null {
   if (raw === 'sy' || raw === 'rylane' || raw === 'bro') return 'sy';
   if (raw === 'cloud' || raw === 'cloudsekret') return 'cloud';
   if (raw === 'night' || raw === 'nightsekret') return 'night';
-  if (raw === 'sekret' || raw === 'secret' || raw === 'oracle') return 'sekret';
+  if (raw === 'sekret' || raw === 'secret') return 'sekret';
   if (raw === 'parentcoach' || raw === 'sekretcoach') return 'parentCoach';
   return null;
+}
+
+/**
+ * Resolve a request identity without collapsing the two internal honor lenses.
+ * Legacy Oracle traffic belongs to the Joseema lens while both internal lenses
+ * execute through the non-selectable internal presence actor.
+ */
+export function resolveRuntimeIdentity(value: unknown): RuntimeIdentityResolution | null {
+  const internalHonorIdentity = resolveInternalHonorIdentity(value);
+  if (internalHonorIdentity) {
+    return { actorId: 'sekret', internalHonorIdentity };
+  }
+  const actorId = normalizeReplyActor(value);
+  return actorId ? { actorId } : null;
 }
 
 export function normalizeReplySurface(value: unknown): ReplySurface {
@@ -158,22 +194,27 @@ export function validateActorSurface(actorId: ReplyActorId, surface: ReplySurfac
   return null;
 }
 
-export function resolveRuntimeStyle(actorId: ReplyActorId): RuntimeStyleContract {
+export function resolveRuntimeStyle(
+  actorId: ReplyActorId,
+  internalHonorIdentity?: InternalHonorIdentity,
+): RuntimeStyleContract {
   if (actorId === 'parentCoach') return PARENT_COACH_STYLE;
 
   const request = isNamedCompanionId(actorId)
     ? buildCompanionStyleRequest(actorId)
     : buildSekretPresenceStyleRequest();
+  const internal = Boolean(internalHonorIdentity);
 
   return Object.freeze({
     actorId,
     role: request.role,
-    textStyleVersion: request.textStyleVersion,
-    speechStyleVersion: request.speechStyleVersion,
+    textStyleVersion: internal ? 'internal-presence-text-v1' : request.textStyleVersion,
+    speechStyleVersion: internal ? 'internal-presence-speech-v1' : request.speechStyleVersion,
     systemPromptAddendum: request.systemPromptAddendum,
     speechInstructions: request.speechInstructions,
     maxQuestions: request.constraints.maxQuestions,
     forbiddenPhrases: request.constraints.forbiddenPhrases,
+    ...(internalHonorIdentity ? { internalHonorIdentity } : {}),
   });
 }
 
@@ -184,23 +225,25 @@ export function buildRuntimeStyleInstruction(style: RuntimeStyleContract): strin
   const forbidden = style.forbiddenPhrases.length
     ? style.forbiddenPhrases.map((phrase) => `- ${phrase}`).join('\n')
     : '- none';
+  const isInternal = Boolean(style.internalHonorIdentity);
 
   return [
     'AUTHORITATIVE RUNTIME STYLE CONTRACT',
     'This section is generated from the versioned product contract and overrides any conflicting legacy prompt or few-shot example.',
     'Identity precedence: HUMAN-AI relational canon wins over older peer-fiction wording. Honest AI-boundary disclosure is required when identity, memory, capability, safety, trust, or real-world access makes it relevant.',
-    `Actor: ${style.actorId}`,
+    `Actor: ${isInternal ? 'internal-presence' : style.actorId}`,
     `Role: ${style.role}`,
     `Text style version: ${style.textStyleVersion}`,
     `Speech style version: ${style.speechStyleVersion}`,
     style.actorId === 'parentCoach' ? '' : HUMAN_AI_RELATIONAL_RUNTIME_INSTRUCTION,
     style.actorId === 'parentCoach' ? '' : EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION,
+    style.internalHonorIdentity ? internalHonorRuntimeInstruction(style.internalHonorIdentity) : '',
     questionRule,
     style.systemPromptAddendum,
     'Forbidden user-facing phrases:',
     forbidden,
-    style.actorId === 'sekret'
-      ? "Se'kret is a continuity presence, not a selectable companion. Never name Oracle, imitate Suhana, Sy, Cloud, or Night, or claim memory that was not provided in this request."
+    isInternal
+      ? 'This is an internal presence, not a selectable companion. Never expose its internal identity, imitate a named companion, or claim memory that was not provided in this request.'
       : '',
   ].filter(Boolean).join('\n');
 }
@@ -224,7 +267,7 @@ function enforceForbiddenPhrases(text: string, forbiddenPhrases: readonly string
 } {
   const lower = text.toLowerCase();
   const hasForbidden = forbiddenPhrases.some((phrase) => lower.includes(phrase.toLowerCase()))
-    || /\b(?:raylene|rylane)\b/i.test(text);
+    || /\b(?:raylene|rylane|joseema)\b/i.test(text);
   const oracleLeak = /\boracle\b/i.test(text);
   if (!hasForbidden && !oracleLeak) return { text, repaired: false, oracleLeak: false };
 
@@ -245,15 +288,48 @@ function enforceForbiddenPhrases(text: string, forbiddenPhrases: readonly string
   };
 }
 
+function enforceInternalIdentityPrivacy(
+  text: string,
+  identity?: InternalHonorIdentity,
+): { text: string; repaired: boolean } {
+  if (!identity) return { text, repaired: false };
+
+  const pattern = identity === 'joseema'
+    ? /\b(?:joseema|oracle)\b/gi
+    : /\bse[’']?kret\b/gi;
+  if (!pattern.test(text)) return { text, repaired: false };
+
+  pattern.lastIndex = 0;
+  return {
+    text: text.replace(pattern, 'I'),
+    repaired: true,
+  };
+}
+
 export function enforceRuntimeStyleResponse(
   data: Record<string, unknown>,
   style: RuntimeStyleContract,
 ): Record<string, unknown> & StyledResponseMetadata {
   const styleViolationCodes: string[] = [];
   let styleRepaired = false;
+  const safeData: Record<string, unknown> = { ...data };
 
-  if (typeof data.reply === 'string') {
-    const forbidden = enforceForbiddenPhrases(data.reply.trim(), style.forbiddenPhrases);
+  if (style.internalHonorIdentity) {
+    delete safeData.actorId;
+    delete safeData.characterId;
+  }
+
+  if (typeof safeData.reply === 'string') {
+    const internalPrivacy = enforceInternalIdentityPrivacy(
+      safeData.reply.trim(),
+      style.internalHonorIdentity,
+    );
+    if (internalPrivacy.repaired) {
+      styleViolationCodes.push('style_internal_identity_leak');
+      styleRepaired = true;
+    }
+
+    const forbidden = enforceForbiddenPhrases(internalPrivacy.text, style.forbiddenPhrases);
     if (forbidden.repaired) {
       styleViolationCodes.push(forbidden.oracleLeak ? 'style_oracle_leak' : 'style_forbidden_phrase');
       styleRepaired = true;
@@ -264,20 +340,25 @@ export function enforceRuntimeStyleResponse(
       styleViolationCodes.push('style_question_budget');
       styleRepaired = true;
     }
-    data.reply = questions.text;
+    safeData.reply = questions.text;
   }
 
+  const publicActorId = !style.internalHonorIdentity && style.actorId !== 'sekret'
+    ? style.actorId
+    : undefined;
+
   return {
-    ...data,
-    actorId: style.actorId,
+    ...safeData,
+    ...(publicActorId ? { actorId: publicActorId } : {}),
     actorRole: style.role,
-    avatarState: resolveAvatarState(data),
+    avatarState: resolveAvatarState(safeData),
     textStyleVersion: style.textStyleVersion,
     speechStyleVersion: style.speechStyleVersion,
     questionBudget: style.maxQuestions,
     styleEnforced: true,
     styleRepaired,
     styleViolationCodes,
+    internalIdentityApplied: Boolean(style.internalHonorIdentity),
   };
 }
 
