@@ -69,16 +69,23 @@ test('canonical teen front door enters as one scene, settles, and stays interact
   await expect(page.getByText('Night · Suhana · Sy', { exact: true })).toHaveCount(0);
   await expect(enter).toBeVisible();
 
-  const backdropBox = await qualityBackdrop.boundingBox();
-  expect(backdropBox).toBeTruthy();
-  expect(backdropBox!.width).toBeGreaterThanOrEqual(389);
-  expect(backdropBox!.height).toBeGreaterThanOrEqual(843);
-
   const pointerEvents = await scene.evaluate(node => getComputedStyle(node).pointerEvents);
   expect(pointerEvents).not.toBe('none');
 
+  // Measure the finish layers only after the intentional scene-arrival transform
+  // has settled. Comparing them during the scale-in animation creates a false
+  // failure because boundingBox() correctly reports the transformed dimensions.
   await expect(page.getByTestId('web-welcome-scene-settled')).toHaveCount(1, { timeout: 5_000 });
   await page.waitForTimeout(100);
+
+  const [sceneBox, backdropBox] = await Promise.all([
+    scene.boundingBox(),
+    qualityBackdrop.boundingBox(),
+  ]);
+  expect(sceneBox).toBeTruthy();
+  expect(backdropBox).toBeTruthy();
+  expect(Math.abs(backdropBox!.width - sceneBox!.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(backdropBox!.height - sceneBox!.height)).toBeLessThanOrEqual(1);
 
   const samples = await readSamples(page);
   expect(samples.length).toBeGreaterThan(5);
