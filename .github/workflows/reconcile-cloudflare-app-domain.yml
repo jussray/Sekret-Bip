@@ -39,7 +39,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cloudflare-app-domain-routing-production
+  group: ${{ github.event_name == 'pull_request' && format('cloudflare-app-domain-pr-{0}', github.event.pull_request.number) || 'cloudflare-app-domain-routing-production' }}
   cancel-in-progress: false
 
 env:
@@ -53,8 +53,33 @@ env:
   BIP_APP_RECONCILE_APPROVAL_FILE: .control-room/provider-mutation-approvals/cloudflare-app-domain.json
 
 jobs:
+  validate:
+    name: Validate app-domain reconciliation contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify focused route reconciler contract
+        run: node --test test/cloudflare-app-domain-reconciler.test.mjs test/cloudflare-app-domain-failure-receipt.test.mjs test/cloudflare-app-domain-approval-gate.test.mjs
+
+      - name: Show non-destructive plan
+        run: node scripts/reconcile-cloudflare-app-domain.mjs
+
   reconcile:
     name: Restore Pages ownership of app.sekretbip.net
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: Production
     timeout-minutes: 10
