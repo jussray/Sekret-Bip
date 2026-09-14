@@ -209,9 +209,9 @@ jobs:
             exit 1
           }
 
-      # Attack 2000 evidence rule: after exact-current-main trust is established,
-      # independent proof planes keep observing even when a sibling plane fails or stalls.
-      # A failed plane still fails the job; it no longer suppresses unrelated evidence.
+      # Independent proof planes keep observing after exact-current-main trust is established.
+      # A deterministic frontend transport blocker still preserves backend and Supabase receipts,
+      # but suppresses browser-dependent work that cannot add truth while the front door is wrong.
       - name: Verify exact Supabase production schema contract
         id: supabase_schema
         if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
@@ -254,13 +254,13 @@ jobs:
 
       - name: Install Chromium
         id: chromium
-        if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' && steps.release_transport.outcome == 'success' }}
         timeout-minutes: 15
         run: npx playwright install --with-deps chromium
 
       - name: Observe public production browser journeys independently
         id: production_browser_observation
-        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' && steps.release_transport.outcome == 'success' }}
         timeout-minutes: 30
         run: >-
           npx playwright test
