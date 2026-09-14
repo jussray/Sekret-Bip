@@ -45,6 +45,11 @@ const ALLOWED = [
     reason: 'comment naming the pre-cutover labels the normalizer still accepts',
     match: /^\s*\/\//,
   },
+  {
+    file: 'src/components/room/character/SekretSprite.tsx',
+    reason: 'doc comment explicitly naming both the legacy keys and the canonical names they alias to',
+    match: /^\s*\*/,
+  },
 ];
 
 function sourceFiles(dir) {

@@ -1,7 +1,7 @@
 /**
  * Canonical theme and compatibility image map.
  *
- * Human companion assets are identity-locked to the approved Raylene, Rylane,
+ * Human companion assets are identity-locked to the approved Suhana, Sy,
  * and Night masters. State-specific keys remain stable so existing screens do
  * not need to change while matching emotional poses are regenerated.
  */
