@@ -57,6 +57,47 @@ HIGGSFIELD COMPILE:
 
 Never substitute prompt-only descriptions for a bound character element when that character has an approved element.
 
+## Character-recognition membrane
+
+A design contract alone never satisfies character authority.
+
+`registry.json` may describe a future/counterpart character’s intended symbol, palette, silhouette differentiation, or emotional role before an exact isolated visual reference exists. That descriptive contract is useful for review but is **not** permission to generate the character as canon.
+
+For every named character requested in a generated still or clip:
+
+```text
+if character_authority_bound != true:
+    GENERATION_ALLOWED = false
+
+if provider_reference_bound != true:
+    GENERATION_ALLOWED = false
+
+if generation_allowed != true:
+    GENERATION_ALLOWED = false
+```
+
+For Night, Suhana, Sy, Cloud, and any other already approved provider-bound character, compile only the exact canonical element registered for that identity.
+
+For Nyra, Suhan, Sya, or any future counterpart whose registry state is `design-contract-approved-reference-pending`:
+
+```text
+NO prompt-only substitute
+NO ensemble-poster crop promoted to identity
+NO world-reference inference
+NO provider trigger invented from a name
+NO continuity cookie
+```
+
+Promotion requires an exact character-authority reference, provider binding, and the recognition review defined by the character canon. The 128 px and 64 px silhouette tests verify recognizability; they do not replace face, hair, clothing, symbol, accessory, or age-lane review.
+
+Run:
+
+```text
+npm run verify:character-canon
+```
+
+before spending generation credits on a cast that touches the Sorian pair system.
+
 ## Cost membrane
 
 Before any paid generation:
@@ -73,13 +114,15 @@ A low balance is not permission to produce only half of a paired/parallel delive
 `VIDEO_ALLOWED = false` by default.
 
 For each shot, video becomes eligible only after a still has:
-- exact required cast;
+- exact required cast from the active episode authority;
 - approved character fingerprints;
 - no substitute people;
 - correct world palette and architecture;
 - visible episode world rule where applicable;
 - no accidental text/logo baked into the frame unless requested;
 - founder or designated canon-review status `APPROVED`.
+
+For Episode 001, `season-01/01-the-bridge-that-listens.md` is the shot-cast authority. In particular, Shots 5, 6, and 7 require Night, Suhana, Sy, **and Cloud**. A still or animation missing Cloud in those shots is not approved source evidence for the final episode.
 
 ```text
 if still_status != APPROVED:
@@ -109,7 +152,7 @@ Animation must preserve:
 - camera intent;
 - emotional cause-and-effect.
 
-If animation mutates identity, introduces a person, or breaks the world rule, reject the clip rather than repairing the mistake by generating unrelated replacements.
+If animation mutates identity, introduces a person, drops a required character, or breaks the world rule, reject the clip rather than repairing the mistake by generating unrelated replacements.
 
 ## Post-production boundary
 
