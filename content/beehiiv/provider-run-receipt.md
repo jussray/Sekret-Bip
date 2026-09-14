@@ -12,14 +12,34 @@ Purpose: prove the trial harvest actually happened without storing subscriber-le
 - Canonical content source: `content/beehiiv/publication-kit.md`
 - Operating plan: `content/beehiiv/trial-harvest-pack.md`
 - Plugin boundary: `content/beehiiv/plugin-boundary.md`
+- Immutable source commit used for provider copy/actions: `SOURCE_COMMIT_SHA=PENDING`
+
+Before any provider mutation, replace `PENDING` with the exact commit SHA whose content is being executed. A branch name is not an immutable receipt.
+
+## Founder approval receipts
+
+A successful preview, login, CI run, or old approval does not authorize a new external action. Record a fresh approval receipt immediately before each bounded action.
+
+| Action | Approval state | Approval timestamp | Evidence note |
+| --- | --- | --- | --- |
+| Enable built-in welcome email | OPEN |  |  |
+| Publish/send Issue #001 | OPEN |  |  |
+| Publish podcast episode | OPEN |  |  |
+| Publish survey | OPEN |  |  |
+| Activate optional automation | NOT_APPLICABLE |  | optional experiment only |
+| Submit support ticket | OPEN |  |  |
+| Change billing/plan | NOT_APPLICABLE |  | never implied by trial harvest |
+
+Allowed approval states: `OPEN`, `APPROVED`, `NOT_APPLICABLE`.
 
 ## Trial clock
 
-- Dashboard trial-expiry date/time: `UNKNOWN — record from beehiiv Billing/Plan`
+- Dashboard trial-expiry date/time: `UNKNOWN — capture from beehiiv Billing/Plan`
 - Timezone shown by provider: `UNKNOWN`
 - Provider-email inferred expiry date: `2026-09-15`
-- Confidence: `HIGH for date, UNKNOWN for exact dashboard timestamp`
-- Final 24-hour sweep scheduled for: `2026-09-14 evening America/New_York`
+- Conservative fallback final-sweep deadline: `2026-09-14 12:00 America/New_York`
+
+Once the provider cutoff is known, schedule the final sweep at least 12 hours before that cutoff, or use the conservative fallback if it is earlier. If the fallback has passed before authentication succeeds, perform durable exports immediately and skip optional premium experiments.
 
 Provider-email countdown evidence:
 
@@ -29,211 +49,232 @@ Provider-email countdown evidence:
 - 2026-09-05: `10 days left on trial`
 - 2026-09-06: `9 days left on trial`
 
-This sequence consistently points to September 15, 2026. Treat the date as provider-email inferred until beehiiv Billing/Plan shows the authoritative expiry timestamp. Do not overwrite the dashboard truth with email math once the dashboard is available.
+This supports only an inferred date. It does not establish the exact cutoff time or timezone.
 
 ## Billing posture baseline
 
-Public beehiiv documentation checked on `2026-09-07` states that the standard Max trial does not require a credit card and remains on the free Launch plan if the user does not upgrade.
+Official source:
 
-Account-email check on `2026-09-07` found no beehiiv billing-style subject indicating a receipt, invoice, charge, payment confirmation, or confirmed paid-plan upgrade in the Se’kret Bip inbox.
+- beehiiv Help: **What’s included in the beehiiv Max trial**
+- https://www.beehiiv.com/support/article/22101553752471
 
-Classification: `EXPECTED FREE LAUNCH FALLBACK / DASHBOARD STILL AUTHORITATIVE`.
+The official source states that trial accounts are technically on Launch with temporary higher-tier access and remain on Launch if the user does not upgrade. Account-level Billing/Plan state remains authoritative for this publication.
+
+Classification: `INFERRED FREE-LAUNCH FALLBACK / DASHBOARD READBACK REQUIRED`.
 
 Cash-protection rule:
 
 - Do not add billing merely to preserve a trial experiment.
-- Do not manually upgrade unless measured evidence justifies the paid plan.
-- If Billing/Plan shows a paid subscription or future charge despite this baseline, treat the dashboard as authoritative and resolve that state before expiry.
+- Do not manually upgrade unless a separately evidenced paid capability is approved.
+- If Billing/Plan shows a paid subscription or future charge, classify that separately and resolve it before any assumption about downgrade behavior.
 
 ## External discovery baseline
 
 Public-web verification run: `2026-09-07 America/New_York`
 
-Queries checked included the publication name, Issue #001 title, podcast title, and beehiiv-domain variants.
+Result at that time:
 
-Result:
-
-- No indexed Se’kret Bip beehiiv publication was found.
-- No indexed copy of **The first sentence is usually the hardest** was found.
-- No indexed **The First Sentence** Se’kret Bip podcast episode was found.
+- no indexed Se’kret Bip beehiiv publication found;
+- no indexed copy of **The first sentence is usually the hardest** found;
+- no indexed **The First Sentence** Se’kret Bip podcast episode found.
 
 Classification: `OPEN / NOT PUBLICLY VERIFIED`.
 
-This is a discovery baseline, not proof of absence. A beehiiv asset may exist without being indexed or discoverable by public search. Promote a public-asset gate to `VERIFIED` only from its direct public URL/provider state or browser evidence.
+Search absence is not proof that a provider asset does not exist.
 
-## Authentication gate
+## Authentication attempt receipts
 
-Live provider browser run: `71158dd4-8fa2-49c5-a626-29768e7f3665`
+### Authentication attempt A
 
-- Run date: `2026-09-10 America/New_York`
-- Result: `BLOCKED — creator authentication required`
-- Provider mutation performed: `NO`
-- Billing mutation performed: `NO`
-- Password reset performed: `NO`
-- Publication/content mutation performed: `NO`
+- Run: `71158dd4-8fa2-49c5-a626-29768e7f3665`
+- Date: `2026-09-10 America/New_York`
+- State: `BLOCKED`
+- Cause: creator authentication required; no usable creator credential/session available to the browser
+- Provider mutation: `NO`
+- Billing mutation: `NO`
+- Password reset: `NO`
+- Publication mutation: `NO`
 
-The live browser reached beehiiv but could not authenticate the `sekretbip@gmail.com` creator account because no usable Beehiiv/Google credential was available in the browser profile or credential vault.
+This attempt is a provider-access blocker only. It is not evidence that publication, billing, or content configuration failed.
 
-A prior beehiiv account email proves this account has used Beehiiv's **Continue on desktop** creator handoff. That email states the handoff link expires after **5 minutes**. The only such message currently available in the connected inbox is from `2026-09-01`, so its token is expired and must not be stored or reused.
+### Authentication attempt B
+
+- Run: `9ecdcc63-099a-464a-80d1-166315bb30ea`
+- Date: `2026-09-11 America/New_York`
+- State: `BLOCKED`
+- Cause: browser reached Beehiiv/Google sign-in but timed out before creator authentication completed
+- Provider mutation: `NO`
+- Billing mutation: `NO`
+- Password reset: `NO`
+- Publication mutation: `NO`
+
+This timeout is a separate receipt from attempt A. Neither receipt may stand in for the other.
+
+### Desktop-handoff evidence
+
+A prior beehiiv **Continue on desktop** email states that its creator handoff link expires after five minutes. The previously observed September 1 link was therefore expired and must not be stored, committed, or reused.
 
 Safe recovery path:
 
-1. obtain a fresh Beehiiv creator session through the user's normal login or a newly generated **Continue on desktop** handoff;
-2. do not paste, commit, log, or retain the handoff token;
-3. resume the same provider run order below after authentication;
-4. do not reset or change account credentials unless the founder explicitly authorizes that separate action.
-
-Classification: `VERIFIED BLOCKER / AUTHENTICATION ONLY`.
-
-This blocker is provider access, not a failure of the publication kit, plugin architecture, trial plan, or content assets.
+1. obtain a fresh normal creator session or a newly generated desktop handoff;
+2. do not paste or persist its token;
+3. after login, capture publication/workspace identity and Billing/Plan truth before any mutation.
 
 ## Live run order
 
-Mark each row only when the provider state is visible and capture the proof location.
+Mark every gate independently.
 
 | Gate | State | Provider evidence | Timestamp |
 | --- | --- | --- | --- |
-| Beehiiv creator authentication | BLOCKED | live browser run `71158dd4-8fa2-49c5-a626-29768e7f3665`; fresh session required | 2026-09-10 |
-| Trial expiry captured | OPEN | beehiiv Billing/Plan screenshot or note |  |
-| Billing posture captured | OPEN | beehiiv Billing/Plan current/upcoming plan |  |
-| Issue #001 previewed desktop | OPEN | preview screenshot |  |
-| Issue #001 previewed mobile | OPEN | preview screenshot |  |
-| Issue #001 published | OPEN | public URL + post report; public discovery baseline currently negative |  |
-| AI podcast generated from Issue #001 | OPEN | provider episode editor screenshot |  |
-| `The First Sentence` published | OPEN | public episode URL; public discovery baseline currently negative |  |
-| Podcast RSS captured | OPEN | RSS URL |  |
-| Built-in welcome email configured | OPEN | Settings → Emails → Preset Emails screenshot |  |
-| Built-in welcome email previewed desktop | OPEN | preview screenshot |  |
-| Built-in welcome email previewed mobile | OPEN | preview screenshot |  |
-| Built-in welcome email enabled | OPEN | enabled-toggle screenshot |  |
-| Preference survey published | OPEN | public/provider survey URL |  |
-| `reader_role` mapping verified | OPEN | survey/custom-field screenshot |  |
-| `primary_interest` mapping verified | OPEN | survey/custom-field screenshot |  |
-| `preferred_cadence` mapping verified | OPEN | survey/custom-field screenshot |  |
-| `Se’kret Bip — First 5 Days` automation experiment | NOT_APPLICABLE | optional paid experiment; not required for critical Launch path | 2026-09-10 |
-| First Full Subscribers export downloaded | OPEN | private-storage filename only |  |
-| First All Posts export downloaded | OPEN | private-storage filename only |  |
+| Beehiiv creator authentication | BLOCKED | attempts A and B above | 2026-09-11 |
+| Publication/workspace identity captured | OPEN | dashboard readback |  |
+| Exact trial cutoff captured | OPEN | Billing/Plan readback |  |
+| Billing posture captured | OPEN | Billing/Plan current/upcoming state |  |
+| Immutable source commit recorded | OPEN | exact Git commit SHA |  |
+| Built-in welcome email configured | OPEN | provider screenshot/readback |  |
+| Built-in welcome desktop preview | OPEN | preview evidence |  |
+| Built-in welcome mobile preview | OPEN | preview evidence |  |
+| Built-in welcome founder approval | OPEN | approval table above |  |
+| Built-in welcome enabled | OPEN | provider state |  |
+| Issue #001 desktop preview | OPEN | preview evidence |  |
+| Issue #001 mobile preview | OPEN | preview evidence |  |
+| Issue #001 founder approval | OPEN | approval table above |  |
+| Issue #001 published/sent | OPEN | public URL/provider report |  |
+| First Full Subscribers export | OPEN | private filename/checksum label only |  |
+| First All Posts export | OPEN | private filename/checksum label only |  |
+| Podcast generated | OPEN | provider editor evidence |  |
+| Podcast audio recovery copy | OPEN | private filename or explicit unavailable receipt |  |
+| Podcast published | OPEN | public URL/provider state |  |
+| Podcast post-trial durability | UNKNOWN | support or post-downgrade readback required |  |
+| `reading_context` test mapping | OPEN | synthetic profile + export readback |  |
+| `primary_interest` test mapping | OPEN | synthetic profile + export readback |  |
+| `preferred_cadence` test mapping | OPEN | synthetic profile + export readback |  |
+| Survey founder approval | OPEN | approval table above |  |
+| Survey published | OPEN | provider/public URL |  |
+| Optional automation experiment | NOT_APPLICABLE | not required for Launch path |  |
+| Support ticket founder approval | OPEN | approval table above |  |
 | Support ticket submitted | OPEN | ticket ID only |  |
-| Final Full Subscribers export downloaded | OPEN | private-storage filename only |  |
-| Final All Posts export downloaded | OPEN | private-storage filename only |  |
-| Post-downgrade public path verified | OPEN | public URLs + browser screenshots |  |
+| Final Full Subscribers export | OPEN | private filename/checksum label only |  |
+| Final All Posts export | OPEN | private filename/checksum label only |  |
+| First snapshot purge | OPEN | purge timestamp/owner only |  |
+| Final snapshot purge when due | OPEN | purge timestamp/owner only |  |
+| Post-downgrade homepage | OPEN | browser evidence |  |
+| Post-downgrade signup | OPEN | browser evidence |  |
+| Post-downgrade Issue #001 | OPEN | browser evidence |  |
+| Post-downgrade podcast episode | OPEN | browser evidence |  |
+| Post-downgrade RSS | OPEN | browser evidence |  |
+| Post-downgrade survey state | OPEN | browser/provider evidence |  |
+| Post-downgrade export access | OPEN | provider evidence |  |
 
-Allowed state values: `OPEN`, `VERIFIED`, `BLOCKED`, `NOT_APPLICABLE`.
+Allowed gate states: `OPEN`, `VERIFIED`, `INFERRED`, `UNKNOWN`, `BLOCKED`, `NOT_APPLICABLE`.
 
 ## Public asset receipts
 
 ### Issue #001
 
 - Title: **The first sentence is usually the hardest**
+- Source commit: `PENDING`
 - Public URL: `PENDING`
-- Published at: `PENDING`
-- Delivered: `PENDING`
-- Opens: `PENDING`
-- Clicks: `PENDING`
+- Published/sent at: `PENDING`
+- Desktop preview: `PENDING`
+- Mobile preview: `PENDING`
+- Founder approval receipt: `PENDING`
+
+Do not record recipient-level open/click histories in this receipt.
 
 ### Podcast
 
 - Episode: **The First Sentence**
+- Source commit: `PENDING`
 - Public episode URL: `PENDING`
 - RSS URL: `PENDING`
 - Published at: `PENDING`
+- Recovery audio filename/private label: `PENDING OR UNAVAILABLE`
+- Post-trial durability: `UNKNOWN`
+- Founder approval receipt: `PENDING`
 
 ### Built-in welcome email
 
 - Subject: **Welcome to Se’kret Bip 🌙**
+- Source commit: `PENDING`
 - Configured: `PENDING`
 - Desktop preview: `PENDING`
 - Mobile preview: `PENDING`
 - Enabled: `PENDING`
+- Founder approval receipt: `PENDING`
 
 ### Survey
 
 - Title: **What should Se’kret Bip send you?**
-- Survey URL or provider identifier: `PENDING`
-- Responses: `PENDING`
+- Survey URL/provider identifier: `PENDING`
+- Synthetic mapping test: `PENDING`
+- Aggregate response count: `PENDING`
+- Founder approval receipt: `PENDING`
 
 ### Optional automation experiment
 
-- Name: **Se’kret Bip — First 5 Days**
-- State: `NOT_APPLICABLE unless intentionally tested after durable P0 gates`
-- Activated at: `N/A`
-- Enrolled: `N/A`
-- Completed: `N/A`
+- State: `NOT_APPLICABLE unless separately approved`
+- `[ISSUE_001_URL]` resolved: `N/A`
+- `[SURVEY_URL]` resolved: `N/A`
+- Pause/disable control verified: `N/A`
+- Queued-send stop behavior verified: `N/A`
+- Operational baseline recorded: `N/A`
 
 ## Export receipts
 
-Record filenames and private-storage location labels only. Never paste subscriber rows, email addresses, response-level survey data, or export contents here.
+Never paste subscriber rows, email addresses, response-level survey data, or export contents here.
 
 ### First export
 
-- Full Subscribers filename: `PENDING`
-- All Posts filename: `PENDING`
-- Private storage label/location: `PENDING`
+- Full Subscribers filename: `beehiiv-sekret-bip-first-subscribers-YYYYMMDD-HHMMZ.csv`
+- All Posts filename: `beehiiv-sekret-bip-first-posts-YYYYMMDD-HHMMZ.csv`
+- Private storage label: `PENDING`
+- Checksum/reference if available: `PENDING`
 - Download verified: `NO`
 
 ### Final pre-downgrade export
 
-- Full Subscribers filename: `PENDING`
-- All Posts filename: `PENDING`
-- Private storage label/location: `PENDING`
+- Full Subscribers filename: `beehiiv-sekret-bip-final-subscribers-YYYYMMDD-HHMMZ.csv`
+- All Posts filename: `beehiiv-sekret-bip-final-posts-YYYYMMDD-HHMMZ.csv`
+- Private storage label: `PENDING`
+- Checksum/reference if available: `PENDING`
 - Download verified: `NO`
 
-## Trial support ticket draft
+### Retention and purge
 
-Use trial support while it is available to obtain provider-written confirmation of the downgrade behavior we depend on.
+- Restricted encrypted storage verified: `PENDING`
+- First snapshot purge due/complete: `PENDING`
+- Final snapshot purge due/complete: `PENDING`
+- Purge owner: `PENDING`
 
-**Subject:** Confirm what remains active after Se’kret Bip trial downgrade
+Subscriber-level data remains outside GitHub.
 
-**Message:**
+## Trial support ticket
 
-Hello beehiiv support,
+Canonical support message: `content/beehiiv/trial-harvest-pack.md` → **Gate 7 — Trial support ticket**.
 
-I’m preparing Se’kret Bip for the end of its current trial and want to verify the exact downgrade behavior before relying on any feature.
+Do not maintain a second competing support-ticket body in this receipt.
 
-Could you please confirm for this publication:
-
-1. whether the built-in single welcome email remains available and enabled after downgrade to Launch;
-2. whether an AI-generated podcast episode that is published before the trial ends remains publicly available after downgrade to Launch;
-3. whether the existing podcast RSS feed remains active after downgrade;
-4. whether automations created during the trial become inactive on Launch;
-5. whether a survey created during the trial remains published or becomes unavailable on Launch;
-6. whether custom-field values collected from subscribers remain included in a Full Subscribers export;
-7. whether the normal publication website and standard newsletter signup remain available on Launch without depending on the premium automation.
-
-I’m not asking for an upgrade recommendation. I only need the exact post-trial behavior so I can preserve the publication correctly.
-
-Thank you.
-
-After submission, record only the ticket ID and the non-sensitive provider answer summary below.
-
+- Founder approval receipt: `PENDING`
 - Ticket ID: `PENDING`
 - Submitted at: `PENDING`
-- Provider answer summary: `PENDING`
+- Non-sensitive provider answer summary: `PENDING`
 
 ## Post-downgrade browser proof
 
-Run after the plan changes or at the earliest point the Launch behavior can be verified.
+Verify separately:
 
-1. Public publication homepage loads.
-2. Newsletter signup can be completed without requiring a premium automation.
-3. Built-in welcome email remains configured for new subscribers.
-4. Issue #001 still loads publicly.
-5. `The First Sentence` episode still loads publicly.
-6. RSS feed still resolves.
-7. No premium-only page is required for the critical public path.
+1. publication homepage;
+2. standard signup;
+3. built-in welcome state;
+4. Issue #001 public state;
+5. podcast episode public state;
+6. RSS state;
+7. survey state;
+8. export-access state.
 
-Record screenshots or trace locations, not subscriber PII.
+One successful check cannot mark the others verified.
 
 ## Completion rule
 
-The beehiiv trial harvest is complete only when:
-
-- both public content assets are live;
-- the built-in welcome email is configured, previewed on desktop/mobile, and enabled;
-- the three audience preference fields were tested;
-- the optional automation logic is preserved in the repository and its provider gate is either `VERIFIED` if intentionally tested or `NOT_APPLICABLE` if skipped;
-- first and final exports were downloaded into private storage;
-- the provider downgrade behavior is either verified directly or documented as an explicit remaining risk;
-- the public post-downgrade path has browser evidence.
-
-If one required gate fails, mark it `BLOCKED`, record the evidence, preserve the durable assets, and replace only the delivery mechanism. An optional automation experiment must never block completion.
+The beehiiv trial harvest is complete only when every required durable gate has its own receipt, the exact source commit is recorded for provider actions, external mutations have founder approval receipts, subscriber exports follow the retention/purge policy, and all remaining provider uncertainties are explicitly classified rather than converted into success by assumption.
