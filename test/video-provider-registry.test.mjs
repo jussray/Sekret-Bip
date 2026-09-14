@@ -68,7 +68,7 @@ test('registry rejects a canary whose usage status still requires review', () =>
   });
   const result = run(['--registry', file]);
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /canary\/production eligibility requires an allowlisted permissive license|canary eligibility requires an explicitly permissive license status/);
+  assert.match(result.stderr, /canary\/production eligibility requires an allowlisted permissive license|Hugging Face eligibility requires an explicitly permissive license status/);
 });
 
 test('registry rejects forged permissive status when the actual HF license is not allowlisted', () => {
@@ -80,6 +80,19 @@ test('registry rejects forged permissive status when the actual HF license is no
   const result = run(['--registry', file]);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /canary\/production eligibility requires an allowlisted permissive license/);
+});
+
+test('production eligibility cannot bypass unresolved Hugging Face usage status', () => {
+  const file = withMutatedRegistry((registry) => {
+    const provider = registry.providers.find((item) => item.id === 'hf-wan22-i2v-a14b');
+    provider.canaryEligible = false;
+    provider.productionEligible = true;
+    provider.identityCanaryPassed = true;
+    provider.commercialUseStatus = 'review-required';
+  });
+  const result = run(['--registry', file]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Hugging Face eligibility requires an explicitly permissive license status/);
 });
 
 test('registry path flag fails closed when its argument is missing', () => {
