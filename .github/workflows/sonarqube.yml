@@ -1,0 +1,82 @@
+# Optional SonarQube analysis for push/PR visibility.
+# SonarQube is a vendor observer, not merge authority unless the repository
+# explicitly configures SONAR_TOKEN and SONAR_HOST_URL.
+
+name: SonarQube analysis
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  analysis:
+    name: SonarQube analysis (optional vendor gate)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    env:
+      EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+    steps:
+      - name: Check out exact workflow subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_SUBJECT_SHA }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify exact workflow subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_SUBJECT_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SUBJECT_SHA"
+
+      - name: Detect SonarQube configuration
+        id: sonar_config
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$SONAR_TOKEN" && -n "$SONAR_HOST_URL" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "SonarQube is configured; the exact checked-out subject will be scanned."
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            {
+              echo "### SonarQube observer state"
+              echo
+              echo "Proof subject: \`$EXPECTED_SUBJECT_SHA\`"
+              echo
+              echo "SonarQube analysis was not executed because SONAR_TOKEN and/or SONAR_HOST_URL is not configured."
+              echo "This optional vendor observer does not create merge authority when unconfigured."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::notice title=SonarQube not configured::Optional vendor scan skipped; no SonarQube proof was produced."
+          fi
+
+      - name: Verify canonical project configuration
+        if: steps.sonar_config.outputs.configured == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f sonar-project.properties
+          grep -Fx 'sonar.projectKey=sekret-bip' sonar-project.properties
+
+      - name: Analyze with SonarQube
+        if: steps.sonar_config.outputs.configured == 'true'
+        uses: SonarSource/sonarqube-scan-action@ad8210318ac8bb816e41990d5af2b304f7a6c213
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.qualitygate.wait=true
