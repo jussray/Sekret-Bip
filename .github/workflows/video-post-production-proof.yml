@@ -1,0 +1,71 @@
+name: Video Post-Production Proof
+
+on:
+  pull_request:
+    paths:
+      - 'production/video-use/**'
+      - 'scripts/verify-video-master.mjs'
+      - 'scripts/verify-video-playback.mjs'
+      - 'test/video-post-production-contract.test.mjs'
+      - 'sekret-bip-short-engine.md'
+      - 'docs/VIDEO_POST_PRODUCTION_CONTRACT.md'
+      - 'package.json'
+      - '.github/workflows/video-post-production-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.node-version'
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Ensure ffmpeg
+        run: |
+          command -v ffmpeg
+          command -v ffprobe
+
+      - name: Run source contracts
+        run: npm run test:video:postproduction
+
+      - name: Generate deterministic synthetic master
+        run: |
+          mkdir -p artifacts/video-proof
+          ffmpeg -hide_banner -loglevel error \
+            -f lavfi -i color=c=black:s=1080x1920:r=30:d=25 \
+            -c:v libx264 -preset ultrafast -pix_fmt yuv420p -movflags +faststart \
+            artifacts/video-proof/synthetic-master.mp4
+
+      - name: Verify master metadata
+        run: |
+          npm run verify:video:master -- \
+            --manifest production/video-use/episode-001.json \
+            --media artifacts/video-proof/synthetic-master.mp4 \
+            --receipt artifacts/video-proof/master-proof.json
+
+      - name: Verify real Chromium playback
+        run: |
+          npm run verify:video:playback -- \
+            --manifest production/video-use/episode-001.json \
+            --media artifacts/video-proof/synthetic-master.mp4 \
+            --receipt artifacts/video-proof/playback-proof.json
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-post-production-proof
+          path: artifacts/video-proof/
+          if-no-files-found: error
