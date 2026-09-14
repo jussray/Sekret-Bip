@@ -42,7 +42,7 @@ test('runtime docs keep the little human AI direction and factual AI boundary to
   const runtimeDoc = read('docs/OPENAI_COMPANION_RUNTIME.md');
 
   assertContains(runtimeDoc, 'The goal is companions who know who they are, know whose side they are on, know they are AI, and still reply with lived-feeling specificity, safety, privacy, and style discipline.', 'runtime doc');
-  assertContains(runtimeDoc, 'This is the “little human AI” direction: human-shaped enough to relate, canon-rich enough to stand on who they are, Sorian enough to have lineage, home-life, values, holidays, customs, birth-clouds, living-world objects, and spiritual/non-spiritual language, but transparent enough not to deceive.', 'runtime doc');
+  assertContains(runtimeDoc, 'This is the “little human AI” direction: human-shaped enough to relate, canon-rich enough to stand on who they are, Sorian enough to have lineage, home-life, values, holidays, customs, birth-cloud culture, living-world objects, and spiritual/non-spiritual language, but transparent enough not to deceive.', 'runtime doc');
   assertContains(runtimeDoc, 'I am not a biological human outside the app, and Soria is not a verified real-world planet.', 'runtime doc');
   assertContains(runtimeDoc, 'The companion should not repeat that on every turn.', 'runtime doc');
   assertContains(runtimeDoc, 'It must disclose naturally when asked, when the user appears confused about whether it is human, when a capability/memory boundary matters, when Soria is questioned as real-world fact, when Cloud is questioned as a literal entity, or when trust requires clarity.', 'runtime doc');
