@@ -13,14 +13,17 @@ test('Episode 001 video-use manifest keeps editing below canon authority', async
   assert.equal(manifest.editor.adapter, 'video-use');
   assert.equal(manifest.editor.role, 'post-production-only');
   assert.deepEqual(manifest.sourcePolicy.requiredShots, [1, 2, 3, 4, 5, 6, 7]);
-  assert.equal(manifest.sourcePolicy.requireApprovedShotCookies, true);
+  assert.equal(manifest.sourcePolicy.requireApprovedShotEvidence, true);
   assert.equal(manifest.sourcePolicy.allowIdentityRegeneration, false);
   assert.equal(manifest.sourcePolicy.allowInventedCharacters, false);
   assert.equal(manifest.proof.playwrightPlayback, 'required');
-  assert.equal(manifest.proof.episodeCookieAfterAllProof, true);
+  assert.equal(manifest.proof.continuityReview, 'required');
+  assert.equal(manifest.proof.finalMasterApprovalAfterAllProof, true);
+  assert.equal('requireApprovedShotCookies' in manifest.sourcePolicy, false);
+  assert.equal('episodeCookieAfterAllProof' in manifest.proof, false);
 });
 
-test('master verifier accepts exact ffprobe metadata and leaves episode cookie ineligible', async () => {
+test('master verifier accepts exact ffprobe metadata and cannot self-approve the final master', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'bip-video-proof-'));
   const media = join(dir, 'master.mp4');
   const ffprobe = join(dir, 'ffprobe');
@@ -46,7 +49,8 @@ test('master verifier accepts exact ffprobe metadata and leaves episode cookie i
   assert.equal(proof.actual.fps, 30);
   assert.equal(proof.actual.durationSeconds, 25);
   assert.deepEqual(proof.requiredNextProof, ['playwright-playback', 'continuity-review']);
-  assert.equal(proof.episodeCookieEligible, false);
+  assert.equal(proof.finalApprovalEligible, false);
+  assert.equal('episodeCookieEligible' in proof, false);
 });
 
 test('Playwright verifier must perform real browser decode and time advancement', async () => {
@@ -58,13 +62,18 @@ test('Playwright verifier must perform real browser decode and time advancement'
   assert.match(source, /v\.play\(\)/);
   assert.match(source, /currentTime/);
   assert.match(source, /playbackAdvanced/);
-  assert.match(source, /episodeCookieEligible: false/);
+  assert.match(source, /finalApprovalEligible: false/);
+  assert.doesNotMatch(source, /episodeCookieEligible/);
 });
 
-test('short engine assigns video-use only to post-production', async () => {
+test('short engine assigns video-use only to post-production and keeps approval in canon review', async () => {
   const engine = await read('sekret-bip-short-engine.md');
   assert.match(engine, /video-use/i);
   assert.match(engine, /post-production/i);
   assert.match(engine, /must not regenerate character identity/i);
   assert.match(engine, /Playwright playback proof/i);
+  assert.match(engine, /shot approval evidence/i);
+  assert.match(engine, /final continuity approval/i);
+  assert.doesNotMatch(engine, /shot cookies?/i);
+  assert.doesNotMatch(engine, /episode cookie/i);
 });
