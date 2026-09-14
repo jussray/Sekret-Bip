@@ -139,6 +139,45 @@ For Episode 001:
 
 This interprets the production brief’s “one portal/world keyframe + six episode keyframes” against its seven-shot final storyboard without dropping a shot.
 
+## Animation provider routing
+
+Animation providers are interchangeable execution lanes, not canon authorities. The machine-readable provider contract is `production/video-providers/registry.json`.
+
+The existing Higgsfield route remains the default production route. Hugging Face is an additional canary lane so the production system is not locked to one provider.
+
+A provider is eligible only when it preserves the existing gate:
+
+```text
+approved keyframe + exact cast/character canon
+→ provider preflight
+→ animation canary
+→ identity/cast/world QA
+→ accepted shot clip
+→ post-production
+→ ffprobe master proof
+→ Playwright playback proof
+→ final continuity approval
+```
+
+Provider rules:
+- provider authority is animation-only;
+- a provider cannot invent or promote character identity;
+- text-only character identity is forbidden when an approved character reference/fingerprint exists;
+- provider choice cannot override cast count, character fingerprints, world authority, shot action, or the episode rule;
+- Hugging Face models begin `productionEligible: false` and must pass an exact Bip identity canary before promotion;
+- models with unresolved license/usage status remain ineligible even if technically capable;
+- every generation lane requires cost/allowance preflight before paid or metered execution;
+- a successful model render is not a shot approval and cannot issue final continuity approval by itself.
+
+Repository gate:
+
+```text
+node scripts/verify-video-provider-registry.mjs
+node scripts/verify-video-provider-registry.mjs --select-canary
+```
+
+The first Hugging Face canary candidate is selected from the registry, not hard-coded into episode canon. Changing models later must remain a provider-policy change rather than a character/world-canon rewrite.
+
 ## Animation gate
 
 Only animate an approved keyframe.
