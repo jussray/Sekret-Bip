@@ -20,13 +20,24 @@ jobs:
     name: SonarQube analysis (optional vendor gate)
     runs-on: ubuntu-22.04
     timeout-minutes: 15
+    env:
+      EXPECTED_SUBJECT_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
     steps:
       - name: Check out exact workflow subject
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          ref: ${{ env.EXPECTED_SUBJECT_SHA }}
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Verify exact workflow subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_SUBJECT_SHA" "$actual"
+          test "$actual" = "$EXPECTED_SUBJECT_SHA"
 
       - name: Detect SonarQube configuration
         id: sonar_config
@@ -43,6 +54,8 @@ jobs:
             echo "configured=false" >> "$GITHUB_OUTPUT"
             {
               echo "### SonarQube observer state"
+              echo
+              echo "Proof subject: \`$EXPECTED_SUBJECT_SHA\`"
               echo
               echo "SonarQube analysis was not executed because SONAR_TOKEN and/or SONAR_HOST_URL is not configured."
               echo "This optional vendor observer does not create merge authority when unconfigured."
