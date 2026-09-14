@@ -21,10 +21,139 @@
     {"key":"bipjr-dreamer","display_name":"Bip Jr. 3","role":"The Dreamer","trigger":"@BIPJR_DREAMER","higgsfield_element_id":"cc4bc603-0250-4e99-b8f8-227dab2d93ea","age_lane":"bip-jr","status":"approved"},
     {"key":"bipjr-explorer","display_name":"Bip Jr. 4","role":"The Explorer","trigger":"@BIPJR_EXPLORER","higgsfield_element_id":"5a9dfde6-11a0-4345-8e98-4bfffb743ec8","age_lane":"bip-jr","status":"approved"}
   ],
+  "recognition_contract": {
+    "principle": "Pairs rhyme, never clone.",
+    "design_contract_is_character_authority": false,
+    "world_or_ensemble_art_may_promote_identity": false,
+    "silhouette_review_sizes_px": [128, 64],
+    "promotion_order": [
+      "design-contract-approved",
+      "exact-character-authority-reference-approved",
+      "provider-reference-bound",
+      "silhouette-and-marker-review-passed",
+      "generation-eligible",
+      "shot-specific-continuity-cookie-eligible"
+    ],
+    "pending_reference_rule": "A counterpart with no exact approved character-authority reference must remain generation-blocked and continuity-cookie-ineligible."
+  },
+  "sorian_pairs": [
+    {
+      "key": "awareness",
+      "domain": "Awareness",
+      "symbol": "Crescent Eye",
+      "symbol_meaning": "seeing what is not obvious",
+      "original": {
+        "character_key": "night",
+        "display_name": "Night",
+        "instant_read": "Watcher",
+        "magic_direction": "outside -> threat/pattern",
+        "character_authority_bound": true,
+        "provider_reference_bound": true,
+        "generation_allowed": true,
+        "silhouette_contract": "Use the current approved Night character-authority reference exactly. Do not infer hair, clothing, face, or proportions from prose, world art, or ensemble posters."
+      },
+      "counterpart": {
+        "key": "nyra",
+        "display_name": "Nyra",
+        "role": "The Intuitive",
+        "age_lane": "teen",
+        "status": "design-contract-approved-reference-pending",
+        "instant_read": "Intuitive",
+        "magic_direction": "inside -> emotion",
+        "palette": ["violet", "silver-lilac"],
+        "symbol": "Crescent Eye",
+        "silhouette_contract": [
+          "softer asymmetric outer layer",
+          "one clear flowing diagonal",
+          "textured hair gathered with a silver-lilac Crescent Eye clasp",
+          "must not clone Night's hoodie or approved silhouette"
+        ],
+        "character_authority_bound": false,
+        "provider_reference_bound": false,
+        "generation_allowed": false,
+        "continuity_cookie_eligible": false
+      }
+    },
+    {
+      "key": "belonging",
+      "domain": "Belonging",
+      "symbol": "Open Circle",
+      "symbol_meaning": "there is room for you to enter",
+      "original": {
+        "character_key": "suhana",
+        "display_name": "Suhana",
+        "instant_read": "Emotional center",
+        "magic_direction": "feeling -> expression",
+        "character_authority_bound": true,
+        "provider_reference_bound": true,
+        "generation_allowed": true,
+        "silhouette_contract": "Use the current approved Suhana character-authority reference exactly. Do not infer hair, clothing, face, or proportions from prose, world art, or ensemble posters."
+      },
+      "counterpart": {
+        "key": "suhan",
+        "display_name": "Suhan",
+        "role": "The Steady Presence",
+        "age_lane": "teen",
+        "status": "design-contract-approved-reference-pending",
+        "instant_read": "Steady presence",
+        "magic_direction": "person -> connection",
+        "palette": ["deep gold", "warm burgundy", "earth-plum"],
+        "symbol": "Open Circle",
+        "silhouette_contract": [
+          "layered open-front overshirt or jacket",
+          "rounded hem language",
+          "Open Circle appears as a bracelet, zipper, or similarly subtle functional detail",
+          "grounded stable silhouette that must not clone Suhana"
+        ],
+        "character_authority_bound": false,
+        "provider_reference_bound": false,
+        "generation_allowed": false,
+        "continuity_cookie_eligible": false
+      }
+    },
+    {
+      "key": "discovery",
+      "domain": "Discovery",
+      "symbol": "Split Star",
+      "symbol_meaning": "what exists plus what could exist",
+      "original": {
+        "character_key": "sy",
+        "display_name": "Sy",
+        "instant_read": "Analyzer",
+        "magic_direction": "reality -> rule",
+        "character_authority_bound": true,
+        "provider_reference_bound": true,
+        "generation_allowed": true,
+        "silhouette_contract": "Use the current approved Sy character-authority reference exactly. Do not infer hair, clothing, face, or proportions from prose, world art, or ensemble posters."
+      },
+      "counterpart": {
+        "key": "sya",
+        "display_name": "Sya",
+        "role": "The Imagineer",
+        "age_lane": "teen",
+        "status": "design-contract-approved-reference-pending",
+        "instant_read": "Imagineer",
+        "magic_direction": "rule -> possibility",
+        "palette": ["cyan", "violet", "luminous teal"],
+        "symbol": "Split Star",
+        "silhouette_contract": [
+          "short asymmetric tech layer",
+          "one offset accessory or cross-body element",
+          "Split Star incorporated into a clasp or fastener",
+          "more recombining and angular than Sy without superhero armor"
+        ],
+        "character_authority_bound": false,
+        "provider_reference_bound": false,
+        "generation_allowed": false,
+        "continuity_cookie_eligible": false
+      }
+    }
+  ],
   "invariants": [
     "World expression may vary; companion identity stays locked.",
     "No random or substitute people may stand in for a canonical companion.",
     "Ensemble posters and world images are not character authority.",
+    "A design contract never grants character authority or provider generation eligibility by itself.",
     "Video generation is blocked until the exact cast passes a still-image canon check."
   ]
 }
