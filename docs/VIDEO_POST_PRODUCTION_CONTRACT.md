@@ -40,7 +40,11 @@ approved shot clip
 → final master approval
 ```
 
-Shot approval evidence means the source shot has already passed the Short Engine's still/animation canon gates. It is evidence, not a new authority object. Metadata and playback proof cannot approve the episode by themselves.
+Shot approval evidence means the source shot has already passed the Short Engine's still/animation canon gates. It is evidence, not a new authority object.
+
+The metadata and playback verifiers do **not** independently validate shot-level approvals. Their receipts therefore emit `sourceApprovalVerified: false`. They prove only their own layer and cannot approve the final episode.
+
+Both receipts carry the SHA-256 of the exact MP4 they inspected. Continuity review must reject the proof set if the metadata and playback hashes do not match the same final master.
 
 ## External tool installation
 

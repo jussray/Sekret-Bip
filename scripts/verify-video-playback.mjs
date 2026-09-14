@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 import { extname } from 'node:path';
@@ -13,6 +14,19 @@ function fail(message, details = {}) {
   process.exit(1);
 }
 
+function assertManifestPolicy(manifest) {
+  if (manifest.$schema !== 'sekret-bip-video-master@v1') fail('UNSUPPORTED_MANIFEST_SCHEMA');
+  if (manifest.editor?.role !== 'post-production-only') fail('EDITOR_AUTHORITY_TOO_BROAD');
+  if (manifest.sourcePolicy?.requireApprovedShotEvidence !== true) fail('APPROVED_SHOT_EVIDENCE_REQUIRED');
+  if (manifest.sourcePolicy?.allowUnapprovedSource !== false) fail('UNAPPROVED_SOURCE_MUST_BE_FORBIDDEN');
+  if (manifest.sourcePolicy?.allowIdentityRegeneration !== false) fail('IDENTITY_REGENERATION_MUST_BE_FORBIDDEN');
+  if (manifest.sourcePolicy?.allowInventedCharacters !== false) fail('INVENTED_CHARACTERS_MUST_BE_FORBIDDEN');
+  if (manifest.sourcePolicy?.allowWorldAuthorityAsCharacterAuthority !== false) fail('WORLD_AUTHORITY_AS_CHARACTER_AUTHORITY_MUST_BE_FORBIDDEN');
+  if (manifest.proof?.playwrightPlayback !== 'required') fail('PLAYWRIGHT_PROOF_MUST_BE_REQUIRED');
+  if (manifest.proof?.continuityReview !== 'required') fail('CONTINUITY_REVIEW_MUST_BE_REQUIRED');
+  if (manifest.proof?.finalMasterApprovalAfterAllProof !== true) fail('FINAL_APPROVAL_MUST_REQUIRE_ALL_PROOF');
+}
+
 const mediaPath = arg('--media');
 const manifestPath = arg('--manifest');
 const receiptPath = arg('--receipt');
@@ -26,9 +40,9 @@ const [mediaBytes, manifestText] = await Promise.all([
   readFile(manifestPath, 'utf8'),
 ]);
 const manifest = JSON.parse(manifestText);
-if (manifest.sourcePolicy?.requireApprovedShotEvidence !== true) fail('APPROVED_SHOT_EVIDENCE_REQUIRED');
-if (manifest.proof?.continuityReview !== 'required') fail('CONTINUITY_REVIEW_MUST_BE_REQUIRED');
+assertManifestPolicy(manifest);
 const expected = manifest.master;
+const mediaSha256 = createHash('sha256').update(mediaBytes).digest('hex');
 
 const server = createServer((req, res) => {
   if (req.url === '/master.mp4') {
@@ -36,12 +50,16 @@ const server = createServer((req, res) => {
     if (range) {
       const match = /bytes=(\d+)-(\d*)/.exec(range);
       if (!match) {
-        res.writeHead(416).end();
+        res.writeHead(416, { 'Content-Range': `bytes */${mediaBytes.length}` }).end();
         return;
       }
       const start = Number(match[1]);
       const requestedEnd = match[2] ? Number(match[2]) : mediaBytes.length - 1;
       const end = Math.min(requestedEnd, mediaBytes.length - 1);
+      if (!Number.isInteger(start) || start < 0 || start >= mediaBytes.length || end < start) {
+        res.writeHead(416, { 'Content-Range': `bytes */${mediaBytes.length}` }).end();
+        return;
+      }
       res.writeHead(206, {
         'Content-Type': 'video/mp4',
         'Accept-Ranges': 'bytes',
@@ -99,10 +117,14 @@ try {
   const receipt = {
     schema: 'sekret-bip-video-playback-proof@v1',
     pass: true,
+    manifest: manifestPath,
+    media: mediaPath,
+    sha256: mediaSha256,
     url,
     before,
     after,
     checks,
+    sourceApprovalVerified: false,
     requiredNextProof: ['continuity-review'],
     finalApprovalEligible: false,
   };
