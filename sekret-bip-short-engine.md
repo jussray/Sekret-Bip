@@ -114,13 +114,15 @@ A low balance is not permission to produce only half of a paired/parallel delive
 `VIDEO_ALLOWED = false` by default.
 
 For each shot, video becomes eligible only after a still has:
-- exact required cast;
+- exact required cast from the active episode authority;
 - approved character fingerprints;
 - no substitute people;
 - correct world palette and architecture;
 - visible episode world rule where applicable;
 - no accidental text/logo baked into the frame unless requested;
 - founder or designated canon-review status `APPROVED`.
+
+For Episode 001, `season-01/01-the-bridge-that-listens.md` is the shot-cast authority. In particular, Shots 5, 6, and 7 require Night, Suhana, Sy, **and Cloud**. A still or animation missing Cloud in those shots is not approved source evidence for the final episode.
 
 ```text
 if still_status != APPROVED:
@@ -150,7 +152,7 @@ Animation must preserve:
 - camera intent;
 - emotional cause-and-effect.
 
-If animation mutates identity, introduces a person, or breaks the world rule, reject the clip rather than repairing the mistake by generating unrelated replacements.
+If animation mutates identity, introduces a person, drops a required character, or breaks the world rule, reject the clip rather than repairing the mistake by generating unrelated replacements.
 
 ## Post-production boundary
 
@@ -163,16 +165,16 @@ For Episode 001 the machine-readable contract is `production/video-use/episode-0
 The post-production proof chain is:
 
 ```text
-approved shot clips + shot cookies
+approved shot clips + shot approval evidence
 → video-use assembly/edit
 → MP4/H.264 master render
 → ffprobe metadata verification
 → Playwright playback proof
 → continuity review
-→ episode cookie
+→ final continuity approval
 ```
 
-An editor export alone is not proof. A metadata pass alone is not browser proof. Playwright playback proof must show that Chromium decoded the actual master and that playback time advanced. The episode cookie remains ineligible until continuity review also passes.
+Shot approval evidence records that the source shot already passed the existing still/animation canon gates; it does not create a new authority object. An editor export alone is not proof. A metadata pass alone is not browser proof. Playwright playback proof must show that Chromium decoded the actual master and that playback time advanced. Final approval remains ineligible until continuity review also passes.
 
 Master target:
 
