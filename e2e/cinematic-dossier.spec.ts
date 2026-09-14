@@ -74,6 +74,38 @@ async function expectDossierMediaTruth(page: Page) {
   await expectRenderedImagesDecoded(characters, 'dossier canonical character images');
 }
 
+async function expectSorianPairRecognitionGate(page: Page) {
+  const gate = page.getByTestId('sorian-character-recognition-gate');
+  await expect(gate).toBeVisible();
+  await expect(gate).toContainText('Pairs rhyme. They do not clone.');
+  await expect(gate).toContainText('128px + 64px silhouette review required');
+  await expect(gate).toContainText('PENDING COUNTERPARTS · GENERATION BLOCKED · NO COOKIE');
+
+  const expected = [
+    { key: 'awareness', original: 'Night', counterpart: 'Nyra', symbol: 'Crescent Eye' },
+    { key: 'belonging', original: 'Suhana', counterpart: 'Suhan', symbol: 'Open Circle' },
+    { key: 'discovery', original: 'Sy', counterpart: 'Sya', symbol: 'Split Star' },
+  ] as const;
+
+  for (const pair of expected) {
+    const card = page.getByTestId(`sorian-pair-${pair.key}`);
+    const counterpart = page.getByTestId(`sorian-pair-${pair.key}-counterpart`);
+    await expect(card).toBeVisible();
+    await expect(card).toContainText(pair.original);
+    await expect(card).toContainText(pair.counterpart);
+    await expect(card).toContainText(pair.symbol);
+    await expect(card).toContainText('APPROVED REFERENCE');
+    await expect(counterpart).toContainText('REFERENCE');
+    await expect(counterpart).toContainText('PENDING');
+    await expect(counterpart).toContainText('GENERATION BLOCKED');
+    await expect(counterpart.locator('img')).toHaveCount(0);
+  }
+
+  const originals = page.locator('[data-testid^="sorian-pair-"][data-testid$="-original-image"]');
+  await expect(originals).toHaveCount(3);
+  await expectRenderedImagesDecoded(originals, 'Sorian pair approved original references');
+}
+
 async function unclipBoardForEvidence(board: Locator) {
   return board.evaluate(node => {
     const changed: Array<{ selector: string; style: string | null }> = [];
@@ -144,6 +176,19 @@ async function captureCompleteBoardEvidence(
   }
 }
 
+async function captureSorianGateEvidence(
+  page: Page,
+  viewport: (typeof VIEWPORTS)[number],
+  testInfo: TestInfo,
+) {
+  const gate = page.getByTestId('sorian-character-recognition-gate');
+  await gate.scrollIntoViewIfNeeded();
+  const screenshot = await gate.screenshot({ animations: 'disabled' });
+  const filename = `sorian-character-recognition-${viewport.name}.png`;
+  await fs.writeFile(path.join(ARTIFACT_DIR, filename), screenshot);
+  await testInfo.attach(filename, { body: screenshot, contentType: 'image/png' });
+}
+
 for (const viewport of VIEWPORTS) {
   test(`Night cinematic evidence dossier renders on ${viewport.name}`, async ({ page }, testInfo) => {
     const consoleErrors: string[] = [];
@@ -172,6 +217,7 @@ for (const viewport of VIEWPORTS) {
     await expect(page.getByText('GENERATED · neutral', { exact: true })).toBeVisible();
 
     await expectDossierMediaTruth(page);
+    await expectSorianPairRecognitionGate(page);
     await expectNoHorizontalOverflow(page);
 
     await fs.mkdir(ARTIFACT_DIR, { recursive: true });
@@ -182,6 +228,7 @@ for (const viewport of VIEWPORTS) {
     await testInfo.attach(viewportFilename, { body: viewportScreenshot, contentType: 'image/png' });
 
     await captureCompleteBoardEvidence(page, board, viewport, testInfo);
+    await captureSorianGateEvidence(page, viewport, testInfo);
 
     expect(pageErrors, `Uncaught page errors: ${pageErrors.join('\n')}`).toEqual([]);
     expect(consoleErrors, `Console errors: ${consoleErrors.join('\n')}`).toEqual([]);
