@@ -33,10 +33,12 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Ensure ffmpeg
+      - name: Install ffmpeg
         run: |
-          command -v ffmpeg
-          command -v ffprobe
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
 
       - name: Run source contracts
         run: npm run test:video:postproduction
