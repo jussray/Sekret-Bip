@@ -74,8 +74,8 @@ for (const provider of registry.providers) {
       fail(`${provider.id}: canary/production eligibility requires an allowlisted permissive license`);
     }
 
-    if (provider.canaryEligible === true && provider.commercialUseStatus !== 'permissive-license') {
-      fail(`${provider.id}: canary eligibility requires an explicitly permissive license status`);
+    if (eligibilityRequested && provider.commercialUseStatus !== 'permissive-license') {
+      fail(`${provider.id}: Hugging Face eligibility requires an explicitly permissive license status`);
     }
 
     if (provider.productionEligible === true && provider.identityCanaryPassed !== true) {
