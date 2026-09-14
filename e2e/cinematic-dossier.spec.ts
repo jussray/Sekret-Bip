@@ -182,11 +182,22 @@ async function captureSorianGateEvidence(
   testInfo: TestInfo,
 ) {
   const gate = page.getByTestId('sorian-character-recognition-gate');
-  await gate.scrollIntoViewIfNeeded();
-  const screenshot = await gate.screenshot({ animations: 'disabled' });
-  const filename = `sorian-character-recognition-${viewport.name}.png`;
-  await fs.writeFile(path.join(ARTIFACT_DIR, filename), screenshot);
-  await testInfo.attach(filename, { body: screenshot, contentType: 'image/png' });
+  const changed = await unclipBoardForEvidence(gate);
+
+  try {
+    const gateBox = await gate.boundingBox();
+    const discoveryBox = await page.getByTestId('sorian-pair-discovery').boundingBox();
+    expect(gateBox, 'Sorian recognition gate must have measurable geometry').not.toBeNull();
+    expect(discoveryBox, 'Discovery pair must remain measurable inside Sorian gate').not.toBeNull();
+    expect(discoveryBox!.y + discoveryBox!.height).toBeLessThanOrEqual(gateBox!.y + gateBox!.height + 1);
+
+    const screenshot = await gate.screenshot({ animations: 'disabled' });
+    const filename = `sorian-character-recognition-${viewport.name}.png`;
+    await fs.writeFile(path.join(ARTIFACT_DIR, filename), screenshot);
+    await testInfo.attach(filename, { body: screenshot, contentType: 'image/png' });
+  } finally {
+    await restoreBoardEvidenceClipping(page, changed);
+  }
 }
 
 for (const viewport of VIEWPORTS) {
