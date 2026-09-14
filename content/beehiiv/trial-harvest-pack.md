@@ -1,359 +1,279 @@
 # Se’kret Bip — Beehiiv Trial Harvest Pack
 
 Status: DURABLE OPERATING ARTIFACT
-Working deadline: 2026-09-15 (verify the exact expiry in beehiiv before the final sweep)
 Canonical publication copy: `content/beehiiv/publication-kit.md`
+Provider receipt: `content/beehiiv/provider-run-receipt.md`
+Plugin boundary: `content/beehiiv/plugin-boundary.md`
 
 ## Objective
 
-Use the remaining beehiiv trial only for value that survives downgrade or can be exported before access disappears.
+Use the remaining beehiiv trial only for value that survives downgrade, can be exported, or produces evidence worth keeping.
 
-Durable value means one of four things:
+Beehiiv is an optional publication plugin. Chief AI, PromptOS, and Sol remain system-level components. Beehiiv never becomes product, identity, continuity, or governance authority.
 
-1. an owned audience record we can export;
-2. reusable copy or workflow logic stored outside beehiiv;
-3. a public asset that stays live after downgrade;
-4. provider evidence that tells us what actually worked.
+## Authority gate
 
-Do not optimize trial-only cosmetics.
+Every external action needs a founder-approval receipt immediately before execution. A repo commit, green check, old approval, provider login, or successful preview is not approval to publish or message people.
+
+Record approval in `provider-run-receipt.md` before any of these actions:
+
+- enabling a welcome email;
+- publishing or sending Issue #001;
+- publishing a podcast episode;
+- publishing a survey;
+- activating any automation;
+- submitting a support ticket;
+- changing billing or plan state.
+
+Read-only inspection, previews, and local/repository edits do not expand provider authority.
+
+## Trial clock
+
+The beehiiv dashboard is authoritative for the exact trial cutoff and timezone.
+
+Until that exact timestamp is captured, use this conservative fallback:
+
+- inferred trial date: `2026-09-15`;
+- fallback final-sweep deadline: `2026-09-14 12:00 America/New_York`;
+- once the provider cutoff is known, schedule the final sweep at least 12 hours before the cutoff, or use the fallback above if it is earlier;
+- if the fallback deadline has already passed and the exact cutoff is still unknown, perform the durable exports immediately after authentication and skip optional premium experiments.
+
+Do not assume “September 15” means the end of a local calendar day.
+
+## Official provider baseline
+
+Official source checked for the trial model:
+
+- beehiiv Help: **What’s included in the beehiiv Max trial**
+- https://www.beehiiv.com/support/article/22101553752471
+
+That source states that a trial account is technically on Launch with temporary higher-tier access, and that an account that does not upgrade remains on Launch after the trial. Account-level Billing/Plan state still overrides this general documentation.
 
 ## Priority order
 
-### P0 — Harvest before expiry
+### P0 — Durable gates first
 
-1. **Publish Issue #001.**
-   - Source copy already lives in `publication-kit.md`.
-   - Preview desktop and mobile before send.
-   - Record published URL and send timestamp.
+#### Gate 0 — Authenticate without changing credentials
 
-2. **Generate and publish one AI-created podcast episode from Issue #001.**
-   - Episode title: **The First Sentence**
-   - Use the existing script in `publication-kit.md`.
-   - Record the public episode URL and RSS feed URL.
-   - The trial-only advantage is beehiiv's AI-from-newsletter creation tool. Existing published AI-created episodes and the RSS feed remain active after trial.
-   - After trial, the Launch plan can still host one recorded podcast episode per month; do not confuse loss of the AI creation tool with loss of podcast hosting.
+1. Use the founder’s normal beehiiv creator session.
+2. Do not reset a password, create a second account, add billing, or widen permissions merely to finish the trial harvest.
+3. Capture the publication/workspace identity shown after login.
+4. Capture the exact Billing/Plan trial cutoff, timezone, current plan, and any future charge or renewal state.
 
-3. **Configure and enable the built-in welcome email.**
-   - Use the exact welcome copy in `publication-kit.md`.
-   - Preview desktop and mobile before enabling.
-   - The built-in single welcome email is the durable onboarding path because it is available on the free Launch plan.
-   - Do not make a paid automation part of the critical onboarding path.
+If authentication fails, record each attempt separately in the provider receipt. Do not collapse multiple auth failures into one generic blocker.
 
-4. **Collect only low-sensitivity audience preferences through one short survey.**
-   - Bind every answer to a custom field.
-   - Do not ask for journals, private family situations, mental-health details, safety events, or free-form secrets.
-   - Treat the survey as a temporary collection surface: export the resulting audience fields before the trial ends because the survey itself will be unpublished on Launch.
+#### Gate 1 — Configure the Launch-safe built-in welcome email
 
-5. **Export the audience and content twice.**
-   - First export: as soon as the live publication path is working.
-   - Final export: during the last 24 hours of the trial.
-   - Request **Full Subscribers** and **All Posts**.
-   - Download completed exports immediately; provider download links are temporary.
-   - Never commit subscriber CSVs, email addresses, survey response rows, or other personal data to GitHub.
+Use the exact welcome copy from `publication-kit.md`.
 
-6. **Capture aggregate evidence before downgrade.**
-   - subscriber count;
-   - acquisition-source totals where available;
-   - Issue #001 delivered/open/click totals;
-   - survey response count;
-   - welcome-email performance totals where available;
-   - optional automation enrollment/completion totals only if an automation experiment is actually run;
-   - podcast public URL;
-   - website/signup URL;
-   - export filenames and local/private-storage location.
+1. Configure the built-in welcome email.
+2. Preview desktop.
+3. Preview mobile.
+4. Verify links and footer.
+5. Record founder approval.
+6. Enable only after that approval is recorded.
 
-7. **Use trial-only support once.**
-   - Submit the provider confirmation ticket below while ticket support is still available.
-   - Save only the non-sensitive answer or a screenshot reference in the evidence ledger.
+The built-in welcome email owns the immediate welcome message. Do not also activate a premium automation that sends the same welcome.
 
-### P1 — Keep because Launch can still use it
+#### Gate 2 — Prepare Issue #001
 
-- Keep the core newsletter, publication website, custom domain, and ordinary sends healthy.
-- Keep the built-in welcome email enabled and healthy.
-- Keep the normal signup flow healthy. A published signup flow can remain active on Launch, but a flow linked to a premium automation can be unlinked or become inactive after downgrade.
-- Keep the existing podcast RSS feed and published episode healthy.
-- Keep all canonical copy in this repository.
-- Keep free recommendation relationships only if they are genuinely relevant; they are not an expiry emergency.
+Use the exact title, subject, preheader, and body from `publication-kit.md`.
 
-### P2 — Optional or not worth blocking P0
+1. Preview desktop.
+2. Preview mobile.
+3. Verify the privacy boundary and footer.
+4. Verify all links.
+5. Record founder approval.
+6. Publish/send only after approval is recorded.
 
-- Premium multi-step welcome automation: optional experiment only. Do not run it until the durable P0 gates are complete, and never enable it alongside the built-in welcome email for the same Signed Up path.
-- Paid recommendations: trial accounts can browse but cannot activate paid offers.
-- Ad Network: unavailable during trial.
-- Paid subscriptions: unavailable during trial.
-- Premium-only custom pages or blocks that will not remain publishable after downgrade.
-- Digital products that can be created but not published during the trial.
-- Complex dynamic-content trees that produce no durable learning before expiry.
+If recipient-level engagement tracking cannot be disabled for a teen-inclusive audience, do not email the issue to that audience. Keep it web-only or draft until a separately approved privacy boundary exists. Do not create an age/teen behavioral profile in beehiiv merely to measure the trial.
 
-## Audience asset — one-screen preference survey
+#### Gate 3 — Take the first ownership export immediately
 
-Survey title: **What should Se’kret Bip send you?**
+Do this as soon as the normal publication and signup path works, before podcast, survey, or automation experiments.
 
-Intro:
+Request:
 
-**Help us make the public Se’kret Bip newsletter more useful. Choose what you want more of. Please do not share private family details or personal stories here.**
+- Full Subscribers export;
+- All Posts export.
 
-Use multiple-choice or dropdown questions only.
+Use distinct timestamped filenames so later exports cannot overwrite the baseline:
 
-### Question 1
+- `beehiiv-sekret-bip-first-subscribers-YYYYMMDD-HHMMZ.csv`
+- `beehiiv-sekret-bip-first-posts-YYYYMMDD-HHMMZ.csv`
 
-**What brings you to Se’kret Bip?**
+If an optional premium gate is blocked, skip it and continue to the durable export gates.
 
-Custom field: `reader_role`
+#### Gate 4 — Podcast experiment
 
-Options:
+Create **The First Sentence** from the canonical script only if the trial tool is available without payment or upgrade.
 
-- Teen reader
-- Parent or caregiver
-- Educator or supporter
-- Following the Se’kret Bip build
-- Prefer not to say
+Treat post-trial survival as `UNKNOWN` until provider readback or official support evidence confirms it for this account. A public URL by itself is not a durability receipt.
 
-### Question 2
+If beehiiv provides a download/export for the generated audio, save one copy to approved private storage before downgrade. If no download is available, record that limitation separately.
 
-**What would you like more of?**
+Only count the podcast as durable when at least one of these is true:
 
-Custom field: `primary_interest`
+- post-downgrade browser proof confirms the public episode and RSS remain active;
+- provider support confirms the behavior and the answer is retained in the receipt;
+- a recoverable audio copy is held in approved private storage.
 
-Options:
+#### Gate 5 — Optional low-sensitivity preference survey
 
-- Short stories
-- Conversation starters
-- Parent and grown-up perspective
-- Se’kret Bip build updates
+Do not collect an age or “teen” identity field.
 
-### Question 3
+Allowed fields:
 
-**How often should we show up in your inbox?**
+- `reading_context` — `for_myself`, `family_conversations`, `supporting_sekret_bip`;
+- `primary_interest` — `stories`, `conversation_tools`, `parent_perspective`, `build_updates`;
+- `preferred_cadence` — `weekly`, `twice_monthly`, `monthly`.
 
-Custom field: `preferred_cadence`
+Do not ask for journals, private family situations, mental-health details, safety events, or free-form secrets.
 
-Options:
+Before public distribution:
 
-- About once a week
-- About twice a month
-- Major updates only
+1. create the three custom fields;
+2. create the survey;
+3. submit one synthetic founder-controlled test response;
+4. verify all three values on the test subscriber profile;
+5. verify the same values in a Full Subscribers export;
+6. delete or neutralize the synthetic test row if it is no longer needed;
+7. record founder approval;
+8. only then publish the survey.
 
-Success copy:
+A configuration screenshot alone is not proof that the custom fields persist.
 
-**Thank you. Your answers help shape the public newsletter. You can change your email preferences or unsubscribe anytime.**
+#### Gate 6 — Optional automation experiment
 
-## Automation asset — Welcome → useful idea → preference
+Default state: `NOT_APPLICABLE`.
 
-Status: OPTIONAL TRIAL EXPERIMENT / NOT CRITICAL PATH
+The durable Launch path must not depend on automation. If the founder explicitly chooses to test it while the trial is active:
 
-Preserve this logic in the repository even if it is never activated. The built-in welcome email is the durable default. If this paid automation is tested, choose it **instead of** the built-in welcome email during the short experiment, never alongside it, then restore the built-in welcome email before downgrade. Mark the automation gate `NOT_APPLICABLE` if there is no concrete reason to spend trial time on it.
+1. use a founder-controlled synthetic test subscriber first;
+2. verify the provider pause/disable control before activation;
+3. verify how queued messages are stopped or cancelled;
+4. ensure the built-in welcome email is not duplicated;
+5. populate and verify both destination placeholders before activation:
+   - `[ISSUE_001_URL]`
+   - `[SURVEY_URL]`
+6. record founder approval;
+7. activate only for the bounded test scope.
 
-Automation name: **Se’kret Bip — First 5 Days**
+Do not credit automation for reader engagement on a teen-inclusive list. If evaluating whether automation is worth paying for, use an operational comparison instead:
 
-Re-entry: **No re-entry**
+- baseline: manual minutes required to perform the same bounded sequence;
+- experiment: automation setup minutes plus ongoing minutes;
+- observation unit: the same synthetic workflow repeated at least three times;
+- decision metric: verified operator time saved without widening tracking, authority, or data collection.
 
-Trigger: **New newsletter subscription**
+No baseline means no causal claim and no paid-plan justification.
 
-### Step 1 — Immediately
+#### Gate 7 — Trial support ticket
 
-Send the existing welcome email from `publication-kit.md`.
+This file is the single canonical support-ticket draft. The provider receipt must reference this section rather than carrying a second competing message.
 
-### Step 2 — Delay 2 days
+**Subject:** Confirm Se’kret Bip trial cutoff and Launch behavior
 
-Email subject: **One sentence can be enough to begin**
+**Message:**
 
-Preheader: **You do not need the whole explanation before you start talking.**
+Hello beehiiv support,
 
-Body:
+I’m preparing Se’kret Bip for the end of its current trial and need exact account-level behavior, not an upgrade recommendation.
 
-# Start smaller than the whole conversation.
+Please confirm:
 
-Sometimes the first sentence is the hardest because we expect it to explain everything.
+1. the exact trial end date, time, and timezone for this publication;
+2. whether a published AI-created podcast episode remains public after downgrade to Launch;
+3. whether the existing podcast RSS feed remains active after downgrade;
+4. whether automations become inactive on Launch and whether queued sends stop;
+5. whether surveys become unpublished on Launch;
+6. whether custom-field values remain present in a Full Subscribers export;
+7. whether Full Subscribers and All Posts exports remain available after downgrade;
+8. whether the normal publication website, built-in welcome email, and standard newsletter signup remain available on Launch without a premium automation.
 
-It does not have to.
+Thank you.
 
-Try this structure:
+Record founder approval before submitting this ticket. Store only the ticket ID and a non-sensitive answer summary in GitHub.
 
-**“I’m not sure how to say this yet, but I do want to talk with you. Can you listen while I figure it out?”**
+#### Gate 8 — Final pre-downgrade export
 
-The words can change. The useful part is the shape: name the difficulty, name the intention, ask for the space you need.
+Run at least 12 hours before the authoritative provider cutoff, or by the conservative fallback deadline, whichever is earlier.
 
-Issue #001 goes deeper into that idea and includes a version for parents and grown-ups too.
+Use distinct filenames:
 
-**Read: The first sentence is usually the hardest**
+- `beehiiv-sekret-bip-final-subscribers-YYYYMMDD-HHMMZ.csv`
+- `beehiiv-sekret-bip-final-posts-YYYYMMDD-HHMMZ.csv`
 
-Se’kret Bip newsletter content is general educational and editorial material. Private product data and newsletter subscriptions stay separate.
+Verify each downloaded file exists and is readable before treating the export as complete.
 
-### Step 3 — Delay 3 days
+## Export privacy, retention, and deletion
 
-Email subject: **What should we send you more of?**
+Subscriber exports contain personal data and must never be committed to GitHub, pasted into issues, or attached to PRs.
 
-Preheader: **Three quick choices. No private story required.**
+Approved handling:
 
-Body:
+- store only in restricted encrypted private storage controlled by the founder or an explicitly authorized operator;
+- keep access limited to migration, backup verification, or deletion handling;
+- record only filename, timestamp, checksum if available, and private-storage label in the provider receipt;
+- delete the first snapshot after the final snapshot is verified unless it is still needed for a documented comparison;
+- delete the final snapshot within 30 days after successful migration/downgrade verification if it is no longer operationally needed;
+- if a subscriber deletion request arrives while an export is retained, remove that subscriber from every retained snapshot or regenerate a sanitized snapshot, then delete the superseded copy;
+- record the purge date and owner without recording subscriber identity in GitHub.
 
-# Help shape the next issues.
+These exports are temporary operational backups, not a permanent audience archive.
 
-Se’kret Bip can talk about a lot of things: short stories, conversation starters, parent perspective, and public build updates.
+## Analytics boundary
 
-Rather than guess what you want, we made a tiny preference survey.
+Use aggregate evidence only where possible:
 
-**Choose what you want more of →**
+- total subscriber count;
+- total signup count;
+- public page visits where available without recipient profiling;
+- aggregate survey response count;
+- operational time saved in synthetic automation tests.
 
-It is three quick multiple-choice questions. Please do not share private family details or personal stories.
-
-Your answers help us make the public newsletter more useful without turning your inbox into noise.
-
-## Export protocol
-
-### First working-path export
-
-After Issue #001 and the signup path are live:
-
-- Settings → Export Data → Export All Subscribers (Full)
-- Settings → Export Data → Export All Posts
-- If a poll is used, export its results separately.
-- Download each completed export immediately.
-
-Store subscriber-level exports in private storage only. Do not add them to this repository.
-
-### Final 24-hour export
-
-Repeat:
-
-- Full Subscribers
-- All Posts
-- poll data if used
-
-Use filenames that preserve provider and date, for example:
-
-- `beehiiv-sekret-bip-subscribers-full-2026-09-14.csv`
-- `beehiiv-sekret-bip-posts-all-2026-09-14.csv`
-
-Record only aggregate counts and filenames in the evidence ledger below.
+Do not create or retain recipient-level open/click histories for teen-identified subscribers. Do not add an age-identifying custom field to make tracking easier.
 
 ## Evidence ledger
 
-Fill this with aggregate evidence only.
+For every gate, record one of:
 
-| Evidence | Baseline | Final pre-downgrade | Proof location |
-| --- | ---: | ---: | --- |
-| Exact trial expiry |  |  | beehiiv Billing & Plan screenshot |
-| Total subscribers |  |  | beehiiv analytics screenshot |
-| Issue #001 delivered |  |  | beehiiv post report |
-| Issue #001 opens |  |  | beehiiv post report |
-| Issue #001 clicks |  |  | beehiiv post report |
-| Survey responses |  |  | beehiiv survey report |
-| Built-in welcome email enabled | no/yes |  | beehiiv Settings → Emails screenshot |
-| Automation enrolled | N/A unless tested |  | beehiiv automation analytics |
-| Automation completed | N/A unless tested |  | beehiiv automation analytics |
-| Podcast episode published | no/yes |  | public episode URL |
-| Podcast RSS captured | no/yes |  | RSS URL |
-| Website/signup live | no/yes |  | public URL |
-| Full subscriber export | no/yes |  | private-storage filename |
-| All-post export | no/yes |  | private-storage filename |
-| Provider downgrade confirmation | no/yes |  | support-ticket screenshot/reference |
+- `VERIFIED` — direct provider/readback evidence exists;
+- `INFERRED` — supported but not directly read back;
+- `UNKNOWN` — not observed;
+- `BLOCKED` — attempted and prevented, with its own receipt;
+- `NOT_APPLICABLE` — intentionally skipped and not required.
+
+Never let one failure receipt stand in for another.
 
 ## Provider run card
 
-Use this order so one incomplete premium feature cannot block a durable one.
+Use this order after authentication:
 
-### Gate 1 — Billing truth
+`Billing truth → built-in welcome preview → Issue #001 preview → founder approval → enable/publish bounded actions → first export → optional podcast → optional survey → optional automation → support ticket → final export → post-downgrade readback`
 
-1. Open **Settings → Billing & Plan**.
-2. Record the exact trial-end date shown by beehiiv.
-3. Do not upgrade or add billing merely to preserve an experiment. The default decision is Launch unless measured evidence justifies paying.
-
-### Gate 2 — Public written asset
-
-1. Open the existing Issue #001 draft from `publication-kit.md`.
-2. Preview desktop and mobile.
-3. Verify the public-content boundary footer is present.
-4. Publish or send.
-5. Copy the public post URL into the evidence ledger.
-
-### Gate 3 — Durable trial-only audio
-
-1. Open **Podcasts** and create the Se’kret Bip show if it does not exist.
-2. Use the trial AI-from-newsletter flow on Issue #001.
-3. Title the episode **The First Sentence**.
-4. Compare the generated result to the canonical podcast script in `publication-kit.md`; reject any invented clinical, private-data, or guaranteed-outcome language.
-5. Publish the episode while the trial is active.
-6. Capture the episode URL and the public RSS feed URL.
-
-### Gate 4 — Durable welcome path and audience preference evidence
-
-1. Configure the built-in welcome email from `publication-kit.md` under **Settings → Emails → Preset Emails**.
-2. Preview desktop and mobile.
-3. Enable the built-in welcome email.
-4. Create the three custom fields exactly as named: `reader_role`, `primary_interest`, `preferred_cadence`.
-5. Build the three-question survey above using choice controls only.
-6. Publish the survey.
-7. Do not make the surviving Launch signup path depend on that survey.
-
-### Gate 5 — Optional automation experiment
-
-1. Run this gate only after the durable P0 gates are complete and only if there is a concrete experiment worth measuring.
-2. Never run the Signed Up automation while the built-in welcome email is enabled for the same path.
-3. If testing it, temporarily choose the automation instead of the built-in welcome email, then restore the built-in welcome email before downgrade.
-4. Create **Se’kret Bip — First 5 Days**.
-5. Trigger on new newsletter subscription.
-6. No re-entry.
-7. Send welcome immediately.
-8. Delay 2 days, then send the useful-idea email.
-9. Delay 3 more days, then send the preference-survey email.
-10. If skipped, record `NOT_APPLICABLE`; it must not block harvest completion.
-
-### Gate 6 — First ownership export
-
-1. Request **Export All Subscribers (Full)**.
-2. Request **Export All Posts**.
-3. Download both completed files immediately.
-4. Store subscriber-level data privately.
-5. Record only filenames and aggregate counts here.
-
-### Gate 7 — Provider statement
-
-Use **Help → submit a support ticket** while the trial still permits ticket access.
-
-Ticket subject:
-
-**Confirm post-trial Launch behavior for Se’kret Bip publication**
-
-Ticket body:
-
-> I am currently using the Max trial and expect to remain on the free Launch plan when it ends. Before the trial closes, please confirm the post-trial behavior for this publication: (1) the built-in single welcome email, (2) a published normal signup flow, (3) a signup flow linked to an automation, (4) existing automations and their analytics, (5) a published survey and its collected custom-field data, (6) an existing public podcast RSS feed and a published AI-created episode, and (7) access to Full Subscriber and All Posts exports after downgrade. I am not asking to preserve paid-only functionality; I want to know exactly what remains live, what becomes read-only or inactive, and what should be exported first. Please also confirm the exact trial-end date/time visible for this workspace if support can see it.
-
-Do not include subscriber data, secrets, private family information, or product-account data in the ticket.
-
-### Gate 8 — Final 24-hour sweep
-
-1. Capture the latest aggregate analytics.
-2. Repeat Full Subscribers and All Posts exports.
-3. Confirm the files are downloaded and recoverable.
-4. Capture current public post, signup, podcast episode, and RSS URLs.
-5. Confirm the built-in welcome email is enabled for the surviving Launch path.
-6. Record the provider support answer.
+If any optional gate fails, record it separately and continue to the next durable gate.
 
 ## Downgrade test
 
-Before calling the harvest complete, verify the public path that must remain after trial:
+After Launch behavior is active, verify independently:
 
-1. public publication page loads;
-2. normal newsletter signup still works without depending on the premium automation;
-3. built-in welcome email remains configured for new subscribers;
-4. Issue #001 remains public;
-5. the published podcast episode and RSS feed still resolve;
-6. repository copy remains the canonical source for future migration;
-7. subscriber exports are recoverable from private storage.
+1. publication homepage loads;
+2. standard signup works without premium automation;
+3. built-in welcome email remains configured if Launch permits it;
+4. Issue #001 remains public if it was published;
+5. podcast episode and RSS state are checked independently;
+6. survey state is checked independently;
+7. export access is checked independently.
 
-If any provider feature disappears, keep the promise and replace only the delivery mechanism.
+Do not collapse these into one “downgrade passed” receipt.
 
 ## Pay-or-cancel decision rule
 
-Do not pay for beehiiv because the trial is ending. Pay only if the evidence proves at least one premium capability is already creating value that cannot be replaced cheaply on Launch.
+Do not pay because the trial is ending.
 
-Upgrade evidence must be concrete, such as:
+A paid plan is justified only by a separately evidenced capability need that cannot be met by Launch or another replaceable delivery mechanism. Optional automation must meet the operational comparison above before it can count as evidence for payment.
 
-- automation materially improves activation or repeat reading;
-- survey segmentation is producing enough useful audience behavior to justify keeping the live survey surface;
-- AI podcast generation saves enough recurring production effort to justify Max;
-- another premium feature is directly responsible for measurable audience growth or retained operating time.
+## Completion rule
 
-If that evidence is absent, remain on Launch, keep the exported audience/content, keep the RSS episode, preserve the automation and copy logic in the repository, and revisit paid beehiiv only when demand earns it.
+The trial harvest is complete when all required durable gates have independent receipts, every external action has a founder-approval receipt, private exports follow the retention policy, and any remaining provider uncertainty is explicitly classified rather than guessed.
