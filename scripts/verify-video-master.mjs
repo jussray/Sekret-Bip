@@ -21,6 +21,19 @@ function parseRate(value) {
   return d ? n / d : NaN;
 }
 
+function assertManifestPolicy(manifest) {
+  if (manifest.$schema !== 'sekret-bip-video-master@v1') fail('UNSUPPORTED_MANIFEST_SCHEMA');
+  if (manifest.editor?.role !== 'post-production-only') fail('EDITOR_AUTHORITY_TOO_BROAD');
+  if (manifest.sourcePolicy?.requireApprovedShotEvidence !== true) fail('APPROVED_SHOT_EVIDENCE_REQUIRED');
+  if (manifest.sourcePolicy?.allowUnapprovedSource !== false) fail('UNAPPROVED_SOURCE_MUST_BE_FORBIDDEN');
+  if (manifest.sourcePolicy?.allowIdentityRegeneration !== false) fail('IDENTITY_REGENERATION_MUST_BE_FORBIDDEN');
+  if (manifest.sourcePolicy?.allowInventedCharacters !== false) fail('INVENTED_CHARACTERS_MUST_BE_FORBIDDEN');
+  if (manifest.sourcePolicy?.allowWorldAuthorityAsCharacterAuthority !== false) fail('WORLD_AUTHORITY_AS_CHARACTER_AUTHORITY_MUST_BE_FORBIDDEN');
+  if (manifest.proof?.playwrightPlayback !== 'required') fail('PLAYWRIGHT_PROOF_MUST_BE_REQUIRED');
+  if (manifest.proof?.continuityReview !== 'required') fail('CONTINUITY_REVIEW_MUST_BE_REQUIRED');
+  if (manifest.proof?.finalMasterApprovalAfterAllProof !== true) fail('FINAL_APPROVAL_MUST_REQUIRE_ALL_PROOF');
+}
+
 const manifestPath = arg('--manifest');
 const mediaPath = arg('--media');
 const receiptPath = arg('--receipt');
@@ -31,10 +44,7 @@ if (!manifestPath || !mediaPath) {
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
-if (manifest.$schema !== 'sekret-bip-video-master@v1') fail('UNSUPPORTED_MANIFEST_SCHEMA');
-if (manifest.editor?.role !== 'post-production-only') fail('EDITOR_AUTHORITY_TOO_BROAD');
-if (manifest.sourcePolicy?.allowIdentityRegeneration !== false) fail('IDENTITY_REGENERATION_MUST_BE_FORBIDDEN');
-if (manifest.proof?.playwrightPlayback !== 'required') fail('PLAYWRIGHT_PROOF_MUST_BE_REQUIRED');
+assertManifestPolicy(manifest);
 if (extname(mediaPath).toLowerCase() !== '.mp4') fail('MASTER_MUST_BE_MP4');
 
 const probe = spawnSync(ffprobe, [
@@ -91,8 +101,9 @@ const receipt = {
     fps: actualFps,
     durationSeconds: duration,
   },
+  sourceApprovalVerified: false,
   requiredNextProof: ['playwright-playback', 'continuity-review'],
-  episodeCookieEligible: false,
+  finalApprovalEligible: false,
 };
 
 if (receiptPath) await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);

@@ -31,16 +31,20 @@ The durable flow is:
 
 ```text
 approved shot clip
-→ shot fingerprint/cookie
+→ shot approval evidence
 → video-use edit
 → final master
 → metadata proof
 → Playwright playback proof
 → continuity review
-→ episode cookie
+→ final master approval
 ```
 
-No episode cookie is issued from metadata or playback alone.
+Shot approval evidence means the source shot has already passed the Short Engine's still/animation canon gates. It is evidence, not a new authority object.
+
+The metadata and playback verifiers do **not** independently validate shot-level approvals. Their receipts therefore emit `sourceApprovalVerified: false`. They prove only their own layer and cannot approve the final episode.
+
+Both receipts carry the SHA-256 of the exact MP4 they inspected. Continuity review must reject the proof set if the metadata and playback hashes do not match the same final master.
 
 ## External tool installation
 

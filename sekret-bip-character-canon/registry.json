@@ -23,6 +23,8 @@
   ],
   "recognition_contract": {
     "principle": "Pairs rhyme, never clone.",
+    "story_character_engine": "docs/SORIAN_CHARACTER_ENGINE.md",
+    "runtime_enrollment_implicit": false,
     "design_contract_is_character_authority": false,
     "world_or_ensemble_art_may_promote_identity": false,
     "silhouette_review_sizes_px": [128, 64],
@@ -92,7 +94,7 @@
       "counterpart": {
         "key": "suhan",
         "display_name": "Suhan",
-        "role": "The Steady Presence",
+        "role": "The Steady",
         "age_lane": "teen",
         "status": "design-contract-approved-reference-pending",
         "instant_read": "Steady presence",
