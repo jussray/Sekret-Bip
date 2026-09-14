@@ -57,6 +57,47 @@ HIGGSFIELD COMPILE:
 
 Never substitute prompt-only descriptions for a bound character element when that character has an approved element.
 
+## Character-recognition membrane
+
+A design contract alone never satisfies character authority.
+
+`registry.json` may describe a future/counterpart character’s intended symbol, palette, silhouette differentiation, or emotional role before an exact isolated visual reference exists. That descriptive contract is useful for review but is **not** permission to generate the character as canon.
+
+For every named character requested in a generated still or clip:
+
+```text
+if character_authority_bound != true:
+    GENERATION_ALLOWED = false
+
+if provider_reference_bound != true:
+    GENERATION_ALLOWED = false
+
+if generation_allowed != true:
+    GENERATION_ALLOWED = false
+```
+
+For Night, Suhana, Sy, Cloud, and any other already approved provider-bound character, compile only the exact canonical element registered for that identity.
+
+For Nyra, Suhan, Sya, or any future counterpart whose registry state is `design-contract-approved-reference-pending`:
+
+```text
+NO prompt-only substitute
+NO ensemble-poster crop promoted to identity
+NO world-reference inference
+NO provider trigger invented from a name
+NO continuity cookie
+```
+
+Promotion requires an exact character-authority reference, provider binding, and the recognition review defined by the character canon. The 128 px and 64 px silhouette tests verify recognizability; they do not replace face, hair, clothing, symbol, accessory, or age-lane review.
+
+Run:
+
+```text
+npm run verify:character-canon
+```
+
+before spending generation credits on a cast that touches the Sorian pair system.
+
 ## Cost membrane
 
 Before any paid generation:
