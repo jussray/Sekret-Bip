@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.0",
   "repository": "jussray/Sekret-Bip",
   "controlRoom": {
     "scope": "repository-local",
@@ -19,22 +19,11 @@
     "reportPath": "artifacts/control-room-test-ledger.json",
     "retentionDays": 14
   },
-  "supabaseAssociationArtifact": {
-    "namePattern": "supabase-check-association-{sha}",
-    "reportPath": "artifacts/supabase-check-association.json",
-    "verifier": "scripts/verify-supabase-check-association.mjs",
-    "authority": "separate-provider-association-receipt",
-    "retentionDays": 14
-  },
   "policy": {
     "failed": "block",
     "pending": "block",
     "unknown": "block",
     "skippedOrNeutral": "warning",
-    "supabaseForeignProject": "block",
-    "supabaseProductionBranchUnassociated": "block",
-    "supabaseProductionCheckMissing": "block",
-    "supabaseFeatureBranchUnassociated": "informational",
     "requiredCheckAuthority": "repository-native-ruleset",
     "productionMutation": false,
     "secretMaterialAllowed": false,

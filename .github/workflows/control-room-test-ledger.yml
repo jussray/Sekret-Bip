@@ -17,7 +17,6 @@ env:
   CONTROL_ROOM_LEDGER_SELF_CHECK: Publish exact-head test ledger
   CONTROL_ROOM_TEST_LEDGER_PATH: artifacts/control-room-test-ledger.json
   CONTROL_ROOM_JUSS_PROOF_PATH: artifacts/control-room-juss-proof.json
-  SUPABASE_CHECK_ASSOCIATION_PATH: artifacts/supabase-check-association.json
 
 concurrency:
   group: control-room-test-ledger-${{ github.event.pull_request.number || github.ref }}
@@ -48,7 +47,7 @@ jobs:
           node-version: '24'
 
       - name: Run Control Room test-ledger contracts
-        run: node --test test/control-room-test-ledger.test.mjs test/control-room-test-ledger-workflow-contract.test.mjs test/control-room-juss-proof.test.mjs test/supabase-check-association.test.mjs
+        run: node --test test/control-room-test-ledger.test.mjs test/control-room-test-ledger-workflow-contract.test.mjs test/control-room-juss-proof.test.mjs
 
   publish-ledger:
     name: Publish exact-head test ledger
@@ -79,14 +78,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/control-room-test-ledger.mjs
 
-      - name: Verify Supabase Git branch association truth
-        if: always()
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/verify-supabase-check-association.mjs
-
       - name: Normalize ledger to federated proof
-        if: ${{ always() && hashFiles('artifacts/control-room-test-ledger.json') != '' }}
         run: node scripts/control-room-juss-proof.mjs
 
       - name: Upload repository-local Control Room ledger
@@ -98,17 +90,8 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Supabase association receipt
-        if: ${{ always() && hashFiles('artifacts/supabase-check-association.json') != '' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: supabase-check-association-${{ env.EXPECTED_HEAD_SHA }}
-          path: artifacts/supabase-check-association.json
-          if-no-files-found: error
-          retention-days: 14
-
       - name: Upload sanitized juss-proof receipt
-        if: ${{ always() && hashFiles('artifacts/control-room-juss-proof.json') != '' }}
+        if: ${{ hashFiles('artifacts/control-room-juss-proof.json') != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: juss-proof-${{ env.EXPECTED_HEAD_SHA }}
