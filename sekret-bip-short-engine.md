@@ -115,6 +115,24 @@ If animation mutates identity, introduces a person, or breaks the world rule, re
 
 Add exact title, captions, logo, and closing line in post-production, not by asking the image/video generator to typeset them into the world.
 
+`browser-use/video-use` is an approved **post-production adapter**, not a canon or character-generation authority. It may assemble already-approved source clips, trim, mix audio, add captions/graphics, and render the master. It must not regenerate character identity, substitute cast, invent a missing shot, or reinterpret a world-only reference as character authority.
+
+For Episode 001 the machine-readable contract is `production/video-use/episode-001.json`.
+
+The post-production proof chain is:
+
+```text
+approved shot clips + shot cookies
+→ video-use assembly/edit
+→ MP4/H.264 master render
+→ ffprobe metadata verification
+→ Playwright playback proof
+→ continuity review
+→ episode cookie
+```
+
+An editor export alone is not proof. A metadata pass alone is not browser proof. Playwright playback proof must show that Chromium decoded the actual master and that playback time advanced. The episode cookie remains ineligible until continuity review also passes.
+
 Master target:
 
 ```text
@@ -122,6 +140,13 @@ Master target:
 9:16 vertical
 30 fps
 MP4 / H.264
+```
+
+Repository verification commands:
+
+```text
+npm run verify:video:master -- --manifest production/video-use/episode-001.json --media <master.mp4> --receipt <metadata-proof.json>
+npm run verify:video:playback -- --manifest production/video-use/episode-001.json --media <master.mp4> --receipt <playback-proof.json>
 ```
 
 ## Final proof-of-canon gate
