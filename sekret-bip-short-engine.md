@@ -122,16 +122,16 @@ For Episode 001 the machine-readable contract is `production/video-use/episode-0
 The post-production proof chain is:
 
 ```text
-approved shot clips + shot cookies
+approved shot clips + shot approval evidence
 → video-use assembly/edit
 → MP4/H.264 master render
 → ffprobe metadata verification
 → Playwright playback proof
 → continuity review
-→ episode cookie
+→ final continuity approval
 ```
 
-An editor export alone is not proof. A metadata pass alone is not browser proof. Playwright playback proof must show that Chromium decoded the actual master and that playback time advanced. The episode cookie remains ineligible until continuity review also passes.
+Shot approval evidence records that the source shot already passed the existing still/animation canon gates; it does not create a new authority object. An editor export alone is not proof. A metadata pass alone is not browser proof. Playwright playback proof must show that Chromium decoded the actual master and that playback time advanced. Final approval remains ineligible until continuity review also passes.
 
 Master target:
 

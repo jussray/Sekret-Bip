@@ -26,6 +26,8 @@ const [mediaBytes, manifestText] = await Promise.all([
   readFile(manifestPath, 'utf8'),
 ]);
 const manifest = JSON.parse(manifestText);
+if (manifest.sourcePolicy?.requireApprovedShotEvidence !== true) fail('APPROVED_SHOT_EVIDENCE_REQUIRED');
+if (manifest.proof?.continuityReview !== 'required') fail('CONTINUITY_REVIEW_MUST_BE_REQUIRED');
 const expected = manifest.master;
 
 const server = createServer((req, res) => {
@@ -102,7 +104,7 @@ try {
     after,
     checks,
     requiredNextProof: ['continuity-review'],
-    episodeCookieEligible: false,
+    finalApprovalEligible: false,
   };
   if (receiptPath) await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(JSON.stringify(receipt, null, 2));

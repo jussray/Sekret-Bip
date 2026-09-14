@@ -31,16 +31,16 @@ The durable flow is:
 
 ```text
 approved shot clip
-→ shot fingerprint/cookie
+→ shot approval evidence
 → video-use edit
 → final master
 → metadata proof
 → Playwright playback proof
 → continuity review
-→ episode cookie
+→ final master approval
 ```
 
-No episode cookie is issued from metadata or playback alone.
+Shot approval evidence means the source shot has already passed the Short Engine's still/animation canon gates. It is evidence, not a new authority object. Metadata and playback proof cannot approve the episode by themselves.
 
 ## External tool installation
 

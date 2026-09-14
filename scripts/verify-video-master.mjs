@@ -33,8 +33,10 @@ if (!manifestPath || !mediaPath) {
 const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 if (manifest.$schema !== 'sekret-bip-video-master@v1') fail('UNSUPPORTED_MANIFEST_SCHEMA');
 if (manifest.editor?.role !== 'post-production-only') fail('EDITOR_AUTHORITY_TOO_BROAD');
+if (manifest.sourcePolicy?.requireApprovedShotEvidence !== true) fail('APPROVED_SHOT_EVIDENCE_REQUIRED');
 if (manifest.sourcePolicy?.allowIdentityRegeneration !== false) fail('IDENTITY_REGENERATION_MUST_BE_FORBIDDEN');
 if (manifest.proof?.playwrightPlayback !== 'required') fail('PLAYWRIGHT_PROOF_MUST_BE_REQUIRED');
+if (manifest.proof?.continuityReview !== 'required') fail('CONTINUITY_REVIEW_MUST_BE_REQUIRED');
 if (extname(mediaPath).toLowerCase() !== '.mp4') fail('MASTER_MUST_BE_MP4');
 
 const probe = spawnSync(ffprobe, [
@@ -92,7 +94,7 @@ const receipt = {
     durationSeconds: duration,
   },
   requiredNextProof: ['playwright-playback', 'continuity-review'],
-  episodeCookieEligible: false,
+  finalApprovalEligible: false,
 };
 
 if (receiptPath) await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
