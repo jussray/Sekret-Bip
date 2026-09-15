@@ -13,10 +13,12 @@ export * from './theme.base';
 const sekretSplashTeen = require('../assets/images/splash-teen.jpeg');
 const sekretSplashParent = require('../assets/images/splash-parent.png');
 
-// Room sprites use the existing teen companion production pipeline. These PNGs
-// are isolated character renders; cinematic identity masters remain runtime
-// identity/fallback assets and must not be pasted over the furnished Room.
-const suhanaRoomSprite = require('../assets/images/companions/teen/raylene/neutral.png');
+// Browser evidence proved the teen/raylene neutral carries a pale card into the
+// furnished Room. Suhana therefore uses the existing production avatar-layer
+// asset documented as already separate from room backgrounds. Sy and Night
+// remain on their existing production companion assets until their own visual
+// receipts prove a change is necessary.
+const suhanaRoomSprite = require('../assets/images/raylene-neutral-new.png');
 const syRoomSprite = require('../assets/images/companions/teen/rylane/neutral.png');
 const nightRoomSprite = require('../assets/images/companions/teen/night/neutral.png');
 
