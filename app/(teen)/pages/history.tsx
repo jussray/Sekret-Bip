@@ -46,6 +46,7 @@ function matchesTypeTab(entry: JournalEntry, tab: TypeTab): boolean {
   if (tab === 'voice') return entry.entryMode === 'voice';
   if (tab === 'video') return entry.mediaType === 'video';
   if (tab === 'scrap') return !!(entry.imageUri && entry.mediaType !== 'video');
+  // journal = typed, no special media
   return entry.entryMode !== 'voice' && !entry.imageUri;
 }
 
@@ -112,6 +113,7 @@ export default function PagesHistoryRoute() {
           <Text style={s.cardDate}>{item.date}</Text>
         </View>
 
+        {/* Voice entry waveform indicator */}
         {item.entryMode === 'voice' ? (
           <View style={s.waveformRow}>
             <Text style={s.waveformIcon}>🎙️</Text>
@@ -149,6 +151,7 @@ export default function PagesHistoryRoute() {
       <LinearGradient colors={['#10091b', '#171024', '#090711']} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
+        {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
             <Text style={s.backBtnText}>‹</Text>
@@ -166,6 +169,7 @@ export default function PagesHistoryRoute() {
           </TouchableOpacity>
         </View>
 
+        {/* Search bar */}
         <View style={s.searchWrap}>
           <TextInput
             value={query}
@@ -177,6 +181,7 @@ export default function PagesHistoryRoute() {
           />
         </View>
 
+        {/* Type tabs: All / journal / voice / scrap / video */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -197,6 +202,7 @@ export default function PagesHistoryRoute() {
           })}
         </ScrollView>
 
+        {/* Companion filter chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -226,6 +232,7 @@ export default function PagesHistoryRoute() {
           })}
         </ScrollView>
 
+        {/* Entry list */}
         <FlatList
           data={displayEntries}
           keyExtractor={e => String(e.id)}
