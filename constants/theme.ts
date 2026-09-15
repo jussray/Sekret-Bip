@@ -12,7 +12,7 @@ export * from './theme.base';
 
 const sekretSplashTeen = require('../assets/images/splash-teen.jpeg');
 const sekretSplashParent = require('../assets/images/splash-parent.png');
-const suhanaFullbody = require('../assets/images/raylene-fullbody.png');
+const suhanaFullbody = require('../assets/images/companions/raylene/raylene-master.png');
 
 export const IMAGES = {
   ...BASE_IMAGES,
