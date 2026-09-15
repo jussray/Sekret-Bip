@@ -16,11 +16,16 @@ test('canonical companion identities preserve only legacy compatibility aliases'
   assert.match(registry, /label: 'Sy'/);
 });
 
-test('public image map binds the Teen Room to the canonical Suhana full-body asset', () => {
+test('public image map binds the Teen Room to the same canonical Suhana master as the runtime registry', () => {
+  assert.match(
+    registry,
+    /const\s+SUHANA_MASTER\s*=\s*require\(["']\.\.\/\.\.\/assets\/images\/companions\/raylene\/raylene-master\.png["']\)/,
+    'The shared runtime registry must own the canonical Suhana master',
+  );
   assert.match(
     themeEntry,
-    /const\s+suhanaFullbody\s*=\s*require\(["']\.\.\/assets\/images\/raylene-fullbody\.png["']\)/,
-    'The public theme boundary must bind the dedicated Suhana full-body asset',
+    /const\s+suhanaFullbody\s*=\s*require\(["']\.\.\/assets\/images\/companions\/raylene\/raylene-master\.png["']\)/,
+    'The public theme boundary must use the same canonical Suhana master as the runtime registry',
   );
   assert.match(
     themeEntry,
@@ -30,7 +35,7 @@ test('public image map binds the Teen Room to the canonical Suhana full-body ass
   assert.match(
     themeEntry,
     /raylene:[\s\S]*fullbody:\s*suhanaFullbody/,
-    'The public avatar map must route the Room fullbody pose to the dedicated asset',
+    'The public avatar map must route the Room fullbody pose to the canonical master',
   );
 });
 
