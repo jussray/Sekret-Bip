@@ -1,60 +1,61 @@
 /**
  * BareRoomRenderer
  *
- * Compatibility renderer for the User Room layer stack.
+ * Production room-art renderer for the User Room layer stack.
  *
- * The previous implementation drew a temporary empty room in React Native.
- * That was useful during extraction work, but it bypassed the production room
- * artwork that already contains the furnished environment and hotspot objects.
+ * The canonical runtime backgrounds are the large room-only PNGs in
+ * assets/images/archive. They preserve the furnished environment and hotspot
+ * geometry without baking a companion into the background. Scene/reference
+ * JPEG composites are design evidence only and must never become runtime art.
  *
- * Keep this component's API stable for UserRoomScreen while restoring the
- * production art-led room backgrounds. Lighting variants still follow the
- * existing RoomPhase grammar, and interaction remains owned by UserRoomScreen.
+ * Keep this component's API stable for UserRoomScreen. The Room owns one
+ * separate companion layer and all interaction geometry remains in
+ * UserRoomScreen.
  */
 
 import React from 'react';
 import { Image, StyleSheet, View, type ImageSourcePropType } from 'react-native';
-import { IMAGES, type Character, type RoomPhase } from '../../constants/theme';
+import { type Character, type RoomPhase } from '../../constants/theme';
 import type { LightingMode } from '../../screens/UserRoomScreen';
 
 type RoomArtMap = Record<RoomPhase, ImageSourcePropType>;
 
 const ROOM_ART: Record<Character, RoomArtMap> = {
   raylene: {
-    day: IMAGES.bgRayleneRoomDay,
-    midday: IMAGES.bgRayleneRoomMidday,
-    afternoon: IMAGES.bgRayleneRoomAfternoon,
-    evening: IMAGES.bgRayleneRoomEvening,
-    rain: IMAGES.bgRayleneRoomRain,
-    night: IMAGES.bgRayleneRoomNight,
-    deepNight: IMAGES.bgRayleneRoomDeepNight,
+    day: require('../../assets/images/archive/bg-raylene-room-day.png'),
+    midday: require('../../assets/images/archive/bg-raylene-room-midday.png'),
+    afternoon: require('../../assets/images/archive/bg-raylene-room-afternoon.png'),
+    evening: require('../../assets/images/archive/bg-raylene-room-evening.png'),
+    rain: require('../../assets/images/archive/bg-raylene-room-rain.png'),
+    night: require('../../assets/images/archive/bg-raylene-room-night.png'),
+    deepNight: require('../../assets/images/archive/bg-raylene-room-deep-night.png'),
   },
   rylane: {
-    day: IMAGES.bgRylaneRoomDay,
-    midday: IMAGES.bgRylaneRoomMidday,
-    afternoon: IMAGES.bgRylaneRoomAfternoon,
-    evening: IMAGES.bgRylaneRoomEvening,
-    rain: IMAGES.bgRylaneRoomRain,
-    night: IMAGES.bgRylaneRoomNight,
-    deepNight: IMAGES.bgRylaneRoomDeepNight,
+    day: require('../../assets/images/archive/bg-rylane-room-day.png'),
+    midday: require('../../assets/images/archive/bg-rylane-room-midday.png'),
+    afternoon: require('../../assets/images/archive/bg-rylane-room-afternoon.png'),
+    evening: require('../../assets/images/archive/bg-rylane-room-evening.png'),
+    rain: require('../../assets/images/archive/bg-rylane-room-rain.png'),
+    night: require('../../assets/images/archive/bg-rylane-room-night.png'),
+    deepNight: require('../../assets/images/archive/bg-rylane-room-deep-night.png'),
   },
   cloud: {
-    day: IMAGES.bgCloudRoomDay,
-    midday: IMAGES.bgCloudRoomMidday,
-    afternoon: IMAGES.bgCloudRoomAfternoon,
-    evening: IMAGES.bgCloudRoomEvening,
-    rain: IMAGES.bgCloudRoomRain,
-    night: IMAGES.bgCloudRoomNight,
-    deepNight: IMAGES.bgCloudRoomDeepNight,
+    day: require('../../assets/images/archive/bg-cloud-room-day.png'),
+    midday: require('../../assets/images/archive/bg-cloud-room-midday.png'),
+    afternoon: require('../../assets/images/archive/bg-cloud-room-afternoon.png'),
+    evening: require('../../assets/images/archive/bg-cloud-room-evening.png'),
+    rain: require('../../assets/images/archive/bg-cloud-room-rain.png'),
+    night: require('../../assets/images/archive/bg-cloud-room-night.png'),
+    deepNight: require('../../assets/images/archive/bg-cloud-room-deep-night.png'),
   },
   night: {
-    day: IMAGES.bgNightRoomDay,
-    midday: IMAGES.bgNightRoomMidday,
-    afternoon: IMAGES.bgNightRoomAfternoon,
-    evening: IMAGES.bgNightRoomEvening,
-    rain: IMAGES.bgNightRoomRain,
-    night: IMAGES.bgNightRoomNight,
-    deepNight: IMAGES.bgNightRoomDeepNight,
+    day: require('../../assets/images/archive/bg-night-room-day.png'),
+    midday: require('../../assets/images/archive/bg-night-room-midday.png'),
+    afternoon: require('../../assets/images/archive/bg-night-room-afternoon.png'),
+    evening: require('../../assets/images/archive/bg-night-room-evening.png'),
+    rain: require('../../assets/images/archive/bg-night-room-rain.png'),
+    night: require('../../assets/images/archive/bg-night-room-night.png'),
+    deepNight: require('../../assets/images/archive/bg-night-room-deep-night.png'),
   },
 };
 

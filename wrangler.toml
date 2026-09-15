@@ -41,8 +41,10 @@ OPENAI_TTS_MODEL  = "gpt-4o-mini-tts"
 OPENAI_STT_MODEL  = "whisper-1"
 
 # Firebase App Check starts disabled. Moving this to `observe` or `enforce`
-# requires FIREBASE_PROJECT_NUMBER and FIREBASE_WEB_APP_ID to be configured
-# on the Worker and exact-runtime evidence for the intended client cohort.
+# requires FIREBASE_PROJECT_NUMBER and FIREBASE_APP_IDS to be configured on
+# the Worker. FIREBASE_APP_IDS is a comma-separated allowlist of Firebase App
+# IDs for the supported clients; legacy FIREBASE_WEB_APP_ID remains accepted
+# during rollout. Exact-runtime evidence is required for every intended cohort.
 # `off` is the one-variable rollback to the pre-App-Check request path.
 FIREBASE_APPCHECK_MODE = "off"
 

@@ -57,6 +57,47 @@ HIGGSFIELD COMPILE:
 
 Never substitute prompt-only descriptions for a bound character element when that character has an approved element.
 
+## Character-recognition membrane
+
+A design contract alone never satisfies character authority.
+
+`registry.json` may describe a future/counterpart character’s intended symbol, palette, silhouette differentiation, or emotional role before an exact isolated visual reference exists. That descriptive contract is useful for review but is **not** permission to generate the character as canon.
+
+For every named character requested in a generated still or clip:
+
+```text
+if character_authority_bound != true:
+    GENERATION_ALLOWED = false
+
+if provider_reference_bound != true:
+    GENERATION_ALLOWED = false
+
+if generation_allowed != true:
+    GENERATION_ALLOWED = false
+```
+
+For Night, Suhana, Sy, Cloud, and any other already approved provider-bound character, compile only the exact canonical element registered for that identity.
+
+For Nyra, Suhan, Sya, or any future counterpart whose registry state is `design-contract-approved-reference-pending`:
+
+```text
+NO prompt-only substitute
+NO ensemble-poster crop promoted to identity
+NO world-reference inference
+NO provider trigger invented from a name
+NO continuity cookie
+```
+
+Promotion requires an exact character-authority reference, provider binding, and the recognition review defined by the character canon. The 128 px and 64 px silhouette tests verify recognizability; they do not replace face, hair, clothing, symbol, accessory, or age-lane review.
+
+Run:
+
+```text
+npm run verify:character-canon
+```
+
+before spending generation credits on a cast that touches the Sorian pair system.
+
 ## Cost membrane
 
 Before any paid generation:
@@ -73,13 +114,15 @@ A low balance is not permission to produce only half of a paired/parallel delive
 `VIDEO_ALLOWED = false` by default.
 
 For each shot, video becomes eligible only after a still has:
-- exact required cast;
+- exact required cast from the active episode authority;
 - approved character fingerprints;
 - no substitute people;
 - correct world palette and architecture;
 - visible episode world rule where applicable;
 - no accidental text/logo baked into the frame unless requested;
 - founder or designated canon-review status `APPROVED`.
+
+For Episode 001, `season-01/01-the-bridge-that-listens.md` is the shot-cast authority. In particular, Shots 5, 6, and 7 require Night, Suhana, Sy, **and Cloud**. A still or animation missing Cloud in those shots is not approved source evidence for the final episode.
 
 ```text
 if still_status != APPROVED:
@@ -96,6 +139,45 @@ For Episode 001:
 
 This interprets the production brief’s “one portal/world keyframe + six episode keyframes” against its seven-shot final storyboard without dropping a shot.
 
+## Animation provider routing
+
+Animation providers are interchangeable execution lanes, not canon authorities. The machine-readable provider contract is `production/video-providers/registry.json`.
+
+The existing Higgsfield route remains the default production route. Hugging Face is an additional canary lane so the production system is not locked to one provider.
+
+A provider is eligible only when it preserves the existing gate:
+
+```text
+approved keyframe + exact cast/character canon
+→ provider preflight
+→ animation canary
+→ identity/cast/world QA
+→ accepted shot clip
+→ post-production
+→ ffprobe master proof
+→ Playwright playback proof
+→ final continuity approval
+```
+
+Provider rules:
+- provider authority is animation-only;
+- a provider cannot invent or promote character identity;
+- text-only character identity is forbidden when an approved character reference/fingerprint exists;
+- provider choice cannot override cast count, character fingerprints, world authority, shot action, or the episode rule;
+- Hugging Face models begin `productionEligible: false` and must pass an exact Bip identity canary before promotion;
+- models with unresolved license/usage status remain ineligible even if technically capable;
+- every generation lane requires cost/allowance preflight before paid or metered execution;
+- a successful model render is not a shot approval and cannot issue final continuity approval by itself.
+
+Repository gate:
+
+```text
+node scripts/verify-video-provider-registry.mjs
+node scripts/verify-video-provider-registry.mjs --select-canary
+```
+
+The first Hugging Face canary candidate is selected from the registry, not hard-coded into episode canon. Changing models later must remain a provider-policy change rather than a character/world-canon rewrite.
+
 ## Animation gate
 
 Only animate an approved keyframe.
@@ -109,7 +191,7 @@ Animation must preserve:
 - camera intent;
 - emotional cause-and-effect.
 
-If animation mutates identity, introduces a person, or breaks the world rule, reject the clip rather than repairing the mistake by generating unrelated replacements.
+If animation mutates identity, introduces a person, drops a required character, or breaks the world rule, reject the clip rather than repairing the mistake by generating unrelated replacements.
 
 ## Post-production boundary
 
