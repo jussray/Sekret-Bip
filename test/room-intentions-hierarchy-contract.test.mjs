@@ -147,10 +147,10 @@ test('Teen Room loads canonical room-only archive PNGs instead of drifted refere
   );
 });
 
-test('Public theme boundary binds the true Suhana fullbody and canonical display names', () => {
+test('Public theme boundary binds the canonical Suhana master and canonical display names', () => {
   assert.ok(
-    themeEntry.includes("const suhanaFullbody = require('../assets/images/raylene-fullbody.png');"),
-    'Suhana must use the real full-body asset rather than a portrait alias',
+    themeEntry.includes("const suhanaFullbody = require('../assets/images/companions/raylene/raylene-master.png');"),
+    'Suhana must use the canonical runtime master rather than a legacy portrait/fullbody alias',
   );
   assert.ok(
     themeEntry.includes('rayleneFullbody: suhanaFullbody'),
@@ -158,7 +158,7 @@ test('Public theme boundary binds the true Suhana fullbody and canonical display
   );
   assert.ok(
     themeEntry.includes('fullbody: suhanaFullbody'),
-    'Public AVATARS must route the Room fullbody pose to the canonical Suhana asset',
+    'Public AVATARS must route the Room fullbody pose to the canonical Suhana master',
   );
   assert.ok(themeEntry.includes('name: "Suhana\'s Room"'));
   assert.ok(themeEntry.includes("name: 'Sy After Dark'"));
