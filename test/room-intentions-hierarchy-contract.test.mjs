@@ -32,11 +32,6 @@ const themeEntry = readFileSync(
   'utf8',
 );
 
-const themeBase = readFileSync(
-  'constants/theme.base.ts',
-  'utf8',
-);
-
 const workflow = readFileSync(
   '.github/workflows/product-design-playwright-proof.yml',
   'utf8',
@@ -152,12 +147,23 @@ test('Teen Room loads canonical room-only archive PNGs instead of drifted refere
   );
 });
 
-test('Room reuses the existing base full-body asset rather than overriding it in the public theme entry', () => {
-  assert.match(
-    themeBase,
-    /const\s+rayleneFullbody\s*=\s*require\(["']\.\.\/assets\/images\/raylene-confident-new\.png["']\)/,
+test('Public theme boundary binds the true Suhana fullbody and canonical display names', () => {
+  assert.ok(
+    themeEntry.includes("const suhanaFullbody = require('../assets/images/raylene-fullbody.png');"),
+    'Suhana must use the real full-body asset rather than a portrait alias',
   );
-  assert.doesNotMatch(themeEntry, /raylene-fullbody\.png/);
+  assert.ok(
+    themeEntry.includes('rayleneFullbody: suhanaFullbody'),
+    'Public IMAGES must override the legacy raylene fullbody alias',
+  );
+  assert.ok(
+    themeEntry.includes('fullbody: suhanaFullbody'),
+    'Public AVATARS must route the Room fullbody pose to the canonical Suhana asset',
+  );
+  assert.ok(themeEntry.includes('name: "Suhana\'s Room"'));
+  assert.ok(themeEntry.includes("name: 'Sy After Dark'"));
+  assert.ok(themeEntry.includes("name: 'Suhana'"));
+  assert.ok(themeEntry.includes("name: 'Sy'"));
 });
 
 test('Product Design proof watches the composition surfaces', () => {
