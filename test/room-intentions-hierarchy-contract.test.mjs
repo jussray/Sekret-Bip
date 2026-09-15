@@ -111,7 +111,7 @@ test('Room owns one canonical companion visual with a separate bounded tap targe
   );
   assert.ok(
     roomScreen.includes('const cSrc        = safe(AVATARS[cId]?.fullbody, cRuntime.source ?? cPoseSrc);'),
-    'Room staging must prefer the full-body pose while retaining canonical runtime fallback authority',
+    'Room staging must prefer the public fullbody alias while retaining canonical runtime fallback authority',
   );
   assert.doesNotMatch(roomScreen, /const COMPANION_POSITIONS/);
 });
@@ -147,19 +147,23 @@ test('Teen Room loads canonical room-only archive PNGs instead of drifted refere
   );
 });
 
-test('Public theme boundary binds the canonical Suhana master and canonical display names', () => {
+test('Public theme boundary binds production isolated Room sprites and canonical display names', () => {
   assert.ok(
-    themeEntry.includes("const suhanaFullbody = require('../assets/images/companions/raylene/raylene-master.png');"),
-    'Suhana must use the canonical runtime master rather than a legacy portrait/fullbody alias',
+    themeEntry.includes("const suhanaRoomSprite = require('../assets/images/companions/teen/raylene/neutral.png');"),
+    'Suhana Room sprite must use the production isolated teen companion asset',
   );
   assert.ok(
-    themeEntry.includes('rayleneFullbody: suhanaFullbody'),
-    'Public IMAGES must override the legacy raylene fullbody alias',
+    themeEntry.includes("const syRoomSprite = require('../assets/images/companions/teen/rylane/neutral.png');"),
+    'Sy Room sprite must use the production isolated teen companion asset',
   );
   assert.ok(
-    themeEntry.includes('fullbody: suhanaFullbody'),
-    'Public AVATARS must route the Room fullbody pose to the canonical Suhana master',
+    themeEntry.includes("const nightRoomSprite = require('../assets/images/companions/teen/night/neutral.png');"),
+    'Night Room sprite must use the production isolated teen companion asset',
   );
+  assert.ok(themeEntry.includes('rayleneFullbody: suhanaRoomSprite'));
+  assert.ok(themeEntry.includes('rylaneFullbody: syRoomSprite'));
+  assert.ok(themeEntry.includes('nightFullbody: nightRoomSprite'));
+  assert.doesNotMatch(themeEntry, /raylene-master\.png/);
   assert.ok(themeEntry.includes('name: "Suhana\'s Room"'));
   assert.ok(themeEntry.includes("name: 'Sy After Dark'"));
   assert.ok(themeEntry.includes("name: 'Suhana'"));
