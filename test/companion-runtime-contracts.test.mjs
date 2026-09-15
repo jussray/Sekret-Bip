@@ -7,7 +7,6 @@ const sprite = await readFile(new URL('../src/components/room/character/SekretSp
 const layer = await readFile(new URL('../src/components/room/character/CharacterLayer.tsx', import.meta.url), 'utf8');
 const userRoom = await readFile(new URL('../screens/UserRoomScreen.tsx', import.meta.url), 'utf8');
 const themeEntry = await readFile(new URL('../constants/theme.ts', import.meta.url), 'utf8');
-const themeBase = await readFile(new URL('../constants/theme.base.ts', import.meta.url), 'utf8');
 
 test('canonical companion identities preserve only legacy compatibility aliases', () => {
   assert.match(registry, /type CompanionId = 'night' \| 'suhana' \| 'sy' \| 'cloud' \| 'mom' \| 'dad'/);
@@ -17,15 +16,21 @@ test('canonical companion identities preserve only legacy compatibility aliases'
   assert.match(registry, /label: 'Sy'/);
 });
 
-test('public image map preserves the existing Suhana full-body asset authority', () => {
+test('public image map binds the Teen Room to the canonical Suhana full-body asset', () => {
   assert.match(
-    themeBase,
-    /const\s+rayleneFullbody\s*=\s*require\(["']\.\.\/assets\/images\/raylene-confident-new\.png["']\)/,
-  );
-  assert.doesNotMatch(
     themeEntry,
-    /raylene-fullbody\.png/,
-    'The public theme entry must not replace the proven base full-body asset with the cropped legacy file',
+    /const\s+suhanaFullbody\s*=\s*require\(["']\.\.\/assets\/images\/raylene-fullbody\.png["']\)/,
+    'The public theme boundary must bind the dedicated Suhana full-body asset',
+  );
+  assert.match(
+    themeEntry,
+    /rayleneFullbody:\s*suhanaFullbody/,
+    'The public image map must override the legacy fullbody alias',
+  );
+  assert.match(
+    themeEntry,
+    /raylene:[\s\S]*fullbody:\s*suhanaFullbody/,
+    'The public avatar map must route the Room fullbody pose to the dedicated asset',
   );
 });
 
