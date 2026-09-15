@@ -12,6 +12,21 @@ const roomScreen = readFileSync(
   'utf8',
 );
 
+const roomRenderer = readFileSync(
+  'components/rooms/BareRoomRenderer.tsx',
+  'utf8',
+);
+
+const roomArtGuide = readFileSync(
+  'docs/ROOM_ART_GUIDE.md',
+  'utf8',
+);
+
+const roomAssetMap = readFileSync(
+  'ROOM_ASSET_MAP.md',
+  'utf8',
+);
+
 const themeEntry = readFileSync(
   'constants/theme.ts',
   'utf8',
@@ -104,6 +119,37 @@ test('Room owns one canonical companion visual with a separate bounded tap targe
     'Room staging must prefer the full-body pose while retaining canonical runtime fallback authority',
   );
   assert.doesNotMatch(roomScreen, /const COMPANION_POSITIONS/);
+});
+
+test('Teen Room loads canonical room-only archive PNGs instead of drifted reference composites', () => {
+  for (const key of ['raylene', 'rylane', 'cloud', 'night']) {
+    assert.ok(
+      roomRenderer.includes(`../../assets/images/archive/bg-${key}-room-day.png`),
+      `${key} must load its canonical archive room background`,
+    );
+  }
+  assert.doesNotMatch(
+    roomRenderer,
+    /IMAGES\.bg(?:Raylene|Rylane|Cloud|Night)Room/,
+    'User Room must not inherit the resized theme background mapping',
+  );
+  assert.doesNotMatch(
+    roomRenderer,
+    /-scene\.jpg/,
+    'Scene/reference composites must never become User Room runtime backgrounds',
+  );
+  assert.ok(
+    roomAssetMap.includes('Do not render in production UI.'),
+    'The asset inventory must keep scene composites below production authority',
+  );
+  assert.ok(
+    roomArtGuide.includes('Production room backgrounds stay room-only. Do not bake a second companion into the background.'),
+    'The art guide must preserve the single-companion composition boundary',
+  );
+  assert.ok(
+    roomArtGuide.includes('The Teen User Room may render exactly one canonical companion visual above the room background'),
+    'The art guide must agree with the runtime companion-layer contract',
+  );
 });
 
 test('Room reuses the existing base full-body asset rather than overriding it in the public theme entry', () => {
