@@ -20,11 +20,11 @@ import { useAppContext } from '@/context/AppContext';
 import type { JournalEntry } from '@/types';
 
 const COMPANION_META: Record<string, { label: string; accent: string; emoji: string }> = {
-  raylene: { label: 'Raylene', accent: '#f08bc5', emoji: '💜' },
-  rylane:  { label: 'Rylane',  accent: '#76a7ff', emoji: '⚡' },
-  cloud:   { label: 'Cloud',   accent: '#8ed9e7', emoji: '☁️' },
-  night:   { label: 'Night',   accent: '#9a8ee8', emoji: '🌙' },
-  me:      { label: 'Me',      accent: '#b8a9c9', emoji: '🪞' },
+  raylene: { label: 'Suhana', accent: '#f08bc5', emoji: '💜' },
+  rylane:  { label: 'Sy',     accent: '#76a7ff', emoji: '⚡' },
+  cloud:   { label: 'Cloud',  accent: '#8ed9e7', emoji: '☁️' },
+  night:   { label: 'Night',  accent: '#9a8ee8', emoji: '🌙' },
+  me:      { label: 'Me',     accent: '#b8a9c9', emoji: '🪞' },
   oracle:  { label: 'Joseema', accent: '#c7b87a', emoji: '🔮' },
 };
 
@@ -46,7 +46,6 @@ function matchesTypeTab(entry: JournalEntry, tab: TypeTab): boolean {
   if (tab === 'voice') return entry.entryMode === 'voice';
   if (tab === 'video') return entry.mediaType === 'video';
   if (tab === 'scrap') return !!(entry.imageUri && entry.mediaType !== 'video');
-  // journal = typed, no special media
   return entry.entryMode !== 'voice' && !entry.imageUri;
 }
 
@@ -113,7 +112,6 @@ export default function PagesHistoryRoute() {
           <Text style={s.cardDate}>{item.date}</Text>
         </View>
 
-        {/* Voice entry waveform indicator */}
         {item.entryMode === 'voice' ? (
           <View style={s.waveformRow}>
             <Text style={s.waveformIcon}>🎙️</Text>
@@ -151,7 +149,6 @@ export default function PagesHistoryRoute() {
       <LinearGradient colors={['#10091b', '#171024', '#090711']} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
-        {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
             <Text style={s.backBtnText}>‹</Text>
@@ -169,7 +166,6 @@ export default function PagesHistoryRoute() {
           </TouchableOpacity>
         </View>
 
-        {/* Search bar */}
         <View style={s.searchWrap}>
           <TextInput
             value={query}
@@ -181,7 +177,6 @@ export default function PagesHistoryRoute() {
           />
         </View>
 
-        {/* Type tabs: All / journal / voice / scrap / video */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -202,7 +197,6 @@ export default function PagesHistoryRoute() {
           })}
         </ScrollView>
 
-        {/* Companion filter chips */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -232,7 +226,6 @@ export default function PagesHistoryRoute() {
           })}
         </ScrollView>
 
-        {/* Entry list */}
         <FlatList
           data={displayEntries}
           keyExtractor={e => String(e.id)}
