@@ -12,13 +12,23 @@ const roomScreen = readFileSync(
   'utf8',
 );
 
-const themeEntry = readFileSync(
-  'constants/theme.ts',
+const roomRenderer = readFileSync(
+  'components/rooms/BareRoomRenderer.tsx',
   'utf8',
 );
 
-const themeBase = readFileSync(
-  'constants/theme.base.ts',
+const roomArtGuide = readFileSync(
+  'docs/ROOM_ART_GUIDE.md',
+  'utf8',
+);
+
+const roomAssetMap = readFileSync(
+  'ROOM_ASSET_MAP.md',
+  'utf8',
+);
+
+const themeEntry = readFileSync(
+  'constants/theme.ts',
   'utf8',
 );
 
@@ -101,17 +111,72 @@ test('Room owns one canonical companion visual with a separate bounded tap targe
   );
   assert.ok(
     roomScreen.includes('const cSrc        = safe(AVATARS[cId]?.fullbody, cRuntime.source ?? cPoseSrc);'),
-    'Room staging must prefer the full-body pose while retaining canonical runtime fallback authority',
+    'Room staging must prefer the public fullbody alias while retaining canonical runtime fallback authority',
   );
   assert.doesNotMatch(roomScreen, /const COMPANION_POSITIONS/);
 });
 
-test('Room reuses the existing base full-body asset rather than overriding it in the public theme entry', () => {
-  assert.match(
-    themeBase,
-    /const\s+rayleneFullbody\s*=\s*require\(["']\.\.\/assets\/images\/raylene-confident-new\.png["']\)/,
+test('Teen Room loads canonical room-only archive PNGs instead of drifted reference composites', () => {
+  for (const key of ['raylene', 'rylane', 'cloud', 'night']) {
+    assert.ok(
+      roomRenderer.includes(`../../assets/images/archive/bg-${key}-room-day.png`),
+      `${key} must load its canonical archive room background`,
+    );
+  }
+  assert.doesNotMatch(
+    roomRenderer,
+    /IMAGES\.bg(?:Raylene|Rylane|Cloud|Night)Room/,
+    'User Room must not inherit the resized theme background mapping',
   );
-  assert.doesNotMatch(themeEntry, /raylene-fullbody\.png/);
+  assert.doesNotMatch(
+    roomRenderer,
+    /-scene\.jpg/,
+    'Scene/reference composites must never become User Room runtime backgrounds',
+  );
+  assert.ok(
+    roomAssetMap.includes('Do not render in production UI.'),
+    'The asset inventory must keep scene composites below production authority',
+  );
+  assert.ok(
+    roomArtGuide.includes('Production room backgrounds stay room-only. Do not bake a second companion into the background.'),
+    'The art guide must preserve the single-companion composition boundary',
+  );
+  assert.ok(
+    roomArtGuide.includes('The Teen User Room may render exactly one canonical companion visual above the room background'),
+    'The art guide must agree with the runtime companion-layer contract',
+  );
+});
+
+test('Public theme boundary uses the separated Suhana production avatar and preserves canonical display names', () => {
+  assert.ok(
+    roomAssetMap.includes('assets/images/raylene-neutral-new.png'),
+    'The asset inventory must retain Suhana neutral as a production character asset',
+  );
+  assert.ok(
+    roomAssetMap.includes('These are already separate from room backgrounds.'),
+    'The asset inventory must retain the avatar-layer separation contract',
+  );
+  assert.ok(
+    themeEntry.includes("const suhanaRoomSprite = require('../assets/images/raylene-neutral-new.png');"),
+    'Suhana Room sprite must use the documented separated production avatar layer',
+  );
+  assert.ok(
+    themeEntry.includes("const syRoomSprite = require('../assets/images/companions/teen/rylane/neutral.png');"),
+    'Sy Room sprite must remain unchanged without a Sy-specific failing receipt',
+  );
+  assert.ok(
+    themeEntry.includes("const nightRoomSprite = require('../assets/images/companions/teen/night/neutral.png');"),
+    'Night Room sprite must remain unchanged without a Night-specific failing receipt',
+  );
+  assert.ok(themeEntry.includes('rayleneFullbody: suhanaRoomSprite'));
+  assert.ok(themeEntry.includes('rylaneFullbody: syRoomSprite'));
+  assert.ok(themeEntry.includes('nightFullbody: nightRoomSprite'));
+  assert.doesNotMatch(themeEntry, /companions\/teen\/raylene\/neutral\.png/);
+  assert.doesNotMatch(themeEntry, /raylene-master\.png/);
+  assert.ok(themeEntry.includes('name: "Suhana\'s Room"'));
+  assert.ok(themeEntry.includes("name: 'Sy After Dark'"));
+  assert.ok(themeEntry.includes("name: 'Suhana'"));
+  assert.ok(themeEntry.includes("name: 'Sy'"));
 });
 
 test('Product Design proof watches the composition surfaces', () => {

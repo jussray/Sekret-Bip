@@ -1,0 +1,53 @@
+{
+  "$schema": "sekret-bip-video-master@v1",
+  "episode": "season-01/01-the-bridge-that-listens.md",
+  "title": "The Bridge That Listens",
+  "editor": {
+    "adapter": "video-use",
+    "repository": "browser-use/video-use",
+    "role": "post-production-only"
+  },
+  "master": {
+    "container": "mp4",
+    "codec": "h264",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationSeconds": 25,
+    "durationToleranceSeconds": 0.2
+  },
+  "sourcePolicy": {
+    "requiredShots": [1, 2, 3, 4, 5, 6, 7],
+    "requireApprovedShotEvidence": true,
+    "allowUnapprovedSource": false,
+    "allowIdentityRegeneration": false,
+    "allowInventedCharacters": false,
+    "allowWorldAuthorityAsCharacterAuthority": false
+  },
+  "postProduction": {
+    "allow": [
+      "trim",
+      "reorder-within-approved-story",
+      "audio-mix",
+      "voiceover",
+      "captions",
+      "logo",
+      "closing-line",
+      "color-adjustment",
+      "deterministic-motion-graphics"
+    ],
+    "forbid": [
+      "face-regeneration",
+      "character-substitution",
+      "new-character-generation",
+      "world-rule-rewrite",
+      "baked-generated-typography-as-canon"
+    ]
+  },
+  "proof": {
+    "metadataVerification": "required",
+    "playwrightPlayback": "required",
+    "continuityReview": "required",
+    "finalMasterApprovalAfterAllProof": true
+  }
+}

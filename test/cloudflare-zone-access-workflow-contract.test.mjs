@@ -19,6 +19,10 @@ test('public front-door audit keeps PR contracts secretless and Production provi
     'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020',
     'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
     'actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093',
+    'artifact-ids: ${{ needs.provider_audit.outputs.evidence_artifact_id }}',
+    'github-token: ${{ github.token }}',
+    'repository: ${{ github.repository }}',
+    'run-id: ${{ github.run_id }}',
     'CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}',
     'CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_BINDING_READ_API_TOKEN }}',
     'scripts/audit-cloudflare-app-binding-authority.mjs',
@@ -101,6 +105,9 @@ test('public front-door audit keeps PR contracts secretless and Production provi
   assert.ok(publisherJob.includes('permissions:\n      contents: read\n      actions: read\n      issues: write'), 'ledger publisher must carry only GitHub evidence-publication permissions');
   assert.ok(publisherJob.includes("github.event_name != 'pull_request'"), 'ledger publisher must never run on pull_request');
   assert.ok(publisherJob.includes('needs.provider_audit.outputs.evidence_artifact_id'), 'ledger publisher must consume only the immutable artifact from the Production provider job');
+  assert.ok(publisherJob.includes('github-token: ${{ github.token }}'), 'ledger publisher must use its scoped actions:read token for rerun-safe artifact retrieval');
+  assert.ok(publisherJob.includes('repository: ${{ github.repository }}'), 'ledger publisher artifact retrieval must stay bound to this repository');
+  assert.ok(publisherJob.includes('run-id: ${{ github.run_id }}'), 'ledger publisher artifact retrieval must stay bound to this workflow run');
   assert.ok(publisherJob.includes('cloudflare-app-binding-authority.json'), 'ledger publisher must read the binding receipt rather than infer provider state');
   assert.ok(publisherJob.includes("method = existing ? 'PATCH' : 'POST'"), 'ledger publication must update the exact-main marker instead of blindly duplicating it');
   assert.ok(!publisherJob.includes('CLOUDFLARE_API_TOKEN'), 'ledger publisher must never receive a Cloudflare API token');
