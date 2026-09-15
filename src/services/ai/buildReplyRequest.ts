@@ -16,6 +16,10 @@ import {
   normalizeOracleProfile,
 } from '../../../services/oracleDiscovery';
 import {
+  buildWellbeingContext,
+  loadWellbeingState,
+} from '../../../services/wellbeingState';
+import {
   getConversationPhase,
   buildConversationPhaseInstruction,
   isArrivalMessage,
@@ -79,16 +83,20 @@ async function resolveOracleContext(explicit?: string[]): Promise<string[]> {
 
 /**
  * Load + advance the teen relationship profile, compute conversation phase,
- * recover bounded structured Oracle context, and assemble the reply request.
+ * recover bounded structured Oracle and wellbeing context, and assemble the
+ * reply request. Wellbeing context is a projection of existing user activity,
+ * not a diagnosis or a second clinical record.
  */
 export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<BuiltReplyRequest> {
   const history = ctx.history ?? [];
   const historyLength = history.length;
 
-  const [currentRelationship, oracleContext] = await Promise.all([
+  const [currentRelationship, oracleContext, wellbeingState] = await Promise.all([
     loadTeenRelationshipProfile(),
     resolveOracleContext(ctx.oracleContext),
+    loadWellbeingState(),
   ]);
+  const wellbeingContext = buildWellbeingContext(wellbeingState);
   const relationship = learnTeenRelationshipStyle(ctx.text, currentRelationship);
   await saveTeenRelationshipProfile(relationship);
 
@@ -105,6 +113,12 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
   const memory: Record<string, unknown> = {
     relationshipStyle: relationshipProfileToOracleNote(relationship),
     ...(oracleContext.length > 0 ? { oracleContext } : {}),
+    ...(wellbeingContext.length > 0 ? {
+      wellbeingContext: {
+        policy: 'Tentative, user-controlled observations only. Never diagnose, label, score, or treat these as clinical facts.',
+        observations: wellbeingContext,
+      },
+    } : {}),
     ...(ctx.extraMemory ?? {}),
   };
 
