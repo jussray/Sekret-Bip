@@ -13,6 +13,8 @@ on:
       - 'worker/**'
       - 'security/**'
       - 'config/founder-visual-authority.json'
+      - 'sekret-bip-character-canon/**'
+      - 'sekret-bip-short-engine.md'
       - 'supabase/migrations/**'
       - 'public/_headers'
       - 'public/robots.txt'
@@ -26,7 +28,10 @@ on:
       - 'scripts/reconcile-cloudflare-public-apex-access.mjs'
       - 'scripts/codeql-pr-alert-proof.mjs'
       - 'scripts/playwright-executable.mjs'
+      - 'scripts/verify-character-canon.mjs'
       - 'e2e/product-design-review.spec.ts'
+      - 'e2e/privacy-wording-accuracy.spec.ts'
+      - 'e2e/front-door-scene-arrival.spec.ts'
       - 'e2e/front-door-audience-switch.spec.ts'
       - 'e2e/calm-product-design.spec.ts'
       - 'e2e/room-canonical-display.spec.ts'
@@ -36,14 +41,17 @@ on:
       - 'e2e/ai-search-discovery.spec.ts'
       - 'test/founder-visual-authority-contract.test.mjs'
       - 'test/product-design-workflow-contract.test.mjs'
+      - 'test/visual-wonder-contract.test.mjs'
       - 'test/room-intentions-hierarchy-contract.test.mjs'
       - 'test/pages-companion-asset-contract.test.mjs'
       - 'test/night-room-runtime-registry.test.mjs'
       - 'test/companion-runtime-contracts.test.mjs'
+      - 'test/sorian-character-engine-contract.test.mjs'
       - 'test/dual-front-door-contract.test.mjs'
       - 'test/front-door-motion-contract.test.mjs'
       - 'test/voice-presence-motion-contract.test.mjs'
       - 'test/calm-companion-motion-contract.test.mjs'
+      - 'test/character-recognition-gate.test.mjs'
       - 'test/worker-auth.test.mjs'
       - 'test/cloudflare-worker-consolidation.test.mjs'
       - 'playwright.config.ts'
@@ -96,8 +104,11 @@ jobs:
       - name: Type-check exact head
         run: npm run type-check
 
+      - name: Verify character canon gate
+        run: npm run verify:character-canon
+
       - name: Verify Product Design contracts
-        run: node --test test/founder-visual-authority-contract.test.mjs test/product-design-workflow-contract.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/pages-companion-asset-contract.test.mjs test/night-room-runtime-registry.test.mjs test/companion-runtime-contracts.test.mjs test/dual-front-door-contract.test.mjs test/front-door-motion-contract.test.mjs test/voice-presence-motion-contract.test.mjs test/calm-companion-motion-contract.test.mjs
+        run: node --test test/founder-visual-authority-contract.test.mjs test/product-design-workflow-contract.test.mjs test/visual-wonder-contract.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/pages-companion-asset-contract.test.mjs test/night-room-runtime-registry.test.mjs test/companion-runtime-contracts.test.mjs test/sorian-character-engine-contract.test.mjs test/dual-front-door-contract.test.mjs test/front-door-motion-contract.test.mjs test/voice-presence-motion-contract.test.mjs test/calm-companion-motion-contract.test.mjs test/character-recognition-gate.test.mjs
 
       - run: npx playwright install --with-deps chromium
 
@@ -106,7 +117,7 @@ jobs:
           CI: 'true'
           PLAYWRIGHT_ARTIFACT_DIR: artifacts/product-design-playwright
           EXPO_PUBLIC_ENABLE_FOUNDER_PREVIEW: 'true'
-        run: npx playwright test e2e/product-design-review.spec.ts e2e/front-door-audience-switch.spec.ts e2e/calm-product-design.spec.ts e2e/room-canonical-display.spec.ts e2e/canonical-companion-identity.spec.ts e2e/cinematic-dossier.spec.ts e2e/guardrails.spec.ts e2e/ai-search-discovery.spec.ts --project=chromium
+        run: npx playwright test e2e/product-design-review.spec.ts e2e/privacy-wording-accuracy.spec.ts e2e/front-door-scene-arrival.spec.ts e2e/front-door-audience-switch.spec.ts e2e/calm-product-design.spec.ts e2e/room-canonical-display.spec.ts e2e/canonical-companion-identity.spec.ts e2e/cinematic-dossier.spec.ts e2e/guardrails.spec.ts e2e/ai-search-discovery.spec.ts --project=chromium
 
       - name: Upload Product Design evidence
         if: always()
