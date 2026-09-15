@@ -7,6 +7,8 @@ const sprite = await readFile(new URL('../src/components/room/character/SekretSp
 const layer = await readFile(new URL('../src/components/room/character/CharacterLayer.tsx', import.meta.url), 'utf8');
 const userRoom = await readFile(new URL('../screens/UserRoomScreen.tsx', import.meta.url), 'utf8');
 const themeEntry = await readFile(new URL('../constants/theme.ts', import.meta.url), 'utf8');
+const companionImages = await readFile(new URL('../src/constants/companionImages.ts', import.meta.url), 'utf8');
+const companionManifest = await readFile(new URL('../src/constants/companionManifest.ts', import.meta.url), 'utf8');
 
 test('canonical companion identities preserve only legacy compatibility aliases', () => {
   assert.match(registry, /type CompanionId = 'night' \| 'suhana' \| 'sy' \| 'cloud' \| 'mom' \| 'dad'/);
@@ -16,27 +18,36 @@ test('canonical companion identities preserve only legacy compatibility aliases'
   assert.match(registry, /label: 'Sy'/);
 });
 
-test('public image map binds the Teen Room to the same canonical Suhana master as the runtime registry', () => {
-  assert.match(
-    registry,
-    /const\s+SUHANA_MASTER\s*=\s*require\(["']\.\.\/\.\.\/assets\/images\/companions\/raylene\/raylene-master\.png["']\)/,
-    'The shared runtime registry must own the canonical Suhana master',
-  );
-  assert.match(
-    themeEntry,
-    /const\s+suhanaFullbody\s*=\s*require\(["']\.\.\/assets\/images\/companions\/raylene\/raylene-master\.png["']\)/,
-    'The public theme boundary must use the same canonical Suhana master as the runtime registry',
-  );
-  assert.match(
-    themeEntry,
-    /rayleneFullbody:\s*suhanaFullbody/,
-    'The public image map must override the legacy fullbody alias',
-  );
-  assert.match(
-    themeEntry,
-    /raylene:[\s\S]*fullbody:\s*suhanaFullbody/,
-    'The public avatar map must route the Room fullbody pose to the canonical master',
-  );
+test('Teen Room fullbody aliases use production isolated companion sprites, not cinematic masters', () => {
+  for (const [legacyId, roomConst] of [
+    ['raylene', 'suhanaRoomSprite'],
+    ['rylane', 'syRoomSprite'],
+    ['night', 'nightRoomSprite'],
+  ]) {
+    assert.match(
+      companionImages,
+      new RegExp(`${legacyId}:[\\s\\S]*neutral: require\\(['\"]\\.\\.\\/\\.\\.\\/assets\\/images\\/companions\\/teen\\/${legacyId}\\/neutral\\.png['\"]\\)`),
+      `${legacyId} neutral sprite must exist in the production teen companion registry`,
+    );
+    assert.match(
+      companionManifest,
+      new RegExp(`${legacyId}: buildEntries\\('${legacyId}', \\{ neutral: 'production' \\}\\)`),
+      `${legacyId} neutral sprite must be marked production`,
+    );
+    assert.match(
+      themeEntry,
+      new RegExp(`const\\s+${roomConst}\\s*=\\s*require\\(['\"]\\.\\.\\/assets\\/images\\/companions\\/teen\\/${legacyId}\\/neutral\\.png['\"]\\)`),
+      `${legacyId} Room sprite must consume the production isolated neutral asset`,
+    );
+  }
+
+  assert.match(themeEntry, /rayleneFullbody:\s*suhanaRoomSprite/);
+  assert.match(themeEntry, /rylaneFullbody:\s*syRoomSprite/);
+  assert.match(themeEntry, /nightFullbody:\s*nightRoomSprite/);
+  assert.match(themeEntry, /raylene:[\s\S]*fullbody:\s*suhanaRoomSprite/);
+  assert.match(themeEntry, /rylane:[\s\S]*fullbody:\s*syRoomSprite/);
+  assert.match(themeEntry, /night:[\s\S]*fullbody:\s*nightRoomSprite/);
+  assert.doesNotMatch(themeEntry, /raylene-master\.png/);
 });
 
 test('Teen Room uses the canonical runtime label at user-facing legacy-key boundaries', () => {
