@@ -1,5 +1,6 @@
 import React, { type PropsWithChildren, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Platform, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
 import { FRONT_DOOR_THEME } from '@/constants/frontDoorTheme';
@@ -159,6 +160,16 @@ export function FrontDoorSceneArrival({ children }: PropsWithChildren) {
       accessibilityValue={{ text: arrivalState }}
       style={[styles.scene, sceneStyle]}
     >
+      <LinearGradient
+        testID="web-welcome-quality-backdrop"
+        pointerEvents="none"
+        accessible={false}
+        colors={FRONT_DOOR_THEME.gradient.cinematicBackdrop}
+        start={{ x: 0.06, y: 0 }}
+        end={{ x: 0.94, y: 1 }}
+        style={styles.qualityBackdrop}
+      />
+
       {arrivalState === 'entering' ? (
         <Animated.View
           testID="web-welcome-caveman-visual"
@@ -246,6 +257,31 @@ export function FrontDoorSceneArrival({ children }: PropsWithChildren) {
       ) : null}
 
       {children}
+
+      <LinearGradient
+        testID="web-welcome-quality-wash"
+        pointerEvents="none"
+        accessible={false}
+        colors={FRONT_DOOR_THEME.gradient.cinematicWash}
+        start={{ x: 0, y: 0.38 }}
+        end={{ x: 1, y: 0.62 }}
+        style={styles.qualityWash}
+      />
+      <LinearGradient
+        testID="web-welcome-quality-vignette"
+        pointerEvents="none"
+        accessible={false}
+        colors={FRONT_DOOR_THEME.gradient.cinematicVignette}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={styles.qualityVignette}
+      />
+      <Animated.View
+        testID="web-welcome-quality-rim"
+        pointerEvents="none"
+        accessible={false}
+        style={styles.qualityRim}
+      />
     </Animated.View>
   );
 }
@@ -255,10 +291,47 @@ const { color, RADIUS, SPACE, TYPE } = FRONT_DOOR_THEME;
 const styles = StyleSheet.create({
   scene: {
     flex: 1,
+    position: 'relative',
+    overflow: 'hidden',
+    backgroundColor: color.qualityDeep,
   },
   settled: {
     opacity: 1,
     transform: [{ translateY: 0 }, { scale: 1 }],
+  },
+  qualityBackdrop: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  qualityWash: {
+    position: 'absolute',
+    zIndex: 6,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  qualityVignette: {
+    position: 'absolute',
+    zIndex: 7,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+  },
+  qualityRim: {
+    position: 'absolute',
+    zIndex: 8,
+    top: 1,
+    right: 1,
+    bottom: 1,
+    left: 1,
+    borderWidth: 1,
+    borderColor: color.qualityRim,
+    boxShadow: FRONT_DOOR_THEME.shadow.qualityRim as never,
   },
   primer: {
     position: 'absolute',
