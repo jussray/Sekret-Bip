@@ -12,11 +12,19 @@ export * from './theme.base';
 
 const sekretSplashTeen = require('../assets/images/splash-teen.jpeg');
 const sekretSplashParent = require('../assets/images/splash-parent.png');
-const suhanaFullbody = require('../assets/images/companions/raylene/raylene-master.png');
+
+// Room sprites use the existing teen companion production pipeline. These PNGs
+// are isolated character renders; cinematic identity masters remain runtime
+// identity/fallback assets and must not be pasted over the furnished Room.
+const suhanaRoomSprite = require('../assets/images/companions/teen/raylene/neutral.png');
+const syRoomSprite = require('../assets/images/companions/teen/rylane/neutral.png');
+const nightRoomSprite = require('../assets/images/companions/teen/night/neutral.png');
 
 export const IMAGES = {
   ...BASE_IMAGES,
-  rayleneFullbody: suhanaFullbody,
+  rayleneFullbody: suhanaRoomSprite,
+  rylaneFullbody: syRoomSprite,
+  nightFullbody: nightRoomSprite,
   sekretSplash: sekretSplashTeen,
   sekretSplashTeen,
   sekretSplashParent,
@@ -26,7 +34,15 @@ export const AVATARS = {
   ...BASE_AVATARS,
   raylene: {
     ...BASE_AVATARS.raylene,
-    fullbody: suhanaFullbody,
+    fullbody: suhanaRoomSprite,
+  },
+  rylane: {
+    ...BASE_AVATARS.rylane,
+    fullbody: syRoomSprite,
+  },
+  night: {
+    ...BASE_AVATARS.night,
+    fullbody: nightRoomSprite,
   },
 } as typeof BASE_AVATARS;
 
