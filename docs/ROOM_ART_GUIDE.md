@@ -12,10 +12,12 @@ bg-{sekret}-room-{time-of-day}.png
 
 ### Se'kret slugs
 
+Canonical display names are shown below. The `raylene` and `rylane` slugs remain legacy compatibility keys for existing assets and runtime state.
+
 | Se'kret | Slug |
 |---|---|
-| Raylene | `raylene` |
-| Rylane | `rylane` |
+| Suhana | `raylene` |
+| Sy | `rylane` |
 | Cloud | `cloud` |
 | Night | `night` |
 
