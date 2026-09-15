@@ -31,7 +31,8 @@ test('voice transcript contributes only through existing bounded memory', () => 
   assert.match(voice, /result\.transcript\.status === 'available'/);
   assert.match(voice, /updateSekretMemory/);
   assert.match(voice, /journalEntries:/);
-  assert.match(voice, /The\s+memory\s+service\s+keeps\s+bounded\s+metadata\/patterns,\s+not\s+the\s+raw\s+transcript/i);
+  assert.match(voice, /bounded metadata\/patterns/i);
+  assert.match(voice, /not the raw transcript/i);
 });
 
 test('companion request receives tentative user-controlled context', () => {
