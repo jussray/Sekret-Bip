@@ -13,6 +13,13 @@ function assertContains(text, expected, label) {
   );
 }
 
+function assertNotContains(text, unexpected, label) {
+  assert.ok(
+    !text.includes(unexpected),
+    `${label} should not include stale display copy: ${unexpected}`,
+  );
+}
+
 test('name canon preserves Suhana and Sy as canonical display names with stable legacy ids', () => {
   const nameCanon = read('docs/COMPANION_NAME_CANON.md');
 
@@ -25,6 +32,51 @@ test('name canon preserves Suhana and Sy as canonical display names with stable 
   assertContains(nameCanon, 'raylene -> Suhana', 'name canon');
   assertContains(nameCanon, 'rylane  -> Sy', 'name canon');
   assertContains(nameCanon, 'Do not rename internal ids, database values, analytics values, route keys, fixtures, or saved user state unless a dedicated code migration and compatibility plan exists.', 'name canon');
+});
+
+test('active companion surfaces use Suhana and Sy while legacy ids stay internal', () => {
+  const personalities = read('src/services/ai/personalities.ts');
+  const profile = read('app/(teen)/profile.tsx');
+  const pagesHistory = read('app/(teen)/pages/history.tsx');
+  const settings = read('screens/SettingsScreen.tsx');
+  const reset = read('screens/MindBodyResetScreen.tsx');
+  const womanhood = read('screens/WomanhoodScreen.tsx');
+  const furnishings = read('constants/furnishingCatalog.ts');
+
+  assertContains(personalities, "name: 'Suhana'", 'personality config');
+  assertContains(personalities, "name: 'Sy'", 'personality config');
+  assertContains(personalities, '"You are Suhana', 'personality config');
+  assertContains(personalities, '"You are Sy', 'personality config');
+  assertNotContains(personalities, "name: 'Raylene'", 'personality config');
+  assertNotContains(personalities, "name: 'Rylane'", 'personality config');
+
+  assertContains(profile, "label: 'Suhana'", 'teen profile');
+  assertContains(profile, "label: 'Sy'", 'teen profile');
+  assertNotContains(profile, "label: 'Raylene'", 'teen profile');
+  assertNotContains(profile, "label: 'Rylane'", 'teen profile');
+
+  assertContains(pagesHistory, "label: 'Suhana'", 'Pages history');
+  assertContains(pagesHistory, "label: 'Sy'", 'Pages history');
+  assertNotContains(pagesHistory, "label: 'Raylene'", 'Pages history');
+  assertNotContains(pagesHistory, "label: 'Rylane'", 'Pages history');
+
+  assertContains(settings, '"Suhana\'s Room"', 'Vibe Lab');
+  assertContains(settings, '"Sy\'s Space"', 'Vibe Lab');
+  assertNotContains(settings, '"Raylene\'s Room"', 'Vibe Lab');
+  assertNotContains(settings, '"Rylane\'s Space"', 'Vibe Lab');
+
+  assertContains(reset, "raylene: 'Suhana'", 'reset flows');
+  assertContains(reset, "rylane: 'Sy'", 'reset flows');
+  assertNotContains(reset, "raylene: 'Raylene'", 'reset flows');
+  assertNotContains(reset, "rylane: 'Rylane'", 'reset flows');
+
+  assertContains(womanhood, '{greeting}, Suhana 💜', 'Womanhood');
+  assertNotContains(womanhood, '{greeting}, Raylene 💜', 'Womanhood');
+
+  assertContains(furnishings, "'Suhana Photo'", 'furnishing catalog');
+  assertContains(furnishings, "'Sy Photo'", 'furnishing catalog');
+  assertNotContains(furnishings, "'Raylene Photo'", 'furnishing catalog');
+  assertNotContains(furnishings, "'Rylane Photo'", 'furnishing catalog');
 });
 
 test('identity bible preserves HUMAN-AI canon life without real-world deception', () => {
