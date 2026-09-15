@@ -44,7 +44,7 @@ async function readSamples(page: import('@playwright/test').Page): Promise<Motio
   ).__sekretSceneArrivalSamples ?? []);
 }
 
-test('canonical teen front door enters as one scene, settles, and stays interactive', async ({ page }) => {
+test('canonical teen front door enters as one scene, settles, and stays interactive', async ({ page }, testInfo) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 390, height: 844 });
   await installArrivalSampler(page);
@@ -54,17 +54,38 @@ test('canonical teen front door enters as one scene, settles, and stays interact
   const scene = page.getByTestId('web-welcome-scene-arrival');
   const hero = page.getByTestId('web-welcome-hero-teen');
   const enter = page.getByTestId('web-welcome-enter');
+  const qualityBackdrop = page.getByTestId('web-welcome-quality-backdrop');
+  const qualityWash = page.getByTestId('web-welcome-quality-wash');
+  const qualityVignette = page.getByTestId('web-welcome-quality-vignette');
+  const qualityRim = page.getByTestId('web-welcome-quality-rim');
 
   await expect(scene).toBeVisible();
   await expect(hero).toBeVisible();
+  await expect(qualityBackdrop).toBeVisible();
+  await expect(qualityWash).toBeVisible();
+  await expect(qualityVignette).toBeVisible();
+  await expect(qualityRim).toBeVisible();
   await expect(page.getByText('YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Night · Suhana · Sy', { exact: true })).toHaveCount(0);
   await expect(enter).toBeVisible();
 
   const pointerEvents = await scene.evaluate(node => getComputedStyle(node).pointerEvents);
   expect(pointerEvents).not.toBe('none');
 
+  // Measure the finish layers only after the intentional scene-arrival transform
+  // has settled. Comparing them during the scale-in animation creates a false
+  // failure because boundingBox() correctly reports the transformed dimensions.
   await expect(page.getByTestId('web-welcome-scene-settled')).toHaveCount(1, { timeout: 5_000 });
   await page.waitForTimeout(100);
+
+  const [sceneBox, backdropBox] = await Promise.all([
+    scene.boundingBox(),
+    qualityBackdrop.boundingBox(),
+  ]);
+  expect(sceneBox).toBeTruthy();
+  expect(backdropBox).toBeTruthy();
+  expect(Math.abs(backdropBox!.width - sceneBox!.width)).toBeLessThanOrEqual(1);
+  expect(Math.abs(backdropBox!.height - sceneBox!.height)).toBeLessThanOrEqual(1);
 
   const samples = await readSamples(page);
   expect(samples.length).toBeGreaterThan(5);
@@ -80,6 +101,11 @@ test('canonical teen front door enters as one scene, settles, and stays interact
     clientWidth: document.documentElement.clientWidth,
   }));
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+
+  await testInfo.attach('teen-front-door-quality-proof.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png',
+  });
 });
 
 test('reduced motion renders the canonical scene settled from the first sampled frame', async ({ page }) => {
@@ -92,6 +118,10 @@ test('reduced motion renders the canonical scene settled from the first sampled 
   const scene = page.getByTestId('web-welcome-scene-arrival');
   await expect(scene).toBeVisible();
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible();
+  await expect(page.getByTestId('web-welcome-quality-backdrop')).toBeVisible();
+  await expect(page.getByTestId('web-welcome-quality-wash')).toBeVisible();
+  await expect(page.getByTestId('web-welcome-quality-vignette')).toBeVisible();
+  await expect(page.getByTestId('web-welcome-quality-rim')).toBeVisible();
   await expect(page.getByTestId('web-welcome-scene-settled')).toHaveCount(1);
   await page.waitForTimeout(450);
 
