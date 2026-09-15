@@ -490,7 +490,7 @@ function VibeLab2Sheet({ visible, current, onSave, onClose }: VibeLab2SheetProps
             {CHARACTERS.map(id => {
               const meta = ROOM_META[id];
               const selected = draft.companionId === id;
-              const avatarSrc = safe(AVATARS[id]?.neutral, FALLBACK_AVATAR[id]);
+              const avatarSrc = getCompanionRuntime(id).source ?? safe(AVATARS[id]?.neutral, FALLBACK_AVATAR[id]);
               return (
                 <TouchableOpacity
                   key={id}

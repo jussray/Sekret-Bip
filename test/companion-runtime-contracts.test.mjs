@@ -59,6 +59,11 @@ test('Teen Room uses the canonical runtime label at user-facing legacy-key bound
   assert.match(userRoom, /getCompanionRuntime\(id\)\.label/);
   assert.match(userRoom, /const cRuntime\s*=\s*getCompanionRuntime\(cId\)/);
   assert.match(userRoom, /accessibilityLabel={`\$\{cRuntime\.label\} is here\. Tap to talk\.`}/);
+  assert.match(
+    userRoom,
+    /const avatarSrc\s*=\s*getCompanionRuntime\(id\)\.source \?\? safe\(AVATARS\[id\]\?\.neutral, FALLBACK_AVATAR\[id\]\);/,
+    'VibeLab companion identity previews must prefer the canonical runtime source before legacy portrait fallbacks',
+  );
   assert.doesNotMatch(userRoom, /Raylene's Room/);
   assert.doesNotMatch(userRoom, /Rylane's Room/);
   assert.doesNotMatch(userRoom, /Raylene is nearby/);
