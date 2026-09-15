@@ -103,7 +103,7 @@ export const COMPANION_PROFILES: Record<CompanionId, CompanionProfile> = {
     id:          'cloud',
     name:        'Cloud',
     emoji:       '☁️',
-    title:       'Sorian Birth-Cloud',
+    title:       'Cloud / The Calm',
     vibe:        'Majestic, soft, low-pressure, and present without pushing.',
     firstChatIntro: COMPANION_CURRICULUM.cloud.firstChatIntro,
     greeting:    COMPANION_CURRICULUM.cloud.greeting,
