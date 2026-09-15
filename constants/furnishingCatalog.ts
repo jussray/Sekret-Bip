@@ -93,7 +93,7 @@ export const FURNISH_CATALOG: FurnishItem[] = [
 
   // Neon signs
   item('neon-cloud',     'Cloud Neon Sign',    '☁️',  'lighting', 'shared',
-    IMAGES.cloud,
+    IMAGES.cloud,   // cloud mascot standing in as visual until neon PNG exists
     ['neon', 'cloud', 'sign', 'purple']),
   item('neon-moon',      'Moon Neon Sign',     '🌙',  'lighting', 'night',    null, ['neon', 'moon', 'night', 'sign']),
 
@@ -105,7 +105,7 @@ export const FURNISH_CATALOG: FurnishItem[] = [
 
   // Cloud lamp plush (on Suhana's bed; legacy room key remains `raylene`)
   item('cloud-lamp',     'Cloud Lamp Plush',   '☁️',  'lighting', 'raylene',
-    IMAGES.cloudSleepy,
+    IMAGES.cloudSleepy, // closest existing asset — sleepy cloud
     ['cloud', 'lamp', 'plush', 'cozy', 'raylene']),
 
   // ── DECOR ──────────────────────────────────────────────────────────────────
@@ -177,7 +177,7 @@ export const FURNISH_CATALOG: FurnishItem[] = [
 
   // Cloud plush pillow
   item('cloud-pillow',     'Cloud Plush Pillow', '☁️', 'accessories', 'shared',
-    IMAGES.cloud,
+    IMAGES.cloud,   // cloud mascot as stand-in
     ['cloud', 'pillow', 'plush', 'cozy']),
 
   // ── PLANTS ─────────────────────────────────────────────────────────────────
