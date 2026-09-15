@@ -147,22 +147,31 @@ test('Teen Room loads canonical room-only archive PNGs instead of drifted refere
   );
 });
 
-test('Public theme boundary binds production isolated Room sprites and canonical display names', () => {
+test('Public theme boundary uses the separated Suhana production avatar and preserves canonical display names', () => {
   assert.ok(
-    themeEntry.includes("const suhanaRoomSprite = require('../assets/images/companions/teen/raylene/neutral.png');"),
-    'Suhana Room sprite must use the production isolated teen companion asset',
+    roomAssetMap.includes('assets/images/raylene-neutral-new.png'),
+    'The asset inventory must retain Suhana neutral as a production character asset',
+  );
+  assert.ok(
+    roomAssetMap.includes('These are already separate from room backgrounds.'),
+    'The asset inventory must retain the avatar-layer separation contract',
+  );
+  assert.ok(
+    themeEntry.includes("const suhanaRoomSprite = require('../assets/images/raylene-neutral-new.png');"),
+    'Suhana Room sprite must use the documented separated production avatar layer',
   );
   assert.ok(
     themeEntry.includes("const syRoomSprite = require('../assets/images/companions/teen/rylane/neutral.png');"),
-    'Sy Room sprite must use the production isolated teen companion asset',
+    'Sy Room sprite must remain unchanged without a Sy-specific failing receipt',
   );
   assert.ok(
     themeEntry.includes("const nightRoomSprite = require('../assets/images/companions/teen/night/neutral.png');"),
-    'Night Room sprite must use the production isolated teen companion asset',
+    'Night Room sprite must remain unchanged without a Night-specific failing receipt',
   );
   assert.ok(themeEntry.includes('rayleneFullbody: suhanaRoomSprite'));
   assert.ok(themeEntry.includes('rylaneFullbody: syRoomSprite'));
   assert.ok(themeEntry.includes('nightFullbody: nightRoomSprite'));
+  assert.doesNotMatch(themeEntry, /companions\/teen\/raylene\/neutral\.png/);
   assert.doesNotMatch(themeEntry, /raylene-master\.png/);
   assert.ok(themeEntry.includes('name: "Suhana\'s Room"'));
   assert.ok(themeEntry.includes("name: 'Sy After Dark'"));
