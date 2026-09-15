@@ -42,6 +42,9 @@ test('active companion surfaces use Suhana and Sy while legacy ids stay internal
   const reset = read('screens/MindBodyResetScreen.tsx');
   const womanhood = read('screens/WomanhoodScreen.tsx');
   const furnishings = read('constants/furnishingCatalog.ts');
+  const suhanaTokens = read('design/tokens/tokens.raylene.json');
+  const syTokens = read('design/tokens/tokens.rylane.json');
+  const roomArtGuide = read('docs/ROOM_ART_GUIDE.md');
 
   assertContains(personalities, "name: 'Suhana'", 'personality config');
   assertContains(personalities, "name: 'Sy'", 'personality config');
@@ -77,6 +80,16 @@ test('active companion surfaces use Suhana and Sy while legacy ids stay internal
   assertContains(furnishings, "'Sy Photo'", 'furnishing catalog');
   assertNotContains(furnishings, "'Raylene Photo'", 'furnishing catalog');
   assertNotContains(furnishings, "'Rylane Photo'", 'furnishing catalog');
+
+  assertContains(suhanaTokens, '"displayName": "Suhana\'s Room"', 'Suhana room tokens');
+  assertNotContains(suhanaTokens, '"displayName": "Raylene\'s Room"', 'Suhana room tokens');
+  assertContains(syTokens, '"displayName": "Sy After Dark"', 'Sy room tokens');
+  assertNotContains(syTokens, '"displayName": "Rylane After Dark"', 'Sy room tokens');
+
+  assertContains(roomArtGuide, '| Suhana | `raylene` |', 'room art guide');
+  assertContains(roomArtGuide, '| Sy | `rylane` |', 'room art guide');
+  assertNotContains(roomArtGuide, '| Raylene | `raylene` |', 'room art guide');
+  assertNotContains(roomArtGuide, '| Rylane | `rylane` |', 'room art guide');
 });
 
 test('identity bible preserves HUMAN-AI canon life without real-world deception', () => {
