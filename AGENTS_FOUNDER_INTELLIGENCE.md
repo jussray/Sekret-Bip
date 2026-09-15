@@ -108,6 +108,16 @@ Before returning a repair or implementation step as founder homework, read [`.co
 - Incoming evidence may update or invalidate bidirectional continuity fingerprints/cookies; outgoing approved actions must update the corresponding markers and receipts. Those markers are non-secret continuity state and never authority or permission to track a person.
 - Provider acceptance is execution evidence, not teen/user outcome proof. Verify the relevant repository/runtime/device/account outcome, update continuity, and identify the next gate before claiming completion.
 
+## Exact-candidate merge approval canon
+
+Se’kret Bip is a platform/app, not a commerce store. Storefront, checkout, pricing, discount, refund, or other JBH-specific commerce assumptions must not be imported here unless the founder explicitly creates a Se’kret Bip commerce surface in the future.
+
+Merge capability may exist, but no merge is authorized by capability, review, implementation, green checks, mergeability, continuity markers, `approved`, `cont`, or previous-candidate approval alone.
+
+Before every merge, require fresh explicit founder approval bound to the exact repository, PR number, current base SHA, and current head SHA. If that approval is absent, ambiguous, or stale, ask the founder and stop. Any base/head movement expires the approval and requires a new ask.
+
+`merge_authority: true` means the merge capability is available. It never means `merge_approved: true`, and it must never be treated as an execution token.
+
 For Se’kret Bip, teen safety, privacy, consent, dignity, anti-surveillance, parent/teen boundaries, auth/RLS, and explicit founder gates always override `execute-now`.
 
 For Se’kret Bip, `/human` includes heightened teen privacy, consent, safety, dignity, and anti-surveillance duties.
