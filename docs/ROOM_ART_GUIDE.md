@@ -79,23 +79,26 @@ bg-night-room-rain.png
 | Color space | sRGB |
 | Transparency | Not required — rooms are full-bleed backgrounds |
 
-## Fallback Rules
+## Runtime Source and Fallback Rules
 
-If a room background is missing or fails to load at runtime:
+The Teen User Room uses `components/rooms/BareRoomRenderer.tsx` as its production background authority. That renderer loads the room-only PNGs from `assets/images/archive/` directly so reference composites cannot drift into runtime.
 
-1. `constants/theme.ts` → `IMAGES` map provides the fallback chain.
-2. The `BackgroundLayer` component falls back to the nearest time-of-day variant for the same Se'kret.
-3. If no variant exists for that Se'kret, it falls back to the `day` variant.
-4. If no day variant exists, it renders the solid theme color for that Se'kret.
+1. `BareRoomRenderer` selects the archive PNG for the active legacy room key and lighting phase.
+2. If the requested phase is unavailable in the map, the renderer falls back to that room's `day` variant.
+3. The companion is rendered once by `UserRoomScreen` as a separate controlled visual layer with its own bounded tap target.
+4. Scene/reference JPEG composites under `assets/images/resized-bg/*-room-*-scene.jpg` are design evidence only and must never be loaded as production room backgrounds.
+5. Legacy `constants/theme.ts` room image entries may still serve other surfaces. Do not remove or reinterpret them without auditing those consumers separately.
 
-Do not remove any `bg-*.png` entries from the `IMAGES` map in `constants/theme.ts` without updating the fallback chain.
+See `ROOM_ASSET_MAP.md` for the production/reference/avatar source-of-truth split.
 
 ## Art Style Rules
 
-- Room layout must remain unchanged between variants — only lighting changes.
-- Character composites (Phase 2) must be painted into the room, not layered on top.
-- No floating avatars, no PNG overlays, no sticker-style placements.
-- See [PHASE_2_ROOM_INTEGRATION.md](PHASE_2_ROOM_INTEGRATION.md) for the full composite spec.
+- Room layout must remain unchanged between lighting variants. Only atmosphere and lighting should change.
+- Production room backgrounds stay room-only. Do not bake a second companion into the background.
+- The Teen User Room may render exactly one canonical companion visual above the room background, with interaction owned by a separate bounded hit target.
+- Scene/reference composites are for composition review and prompt/reference work only, never runtime backgrounds.
+- No duplicate companion visuals, sticker-style companion duplicates, or additional floating avatar copies.
+- See [PHASE_2_ROOM_INTEGRATION.md](PHASE_2_ROOM_INTEGRATION.md) and `ROOM_ASSET_MAP.md` for the full runtime composition contract.
 
 ## Enforced By
 
