@@ -78,8 +78,27 @@ test('email routing workflow is manual, secrets-backed, token-type-aware, and re
   assert.doesNotMatch(workflow, /test -n "\$CLOUDFLARE_ZONE_ID"/);
   assert.doesNotMatch(workflow, /test -n "\$CLOUDFLARE_ACCOUNT_ID"/);
   assert.doesNotMatch(workflow, /\/user\/tokens\/verify/);
+  assert.match(workflow, /normalizeCloudflareTokenTransport/);
+  assert.match(workflow, /scripts\/run-with-normalized-cloudflare-token\.mjs/);
+  assert.match(workflow, /BLOCKED_CLOUDFLARE_TOKEN_TRANSPORT/);
+  assert.match(workflow, /CLOUDFLARE_EMAIL_TOKEN_TRANSPORT_INVALID_RETAINING_RECEIPT/);
+  assert.match(workflow, /cloudflare-resend-dns-evidence\.json/);
+  assert.match(workflow, /phase:\s*'preflight-failed-before-mutation'/);
+  assert.match(workflow, /mutationState:\s*'not-reachable'/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
   assert.match(workflow, /retention-days:\s*30/);
+
+  const normalizedRunner = 'node scripts/run-with-normalized-cloudflare-token.mjs';
+  assert.match(
+    workflow,
+    new RegExp(`${normalizedRunner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} scripts/reconcile-cloudflare-email-routing\\.mjs --apply`),
+  );
+  assert.match(
+    workflow,
+    new RegExp(`${normalizedRunner.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} scripts/reconcile-cloudflare-resend-dns\\.mjs --apply`),
+  );
+  assert.doesNotMatch(workflow, /run:\s*node scripts\/reconcile-cloudflare-email-routing\.mjs --apply/);
+  assert.doesNotMatch(workflow, /run:\s*node scripts\/reconcile-cloudflare-resend-dns\.mjs --apply/);
 
   assert.match(reconciler, /\/user\/tokens\/verify/);
   assert.match(reconciler, /\/accounts\/\$\{config\.accountId\}\/tokens\/verify/);

@@ -48,8 +48,48 @@ test('production Auth email provider keeps confirmation enabled and secrets out 
   assert.match(script, /\(pass\|secret\|token\|key\)/i);
 });
 
+test('production Auth email provider stays on the canonical Resend domain', () => {
+  const workflowAdminEmailLines = workflow
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('AUTH_SMTP_ADMIN_EMAIL:'));
+  const scriptAdminEmailLines = script
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('smtp_admin_email:'));
+
+  assert.deepEqual(workflowAdminEmailLines, ['AUTH_SMTP_ADMIN_EMAIL: invite@sekretbip.net']);
+  assert.deepEqual(scriptAdminEmailLines, [
+    "smtp_admin_email: env('AUTH_SMTP_ADMIN_EMAIL', 'invite@sekretbip.net'),",
+    'smtp_admin_email: config.smtp_admin_email,',
+  ]);
+});
+
+test('production apply refuses unverified or sending-disabled Resend domains before Supabase mutation', () => {
+  const resendApiBaseLines = script
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('const RESEND_API_BASE ='));
+
+  assert.deepEqual(resendApiBaseLines, ["const RESEND_API_BASE = 'https://api.resend.com';"]);
+  assert.match(script, /\/domains\?limit=100/);
+  assert.match(script, /RESEND_DOMAIN_NOT_FOUND/);
+  assert.match(script, /RESEND_DOMAIN_NOT_VERIFIED/);
+  assert.match(script, /RESEND_DOMAIN_SENDING_DISABLED/);
+
+  const preflight = script.indexOf('await assertResendDomainVerified');
+  const beforeRead = script.indexOf('const before = await request');
+  const patch = script.indexOf("await request(projectRef, accessToken, { method: 'PATCH'");
+  assert.notEqual(preflight, -1);
+  assert.notEqual(beforeRead, -1);
+  assert.notEqual(patch, -1);
+  assert.ok(preflight < beforeRead, 'Resend verification must happen before reading/applying Supabase Auth config');
+  assert.ok(preflight < patch, 'Resend verification must happen before Supabase Auth mutation');
+});
+
 test('provider receipt is redacted and records rollback evidence', () => {
   assert.match(script, /auth-email-provider-receipt\.json/);
+  assert.match(script, /resendDomain,/);
   assert.match(script, /before: redact\(before\)/);
   assert.match(script, /after: redact\(after\)/);
   assert.match(script, /priorConfigCaptured:\s*true/);
