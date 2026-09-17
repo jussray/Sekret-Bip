@@ -4,7 +4,11 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-import { reconcileWorkersBuildTrigger } from '../scripts/reconcile-cloudflare-workers-build-trigger.mjs';
+import {
+  DESIRED_PATH_EXCLUDES,
+  DESIRED_PATH_INCLUDES,
+  reconcileWorkersBuildTrigger,
+} from '../scripts/reconcile-cloudflare-workers-build-trigger.mjs';
 
 const ACCOUNT_ID = '0123456789abcdef0123456789abcdef';
 const COMMIT_SHA = 'abcdef0123456789abcdef0123456789abcdef01';
@@ -39,7 +43,7 @@ test('retains redacted evidence when Cloudflare token verification fails before 
         assert.match(url, /\/user\/tokens\/verify$/);
         return failedResponse();
       },
-      now: () => new Date('2026-08-11T17:40:00.000Z'),
+      now: () => new Date('2026-09-07T23:35:00.000Z'),
     }),
     /Authentication error/,
   );
@@ -48,7 +52,7 @@ test('retains redacted evidence when Cloudflare token verification fails before 
   const evidenceText = fs.readFileSync(evidencePath, 'utf8');
   const evidence = JSON.parse(evidenceText);
 
-  assert.equal(evidence.schemaVersion, 8);
+  assert.equal(evidence.schemaVersion, 9);
   assert.equal(evidence.status, 'provider-discovery-failed');
   assert.equal(evidence.verified, false);
   assert.equal(evidence.applyRequested, false);
@@ -58,7 +62,9 @@ test('retains redacted evidence when Cloudflare token verification fails before 
   assert.equal(evidence.nonProductionTrigger, null);
   assert.deepEqual(evidence.desired.branchIncludes, ['main']);
   assert.deepEqual(evidence.desired.branchExcludes, []);
-  assert.equal(evidence.desired.watchPathsMode, 'observe-only');
+  assert.deepEqual(evidence.desired.pathIncludes, [...DESIRED_PATH_INCLUDES]);
+  assert.deepEqual(evidence.desired.pathExcludes, [...DESIRED_PATH_EXCLUDES]);
+  assert.equal(evidence.desired.watchPathsMode, 'enforced');
   assert.equal(evidence.before.pathIncludes, null);
   assert.equal(evidence.before.pathExcludes, null);
   assert.equal(evidence.rollback.pathIncludes, null);
@@ -93,13 +99,15 @@ test('retains configuration evidence before any provider request when apply SHA 
   assert.equal(requests, 0);
   const evidenceText = fs.readFileSync(evidencePath, 'utf8');
   const evidence = JSON.parse(evidenceText);
-  assert.equal(evidence.schemaVersion, 8);
+  assert.equal(evidence.schemaVersion, 9);
   assert.equal(evidence.status, 'configuration-invalid');
   assert.equal(evidence.applyRequested, true);
   assert.equal(evidence.verified, false);
   assert.equal(evidence.targetBuild.commitSha, null);
   assert.deepEqual(evidence.desired.branchIncludes, ['main']);
-  assert.equal(evidence.desired.watchPathsMode, 'observe-only');
+  assert.deepEqual(evidence.desired.pathIncludes, [...DESIRED_PATH_INCLUDES]);
+  assert.deepEqual(evidence.desired.pathExcludes, [...DESIRED_PATH_EXCLUDES]);
+  assert.equal(evidence.desired.watchPathsMode, 'enforced');
   assert.equal(evidence.desired.nonProductionBuildsEnabled, false);
   assert.doesNotMatch(evidenceText, /secret-token/);
 });
