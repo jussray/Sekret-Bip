@@ -49,6 +49,27 @@ test('voice memory persistence cannot silently report success', () => {
   assert.doesNotMatch(voice, /\.catch\(\(\) => undefined\)/);
 });
 
+test('optional Oracle fallback is visible without exposing stored profile content', () => {
+  assert.match(builder, /Oracle context unavailable; continuing without optional context\./);
+  assert.match(builder, /console\.warn\('Oracle context unavailable; continuing without optional context\.'\)/);
+  assert.doesNotMatch(builder, /console\.(?:warn|error)\([^\n]*(?:raw|profile|error|cause)[^\n]*\)/i);
+});
+
+test('surface extra memory cannot overwrite canonical reply provenance', () => {
+  const memoryBlock = builder.match(/const memory: Record<string, unknown> = \{([\s\S]*?)\n  \};/)?.[1] ?? '';
+  const extraIndex = memoryBlock.indexOf('...(ctx.extraMemory ?? {})');
+  const relationshipIndex = memoryBlock.indexOf('relationshipStyle:');
+  const oracleIndex = memoryBlock.indexOf('{ oracleContext }');
+  const wellbeingIndex = memoryBlock.indexOf('wellbeingContext:');
+
+  for (const index of [extraIndex, relationshipIndex, oracleIndex, wellbeingIndex]) {
+    assert.notEqual(index, -1);
+  }
+  assert.equal(extraIndex < relationshipIndex, true);
+  assert.equal(extraIndex < oracleIndex, true);
+  assert.equal(extraIndex < wellbeingIndex, true);
+});
+
 test('companion request receives tentative user-controlled context', () => {
   assert.match(builder, /loadWellbeingState/);
   assert.match(builder, /buildWellbeingContext/);
