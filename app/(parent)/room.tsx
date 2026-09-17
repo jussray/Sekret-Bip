@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { ParentRoomScreen } from '@screens/ParentRoomScreen';
 import { RoomExploreGuide } from '@/components/rooms/RoomExploreGuide';
+import { resolveParentEntryState } from '@/services/parentEntryState';
 import { routeForSide } from '@/shared/routes';
 
 const LINK_REQUIRED_ROUTES = new Set([
@@ -13,38 +13,44 @@ const LINK_REQUIRED_ROUTES = new Set([
   'parent-growth',
 ]);
 
+type LinkState = 'loading' | 'linked' | 'unlinked' | 'error';
+
 export default function ParentRoomRoute() {
   const { parentMood, parentMoodDate, setParentMood, parentRoomStyle } = useAppContext();
-  const [hasLinkedTeen, setHasLinkedTeen] = useState<boolean | null>(null);
+  const [linkState, setLinkState] = useState<LinkState>('loading');
+
+  const verifyLink = useCallback(async () => {
+    setLinkState('loading');
+    try {
+      const state = await resolveParentEntryState();
+      if (state.state === 'ready') {
+        setLinkState('linked');
+      } else if (state.state === 'parent_link_required') {
+        setLinkState('unlinked');
+      } else {
+        setLinkState('error');
+      }
+    } catch {
+      setLinkState('error');
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
-
-    AsyncStorage.getItem('linked_teen_id')
-      .then(value => {
-        if (active) setHasLinkedTeen(Boolean(value));
-      })
-      .catch(() => {
-        if (active) setHasLinkedTeen(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, []);
+    void verifyLink();
+  }, [verifyLink]);
 
   const openTeenLink = useCallback(() => {
     router.push('/(onboarding)/parent-link' as any);
   }, []);
 
   const openParentScreen = useCallback((screen: string) => {
-    if (LINK_REQUIRED_ROUTES.has(screen) && hasLinkedTeen !== true) {
-      if (hasLinkedTeen === false) openTeenLink();
+    if (LINK_REQUIRED_ROUTES.has(screen) && linkState !== 'linked') {
+      if (linkState === 'unlinked') openTeenLink();
       return;
     }
 
     router.push(routeForSide('parent', screen) as any);
-  }, [hasLinkedTeen, openTeenLink]);
+  }, [linkState, openTeenLink]);
 
   return (
     <View style={styles.root}>
@@ -57,11 +63,11 @@ export default function ParentRoomRoute() {
         BottomNav={null}
       />
 
-      {hasLinkedTeen === true ? (
+      {linkState === 'linked' ? (
         <RoomExploreGuide side="parent" onNavigate={openParentScreen} />
       ) : null}
 
-      {hasLinkedTeen === false ? (
+      {linkState === 'unlinked' ? (
         <View style={styles.linkCard} accessibilityRole="summary">
           <Text style={styles.linkKicker}>YOUR PARENT SIDE IS READY</Text>
           <Text style={styles.linkTitle}>No teen linked yet.</Text>
@@ -76,6 +82,25 @@ export default function ParentRoomRoute() {
             accessibilityLabel="Link a teen"
           >
             <Text style={styles.linkButtonText}>Link a Teen →</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+
+      {linkState === 'error' ? (
+        <View style={styles.linkCard} accessibilityRole="alert">
+          <Text style={styles.linkKicker}>PRIVATE LINK CHECK</Text>
+          <Text style={styles.linkTitle}>Couldn’t verify your link.</Text>
+          <Text style={styles.linkBody}>
+            Bridge, Connection, and Growth stay locked until the account service confirms the relationship.
+          </Text>
+          <TouchableOpacity
+            onPress={() => void verifyLink()}
+            activeOpacity={0.85}
+            style={styles.linkButton}
+            accessibilityRole="button"
+            accessibilityLabel="Retry private link check"
+          >
+            <Text style={styles.linkButtonText}>Try Again →</Text>
           </TouchableOpacity>
         </View>
       ) : null}
