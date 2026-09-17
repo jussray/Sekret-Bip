@@ -29,6 +29,7 @@ interface FamilyVisitGenerateBody {
 }
 
 const PROMPT_VERSION = 'bridge-family-visit-human-v1';
+const OPENAI_REQUEST_TIMEOUT_MS = 12_000;
 
 const FAMILY_VISIT_SYSTEM_PROMPT = `
 You create TWO different human-readable Se'kret Bridge summaries from a visible Family Visit Mode session.
@@ -79,7 +80,7 @@ const FALLBACK_SUMMARIES: FamilyVisitGeneratedSummaries = {
       'Make it easy to ask for a pause without needing a big explanation.',
     ],
     uncertainty: 'Structured reflections are limited, so Se’kret is keeping the interpretation deliberately cautious.',
-    limitations: 'Se’kret did not record the visit. This reflection summary is not a legal or clinical decision.',
+    limitations: 'Se’kret did not record the visit. This reflection summary is not a legal or clinical decision. No provider model output was accepted; Se’kret used its conservative built-in fallback.',
   },
   professional: {
     interactionPatterns: [],
@@ -92,7 +93,7 @@ const FALLBACK_SUMMARIES: FamilyVisitGeneratedSummaries = {
     ],
     disposition: 'insufficient_evidence',
     uncertainty: 'The structured participant evidence is too limited to characterize the encounter reliably.',
-    limitations: 'Se’kret did not record the visit and does not make legal or clinical decisions.',
+    limitations: 'Se’kret did not record the visit and does not make legal or clinical decisions. No provider model output was accepted; Se’kret used its conservative built-in fallback.',
   },
 };
 
@@ -186,6 +187,7 @@ async function requestCompletion(
       response_format: { type: 'json_schema', json_schema: FAMILY_VISIT_JSON_SCHEMA },
       messages,
     }),
+    signal: AbortSignal.timeout(OPENAI_REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`openai_${response.status}`);
   const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
