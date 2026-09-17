@@ -301,8 +301,8 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
     const usedFallback = !generated;
 
     // Persist audience rows separately. The professional caller receives no
-    // summary content here; RLS on the summary table decides which audience can
-    // read which row after generation.
+    // summary content here; RLS keeps all summary rows unreadable until the
+    // exact evidence version observed above is successfully frozen as ready.
     await store.upsertSummary(sessionId, {
       audience: 'parent',
       content: summaries.parent as unknown as Record<string, unknown>,
@@ -333,6 +333,9 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.error('[bridge-family-visit] summary generation failed', { errorName });
     if (message === 'user_jwt_required') return json({ error: message }, 403, cors);
+    if (message === 'family_visit_evidence_changed') {
+      return json({ sessionId, status: 'blocked', failureCode: 'evidence_changed_retry' }, 409, cors);
+    }
     return json({ sessionId, status: 'failed', failureCode: 'server_error' }, 500, cors);
   }
 }
