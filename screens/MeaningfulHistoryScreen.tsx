@@ -34,18 +34,29 @@ const CATEGORY_COPY: Record<MeaningfulCategory, { icon: string; label: string; d
 
 export function MeaningfulHistoryScreen({ onBack, onNavigate }: MeaningfulHistoryScreenProps) {
   const [snapshot, setSnapshot] = useState<MeaningfulReturnSnapshot | null>(null);
+  const [snapshotLoadFailed, setSnapshotLoadFailed] = useState(false);
   const [wellbeing, setWellbeing] = useState<WellbeingStateV1 | null>(null);
   const [wellbeingError, setWellbeingError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void Promise.all([
+    void Promise.allSettled([
       loadMeaningfulReturnSnapshot(),
       loadWellbeingState(),
-    ]).then(([nextSnapshot, nextWellbeing]) => {
+    ]).then(([snapshotResult, wellbeingResult]) => {
       if (!active) return;
-      setSnapshot(nextSnapshot);
-      setWellbeing(nextWellbeing);
+
+      if (snapshotResult.status === 'fulfilled') {
+        setSnapshot(snapshotResult.value);
+      } else {
+        setSnapshotLoadFailed(true);
+      }
+
+      if (wellbeingResult.status === 'fulfilled') {
+        setWellbeing(wellbeingResult.value);
+      } else {
+        setWellbeingError("Couldn't load your private observations. Try reopening this page.");
+      }
     });
     return () => { active = false; };
   }, []);
@@ -85,10 +96,17 @@ export function MeaningfulHistoryScreen({ onBack, onNavigate }: MeaningfulHistor
         </View>
 
         {!snapshot ? (
-          <View style={styles.loadingCard}>
-            <ActivityIndicator color="#a78bfa" />
-            <Text style={styles.loadingText}>gathering your private receipts…</Text>
-          </View>
+          snapshotLoadFailed ? (
+            <View style={styles.errorCard} testID="meaningful-history-load-error">
+              <Text style={styles.errorTitle}>Your history could not load.</Text>
+              <Text style={styles.errorBody}>Nothing was erased. Try reopening this page.</Text>
+            </View>
+          ) : (
+            <View style={styles.loadingCard}>
+              <ActivityIndicator color="#a78bfa" />
+              <Text style={styles.loadingText}>gathering your private receipts…</Text>
+            </View>
+          )
         ) : (
           <>
             <View style={styles.heroCard}>
@@ -122,6 +140,16 @@ export function MeaningfulHistoryScreen({ onBack, onNavigate }: MeaningfulHistor
               </View>
             ) : null}
 
+            {wellbeingError ? (
+              <Text
+                accessibilityLiveRegion="polite"
+                testID="wellbeing-correction-error"
+                style={styles.patternError}
+              >
+                {wellbeingError}
+              </Text>
+            ) : null}
+
             {wellbeing && wellbeing.observations.length > 0 ? (
               <>
                 <View style={styles.patternHeader}>
@@ -130,15 +158,6 @@ export function MeaningfulHistoryScreen({ onBack, onNavigate }: MeaningfulHistor
                     <Text style={styles.patternIntro}>
                       Built from your own check-ins and repeated activity. These are observations, not diagnoses. You can reject any one.
                     </Text>
-                    {wellbeingError ? (
-                      <Text
-                        accessibilityLiveRegion="polite"
-                        testID="wellbeing-correction-error"
-                        style={styles.patternError}
-                      >
-                        {wellbeingError}
-                      </Text>
-                    ) : null}
                   </View>
                 </View>
                 {wellbeing.observations.map(observation => (
@@ -214,6 +233,9 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 27, fontWeight: '900', marginTop: 3 },
   loadingCard: { borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.04)', padding: 28, alignItems: 'center' },
   loadingText: { color: '#9487a4', fontSize: 12, marginTop: 10 },
+  errorCard: { borderRadius: 20, borderWidth: 1, borderColor: '#f59e0b55', backgroundColor: 'rgba(120,53,15,0.16)', padding: 20 },
+  errorTitle: { color: '#fde68a', fontSize: 13, fontWeight: '900' },
+  errorBody: { color: '#c9b992', fontSize: 11, lineHeight: 17, marginTop: 4 },
   heroCard: { borderRadius: 26, borderWidth: 1, borderColor: '#8b5cf655', backgroundColor: 'rgba(76,29,149,0.19)', padding: 22, marginBottom: 12 },
   heroNumber: { color: '#fff', fontSize: 58, fontWeight: '900', lineHeight: 64 },
   heroLabel: { color: '#e9ddff', fontSize: 15, fontWeight: '900' },
