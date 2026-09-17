@@ -35,6 +35,7 @@ const CATEGORY_COPY: Record<MeaningfulCategory, { icon: string; label: string; d
 export function MeaningfulHistoryScreen({ onBack, onNavigate }: MeaningfulHistoryScreenProps) {
   const [snapshot, setSnapshot] = useState<MeaningfulReturnSnapshot | null>(null);
   const [wellbeing, setWellbeing] = useState<WellbeingStateV1 | null>(null);
+  const [wellbeingError, setWellbeingError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -56,12 +57,17 @@ export function MeaningfulHistoryScreen({ onBack, onNavigate }: MeaningfulHistor
   }, [snapshot]);
 
   const rejectObservation = async (id: string) => {
-    await dismissWellbeingObservation(id);
-    setWellbeing(current => current ? {
-      ...current,
-      observations: current.observations.filter(observation => observation.id !== id),
-      dismissedObservationIds: [...new Set([...current.dismissedObservationIds, id])],
-    } : current);
+    setWellbeingError(null);
+    try {
+      await dismissWellbeingObservation(id);
+      setWellbeing(current => current ? {
+        ...current,
+        observations: current.observations.filter(observation => observation.id !== id),
+        dismissedObservationIds: [...new Set([...current.dismissedObservationIds, id])],
+      } : current);
+    } catch {
+      setWellbeingError("Couldn't save that correction. Try again.");
+    }
   };
 
   return (
@@ -124,6 +130,15 @@ export function MeaningfulHistoryScreen({ onBack, onNavigate }: MeaningfulHistor
                     <Text style={styles.patternIntro}>
                       Built from your own check-ins and repeated activity. These are observations, not diagnoses. You can reject any one.
                     </Text>
+                    {wellbeingError ? (
+                      <Text
+                        accessibilityLiveRegion="polite"
+                        testID="wellbeing-correction-error"
+                        style={styles.patternError}
+                      >
+                        {wellbeingError}
+                      </Text>
+                    ) : null}
                   </View>
                 </View>
                 {wellbeing.observations.map(observation => (
@@ -214,10 +229,11 @@ const styles = StyleSheet.create({
   sectionTitle: { color: '#efe8f7', fontSize: 14, fontWeight: '900', marginTop: 14, marginBottom: 10 },
   patternHeader: { marginBottom: 4 },
   patternIntro: { color: '#9b90a8', fontSize: 11, lineHeight: 17, marginTop: -5, marginBottom: 8 },
+  patternError: { color: '#fbbf24', fontSize: 11, lineHeight: 17, marginBottom: 8 },
   patternCard: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 17, borderWidth: 1, borderColor: '#a78bfa2e', backgroundColor: 'rgba(76,29,149,0.11)', padding: 14, marginBottom: 8 },
   patternStatement: { color: '#eee8f4', fontSize: 12, fontWeight: '800', lineHeight: 18 },
   patternMeta: { color: '#8e819b', fontSize: 9, marginTop: 4 },
-  notMeButton: { borderRadius: 999, borderWidth: 1, borderColor: '#ffffff1a', paddingHorizontal: 10, paddingVertical: 7 },
+  notMeButton: { minWidth: 64, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 999, borderWidth: 1, borderColor: '#ffffff1a', paddingHorizontal: 10, paddingVertical: 7 },
   notMeText: { color: '#b9afc3', fontSize: 9, fontWeight: '800' },
   categoryCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 17, borderWidth: 1, borderColor: '#ffffff12', backgroundColor: 'rgba(255,255,255,0.035)', padding: 14, marginBottom: 8 },
   categoryIcon: { fontSize: 22 },
