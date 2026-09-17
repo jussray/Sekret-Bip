@@ -4,14 +4,20 @@
 // Teen: received notes as left-aligned bubbles (read-only inbox).
 // One-way warmth by design — teen cannot reply, parent cannot read teen journal.
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
   Animated, Easing, StyleSheet, Platform, Alert, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
-import { sendParentNote, fetchLinkedTeenId, fetchParentNotes, fetchParentSentNotes, ParentNote } from '@/utils/sync';
+import {
+  sendParentNote,
+  fetchLinkedTeenId,
+  fetchParentNotesResult,
+  fetchParentSentNotesResult,
+  type ParentNote,
+} from '@/utils/sync';
 
 const STARTERS = [
   "I'm proud of who you're becoming.",
@@ -34,10 +40,40 @@ export function MessagesScreen({ side, setScreen, BottomNav }: MessagesScreenPro
   const [teenId,   setTeenId]   = useState<string | null>(null);
   const [notes,    setNotes]    = useState<ParentNote[]>([]);
   const [loading,  setLoading]  = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
   const fade1  = useRef(new Animated.Value(0)).current;
   const breath = useRef(new Animated.Value(0)).current;
+
+  const loadNotes = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+
+    try {
+      if (side === 'parent') {
+        const id = await fetchLinkedTeenId();
+        setTeenId(id);
+        const result = await fetchParentSentNotesResult();
+        if (!result.ok) {
+          setLoadError(true);
+          return;
+        }
+        setNotes(result.notes);
+      } else {
+        const result = await fetchParentNotesResult();
+        if (!result.ok) {
+          setLoadError(true);
+          return;
+        }
+        setNotes(result.notes);
+      }
+    } catch {
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [side]);
 
   useEffect(() => {
     Animated.timing(fade1, { toValue: 1, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
@@ -48,29 +84,17 @@ export function MessagesScreen({ side, setScreen, BottomNav }: MessagesScreenPro
     ]));
     loop.start();
 
-    async function load() {
-      if (side === 'parent') {
-        const id = await fetchLinkedTeenId();
-        if (id) setTeenId(id);
-        const history = await fetchParentSentNotes();
-        setNotes(history);
-      } else {
-        const inbox = await fetchParentNotes();
-        setNotes(inbox);
-      }
-      setLoading(false);
-    }
-    load();
+    void loadNotes();
 
     return () => loop.stop();
-  }, [fade1, breath, side]);
+  }, [fade1, breath, loadNotes]);
 
   // Scroll to bottom when messages load or new one arrives
   useEffect(() => {
-    if (!loading) {
+    if (!loading && !loadError) {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 120);
     }
-  }, [loading, notes.length]);
+  }, [loading, loadError, notes.length]);
 
   const breathScale = breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.035] });
 
@@ -149,7 +173,24 @@ export function MessagesScreen({ side, setScreen, BottomNav }: MessagesScreenPro
           <Text style={[st.loadingText, { color: soft + '55' }]}>loading...</Text>
         )}
 
-        {!loading && notes.length === 0 && (
+        {!loading && loadError && (
+          <View style={st.errorState} accessibilityRole="alert">
+            <Text style={st.emptyEmoji}>↻</Text>
+            <Text style={[st.errorTitle, { color: accent }]}>Couldn’t load notes right now.</Text>
+            <Text style={[st.emptyText, { color: soft + '99' }]}>We won’t call this inbox empty unless the read succeeds.</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading warm notes"
+              onPress={() => void loadNotes()}
+              activeOpacity={0.8}
+              style={[st.retryButton, { borderColor: accent + '66', backgroundColor: accent + '18' }]}
+            >
+              <Text style={[st.retryText, { color: accent }]}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {!loading && !loadError && notes.length === 0 && (
           <View style={st.emptyState}>
             <Animated.Text style={[st.emptyEmoji, { transform: [{ scale: breathScale }] }]}>💜</Animated.Text>
             <Text style={[st.emptyText, { color: soft + '77' }]}>
@@ -160,7 +201,7 @@ export function MessagesScreen({ side, setScreen, BottomNav }: MessagesScreenPro
           </View>
         )}
 
-        {!loading && notes.map((note, i) => (
+        {!loading && !loadError && notes.map((note) => (
           <Animated.View
             key={note.id}
             style={[
@@ -199,14 +240,12 @@ export function MessagesScreen({ side, setScreen, BottomNav }: MessagesScreenPro
       {/* Parent compose area */}
       {side === 'parent' && (
         <View style={[st.composeArea, { borderTopColor: accent + '33' }]}>
-          {/* Sent flash */}
           {sent && (
             <View style={[st.sentFlash, { backgroundColor: accent + '22', borderColor: accent + '55' }]}>
               <Text style={[{ color: accent, fontWeight: '700', fontSize: 13 }]}>💜 sent.</Text>
             </View>
           )}
 
-          {/* Starter prompts */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -224,7 +263,6 @@ export function MessagesScreen({ side, setScreen, BottomNav }: MessagesScreenPro
             ))}
           </ScrollView>
 
-          {/* Input row */}
           <View style={st.inputRow}>
             <TextInput
               style={[st.input, { borderColor: accent + '66', color: '#fff', backgroundColor: 'rgba(40,20,70,0.85)' }]}
@@ -273,10 +311,13 @@ const st = StyleSheet.create({
   loadingText:    { textAlign: 'center', fontSize: 13, marginTop: 40 },
 
   emptyState:     { alignItems: 'center', paddingVertical: 48 },
+  errorState:     { alignItems: 'center', paddingVertical: 40, paddingHorizontal: 24 },
   emptyEmoji:     { fontSize: 42, marginBottom: 14, textAlign: 'center' },
   emptyText:      { fontSize: 13, lineHeight: 21, textAlign: 'center', fontStyle: 'italic' },
+  errorTitle:     { fontSize: 16, fontWeight: '800', marginBottom: 8, textAlign: 'center' },
+  retryButton:    { minHeight: 44, minWidth: 120, marginTop: 16, borderRadius: 16, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
+  retryText:      { fontSize: 13, fontWeight: '800' },
 
-  // Bubble rows
   bubbleRow:      { flexDirection: 'row', alignItems: 'flex-end', marginBottom: 14, gap: 8 },
   bubbleRowLeft:  { justifyContent: 'flex-start' },
   bubbleRowRight: { justifyContent: 'flex-end' },
@@ -292,7 +333,6 @@ const st = StyleSheet.create({
   bubbleTime:     { fontSize: 10, fontWeight: '600' },
   seenLabel:      { fontSize: 10, fontWeight: '600' },
 
-  // Compose area
   composeArea:    {
     borderTopWidth: 1,
     paddingBottom: Platform.OS === 'ios' ? 0 : 8,
