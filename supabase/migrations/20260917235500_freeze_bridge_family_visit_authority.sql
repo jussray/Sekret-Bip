@@ -185,6 +185,17 @@ begin
       updated_at = now()
   returning id into v_reflection_id;
 
+  -- The session timestamp is the optimistic evidence version used by the Worker.
+  -- If generation froze the session between the read above and this write, fail
+  -- the entire transaction so no post-ready evidence mutation can land.
+  update public.bridge_family_visit_sessions
+  set updated_at = now()
+  where id = p_session_id
+    and state = 'reflection';
+  if not found then
+    raise exception 'family visit evidence is already frozen' using errcode = '40001';
+  end if;
+
   return v_reflection_id;
 end;
 $$;
