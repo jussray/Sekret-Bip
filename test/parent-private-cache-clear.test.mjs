@@ -29,3 +29,14 @@ test('only structured parent cache values are parsed as JSON', () => {
 test('clearPrivateAccountCache removes the complete canonical private list', () => {
   assert.match(source, /AsyncStorage\.multiRemove\(\[\.\.\.PRIVATE_ACCOUNT_KEYS\]\)/);
 });
+
+test('companion memory and wellbeing corrections are private account state', () => {
+  assert.match(source, /'sekret_companion_memory'/);
+  assert.match(source, /'sekret_wellbeing_dismissed_v1'/);
+});
+
+test('private cache removal failures propagate across the sign-out boundary', () => {
+  const clearBody = source.match(/export async function clearPrivateAccountCache\(\): Promise<void> \{([\s\S]*?)\n\}/)?.[1] ?? '';
+  assert.match(clearBody, /await AsyncStorage\.multiRemove\(\[\.\.\.PRIVATE_ACCOUNT_KEYS\]\)/);
+  assert.doesNotMatch(clearBody, /catch\s*\(/);
+});
