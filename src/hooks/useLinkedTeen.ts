@@ -2,27 +2,19 @@
  * src/hooks/useLinkedTeen.ts
  *
  * Centralises all parent-visible teen data in one hook.
- * Used by the parent Bridge route; never throws.
- *
- * Returns:
- *   linkedTeenId    — teen's auth.uid, or null if no active link
- *   isLinked        — true once we've confirmed an active link
- *   activitySummary — streak / sessions / tier (aggregate, no PII)
- *   sharedJournal   — journal entries the teen explicitly shared
- *   sharedMoods     — mood check-ins the teen explicitly shared
- *   signals         — bridge signals (teen's "share this moment" actions)
- *   isLoading       — true until the first fetch completes
+ * A successful empty read is distinct from a failed read so Parent Bridge never
+ * turns backend failure into a false "nothing shared" state.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getSupabase } from '@/utils/supabase';
 import {
-  fetchLinkedTeenId,
-  fetchBridgeSignals,
+  fetchBridgeSignalsResult,
   subscribeToBridgeSignals,
   type BridgeSignal,
 } from '@/utils/parentBridgeCompat';
-import { pullSharedWithParent } from '@/features/consent/consentLayer';
+import { pullSharedWithParentResult } from '@/features/consent/consentLayer';
+import { resolveParentEntryState } from '@/services/parentEntryState';
 
 export type { BridgeSignal };
 
@@ -53,25 +45,35 @@ export interface LinkedTeenData {
   sharedMoods:     SharedMoodEntry[];
   signals:         BridgeSignal[];
   isLoading:       boolean;
+  loadError:       boolean;
+  reload:          () => void;
 }
 
-async function fetchActivitySummary(teenId: string): Promise<TeenActivitySummary | null> {
+type ActivitySummaryResult =
+  | { ok: true; value: TeenActivitySummary | null }
+  | { ok: false; value: null };
+
+async function fetchActivitySummaryResult(teenId: string): Promise<ActivitySummaryResult> {
   const sb = getSupabase();
-  if (!sb) return null;
+  if (!sb) return { ok: false, value: null };
   try {
     const { data, error } = await sb
       .from('teen_activity_summary')
       .select('streak_days, session_count, points_tier')
       .eq('user_id', teenId)
       .maybeSingle();
-    if (error || !data) return null;
+    if (error) return { ok: false, value: null };
+    if (!data) return { ok: true, value: null };
     return {
-      streakDays:   (data.streak_days   as number) ?? 0,
-      sessionCount: (data.session_count as number) ?? 0,
-      pointsTier:   (data.points_tier   as string) ?? 't0',
+      ok: true,
+      value: {
+        streakDays:   (data.streak_days   as number) ?? 0,
+        sessionCount: (data.session_count as number) ?? 0,
+        pointsTier:   (data.points_tier   as string) ?? 't0',
+      },
     };
   } catch {
-    return null;
+    return { ok: false, value: null };
   }
 }
 
@@ -83,39 +85,81 @@ export function useLinkedTeen(): LinkedTeenData {
   const [sharedMoods,     setSharedMoods]      = useState<SharedMoodEntry[]>([]);
   const [signals,         setSignals]          = useState<BridgeSignal[]>([]);
   const [isLoading,       setIsLoading]        = useState(true);
+  const [loadError,       setLoadError]        = useState(false);
+  const [reloadToken,     setReloadToken]      = useState(0);
+
+  const reload = useCallback(() => setReloadToken(value => value + 1), []);
 
   useEffect(() => {
+    let active = true;
     let unsub = () => {};
+
     (async () => {
       setIsLoading(true);
-      const id = await fetchLinkedTeenId();
-      if (!id) {
-        setIsLinked(false);
-        setIsLoading(false);
-        return;
+      setLoadError(false);
+
+      try {
+        const entryState = await resolveParentEntryState();
+        if (!active) return;
+        if (entryState.state !== 'ready') {
+          setLinkedTeenId(null);
+          setIsLinked(false);
+          setActivitySummary(null);
+          setSharedJournal([]);
+          setSharedMoods([]);
+          setSignals([]);
+          return;
+        }
+
+        const id = entryState.teenUserId;
+        const [signalResult, summaryResult, journalResult, moodResult] = await Promise.all([
+          fetchBridgeSignalsResult(id),
+          fetchActivitySummaryResult(id),
+          pullSharedWithParentResult<SharedJournalEntry>('journal_entries', id),
+          pullSharedWithParentResult<SharedMoodEntry>('mood_history', id),
+        ]);
+        if (!active) return;
+
+        if (!signalResult.ok || !summaryResult.ok || !journalResult.ok || !moodResult.ok) {
+          setLoadError(true);
+          return;
+        }
+
+        setLinkedTeenId(id);
+        setIsLinked(true);
+        setSignals(signalResult.signals);
+        setActivitySummary(summaryResult.value);
+        setSharedJournal(journalResult.items);
+        setSharedMoods(moodResult.items);
+
+        subscribeToBridgeSignals(id, (sig) => {
+          if (active) setSignals(prev => [sig, ...prev]);
+        }).then(fn => {
+          if (active) unsub = fn;
+          else fn();
+        });
+      } catch {
+        if (active) setLoadError(true);
+      } finally {
+        if (active) setIsLoading(false);
       }
-      setLinkedTeenId(id);
-      setIsLinked(true);
-
-      const [sigs, summary, journal, moods] = await Promise.all([
-        fetchBridgeSignals(id),
-        fetchActivitySummary(id),
-        pullSharedWithParent<SharedJournalEntry>('journal_entries', id),
-        pullSharedWithParent<SharedMoodEntry>('mood_history', id),
-      ]);
-
-      setSignals(sigs);
-      setActivitySummary(summary);
-      setSharedJournal(journal);
-      setSharedMoods(moods);
-      setIsLoading(false);
-
-      subscribeToBridgeSignals(id, (sig) => {
-        setSignals(prev => [sig, ...prev]);
-      }).then(fn => { unsub = fn; });
     })();
-    return () => { unsub(); };
-  }, []);
 
-  return { linkedTeenId, isLinked, activitySummary, sharedJournal, sharedMoods, signals, isLoading };
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, [reloadToken]);
+
+  return {
+    linkedTeenId,
+    isLinked,
+    activitySummary,
+    sharedJournal,
+    sharedMoods,
+    signals,
+    isLoading,
+    loadError,
+    reload,
+  };
 }
