@@ -65,6 +65,10 @@ export type ParentNotesReadResult =
   | { ok: true; notes: ParentNote[] }
   | { ok: false; notes: []; reason: ParentNotesReadFailure };
 
+export type BridgeSignalsReadResult =
+  | { ok: true; signals: BridgeSignal[] }
+  | { ok: false; signals: []; reason: 'service-unavailable' | 'query-failed' };
+
 export interface ParentEngagement {
   notesSent: number;
   tipsRead: number;
@@ -126,21 +130,11 @@ export async function fetchParentSentNotesResult(): Promise<ParentNotesReadResul
   return readParentNotes('parent_user_id', 30);
 }
 
-/**
- * Compatibility helper for call sites that only need rows. New user-facing
- * surfaces should prefer fetchParentNotesResult() so a failed read cannot be
- * presented as a truthful empty inbox.
- */
 export async function fetchParentNotes(): Promise<ParentNote[]> {
   const result = await fetchParentNotesResult();
   return result.notes;
 }
 
-/**
- * Compatibility helper for call sites that only need rows. New user-facing
- * surfaces should prefer fetchParentSentNotesResult() so a failed read cannot
- * be presented as a truthful empty history.
- */
 export async function fetchParentSentNotes(): Promise<ParentNote[]> {
   const result = await fetchParentSentNotesResult();
   return result.notes;
@@ -166,16 +160,27 @@ export async function subscribeToParentNotes(
   return () => { void sb.removeChannel(channel); };
 }
 
-export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]> {
+export async function fetchBridgeSignalsResult(teenId: string): Promise<BridgeSignalsReadResult> {
   const sb = getSupabase();
-  if (!sb || !teenId) return [];
-  const { data } = await sb
-    .from('bridge_signals')
-    .select('id, share_type, conv_mode, response_preference, char_key, sent_at, created_at')
-    .eq('teen_user_id', teenId)
-    .order('sent_at', { ascending: false })
-    .limit(30);
-  return (data ?? []) as BridgeSignal[];
+  if (!sb) return { ok: false, signals: [], reason: 'service-unavailable' };
+  if (!teenId) return { ok: true, signals: [] };
+  try {
+    const { data, error } = await sb
+      .from('bridge_signals')
+      .select('id, share_type, conv_mode, response_preference, char_key, sent_at, created_at')
+      .eq('teen_user_id', teenId)
+      .order('sent_at', { ascending: false })
+      .limit(30);
+    if (error) return { ok: false, signals: [], reason: 'query-failed' };
+    return { ok: true, signals: (data ?? []) as BridgeSignal[] };
+  } catch {
+    return { ok: false, signals: [], reason: 'query-failed' };
+  }
+}
+
+export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]> {
+  const result = await fetchBridgeSignalsResult(teenId);
+  return result.signals;
 }
 
 export async function sendParentNote(teenId: string, content: string): Promise<boolean> {
