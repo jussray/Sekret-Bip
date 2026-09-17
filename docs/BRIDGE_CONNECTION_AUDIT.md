@@ -14,52 +14,67 @@ Bridge is the private teen-parent connection system.
 1. Doorbell became a standalone parent dashboard route.
 2. Parent More listed Doorbell and Bridge as separate products.
 3. S2Tell had its own screen implementation even though its route already aliases into Bridge.
-4. Bridge signals were cloud-synced, but message content still depended on local side switching and local storage paths.
+4. Bridge signals were cloud-synced, but the main Teen Bridge composer collected text without persisting that intentional S2Tell content while still showing delivery-success copy.
 5. Teen and parent side switching in More made one account imitate both people instead of exercising a linked-account relationship.
 6. Parent Bridge exposed an activity pulse that risks turning the connection layer into monitoring; Bridge should prioritize intentionally shared content.
+7. The routed Parent Bridge had drifted down to summaries and one signal card, leaving the shared S2Tell/reply thread available only in a legacy non-routed screen.
+8. Several Bridge readers collapsed provider failure into an empty array, allowing failed reads to masquerade as “nothing shared.”
 
-## Refactor completed
+## Reconciled implementation
 
-- Doorbell is now defined as `signals` owned by Bridge.
+- Doorbell is defined as `signals` owned by Bridge.
 - The former parent Doorbell route redirects into Parent Bridge signals.
-- S2Tell continues to enter Teen Bridge through the Bridge route.
-- A dedicated `bridge_messages` table was considered but retired in favor of the existing product-specific tables (`supabase/migrations/20260630004000_bridge_linked_accounts.sql`): `bridge_signals` for Doorbell, `bridge_shares` for S2Tell, and `parent_notes` for parent replies.
-- Added RLS that permits only the active linked teen and parent to read or write the shared Bridge thread.
-- Added a Bridge client service that resolves the active parent link instead of relying on side-switch state.
-- Removed Doorbell as a separate item from Parent More.
-- Kept all Circle tables and routes outside the Bridge service.
-- Side-switch controls are hidden unless `EXPO_PUBLIC_ENABLE_SIDE_SWITCH=true` is explicitly set for internal testing.
+- The Teen Bridge composer writes intentional message text to the existing `bridge_shares` S2Tell path before it can claim delivery success.
+- `bridge_signals` remains the lightweight metadata/support-signal path. A signal-write failure cannot erase or falsely invalidate an already-confirmed S2Tell message; the UI reports the partial failure.
+- `parent_notes` remains the parent-to-teen reply path.
+- No generic `bridge_messages` table was introduced. The existing product-specific tables remain authoritative: `bridge_signals`, `bridge_shares`, and `parent_notes`.
+- The routed parent authority remains `app/(parent)/bridge.tsx` → `ParentBridgeSummaryScreen`. The legacy `screens/ParentBridgeScreen.tsx` is retained as reference code, not runtime authority.
+- `ParentBridgeSummaryScreen` now composes the response-request card, a shared Bridge thread, and the consent-bounded Bridge Summary inbox.
+- The shared Parent Bridge thread renders only signals, explicit S2Tell shares, and the parent’s replies for the currently linked teen. It deliberately excludes raw journal/mood data because generated summaries own that consent-bounded surface.
+- Parent-linked hooks clear stale teen snapshots before relationship re-verification and on read failure, so revoked or unverifiable relationships cannot keep old shared content visible.
+- Result-aware readers distinguish successful empty state from provider failure for Bridge signals, S2Tell shares, parent notes, and Bridge Summary history.
+- Parent note history is scoped to the currently linked teen instead of all notes ever sent by that parent account.
+- Side-switch controls remain internal-test-only.
 
 ## Canonical structure
 
 ### Teen Bridge
 
-- Signals / Doorbell
-- S2Tell composer
-- Parent replies
-- Shared moments
-- Connection history
+- Signals / Doorbell metadata
+- S2Tell composer using `bridge_shares`
+- Parent replies from `parent_notes`
+- Consent-bounded Bridge Summary history
+- Connection history with explicit loading/error/empty states
 
 ### Parent Bridge
 
 - Teen signals
 - S2Tell shares
 - Parent reply composer
-- Shared moments
-- Connection history
+- Consent-bounded Bridge Summaries
+- Connection history with explicit loading/error/empty states
 
 ## Privacy boundary
 
-Bridge may contain only content a participant intentionally sends into the linked relationship. It must never read teen journals, companion chats, private voice notes, Circle posts, or general activity history.
+Bridge may contain only content a participant intentionally sends into the linked relationship. It must never read or expose unshared teen journals, companion chats, private voice notes, Circle posts, or general activity history.
 
-## Remaining UI pass
+The routed Parent Bridge intentionally does **not** render raw journal or mood rows in its shared thread. Those sources can appear only through the separate Bridge Summary consent/generation path after teen confirmation.
 
-Completed. `ParentBridgeScreen` no longer embeds the duplicate Se'kret Advice
-topic picker (that capability lives at its real home,
-`src/parent/features/sekret/ParentSekretCoachScreen.tsx`, linked from Bridge
-via a single CTA) or the legacy Activity Pulse card. Both `BridgeScreen`
-(teen) and `ParentBridgeScreen` (parent) now expose a chronological
-Connection history view built from the existing `bridge_signals`,
-`bridge_shares`, and `parent_notes` tables — no new `bridge_messages` table
-was introduced; the canonical structure above is realized entirely on the
-existing linked-account data contract.
+## Failure-truth boundary
+
+A provider, auth, or relationship-authority failure is not an empty Bridge.
+
+- Linked-teen state fails closed while authority is re-verified.
+- S2Tell/share readers return explicit success/failure results.
+- Teen and parent history views show retry/error state when any authoritative source fails.
+- Delivery success is shown only after the core S2Tell share write succeeds.
+- Marking a parent reply as read updates local UI only after the database confirms the update.
+
+## Runtime authority
+
+- Teen: `app/(teen)/bridge.tsx` → `screens/BridgeScreen.tsx`
+- Parent: `app/(parent)/bridge.tsx` → `src/features/bridge/ParentBridgeSummaryScreen.tsx`
+- Relationship authority: `src/services/parentEntryState.ts`
+- Signals/notes compatibility layer: `src/utils/parentBridgeCompat.ts`
+- S2Tell share layer: `src/features/bridge/bridgeShareCompat.ts`
+- Generated summary layer: `src/services/bridgeSummaryService.ts` / `src/services/parentBridgeSummaryService.ts`

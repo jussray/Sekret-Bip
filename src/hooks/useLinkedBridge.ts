@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLinkedTeen, type LinkedTeenData, type SharedJournalEntry } from '@/hooks/useLinkedTeen';
 import {
-  fetchBridgeShares,
+  fetchBridgeSharesResult,
   subscribeToBridgeShares,
   type BridgeShare,
 } from '@/features/bridge/bridgeShareCompat';
@@ -20,6 +20,8 @@ function toSharedEntry(share: BridgeShare): SharedJournalEntry {
 export function useLinkedBridge(): LinkedTeenData {
   const linked = useLinkedTeen();
   const [shares, setShares] = useState<BridgeShare[]>([]);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareLoadError, setShareLoadError] = useState(false);
   const [testTeenId, setTestTeenId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,6 +31,8 @@ export function useLinkedBridge(): LinkedTeenData {
   useEffect(() => {
     if (!linked.linkedTeenId || linked.loadError || testTeenId) {
       setShares([]);
+      setShareLoading(false);
+      setShareLoadError(false);
       return;
     }
 
@@ -36,17 +40,38 @@ export function useLinkedBridge(): LinkedTeenData {
     let unsubscribe = () => {};
     const teenId = linked.linkedTeenId;
 
-    // A teen/link transition must never render the previous teen's Bridge
-    // payload while the next authority-scoped read is still in flight.
     setShares([]);
-    void fetchBridgeShares(teenId).then(nextShares => {
-      if (active) setShares(nextShares);
-    });
-    void subscribeToBridgeShares(teenId, share => {
-      if (active) setShares(previous => [share, ...previous]);
-    }).then(fn => {
-      if (active) unsubscribe = fn;
-      else fn();
+    setShareLoading(true);
+    setShareLoadError(false);
+
+    void (async () => {
+      const result = await fetchBridgeSharesResult(teenId);
+      if (!active) return;
+      if (!result.ok) {
+        setShares([]);
+        setShareLoadError(true);
+        setShareLoading(false);
+        return;
+      }
+
+      setShares(result.shares);
+      setShareLoading(false);
+
+      try {
+        const fn = await subscribeToBridgeShares(teenId, share => {
+          if (active) setShares(previous => [share, ...previous]);
+        });
+        if (active) unsubscribe = fn;
+        else fn();
+      } catch {
+        // The initial authoritative read succeeded, so keep that snapshot.
+        // Realtime subscription is supplementary and must not fabricate a read failure.
+      }
+    })().catch(() => {
+      if (!active) return;
+      setShares([]);
+      setShareLoadError(true);
+      setShareLoading(false);
     });
 
     return () => {
@@ -72,5 +97,10 @@ export function useLinkedBridge(): LinkedTeenData {
     };
   }
 
-  return { ...linked, sharedJournal };
+  return {
+    ...linked,
+    sharedJournal,
+    isLoading: linked.isLoading || shareLoading,
+    loadError: linked.loadError || shareLoadError,
+  };
 }
