@@ -1,3 +1,5 @@
+import { clearProfileIdentityCache } from '@/features/identity/clearProfileIdentityCache';
+import { consentService } from '@/services/consentService';
 import { disableCurrentPushToken } from '@/services/pushTokenSync';
 import { clearPrivateAccountCache } from '@/utils/storage';
 import { getSupabase } from '@/utils/supabase';
@@ -29,12 +31,14 @@ export async function endAuthenticatedSession(): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) throw new Error('Supabase is not configured.');
 
-  // Keep the authenticated context long enough to disable the account-owned
-  // push token, then clear private device state before ending authentication.
-  // If local removal fails, do not report a secure sign-out while old private
-  // data is still readable by the next user of the device.
+  // Keep authenticated authority long enough to disable the account-owned push
+  // token. Then clear all existing identity/private caches before auth ends. A
+  // failed clear stops the transition instead of leaving private data behind
+  // for the next person using the device.
   await disableCurrentPushToken();
+  await clearProfileIdentityCache();
   await clearPrivateAccountCache();
+  consentService.reset();
 
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
