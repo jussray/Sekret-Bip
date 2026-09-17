@@ -21,7 +21,7 @@ test('retention event source uses authenticated account identity and server time
   const teenLayout = await read('app/(teen)/_layout.tsx');
 
   assert.match(logger, /supabase\.auth\.getUser\(\)/);
-  assert.match(logger, /if \(!user\) return/);
+  assert.match(logger, /if \(!user\)[\s\S]*reason: 'unauthenticated'/);
   assert.match(logger, /user_id: user\.id/);
   assert.match(logger, /event_type/);
   assert.doesNotMatch(logger, /created_at\s*:/);
