@@ -38,8 +38,8 @@ export default function ParentRoomRoute() {
   }, []);
 
   const openParentScreen = useCallback((screen: string) => {
-    if (hasLinkedTeen === false && LINK_REQUIRED_ROUTES.has(screen)) {
-      openTeenLink();
+    if (LINK_REQUIRED_ROUTES.has(screen) && hasLinkedTeen !== true) {
+      if (hasLinkedTeen === false) openTeenLink();
       return;
     }
 
@@ -57,7 +57,7 @@ export default function ParentRoomRoute() {
         BottomNav={null}
       />
 
-      {hasLinkedTeen !== false ? (
+      {hasLinkedTeen === true ? (
         <RoomExploreGuide side="parent" onNavigate={openParentScreen} />
       ) : null}
 
