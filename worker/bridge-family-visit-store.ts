@@ -11,6 +11,7 @@ export interface BridgeFamilyVisitSessionRow {
   teen_acknowledged_at: string | null;
   parent_acknowledged_at: string | null;
   professional_acknowledged_at: string | null;
+  updated_at: string;
 }
 
 export interface BridgeCaseAssignmentRow {
@@ -76,7 +77,7 @@ export function createBridgeFamilyVisitStore(env: BridgeFamilyVisitStoreEnv, fet
   async function fetchSession(sessionId: string): Promise<BridgeFamilyVisitSessionRow | null> {
     const { url, key } = requireSupabase(env);
     const response = await fetchImpl(
-      `${url}/rest/v1/bridge_family_visit_sessions?id=eq.${encodeURIComponent(sessionId)}&select=id,assignment_id,state,capture_mode,teen_acknowledged_at,parent_acknowledged_at,professional_acknowledged_at`,
+      `${url}/rest/v1/bridge_family_visit_sessions?id=eq.${encodeURIComponent(sessionId)}&select=id,assignment_id,state,capture_mode,teen_acknowledged_at,parent_acknowledged_at,professional_acknowledged_at,updated_at`,
       { headers: serviceHeaders(key) },
     );
     return oneOrNull<BridgeFamilyVisitSessionRow>(response, 'family_visit_session_lookup_failed');
@@ -140,10 +141,10 @@ export function createBridgeFamilyVisitStore(env: BridgeFamilyVisitStoreEnv, fet
     if (!response.ok) throw new Error('family_visit_summary_write_failed');
   }
 
-  async function markSessionReady(sessionId: string): Promise<void> {
+  async function markSessionReady(sessionId: string, expectedUpdatedAt: string): Promise<void> {
     const { url, key } = requireSupabase(env);
     const response = await fetchImpl(
-      `${url}/rest/v1/bridge_family_visit_sessions?id=eq.${encodeURIComponent(sessionId)}&state=eq.reflection`,
+      `${url}/rest/v1/bridge_family_visit_sessions?id=eq.${encodeURIComponent(sessionId)}&state=eq.reflection&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`,
       {
         method: 'PATCH',
         headers: { ...serviceHeaders(key), Prefer: 'return=representation' },
@@ -152,7 +153,7 @@ export function createBridgeFamilyVisitStore(env: BridgeFamilyVisitStoreEnv, fet
     );
     if (!response.ok) throw new Error('family_visit_session_ready_failed');
     const rows = await response.json() as Array<{ id?: string }>;
-    if (!rows[0]?.id) throw new Error('family_visit_session_state_changed');
+    if (!rows[0]?.id) throw new Error('family_visit_evidence_changed');
   }
 
   return Object.freeze({
