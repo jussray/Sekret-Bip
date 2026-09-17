@@ -1,4 +1,5 @@
 import { disableCurrentPushToken } from '@/services/pushTokenSync';
+import { clearPrivateAccountCache } from '@/utils/storage';
 import { getSupabase } from '@/utils/supabase';
 
 export async function getCurrentSessionUserId(): Promise<string | null> {
@@ -28,7 +29,12 @@ export async function endAuthenticatedSession(): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) throw new Error('Supabase is not configured.');
 
+  // Keep the authenticated context long enough to disable the account-owned
+  // push token, then clear private device state before ending authentication.
+  // If local removal fails, do not report a secure sign-out while old private
+  // data is still readable by the next user of the device.
   await disableCurrentPushToken();
+  await clearPrivateAccountCache();
 
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
