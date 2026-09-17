@@ -96,6 +96,10 @@ const PRIVATE_ACCOUNT_KEYS = [
   STORAGE_KEYS.bipEnergyAdjustmentSeen,
   STORAGE_KEYS.bridgeResponsePreference,
   STORAGE_KEYS.savedContinuation,
+  // Companion memory and wellbeing corrections are private account state even
+  // though their owning services keep their storage constants locally.
+  'sekret_companion_memory',
+  'sekret_wellbeing_dismissed_v1',
   'sekretbip_first_visit_done',
   'parent_bridge_pending',
   'sekret_self_discovery_profile',
@@ -145,9 +149,8 @@ export const saveState = async (stateUpdates: Record<string, any>): Promise<void
 };
 
 export async function clearPrivateAccountCache(): Promise<void> {
-  try {
-    await AsyncStorage.multiRemove([...PRIVATE_ACCOUNT_KEYS]);
-  } catch (error) {
-    console.error('clearPrivateAccountCache error:', error);
-  }
+  // Sign-out is a privacy boundary. If removal fails, propagate the failure so
+  // callers cannot report a secure account transition while old private state
+  // remains readable on a shared device.
+  await AsyncStorage.multiRemove([...PRIVATE_ACCOUNT_KEYS]);
 }
