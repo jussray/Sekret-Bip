@@ -56,6 +56,15 @@ export interface ParentNote {
   seen_by_teen: boolean;
 }
 
+export type ParentNotesReadFailure =
+  | 'service-unavailable'
+  | 'not-authenticated'
+  | 'query-failed';
+
+export type ParentNotesReadResult =
+  | { ok: true; notes: ParentNote[] }
+  | { ok: false; notes: []; reason: ParentNotesReadFailure };
+
 export interface ParentEngagement {
   notesSent: number;
   tipsRead: number;
@@ -84,30 +93,57 @@ export async function sendBridgeSignal(params: {
   });
 }
 
-export async function fetchParentNotes(): Promise<ParentNote[]> {
+async function readParentNotes(
+  ownerColumn: 'teen_user_id' | 'parent_user_id',
+  limit: number,
+): Promise<ParentNotesReadResult> {
   const sb = getSupabase();
+  if (!sb) return { ok: false, notes: [], reason: 'service-unavailable' };
+
   const userId = await uid();
-  if (!sb || !userId) return [];
-  const { data } = await sb
-    .from('parent_notes')
-    .select('id, content, sent_at, seen_by_teen')
-    .eq('teen_user_id', userId)
-    .order('sent_at', { ascending: false })
-    .limit(20);
-  return (data ?? []) as ParentNote[];
+  if (!userId) return { ok: false, notes: [], reason: 'not-authenticated' };
+
+  try {
+    const { data, error } = await sb
+      .from('parent_notes')
+      .select('id, content, sent_at, seen_by_teen')
+      .eq(ownerColumn, userId)
+      .order('sent_at', { ascending: false })
+      .limit(limit);
+
+    if (error) return { ok: false, notes: [], reason: 'query-failed' };
+    return { ok: true, notes: (data ?? []) as ParentNote[] };
+  } catch {
+    return { ok: false, notes: [], reason: 'query-failed' };
+  }
 }
 
+export async function fetchParentNotesResult(): Promise<ParentNotesReadResult> {
+  return readParentNotes('teen_user_id', 20);
+}
+
+export async function fetchParentSentNotesResult(): Promise<ParentNotesReadResult> {
+  return readParentNotes('parent_user_id', 30);
+}
+
+/**
+ * Compatibility helper for call sites that only need rows. New user-facing
+ * surfaces should prefer fetchParentNotesResult() so a failed read cannot be
+ * presented as a truthful empty inbox.
+ */
+export async function fetchParentNotes(): Promise<ParentNote[]> {
+  const result = await fetchParentNotesResult();
+  return result.notes;
+}
+
+/**
+ * Compatibility helper for call sites that only need rows. New user-facing
+ * surfaces should prefer fetchParentSentNotesResult() so a failed read cannot
+ * be presented as a truthful empty history.
+ */
 export async function fetchParentSentNotes(): Promise<ParentNote[]> {
-  const sb = getSupabase();
-  const userId = await uid();
-  if (!sb || !userId) return [];
-  const { data } = await sb
-    .from('parent_notes')
-    .select('id, content, sent_at, seen_by_teen')
-    .eq('parent_user_id', userId)
-    .order('sent_at', { ascending: false })
-    .limit(30);
-  return (data ?? []) as ParentNote[];
+  const result = await fetchParentSentNotesResult();
+  return result.notes;
 }
 
 export async function markParentNoteSeen(id: string): Promise<void> {
