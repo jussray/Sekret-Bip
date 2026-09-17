@@ -17,6 +17,18 @@ test('Room keeps cinematic hotspots but exposes an explicit shortcut guide', asy
   assert.match(guide, /accessibilityLabel=\{open \? 'Hide room shortcuts' : 'Show room shortcuts'\}/);
 });
 
+test('Parent Room unlocks relationship routes only from server-backed link authority', async () => {
+  const parentRoom = await read('app/(parent)/room.tsx');
+
+  assert.match(parentRoom, /resolveParentEntryState\(\)/);
+  assert.match(parentRoom, /state\.state === 'ready'/);
+  assert.match(parentRoom, /linkState !== 'linked'/);
+  assert.match(parentRoom, /linkState === 'linked'[\s\S]*RoomExploreGuide/s);
+  assert.match(parentRoom, /Couldn’t verify your link\./);
+  assert.match(parentRoom, /Retry private link check/);
+  assert.doesNotMatch(parentRoom, /AsyncStorage\.getItem\('linked_teen_id'\)/);
+});
+
 test('More does not duplicate destinations already owned by primary navigation or Bippin 2', async () => {
   const purposes = await read('src/constants/screenPurpose.ts');
   const teenDrawer = purposes.slice(
@@ -42,4 +54,29 @@ test('first-run age setup uses person-facing language instead of implementation 
   assert.doesNotMatch(visibleCopy, /age bucket/i);
   assert.doesNotMatch(visibleCopy, /assurance status/i);
   assert.doesNotMatch(visibleCopy, /account side/i);
+});
+
+test('Live Parent Bridge distinguishes provider failure from a successful empty read', async () => {
+  const route = await read('app/(parent)/bridge.tsx');
+  const screen = await read('src/features/bridge/ParentBridgeSummaryScreen.tsx');
+  const inbox = await read('src/features/bridge/ParentBridgeSummaryInbox.tsx');
+  const responseCard = await read('components/bridge/ParentBridgeResponseRequestCard.tsx');
+  const service = await read('src/services/parentBridgeSummaryService.ts');
+
+  assert.match(route, /ParentBridgeSummaryScreen/);
+  assert.match(screen, /ParentBridgeResponseRequestCard/);
+  assert.match(screen, /ParentBridgeSummaryInbox/);
+  assert.match(inbox, /accessibilityLabel="Retry loading Bridge summaries"/);
+  assert.match(responseCard, /fetchBridgeSignalsResult/);
+  assert.match(responseCard, /Couldn’t load the latest support request/);
+  assert.match(responseCard, /Retry loading Bridge response request/);
+  assert.match(service, /Couldn’t load Bridge Summaries right now\. Try again\./);
+  assert.doesNotMatch(service, /message: requestError\.message/);
+  assert.doesNotMatch(service, /message: summaryError\.message/);
+  assert.doesNotMatch(service, /message: viewError\.message/);
+});
+
+test('Legacy ParentBridgeScreen is not the routed parent Bridge authority', async () => {
+  const route = await read('app/(parent)/bridge.tsx');
+  assert.doesNotMatch(route, /@screens\/ParentBridgeScreen|screens\/ParentBridgeScreen/);
 });
