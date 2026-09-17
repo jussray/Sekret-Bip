@@ -27,6 +27,13 @@ test('derived observations retain provenance and bounded confidence', () => {
   assert.match(state, /MAX_PROVIDER_CONTEXT = 5/);
 });
 
+test('dismissal ledger fails closed instead of silently reviving rejected observations', () => {
+  assert.match(state, /WELLBEING_DISMISSALS_READ_FAILED/);
+  const loadDismissed = state.match(/async function loadDismissed\(\): Promise<DismissedObservation\[]> \{([\s\S]*?)\n\}/)?.[1] ?? '';
+  assert.match(loadDismissed, /throw new Error\('WELLBEING_DISMISSALS_READ_FAILED'\)/);
+  assert.doesNotMatch(loadDismissed, /catch\s*\{[\s\S]*?return \[]/);
+});
+
 test('voice transcript contributes only through existing bounded memory', () => {
   assert.match(voice, /result\.transcript\.status === 'available'/);
   assert.match(voice, /updateSekretMemory/);
@@ -48,9 +55,13 @@ test('companion request receives tentative user-controlled context', () => {
   assert.match(builder, /Never diagnose, label, score, or treat these as clinical facts/);
 });
 
-test('history surface exposes observations and a rejection control', () => {
+test('history surface exposes observations, rejection, and truthful load failure', () => {
   assert.match(history, /What Se'kret is noticing/);
   assert.match(history, /These are observations, not diagnoses/);
   assert.match(history, /dismissWellbeingObservation/);
   assert.match(history, />Not me<\/Text>/);
+  assert.match(history, /Promise\.allSettled/);
+  assert.match(history, /Couldn't load your private observations/);
+  assert.match(history, /Couldn't save that correction/);
+  assert.match(history, /minHeight: 44/);
 });
