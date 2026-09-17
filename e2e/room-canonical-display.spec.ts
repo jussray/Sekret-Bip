@@ -28,7 +28,7 @@ function boxesOverlap(
   );
 }
 
-test('Teen Room keeps one canonical companion visual with bounded interaction geometry', async ({ page }) => {
+test('Teen Room keeps one canonical companion visual with bounded, discoverable interaction geometry', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/room?bipDevSide=teen', { waitUntil: 'domcontentloaded' });
 
@@ -43,6 +43,10 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
     name: 'Open your Bip return choices',
     exact: true,
   });
+  const roomGuide = page.getByRole('button', {
+    name: 'Show room shortcuts',
+    exact: true,
+  });
   const companionButton = page.getByRole('button', {
     name: 'Suhana is here. Tap to talk.',
     exact: true,
@@ -53,6 +57,7 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
   await expect(intentions).toBeVisible({ timeout: 15_000 });
   await expect(moodButton).toBeVisible({ timeout: 15_000 });
   await expect(returnButton).toBeVisible({ timeout: 15_000 });
+  await expect(roomGuide).toBeVisible({ timeout: 15_000 });
   await expect(companionVisual).toHaveCount(1);
   await expect(page.getByText(/Suhana's Room/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Suhana is nearby.', { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -65,18 +70,20 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
   await expect(companionVisual).toHaveCSS('pointer-events', 'none');
   await expect(companionVisual).toHaveCSS('opacity', '1', { timeout: 5_000 });
 
-  const [visualBox, tapBox, intentionsBox, moodBox, returnBox] = await Promise.all([
+  const [visualBox, tapBox, intentionsBox, moodBox, returnBox, guideBox] = await Promise.all([
     companionVisual.boundingBox(),
     companionHitTarget.boundingBox(),
     intentions.boundingBox(),
     moodButton.boundingBox(),
     returnButton.boundingBox(),
+    roomGuide.boundingBox(),
   ]);
   expect(visualBox).not.toBeNull();
   expect(tapBox).not.toBeNull();
   expect(intentionsBox).not.toBeNull();
   expect(moodBox).not.toBeNull();
   expect(returnBox).not.toBeNull();
+  expect(guideBox).not.toBeNull();
   expect(visualBox!.width).toBeGreaterThan(250);
   expect(visualBox!.height).toBeGreaterThan(400);
   expect(visualBox!.width).toBeGreaterThan(tapBox!.width);
@@ -85,8 +92,24 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
   expect(boxesOverlap(intentionsBox!, moodBox!)).toBe(false);
   expect(boxesOverlap(intentionsBox!, returnBox!)).toBe(false);
   expect(boxesOverlap(moodBox!, returnBox!)).toBe(false);
+  expect(boxesOverlap(guideBox!, intentionsBox!)).toBe(false);
+  expect(boxesOverlap(guideBox!, moodBox!)).toBe(false);
+  expect(boxesOverlap(guideBox!, returnBox!)).toBe(false);
 
   await saveEvidence(page, '01-room-companion-first-composition');
+
+  await roomGuide.click();
+  await expect(page.getByTestId('room-explore-guide-panel')).toBeVisible();
+  await expect(page.getByText('Room shortcuts', { exact: true })).toBeVisible();
+  await expect(page.getByText('Tap objects in the room, or use a shortcut here.', { exact: true })).toBeVisible();
+  for (const name of ['Open Journal', 'Open Voice Bip', 'Open Calm', 'Open Bridge', 'Open Circle', 'Open Growth']) {
+    await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+  }
+  await saveEvidence(page, '02-room-shortcuts-visible');
+
+  await page.getByRole('button', { name: 'Open Journal', exact: true }).click();
+  await expect(page).toHaveURL(/\/pages/);
+  await page.goBack({ waitUntil: 'domcontentloaded' });
 
   const journal = page.getByRole('button', { name: 'Journal 📖', exact: true });
   await expect(journal).toBeVisible();
@@ -101,7 +124,7 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
   await expect(page.getByText(/Raylene's Room/)).toHaveCount(0);
   await expect(page.getByText(/Rylane's Room/)).toHaveCount(0);
 
-  await saveEvidence(page, '02-vibelab-room-picker-canonical-display');
+  await saveEvidence(page, '03-vibelab-room-picker-canonical-display');
 
   await page.getByText('💫', { exact: true }).click();
   for (const name of ['Suhana', 'Sy', 'Cloud', 'Night']) {
@@ -110,5 +133,5 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
   await expect(page.getByText('raylene', { exact: true })).toHaveCount(0);
   await expect(page.getByText('rylane', { exact: true })).toHaveCount(0);
 
-  await saveEvidence(page, '03-vibelab-companion-picker-canonical-display');
+  await saveEvidence(page, '04-vibelab-companion-picker-canonical-display');
 });
