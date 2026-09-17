@@ -74,13 +74,17 @@ async function oneOrNull<T>(response: Response, errorCode: string): Promise<T | 
 }
 
 export function createBridgeFamilyVisitStore(env: BridgeFamilyVisitStoreEnv, fetchImpl: BridgeFamilyVisitFetch = fetch) {
+  const observedSessionVersions = new Map<string, string>();
+
   async function fetchSession(sessionId: string): Promise<BridgeFamilyVisitSessionRow | null> {
     const { url, key } = requireSupabase(env);
     const response = await fetchImpl(
       `${url}/rest/v1/bridge_family_visit_sessions?id=eq.${encodeURIComponent(sessionId)}&select=id,assignment_id,state,capture_mode,teen_acknowledged_at,parent_acknowledged_at,professional_acknowledged_at,updated_at`,
       { headers: serviceHeaders(key) },
     );
-    return oneOrNull<BridgeFamilyVisitSessionRow>(response, 'family_visit_session_lookup_failed');
+    const session = await oneOrNull<BridgeFamilyVisitSessionRow>(response, 'family_visit_session_lookup_failed');
+    if (session?.updated_at) observedSessionVersions.set(sessionId, session.updated_at);
+    return session;
   }
 
   async function fetchAssignment(assignmentId: string): Promise<BridgeCaseAssignmentRow | null> {
@@ -141,8 +145,10 @@ export function createBridgeFamilyVisitStore(env: BridgeFamilyVisitStoreEnv, fet
     if (!response.ok) throw new Error('family_visit_summary_write_failed');
   }
 
-  async function markSessionReady(sessionId: string, expectedUpdatedAt: string): Promise<void> {
+  async function markSessionReady(sessionId: string): Promise<void> {
     const { url, key } = requireSupabase(env);
+    const expectedUpdatedAt = observedSessionVersions.get(sessionId);
+    if (!expectedUpdatedAt) throw new Error('family_visit_session_version_missing');
     const response = await fetchImpl(
       `${url}/rest/v1/bridge_family_visit_sessions?id=eq.${encodeURIComponent(sessionId)}&state=eq.reflection&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`,
       {
