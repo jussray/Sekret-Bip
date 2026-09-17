@@ -54,6 +54,9 @@ on:
       - 'test/character-recognition-gate.test.mjs'
       - 'test/worker-auth.test.mjs'
       - 'test/cloudflare-worker-consolidation.test.mjs'
+      - 'test/ux-clarity-contract.test.mjs'
+      - 'test/screen-purpose-parity.test.mjs'
+      - 'test/retention-metrics-contract.test.mjs'
       - 'playwright.config.ts'
       - 'package.json'
       - 'package-lock.json'
@@ -101,14 +104,17 @@ jobs:
 
       - run: npm ci
 
+      - name: Lint exact head
+        run: npm run lint
+
       - name: Type-check exact head
         run: npm run type-check
 
       - name: Verify character canon gate
         run: npm run verify:character-canon
 
-      - name: Verify Product Design contracts
-        run: node --test test/founder-visual-authority-contract.test.mjs test/product-design-workflow-contract.test.mjs test/visual-wonder-contract.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/pages-companion-asset-contract.test.mjs test/night-room-runtime-registry.test.mjs test/companion-runtime-contracts.test.mjs test/sorian-character-engine-contract.test.mjs test/dual-front-door-contract.test.mjs test/front-door-motion-contract.test.mjs test/voice-presence-motion-contract.test.mjs test/calm-companion-motion-contract.test.mjs test/character-recognition-gate.test.mjs
+      - name: Verify Product Design and UX truth contracts
+        run: node --test test/founder-visual-authority-contract.test.mjs test/product-design-workflow-contract.test.mjs test/visual-wonder-contract.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/pages-companion-asset-contract.test.mjs test/night-room-runtime-registry.test.mjs test/companion-runtime-contracts.test.mjs test/sorian-character-engine-contract.test.mjs test/dual-front-door-contract.test.mjs test/front-door-motion-contract.test.mjs test/voice-presence-motion-contract.test.mjs test/calm-companion-motion-contract.test.mjs test/character-recognition-gate.test.mjs test/ux-clarity-contract.test.mjs test/screen-purpose-parity.test.mjs test/retention-metrics-contract.test.mjs
 
       - run: npx playwright install --with-deps chromium
 
