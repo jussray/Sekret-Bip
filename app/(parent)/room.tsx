@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { ParentRoomScreen } from '@screens/ParentRoomScreen';
+import { RoomExploreGuide } from '@/components/rooms/RoomExploreGuide';
 import { routeForSide } from '@/shared/routes';
 
 const LINK_REQUIRED_ROUTES = new Set([
@@ -55,6 +56,10 @@ export default function ParentRoomRoute() {
         setScreen={openParentScreen}
         BottomNav={null}
       />
+
+      {hasLinkedTeen !== false ? (
+        <RoomExploreGuide side="parent" onNavigate={openParentScreen} />
+      ) : null}
 
       {hasLinkedTeen === false ? (
         <View style={styles.linkCard} accessibilityRole="summary">
