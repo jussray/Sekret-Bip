@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { ParentRoomScreen } from '@screens/ParentRoomScreen';
-import { RoomExploreGuide } from '@/components/rooms/RoomExploreGuide';
+import { RoomExploreGuide } from '../../components/rooms/RoomExploreGuide';
 import { resolveParentEntryState } from '@/services/parentEntryState';
 import { routeForSide } from '@/shared/routes';
 
@@ -31,6 +31,7 @@ export default function ParentRoomRoute() {
         setLinkState('error');
       }
     } catch {
+      console.warn('[parent-room] relationship authority check failed');
       setLinkState('error');
     }
   }, []);
