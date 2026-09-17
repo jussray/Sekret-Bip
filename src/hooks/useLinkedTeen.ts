@@ -89,6 +89,14 @@ export function useLinkedTeen(): LinkedTeenData {
   const [reloadToken,     setReloadToken]      = useState(0);
 
   const reload = useCallback(() => setReloadToken(value => value + 1), []);
+  const clearLinkedSnapshot = useCallback(() => {
+    setLinkedTeenId(null);
+    setIsLinked(false);
+    setActivitySummary(null);
+    setSharedJournal([]);
+    setSharedMoods([]);
+    setSignals([]);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -97,17 +105,16 @@ export function useLinkedTeen(): LinkedTeenData {
     (async () => {
       setIsLoading(true);
       setLoadError(false);
+      // Parent-visible teen state must fail closed while relationship authority
+      // is being re-verified. Never keep an old teen snapshot on screen through
+      // a revoked link, provider failure, or account-side transition.
+      clearLinkedSnapshot();
 
       try {
         const entryState = await resolveParentEntryState();
         if (!active) return;
         if (entryState.state !== 'ready') {
-          setLinkedTeenId(null);
-          setIsLinked(false);
-          setActivitySummary(null);
-          setSharedJournal([]);
-          setSharedMoods([]);
-          setSignals([]);
+          clearLinkedSnapshot();
           return;
         }
 
@@ -121,6 +128,7 @@ export function useLinkedTeen(): LinkedTeenData {
         if (!active) return;
 
         if (!signalResult.ok || !summaryResult.ok || !journalResult.ok || !moodResult.ok) {
+          clearLinkedSnapshot();
           setLoadError(true);
           return;
         }
@@ -139,7 +147,10 @@ export function useLinkedTeen(): LinkedTeenData {
           else fn();
         });
       } catch {
-        if (active) setLoadError(true);
+        if (active) {
+          clearLinkedSnapshot();
+          setLoadError(true);
+        }
       } finally {
         if (active) setIsLoading(false);
       }
@@ -149,7 +160,7 @@ export function useLinkedTeen(): LinkedTeenData {
       active = false;
       unsub();
     };
-  }, [reloadToken]);
+  }, [clearLinkedSnapshot, reloadToken]);
 
   return {
     linkedTeenId,

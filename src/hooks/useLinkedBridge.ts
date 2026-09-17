@@ -27,14 +27,33 @@ export function useLinkedBridge(): LinkedTeenData {
   }, []);
 
   useEffect(() => {
-    if (!linked.linkedTeenId || testTeenId) return;
+    if (!linked.linkedTeenId || linked.loadError || testTeenId) {
+      setShares([]);
+      return;
+    }
+
+    let active = true;
     let unsubscribe = () => {};
-    void fetchBridgeShares(linked.linkedTeenId).then(setShares);
-    void subscribeToBridgeShares(linked.linkedTeenId, share => {
-      setShares(previous => [share, ...previous]);
-    }).then(fn => { unsubscribe = fn; });
-    return () => unsubscribe();
-  }, [linked.linkedTeenId, testTeenId]);
+    const teenId = linked.linkedTeenId;
+
+    // A teen/link transition must never render the previous teen's Bridge
+    // payload while the next authority-scoped read is still in flight.
+    setShares([]);
+    void fetchBridgeShares(teenId).then(nextShares => {
+      if (active) setShares(nextShares);
+    });
+    void subscribeToBridgeShares(teenId, share => {
+      if (active) setShares(previous => [share, ...previous]);
+    }).then(fn => {
+      if (active) unsubscribe = fn;
+      else fn();
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [linked.linkedTeenId, linked.loadError, testTeenId]);
 
   const sharedJournal = useMemo(
     () => [...shares.map(toSharedEntry), ...linked.sharedJournal]

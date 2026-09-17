@@ -76,6 +76,19 @@ test('Live Parent Bridge distinguishes provider failure from a successful empty 
   assert.doesNotMatch(service, /message: viewError\.message/);
 });
 
+test('Parent-linked hooks fail closed before relationship authority is re-established', async () => {
+  const linkedTeen = await read('src/hooks/useLinkedTeen.ts');
+  const linkedBridge = await read('src/hooks/useLinkedBridge.ts');
+
+  assert.match(linkedTeen, /const clearLinkedSnapshot = useCallback\(\(\) => \{/);
+  assert.match(linkedTeen, /setLinkedTeenId\(null\);[\s\S]*setIsLinked\(false\);[\s\S]*setSharedJournal\(\[\]\);[\s\S]*setSharedMoods\(\[\]\);[\s\S]*setSignals\(\[\]\);/);
+  assert.match(linkedTeen, /setIsLoading\(true\);[\s\S]*setLoadError\(false\);[\s\S]*clearLinkedSnapshot\(\);[\s\S]*resolveParentEntryState\(\)/);
+  assert.match(linkedTeen, /if \(!signalResult\.ok \|\| !summaryResult\.ok \|\| !journalResult\.ok \|\| !moodResult\.ok\) \{[\s\S]*clearLinkedSnapshot\(\);[\s\S]*setLoadError\(true\);/);
+  assert.match(linkedBridge, /if \(!linked\.linkedTeenId \|\| linked\.loadError \|\| testTeenId\) \{[\s\S]*setShares\(\[\]\);/);
+  assert.match(linkedBridge, /setShares\(\[\]\);[\s\S]*fetchBridgeShares\(teenId\)/);
+  assert.match(linkedBridge, /if \(active\) setShares\(nextShares\)/);
+});
+
 test('Legacy ParentBridgeScreen is not the routed parent Bridge authority', async () => {
   const route = await read('app/(parent)/bridge.tsx');
   assert.doesNotMatch(route, /@screens\/ParentBridgeScreen|screens\/ParentBridgeScreen/);
