@@ -2,7 +2,8 @@ begin;
 
 -- Family Visit RLS/performance hardening before production rollout.
 -- Keep the same visibility rules while evaluating auth context once per query,
--- and add covering indexes for auth.users foreign keys used by audit/actor fields.
+-- add covering indexes for auth.users foreign keys used by audit/actor fields,
+-- and keep generated summaries unreadable until the session is atomically ready.
 
 create index if not exists bridge_professional_profiles_reviewed_by_idx
   on public.bridge_professional_profiles (reviewed_by);
@@ -138,6 +139,7 @@ using (
     from public.bridge_family_visit_sessions s
     join public.bridge_case_assignments a on a.id = s.assignment_id
     where s.id = bridge_family_visit_summaries.session_id
+      and s.state = 'ready'
       and (
         a.teen_user_id = (select auth.uid())
         or (
