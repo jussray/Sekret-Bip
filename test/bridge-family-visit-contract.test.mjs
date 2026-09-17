@@ -9,11 +9,13 @@ const migrationsDir = path.join(root, 'supabase', 'migrations');
 const contractPath = path.join(migrationsDir, '20260907223000_bridge_family_visit_mode.sql');
 const hardeningPath = path.join(migrationsDir, '20260907223100_harden_bridge_family_visit_mode.sql');
 const idempotencyPath = path.join(migrationsDir, '20260907223200_idempotent_bridge_family_visit_start.sql');
+const optimizationPath = path.join(migrationsDir, '20260917234000_optimize_bridge_family_visit_policies.sql');
 
 const contract = fs.readFileSync(contractPath, 'utf8');
 const hardening = fs.readFileSync(hardeningPath, 'utf8');
 const idempotency = fs.readFileSync(idempotencyPath, 'utf8');
-const combined = `${contract}\n${hardening}\n${idempotency}`;
+const optimization = fs.readFileSync(optimizationPath, 'utf8');
+const combined = `${contract}\n${hardening}\n${idempotency}\n${optimization}`;
 
 function tableBlock(name) {
   const start = contract.indexOf(`create table if not exists public.${name}`);
@@ -35,6 +37,7 @@ test('family visit migrations exist at ordered authority paths', () => {
   assert.equal(fs.existsSync(contractPath), true);
   assert.equal(fs.existsSync(hardeningPath), true);
   assert.equal(fs.existsSync(idempotencyPath), true);
+  assert.equal(fs.existsSync(optimizationPath), true);
 });
 
 test('Family Visit Mode is structurally no-recording and cannot store passive media or transcripts', () => {
@@ -118,6 +121,20 @@ test('parent and professional summaries are audience-isolated while teen transpa
   assert.match(policy, /audience = 'parent'.*a\.parent_user_id = auth\.uid\(\)/is);
   assert.match(policy, /audience = 'professional'.*a\.professional_user_id = auth\.uid\(\)/is);
   assert.match(policy, /verification_status = 'verified'/i);
+});
+
+test('Family Visit RLS hardening uses one-time auth lookups and covers actor audit foreign keys', () => {
+  assert.match(optimization, /user_id = \(select auth\.uid\(\)\)/i);
+  assert.match(optimization, /\(\(select auth\.jwt\(\)\) ->> 'is_anonymous'\)/i);
+  for (const index of [
+    'bridge_professional_profiles_reviewed_by_idx',
+    'bridge_case_assignments_created_by_idx',
+    'bridge_family_visit_sessions_created_by_idx',
+    'bridge_family_visit_markers_actor_idx',
+    'bridge_family_visit_reflections_actor_idx',
+  ]) {
+    assert.match(optimization, new RegExp(`create index if not exists ${index}`, 'i'));
+  }
 });
 
 test('authenticated clients cannot directly mutate family visit tables', () => {
