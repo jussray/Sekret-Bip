@@ -13,6 +13,7 @@ import { backendAuthHeaders } from '@/utils/backendAuth';
 import { getSupabase } from '@/utils/supabase';
 
 const BASE_URL = ((process.env as Record<string, string | undefined>).EXPO_PUBLIC_BACKEND_URL ?? '').replace(/\/$/, '');
+const SUMMARY_REQUEST_TIMEOUT_MS = 15_000;
 
 interface ProfessionalRow {
   user_id: string;
@@ -264,12 +265,15 @@ export async function generateBridgeFamilyVisitHumanSummaries(sessionId: string)
   const user = await currentPermanentUserId();
   if (!user.ok) return forwardFailure<{ ready: boolean }>(user);
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SUMMARY_REQUEST_TIMEOUT_MS);
   try {
     const headers = await backendAuthHeaders();
     const response = await fetch(`${BASE_URL}/api/bridge/summary/generate`, {
       method: 'POST',
       headers: { ...headers, 'Content-Type': 'application/json' },
       body: JSON.stringify({ sessionId }),
+      signal: controller.signal,
     });
     const body = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
     if (!response.ok) {
@@ -291,5 +295,7 @@ export async function generateBridgeFamilyVisitHumanSummaries(sessionId: string)
     return { ok: true, value: { ready: body?.status === 'ready' } };
   } catch {
     return { ok: false, code: 'ai_unavailable', message: 'Se’kret could not prepare the summaries yet.', retryable: true };
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
