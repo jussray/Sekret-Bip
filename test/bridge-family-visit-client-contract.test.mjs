@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const screen = fs.readFileSync(path.join(root, 'src/features/bridge/BridgeFamilyVisitScreen.tsx'), 'utf8');
 const service = fs.readFileSync(path.join(root, 'src/services/bridgeFamilyVisitService.ts'), 'utf8');
+const worker = fs.readFileSync(path.join(root, 'worker/bridge-family-visit.ts'), 'utf8');
 const bootstrap = fs.readFileSync(path.join(root, 'src/services/auth/postAuthBootstrap.ts'), 'utf8');
 const parentLayout = fs.readFileSync(path.join(root, 'app/(parent)/_layout.tsx'), 'utf8');
 const signup = fs.readFileSync(path.join(root, 'src/features/identity/accountProfile.ts'), 'utf8');
@@ -65,6 +66,18 @@ test('professional account still completes normal consent and onboarding before 
 test('professional summary generation uses the existing authenticated Bridge endpoint', () => {
   assert.match(service, /\/api\/bridge\/summary\/generate/);
   assert.match(service, /JSON\.stringify\(\{ sessionId \}\)/);
+});
+
+test('Family Visit summary network calls are explicitly time bounded', () => {
+  assert.match(service, /SUMMARY_REQUEST_TIMEOUT_MS = 15_000/);
+  assert.match(service, /signal: controller\.signal/);
+  assert.match(service, /clearTimeout\(timeoutId\)/);
+  assert.match(worker, /OPENAI_REQUEST_TIMEOUT_MS = 12_000/);
+  assert.match(worker, /signal: AbortSignal\.timeout\(OPENAI_REQUEST_TIMEOUT_MS\)/);
+});
+
+test('fallback summaries disclose that provider output was not accepted', () => {
+  assert.match(worker, /No provider model output was accepted; Se’kret used its conservative built-in fallback\./);
 });
 
 test('professional gets a specific wait state until all three reflections exist', () => {
