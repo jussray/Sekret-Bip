@@ -96,10 +96,16 @@ const PRIVATE_ACCOUNT_KEYS = [
   STORAGE_KEYS.bipEnergyAdjustmentSeen,
   STORAGE_KEYS.bridgeResponsePreference,
   STORAGE_KEYS.savedContinuation,
-  // Companion memory and wellbeing corrections are private account state even
-  // though their owning services keep their storage constants locally.
+  // Account-scoped companion and relationship state.
   'sekret_companion_memory',
   'sekret_wellbeing_dismissed_v1',
+  'oracle_relationship_profile_teen',
+  // Private expression and account-specific UI state written outside loadState.
+  's2tell_saved',
+  's2tell_history',
+  'sleepWindow',
+  'parentOwnCycleDays',
+  'parentOwnCycleStart',
   'sekretbip_first_visit_done',
   'parent_bridge_pending',
   'sekret_self_discovery_profile',
