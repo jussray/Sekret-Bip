@@ -1,0 +1,255 @@
+name: Cloudflare Build Cost Guard Apply
+
+on:
+  push:
+    branches:
+      - fix/cloudflare-build-cost-guard
+    paths:
+      - .github/workflows/cloudflare-build-cost-guard-apply.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-build-cost-guard-apply
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  apply-cost-guard:
+    name: Apply and verify Worker build watch-path cost guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_BUILD_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+      CF_FALLBACK_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_WORKER_NAME: sekret-backend
+    steps:
+      - name: Require founder branch and repository credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "jussray"
+          test "$GITHUB_REF" = "refs/heads/fix/cloudflare-build-cost-guard"
+          [[ "${CF_ACCOUNT_ID:-}" =~ ^[0-9a-f]{32}$ ]]
+          test -n "${CF_BUILD_TOKEN:-}${CF_FALLBACK_TOKEN:-}"
+
+      - name: Apply only production build watch paths and verify provider readback
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const API = 'https://api.cloudflare.com/client/v4';
+          const accountId = String(process.env.CF_ACCOUNT_ID || '').trim();
+          const workerName = String(process.env.CF_WORKER_NAME || '').trim();
+          const desired = {
+            pathIncludes: ['*'],
+            pathExcludes: [
+              '.agents/**',
+              '.ai-skills/**',
+              '.control-room/**',
+              '.github/**',
+              'artifacts/**',
+              'control-room/**',
+              'docs/**',
+              'e2e/**',
+              'screenshots/**',
+              'test/**',
+              '*.md',
+            ],
+          };
+
+          const cleanList = (value) => [...new Set((Array.isArray(value) ? value : [])
+            .map((item) => String(item || '').trim()).filter(Boolean))];
+          const sameSet = (left, right) => {
+            const a = cleanList(left).sort();
+            const b = cleanList(right).sort();
+            return a.length === b.length && a.every((value, index) => value === b[index]);
+          };
+          const normalize = (value) => {
+            let token = String(value || '').trim().normalize('NFKC');
+            token = token.replace(/^Bearer\s+/iu, '').replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+            return /^[\x21-\x7e]+$/.test(token) ? token : '';
+          };
+          const tokenCandidates = [...new Set([
+            normalize(process.env.CF_BUILD_TOKEN),
+            normalize(process.env.CF_FALLBACK_TOKEN),
+          ].filter(Boolean))];
+
+          function providerError(payload, status) {
+            const errors = Array.isArray(payload?.errors) ? payload.errors : [];
+            return errors.map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`).join('; ') || `HTTP ${status}`;
+          }
+
+          async function cf(token, path, options = {}) {
+            const response = await fetch(`${API}${path}`, {
+              method: options.method || 'GET',
+              headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+              body: options.body === undefined ? undefined : JSON.stringify(options.body),
+            });
+            const payload = await response.json().catch(() => null);
+            if (!response.ok || payload?.success === false) throw new Error(providerError(payload, response.status));
+            return payload?.result;
+          }
+
+          async function inspect(token) {
+            const scripts = await cf(token, `/accounts/${accountId}/workers/scripts?per_page=100`);
+            const matches = (Array.isArray(scripts) ? scripts : []).filter((row) => row?.id === workerName);
+            if (matches.length !== 1 || !matches[0]?.tag) throw new Error(`Expected one ${workerName} Worker with a script tag.`);
+            const triggers = await cf(token, `/accounts/${accountId}/builds/workers/${matches[0].tag}/triggers`);
+            const active = (Array.isArray(triggers) ? triggers : []).filter((row) => !row?.deleted_on);
+            const production = active.filter((row) => {
+              const includes = cleanList(row?.branch_includes);
+              const excludes = cleanList(row?.branch_excludes);
+              return includes.includes('main') && !excludes.includes('main') && !excludes.includes('*');
+            });
+            if (production.length !== 1) throw new Error(`Expected one active main production trigger, found ${production.length}.`);
+            return {
+              trigger: production[0],
+              otherActiveCount: active.filter((row) => row?.trigger_uuid !== production[0]?.trigger_uuid).length,
+            };
+          }
+
+          let readToken = null;
+          let beforeState = null;
+          const readFailures = [];
+          for (const token of tokenCandidates) {
+            try {
+              beforeState = await inspect(token);
+              readToken = token;
+              break;
+            } catch (error) {
+              readFailures.push(error instanceof Error ? error.message : String(error));
+            }
+          }
+          if (!readToken || !beforeState) throw new Error(`No refreshed repository token could read Workers Builds state: ${readFailures.join(' | ')}`);
+
+          const triggerUuid = String(beforeState.trigger?.trigger_uuid || '').trim();
+          if (!triggerUuid) throw new Error('Production trigger UUID is missing.');
+          const before = {
+            pathIncludes: cleanList(beforeState.trigger?.path_includes),
+            pathExcludes: cleanList(beforeState.trigger?.path_excludes),
+          };
+          const changeRequired = !sameSet(before.pathIncludes, desired.pathIncludes)
+            || !sameSet(before.pathExcludes, desired.pathExcludes);
+          const receipt = {
+            schema: 'sekret-bip/cloudflare-build-cost-guard@v2',
+            generatedAt: new Date().toISOString(),
+            worker: workerName,
+            branchPolicy: 'main production trigger only',
+            before,
+            desired,
+            after: null,
+            applied: false,
+            verified: false,
+            otherActiveTriggerCount: beforeState.otherActiveCount,
+            buildRequested: false,
+            deploymentRequested: false,
+          };
+          const persist = () => fs.writeFileSync('artifacts/cloudflare-build-cost-guard.json', `${JSON.stringify(receipt, null, 2)}\n`);
+          persist();
+
+          if (!changeRequired) {
+            receipt.after = before;
+            receipt.verified = true;
+            persist();
+            console.log('COST_GUARD_ALREADY_CORRECT');
+            process.exit(0);
+          }
+
+          let writeToken = null;
+          const writeFailures = [];
+          for (const token of tokenCandidates) {
+            try {
+              await cf(token, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+                method: 'PATCH',
+                body: { path_includes: desired.pathIncludes, path_excludes: desired.pathExcludes },
+              });
+              writeToken = token;
+              break;
+            } catch (error) {
+              writeFailures.push(error instanceof Error ? error.message : String(error));
+            }
+          }
+          if (!writeToken) throw new Error(`No refreshed repository token could write Workers Builds state: ${writeFailures.join(' | ')}`);
+
+          try {
+            const afterState = await inspect(readToken);
+            const after = {
+              pathIncludes: cleanList(afterState.trigger?.path_includes),
+              pathExcludes: cleanList(afterState.trigger?.path_excludes),
+            };
+            if (!sameSet(after.pathIncludes, desired.pathIncludes) || !sameSet(after.pathExcludes, desired.pathExcludes)) {
+              throw new Error('Cloudflare watch-path readback mismatch.');
+            }
+            receipt.after = after;
+            receipt.applied = true;
+            receipt.verified = true;
+            receipt.otherActiveTriggerCount = afterState.otherActiveCount;
+            persist();
+            console.log(`COST_GUARD_VERIFIED other_active_triggers=${receipt.otherActiveTriggerCount}`);
+          } catch (error) {
+            try {
+              await cf(writeToken, `/accounts/${accountId}/builds/triggers/${triggerUuid}`, {
+                method: 'PATCH',
+                body: { path_includes: before.pathIncludes, path_excludes: before.pathExcludes },
+              });
+              console.error('COST_GUARD_ROLLBACK_SUCCEEDED');
+            } catch {
+              console.error('COST_GUARD_ROLLBACK_FAILED');
+            }
+            persist();
+            throw error;
+          }
+          NODE
+
+      - name: Upload sanitized cost-guard receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-build-cost-guard-${{ github.run_id }}
+          path: artifacts/cloudflare-build-cost-guard.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  browser-proof:
+    name: Prove public production path remains healthy
+    needs: apply-cost-guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact repair commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Install repository dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run anonymous production Playwright proof
+        env:
+          CI: 'true'
+        run: npx playwright test e2e/production-public-front-door.spec.ts --config=playwright.production.config.ts --project=chromium
+      - name: Upload browser proof artifacts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-build-cost-guard-browser-${{ github.run_id }}
+          path: |
+            playwright-report-production
+            test-results
+          if-no-files-found: warn
+          retention-days: 30

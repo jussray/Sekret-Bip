@@ -39,7 +39,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: cloudflare-app-domain-routing-production
+  group: ${{ github.event_name == 'pull_request' && format('cloudflare-app-domain-pr-{0}', github.event.pull_request.number) || 'cloudflare-app-domain-routing-production' }}
   cancel-in-progress: false
 
 env:
@@ -53,8 +53,33 @@ env:
   BIP_APP_RECONCILE_APPROVAL_FILE: .control-room/provider-mutation-approvals/cloudflare-app-domain.json
 
 jobs:
+  validate:
+    name: Validate app-domain reconciliation contract
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 2
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify focused route reconciler contract
+        run: node --test test/cloudflare-app-domain-reconciler.test.mjs test/cloudflare-app-domain-failure-receipt.test.mjs test/cloudflare-app-domain-approval-gate.test.mjs
+
+      - name: Show non-destructive plan
+        run: node scripts/reconcile-cloudflare-app-domain.mjs
+
   reconcile:
     name: Restore Pages ownership of app.sekretbip.net
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: Production
     timeout-minutes: 10
@@ -182,12 +207,13 @@ jobs:
       - name: Require Cloudflare credentials before approved apply
         if: steps.apply_authority.outputs.apply == 'true'
         env:
+          CLOUDFLARE_APP_DOMAIN_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_DOMAIN_API_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
-          test -n "$CLOUDFLARE_API_TOKEN" || {
-            echo 'CLOUDFLARE_API_TOKEN is not configured.' >&2
+          test -n "${CLOUDFLARE_APP_DOMAIN_API_TOKEN:-}${CLOUDFLARE_API_TOKEN:-}" || {
+            echo 'Neither CLOUDFLARE_APP_DOMAIN_API_TOKEN nor CLOUDFLARE_API_TOKEN is configured.' >&2
             exit 1
           }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || {
@@ -221,11 +247,20 @@ jobs:
         if: steps.apply_authority.outputs.apply == 'true'
         shell: bash
         env:
+          CLOUDFLARE_APP_DOMAIN_API_TOKEN: ${{ secrets.CLOUDFLARE_APP_DOMAIN_API_TOKEN }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: |
           set -euo pipefail
+          selected_source='CLOUDFLARE_API_TOKEN'
+          selected_token="${CLOUDFLARE_API_TOKEN:-}"
+          if [[ -n "${CLOUDFLARE_APP_DOMAIN_API_TOKEN:-}" ]]; then
+            selected_source='CLOUDFLARE_APP_DOMAIN_API_TOKEN'
+            selected_token="$CLOUDFLARE_APP_DOMAIN_API_TOKEN"
+          fi
+          echo "CLOUDFLARE_APP_DOMAIN_CREDENTIAL_SOURCE=$selected_source"
+          export CLOUDFLARE_API_TOKEN="$selected_token"
           if node --input-type=module -e "import { normalizeCloudflareTokenTransport } from './scripts/run-with-normalized-cloudflare-token.mjs'; const result = normalizeCloudflareTokenTransport(process.env.CLOUDFLARE_API_TOKEN); process.exit(result.token && !result.nonAsciiRemaining ? 0 : 1);"; then
             node scripts/run-with-normalized-cloudflare-token.mjs \
               scripts/run-cloudflare-app-domain-reconcile-with-receipt.mjs \
