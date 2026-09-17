@@ -96,8 +96,16 @@ export function ParentBridgeSummaryInbox({ audience = 'public' }: ParentBridgeSu
 
   if (message) {
     return (
-      <View style={styles.stateCard}>
+      <View style={styles.stateCard} accessibilityRole="alert">
         <Text style={styles.stateText}>{message}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => void load()}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading Bridge summaries"
+        >
+          <Text style={styles.retryText}>Try again</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -210,6 +218,14 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(233,160,74,0.25)',
     padding: 20,
   },
+  retryButton: {
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(233,160,74,0.55)',
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+  },
+  retryText: { color: '#e9a04a', fontWeight: '800', fontSize: 12 },
   emptyTitle: { color: '#f5e8c8', fontSize: 17, fontWeight: '700' },
   stateText: { color: 'rgba(245,232,200,0.72)', textAlign: 'center', lineHeight: 20 },
 });
