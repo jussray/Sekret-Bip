@@ -83,18 +83,21 @@ test('Live Parent Bridge distinguishes provider failure from a successful empty 
   assert.doesNotMatch(service, /message: viewError\.message/);
 });
 
-test('Parent-linked hooks fail closed before relationship authority is re-established', async () => {
+test('Parent-linked hooks fail closed and minimize raw shared-content reads', async () => {
   const linkedTeen = await read('src/hooks/useLinkedTeen.ts');
   const linkedBridge = await read('src/hooks/useLinkedBridge.ts');
 
   assert.match(linkedTeen, /const clearLinkedSnapshot = useCallback\(\(\) => \{/);
   assert.match(linkedTeen, /setLinkedTeenId\(null\);[\s\S]*setIsLinked\(false\);[\s\S]*setSharedJournal\(\[\]\);[\s\S]*setSharedMoods\(\[\]\);[\s\S]*setSignals\(\[\]\);/);
   assert.match(linkedTeen, /setIsLoading\(true\);[\s\S]*setLoadError\(false\);[\s\S]*clearLinkedSnapshot\(\);[\s\S]*resolveParentEntryState\(\)/);
-  assert.match(linkedTeen, /if \(!signalResult\.ok \|\| !summaryResult\.ok \|\| !journalResult\.ok \|\| !moodResult\.ok\) \{[\s\S]*clearLinkedSnapshot\(\);[\s\S]*setLoadError\(true\);/);
+  assert.match(linkedTeen, /includeSharedContent \? pullSharedWithParentResult<SharedJournalEntry>/);
+  assert.match(linkedTeen, /includeSharedContent \? pullSharedWithParentResult<SharedMoodEntry>/);
+  assert.match(linkedBridge, /useLinkedTeen\(\{ includeSharedContent: false \}\)/);
   assert.match(linkedBridge, /fetchBridgeSharesResult\(teenId\)/);
   assert.match(linkedBridge, /setShares\(\[\]\);[\s\S]*setShareLoading\(true\);[\s\S]*setShareLoadError\(false\);/);
   assert.match(linkedBridge, /if \(!result\.ok\) \{[\s\S]*setShares\(\[\]\);[\s\S]*setShareLoadError\(true\);/);
   assert.match(linkedBridge, /loadError: linked\.loadError \|\| shareLoadError/);
+  assert.doesNotMatch(linkedBridge, /\.\.\.linked\.sharedJournal/);
 });
 
 test('Teen Bridge sends intentional S2Tell text and never treats read failure as empty history', async () => {

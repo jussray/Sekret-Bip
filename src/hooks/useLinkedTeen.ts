@@ -1,9 +1,9 @@
 /**
  * src/hooks/useLinkedTeen.ts
  *
- * Centralises all parent-visible teen data in one hook.
- * A successful empty read is distinct from a failed read so Parent Bridge never
- * turns backend failure into a false "nothing shared" state.
+ * Centralises parent-visible teen relationship state. A successful empty read
+ * is distinct from a failed read so Parent surfaces never turn backend failure
+ * into a false "nothing shared" state.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -49,6 +49,15 @@ export interface LinkedTeenData {
   reload:          () => void;
 }
 
+export interface LinkedTeenOptions {
+  /**
+   * Defaults true for compatibility. Set false on surfaces that only need
+   * relationship/signal authority so raw explicitly-shared journal/mood rows
+   * are not fetched unnecessarily.
+   */
+  includeSharedContent?: boolean;
+}
+
 type ActivitySummaryResult =
   | { ok: true; value: TeenActivitySummary | null }
   | { ok: false; value: null };
@@ -77,7 +86,9 @@ async function fetchActivitySummaryResult(teenId: string): Promise<ActivitySumma
   }
 }
 
-export function useLinkedTeen(): LinkedTeenData {
+export function useLinkedTeen(
+  { includeSharedContent = true }: LinkedTeenOptions = {},
+): LinkedTeenData {
   const [linkedTeenId,    setLinkedTeenId]    = useState<string | null>(null);
   const [isLinked,        setIsLinked]         = useState(false);
   const [activitySummary, setActivitySummary]  = useState<TeenActivitySummary | null>(null);
@@ -119,11 +130,18 @@ export function useLinkedTeen(): LinkedTeenData {
         }
 
         const id = entryState.teenUserId;
+        const journalRead = includeSharedContent
+          ? pullSharedWithParentResult<SharedJournalEntry>('journal_entries', id)
+          : Promise.resolve({ ok: true as const, items: [] as SharedJournalEntry[] });
+        const moodRead = includeSharedContent
+          ? pullSharedWithParentResult<SharedMoodEntry>('mood_history', id)
+          : Promise.resolve({ ok: true as const, items: [] as SharedMoodEntry[] });
+
         const [signalResult, summaryResult, journalResult, moodResult] = await Promise.all([
           fetchBridgeSignalsResult(id),
           fetchActivitySummaryResult(id),
-          pullSharedWithParentResult<SharedJournalEntry>('journal_entries', id),
-          pullSharedWithParentResult<SharedMoodEntry>('mood_history', id),
+          journalRead,
+          moodRead,
         ]);
         if (!active) return;
 
@@ -160,7 +178,7 @@ export function useLinkedTeen(): LinkedTeenData {
       active = false;
       unsub();
     };
-  }, [clearLinkedSnapshot, reloadToken]);
+  }, [clearLinkedSnapshot, includeSharedContent, reloadToken]);
 
   return {
     linkedTeenId,

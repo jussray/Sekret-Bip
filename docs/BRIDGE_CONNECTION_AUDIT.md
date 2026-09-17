@@ -19,6 +19,7 @@ Bridge is the private teen-parent connection system.
 6. Parent Bridge exposed an activity pulse that risks turning the connection layer into monitoring; Bridge should prioritize intentionally shared content.
 7. The routed Parent Bridge had drifted down to summaries and one signal card, leaving the shared S2Tell/reply thread available only in a legacy non-routed screen.
 8. Several Bridge readers collapsed provider failure into an empty array, allowing failed reads to masquerade as “nothing shared.”
+9. The Bridge hook fetched raw explicitly-shared journal/mood rows even though the routed Bridge thread intentionally does not render those rows and the generated Summary inbox owns that use case.
 
 ## Reconciled implementation
 
@@ -29,8 +30,9 @@ Bridge is the private teen-parent connection system.
 - `parent_notes` remains the parent-to-teen reply path.
 - No generic `bridge_messages` table was introduced. The existing product-specific tables remain authoritative: `bridge_signals`, `bridge_shares`, and `parent_notes`.
 - The routed parent authority remains `app/(parent)/bridge.tsx` → `ParentBridgeSummaryScreen`. The legacy `screens/ParentBridgeScreen.tsx` is retained as reference code, not runtime authority.
-- `ParentBridgeSummaryScreen` now composes the response-request card, a shared Bridge thread, and the consent-bounded Bridge Summary inbox.
-- The shared Parent Bridge thread renders only signals, explicit S2Tell shares, and the parent’s replies for the currently linked teen. It deliberately excludes raw journal/mood data because generated summaries own that consent-bounded surface.
+- `ParentBridgeSummaryScreen` composes the response-request card, a shared Bridge thread, and the consent-bounded Bridge Summary inbox.
+- The shared Parent Bridge thread renders only signals, explicit S2Tell shares, and the parent’s replies for the currently linked teen.
+- `useLinkedBridge()` explicitly disables raw shared-journal/mood loading. Generated Bridge Summaries own journal/mood disclosure, so the linked thread does not fetch data it will not render.
 - Parent-linked hooks clear stale teen snapshots before relationship re-verification and on read failure, so revoked or unverifiable relationships cannot keep old shared content visible.
 - Result-aware readers distinguish successful empty state from provider failure for Bridge signals, S2Tell shares, parent notes, and Bridge Summary history.
 - Parent note history is scoped to the currently linked teen instead of all notes ever sent by that parent account.
@@ -58,7 +60,7 @@ Bridge is the private teen-parent connection system.
 
 Bridge may contain only content a participant intentionally sends into the linked relationship. It must never read or expose unshared teen journals, companion chats, private voice notes, Circle posts, or general activity history.
 
-The routed Parent Bridge intentionally does **not** render raw journal or mood rows in its shared thread. Those sources can appear only through the separate Bridge Summary consent/generation path after teen confirmation.
+The routed Parent Bridge shared thread intentionally does **not fetch or render** raw journal or mood rows. Those sources can appear only through the separate Bridge Summary consent/generation path after teen confirmation.
 
 ## Failure-truth boundary
 

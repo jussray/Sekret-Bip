@@ -18,7 +18,9 @@ function toSharedEntry(share: BridgeShare): SharedJournalEntry {
 }
 
 export function useLinkedBridge(): LinkedTeenData {
-  const linked = useLinkedTeen();
+  // Bridge owns explicit signals/S2Tell content. Generated journal/mood summaries
+  // have their own consent-bounded inbox, so do not download raw shared rows here.
+  const linked = useLinkedTeen({ includeSharedContent: false });
   const [shares, setShares] = useState<BridgeShare[]>([]);
   const [shareLoading, setShareLoading] = useState(false);
   const [shareLoadError, setShareLoadError] = useState(false);
@@ -81,9 +83,9 @@ export function useLinkedBridge(): LinkedTeenData {
   }, [linked.linkedTeenId, linked.loadError, testTeenId]);
 
   const sharedJournal = useMemo(
-    () => [...shares.map(toSharedEntry), ...linked.sharedJournal]
+    () => shares.map(toSharedEntry)
       .sort((a, b) => b.created_at.localeCompare(a.created_at)),
-    [shares, linked.sharedJournal],
+    [shares],
   );
 
   if (testTeenId) {
