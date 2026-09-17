@@ -35,6 +35,13 @@ test('voice transcript contributes only through existing bounded memory', () => 
   assert.match(voice, /not the raw transcript/i);
 });
 
+test('voice memory persistence cannot silently report success', () => {
+  assert.match(voice, /memoryPersistence/);
+  assert.match(voice, /loadSekretMemory/);
+  assert.match(voice, /VOICE_BIP_MEMORY_PERSIST_VERIFY_FAILED/);
+  assert.doesNotMatch(voice, /\.catch\(\(\) => undefined\)/);
+});
+
 test('companion request receives tentative user-controlled context', () => {
   assert.match(builder, /loadWellbeingState/);
   assert.match(builder, /buildWellbeingContext/);
