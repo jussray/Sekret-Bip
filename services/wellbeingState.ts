@@ -144,12 +144,15 @@ async function loadDismissed(): Promise<DismissedObservation[]> {
     const raw = await AsyncStorage.getItem(DISMISSED_STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
+    if (!Array.isArray(parsed)) throw new Error('INVALID_DISMISSAL_LEDGER');
     return parsed.filter((item): item is DismissedObservation => Boolean(
       item && typeof item === 'object' && typeof item.id === 'string' && typeof item.dismissedAt === 'string'
     )).slice(-MAX_DISMISSED);
   } catch {
-    return [];
+    // A rejected observation must never silently reappear because its local
+    // correction ledger became unreadable. Propagate a bounded, content-free
+    // error so the UI can fail closed without exposing stored values.
+    throw new Error('WELLBEING_DISMISSALS_READ_FAILED');
   }
 }
 
