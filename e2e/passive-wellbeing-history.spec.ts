@@ -57,9 +57,10 @@ test('history reflects repeated private activity without diagnosis and lets the 
   await expect(reject).toBeVisible();
   const box = await reject.boundingBox();
   expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(30);
+  expect(box!.height).toBeGreaterThanOrEqual(44);
   await reject.click();
 
+  await expect(page.getByTestId('wellbeing-correction-error')).toHaveCount(0);
   await expect(page.getByText(MOOD_OBSERVATION, { exact: true })).toHaveCount(0);
   const dismissed = await page.evaluate(key => window.localStorage.getItem(key), DISMISSED_KEY);
   expect(dismissed).not.toBeNull();
