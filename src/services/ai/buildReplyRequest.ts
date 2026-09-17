@@ -77,6 +77,10 @@ async function resolveOracleContext(explicit?: string[]): Promise<string[]> {
     const profile = normalizeOracleProfile(JSON.parse(raw), 'teen');
     return buildOracleContext(profile, 'teen').slice(0, 8);
   } catch {
+    // Oracle context is optional enrichment, not reply authority. Continue
+    // without it, but make the degraded path visible without logging stored
+    // profile content or parser/provider details.
+    console.warn('Oracle context unavailable; continuing without optional context.');
     return [];
   }
 }
@@ -110,7 +114,10 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
   );
   const isArrival = isArrivalMessage(ctx.text, historyLength);
 
+  // Surface-specific memory is allowed to add context, but it cannot override
+  // the canonical relationship/Oracle/wellbeing provenance fields below.
   const memory: Record<string, unknown> = {
+    ...(ctx.extraMemory ?? {}),
     relationshipStyle: relationshipProfileToOracleNote(relationship),
     ...(oracleContext.length > 0 ? { oracleContext } : {}),
     ...(wellbeingContext.length > 0 ? {
@@ -119,7 +126,6 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
         observations: wellbeingContext,
       },
     } : {}),
-    ...(ctx.extraMemory ?? {}),
   };
 
   return {
