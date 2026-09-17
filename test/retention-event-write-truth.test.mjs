@@ -22,3 +22,8 @@ test('teen session retention marks success only after the event write succeeds',
   assert.match(teenLayout, /result\.retryable && attempt < 1/);
   assert.match(teenLayout, /clearTimeout\(retryTimer\)/);
 });
+
+test('founder preview cannot enter the teen retention cohort', () => {
+  assert.match(teenLayout, /if \(!isTeenActive \|\| founderPreview \|\| sessionLogged\.current\) return;/);
+  assert.match(teenLayout, /\[isTeenActive, founderPreview\]/);
+});
