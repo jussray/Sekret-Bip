@@ -76,7 +76,7 @@ export async function fetchParentBridgeSummaryInbox(audience: 'founder' | 'inter
 
     return { ok: true, value: items };
   } catch {
-    return readFailure();
+    return { ok: false, code: 'server_error', message: 'Couldn’t load Bridge Summaries right now. Try again.' };
   }
 }
 
@@ -107,6 +107,6 @@ export async function markBridgeSummaryViewed(summaryId: string, audience: 'foun
     if (viewError) return writeFailure();
     return { ok: true, value: { viewed: true } };
   } catch {
-    return writeFailure();
+    return { ok: false, code: 'server_error', message: 'Couldn’t update Bridge Summary status right now. Try again.' };
   }
 }
