@@ -3,6 +3,7 @@ name: Video Post-Production Proof
 on:
   pull_request:
     paths:
+      - 'season-01/01-the-bridge-that-listens.md'
       - 'production/video-use/**'
       - 'production/video-providers/**'
       - 'scripts/verify-video-master.mjs'
@@ -10,6 +11,7 @@ on:
       - 'scripts/verify-video-provider-registry.mjs'
       - 'test/video-post-production-contract.test.mjs'
       - 'test/video-provider-registry.test.mjs'
+      - 'test/sekret-bip-story-canon-contract.test.mjs'
       - 'sekret-bip-short-engine.md'
       - 'docs/VIDEO_POST_PRODUCTION_CONTRACT.md'
       - 'package.json'
@@ -58,19 +60,20 @@ jobs:
           ffmpeg -version | head -1
           ffprobe -version | head -1
 
-      - name: Run source and provider contracts
+      - name: Run source, story, and provider contracts
         run: |
           set -euo pipefail
           mkdir -p artifacts/video-proof
           npm run test:video:postproduction
+          node --test test/sekret-bip-story-canon-contract.test.mjs
           node scripts/verify-video-provider-registry.mjs
           node --test test/video-provider-registry.test.mjs
           node scripts/verify-video-provider-registry.mjs --select-canary > artifacts/video-proof/provider-canary.json
 
-      - name: Generate deterministic synthetic master
+      - name: Generate deterministic synthetic 16:9 master
         run: |
           ffmpeg -hide_banner -loglevel error \
-            -f lavfi -i color=c=black:s=1080x1920:r=30:d=25 \
+            -f lavfi -i color=c=black:s=1920x1080:r=30:d=64 \
             -c:v libx264 -preset ultrafast -pix_fmt yuv420p -movflags +faststart \
             artifacts/video-proof/synthetic-master.mp4
 
