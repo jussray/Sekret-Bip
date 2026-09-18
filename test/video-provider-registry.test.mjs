@@ -48,6 +48,15 @@ test('Gemini animation lane is registered but cannot self-promote to production'
   assert.equal(gemini.requiresCostPreflight, true);
 });
 
+test('registry rejects premature Gemini production promotion', () => {
+  const file = withMutatedRegistry((registry) => {
+    registry.providers.find((provider) => provider.id === 'openart-gemini-omni-1-1-flash').productionEligible = true;
+  });
+  const result = run(['--registry', file]);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /production eligibility requires a passed identity canary/);
+});
+
 test('Hugging Face canary selection chooses the permissive I2V candidate without production authority', () => {
   const result = run(['--select-canary']);
   assert.equal(result.status, 0, result.stderr);
