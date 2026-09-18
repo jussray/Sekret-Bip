@@ -64,6 +64,14 @@ for (const provider of registry.providers) {
   if (provider.requiresPlaywrightPlayback !== true) fail(`${provider.id}: Playwright playback proof is required`);
   if (provider.requiresCostPreflight !== true) fail(`${provider.id}: cost/allowance preflight is required`);
 
+  if (provider.productionEligible === true && provider.identityCanaryPassed !== true) {
+    fail(`${provider.id}: production eligibility requires a passed identity canary`);
+  }
+
+  if (provider.kind === 'external-service' && !provider.license) {
+    fail(`${provider.id}: external service terms metadata is required`);
+  }
+
   if (provider.kind === 'huggingface') {
     if (!provider.modelId || !provider.modelId.includes('/')) fail(`${provider.id}: Hugging Face modelId must be owner/repo`);
     if (!provider.library) fail(`${provider.id}: Hugging Face library metadata is required`);
@@ -76,10 +84,6 @@ for (const provider of registry.providers) {
 
     if (eligibilityRequested && provider.commercialUseStatus !== 'permissive-license') {
       fail(`${provider.id}: Hugging Face eligibility requires an explicitly permissive license status`);
-    }
-
-    if (provider.productionEligible === true && provider.identityCanaryPassed !== true) {
-      fail(`${provider.id}: Hugging Face production eligibility requires a passed identity canary`);
     }
   }
 }
