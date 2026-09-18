@@ -3,6 +3,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const DEFAULT_MAX_TEXT_BYTES = 32 * 1024 * 1024;
+const SERVER_SECRET_ENV_NAMES = [
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'OPENAI_API_KEY',
+  'ANTHROPIC_API_KEY',
+  'CLOUDFLARE_API_TOKEN',
+  'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN',
+  'RESEND_API_KEY',
+  'FOUNDER_SESSION_ENCRYPTION_KEY',
+];
 
 const FORBIDDEN_PATH_PATTERNS = [
   /(^|\/)\.git(?:\/|$)/i,
@@ -23,6 +32,7 @@ const FORBIDDEN_TEXT_PATTERNS = [
   { label: 'Resend secret key marker', pattern: /\bRESEND_API_KEY\b/ },
   { label: 'founder session encryption key marker', pattern: /\bFOUNDER_SESSION_ENCRYPTION_KEY\b/ },
   { label: 'private key material', pattern: /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/ },
+  { label: 'Supabase secret key material', pattern: /\bsb_secret_[A-Za-z0-9_-]{12,}/ },
   { label: 'OpenAI project key material', pattern: /\bsk-proj-[A-Za-z0-9_-]{12,}/ },
   { label: 'Anthropic key material', pattern: /\bsk-ant-[A-Za-z0-9_-]{12,}/ },
   { label: 'GitHub classic token material', pattern: /\bghp_[A-Za-z0-9]{20,}/ },
@@ -49,9 +59,18 @@ function looksLikeText(buffer) {
   return !sample.includes(0);
 }
 
+function configuredSecrets(env) {
+  return SERVER_SECRET_ENV_NAMES.flatMap((name) => {
+    const value = typeof env[name] === 'string' ? env[name].trim() : '';
+    return value.length >= 8 ? [{ name, value }] : [];
+  });
+}
+
 export function auditBuiltArtifact(outputDirectory, options = {}) {
   const root = path.resolve(outputDirectory);
   const maxTextBytes = options.maxTextBytes ?? DEFAULT_MAX_TEXT_BYTES;
+  const env = options.env ?? process.env;
+  const secrets = configuredSecrets(env);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) {
     throw new Error(`Built artifact directory does not exist: ${root}`);
   }
@@ -80,6 +99,9 @@ export function auditBuiltArtifact(outputDirectory, options = {}) {
 
     for (const { label, pattern } of FORBIDDEN_TEXT_PATTERNS) {
       if (pattern.test(text)) violations.push(`${relative}: ${label}`);
+    }
+    for (const { name, value } of secrets) {
+      if (text.includes(value)) violations.push(`${relative}: configured ${name} value`);
     }
   }
 
