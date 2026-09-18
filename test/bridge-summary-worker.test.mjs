@@ -69,9 +69,17 @@ test('Bridge summary generation reads source content only as ephemeral LLM input
 
 test('missing and partial sources fail explicitly instead of producing a ready fallback', () => {
   assert.match(handlerSource, /failureCode: 'no_sources'/);
-  assert.match(handlerSource, /failureCode: sourceFailure/);
+  assert.match(handlerSource, /failureCode: 'source_not_available'/);
   assert.match(storeSource, /throw new Error\('source_not_available'\)/);
   assert.match(storeSource, /A partial result is/);
+});
+
+test('Bridge provider calls are time bounded and do not persist raw exception text', () => {
+  assert.match(handlerSource, /BRIDGE_OPENAI_REQUEST_TIMEOUT_MS = 12_000/);
+  assert.match(handlerSource, /signal: AbortSignal\.timeout\(BRIDGE_OPENAI_REQUEST_TIMEOUT_MS\)/);
+  assert.match(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', 'server_error'\)/);
+  assert.doesNotMatch(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', message\.slice/);
+  assert.doesNotMatch(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', failure\.slice/);
 });
 
 test('Bridge summary route does not expose notification or email delivery behavior', () => {
