@@ -21,9 +21,19 @@ function parseRate(value) {
   return d ? n / d : NaN;
 }
 
+function parseAspect(value) {
+  const match = /^(\d+):(\d+)$/.exec(String(value ?? ''));
+  if (!match) return NaN;
+  return Number(match[1]) / Number(match[2]);
+}
+
 function assertManifestPolicy(manifest) {
   if (manifest.$schema !== 'sekret-bip-video-master@v1') fail('UNSUPPORTED_MANIFEST_SCHEMA');
+  if (manifest.delivery?.platform !== 'youtube') fail('YOUTUBE_DELIVERY_REQUIRED');
+  if (manifest.delivery?.audience !== 'young-children') fail('YOUNG_CHILD_AUDIENCE_REQUIRED');
+  if (manifest.delivery?.aspectRatio !== '16:9') fail('WIDESCREEN_16_9_REQUIRED');
   if (manifest.editor?.role !== 'post-production-only') fail('EDITOR_AUTHORITY_TOO_BROAD');
+  if (manifest.master?.dimensionPolicy !== 'minimum') fail('MINIMUM_DIMENSION_POLICY_REQUIRED');
   if (manifest.sourcePolicy?.requireApprovedShotEvidence !== true) fail('APPROVED_SHOT_EVIDENCE_REQUIRED');
   if (manifest.sourcePolicy?.allowUnapprovedSource !== false) fail('UNAPPROVED_SOURCE_MUST_BE_FORBIDDEN');
   if (manifest.sourcePolicy?.allowIdentityRegeneration !== false) fail('IDENTITY_REGENERATION_MUST_BE_FORBIDDEN');
@@ -31,6 +41,9 @@ function assertManifestPolicy(manifest) {
   if (manifest.sourcePolicy?.allowWorldAuthorityAsCharacterAuthority !== false) fail('WORLD_AUTHORITY_AS_CHARACTER_AUTHORITY_MUST_BE_FORBIDDEN');
   if (manifest.proof?.playwrightPlayback !== 'required') fail('PLAYWRIGHT_PROOF_MUST_BE_REQUIRED');
   if (manifest.proof?.continuityReview !== 'required') fail('CONTINUITY_REVIEW_MUST_BE_REQUIRED');
+  if (manifest.proof?.toneReview !== 'required') fail('TONE_REVIEW_MUST_BE_REQUIRED');
+  if (manifest.proof?.audioClarityReview !== 'required') fail('AUDIO_CLARITY_REVIEW_MUST_BE_REQUIRED');
+  if (manifest.proof?.youtubeTargetIdentityReview !== 'required-before-publish') fail('YOUTUBE_TARGET_IDENTITY_REVIEW_MUST_BE_REQUIRED');
   if (manifest.proof?.finalMasterApprovalAfterAllProof !== true) fail('FINAL_APPROVAL_MUST_REQUIRE_ALL_PROOF');
 }
 
@@ -69,12 +82,17 @@ if (videoStreams.length !== 1) fail('MASTER_REQUIRES_ONE_VIDEO_STREAM', { count:
 
 const video = videoStreams[0];
 const expected = manifest.master;
+const actualWidth = Number(video.width);
+const actualHeight = Number(video.height);
+const expectedAspect = parseAspect(manifest.delivery.aspectRatio);
+const actualAspect = actualHeight ? actualWidth / actualHeight : NaN;
 const actualFps = parseRate(video.avg_frame_rate || video.r_frame_rate);
 const duration = Number(metadata.format?.duration ?? video.duration);
 const checks = {
   codec: video.codec_name === expected.codec,
-  width: Number(video.width) === expected.width,
-  height: Number(video.height) === expected.height,
+  widthMinimum: actualWidth >= expected.width,
+  heightMinimum: actualHeight >= expected.height,
+  aspectRatio: Number.isFinite(actualAspect) && Math.abs(actualAspect - expectedAspect) <= 0.001,
   fps: Number.isFinite(actualFps) && Math.abs(actualFps - expected.fps) <= 0.01,
   duration: Number.isFinite(duration) && Math.abs(duration - expected.durationSeconds) <= expected.durationToleranceSeconds,
 };
@@ -82,7 +100,7 @@ const checks = {
 if (Object.values(checks).some((v) => !v)) {
   fail('MASTER_CONTRACT_FAILED', {
     checks,
-    actual: { codec: video.codec_name, width: video.width, height: video.height, fps: actualFps, duration },
+    actual: { codec: video.codec_name, width: actualWidth, height: actualHeight, aspectRatio: actualAspect, fps: actualFps, duration },
     expected,
   });
 }
@@ -96,14 +114,22 @@ const receipt = {
   sha256: createHash('sha256').update(bytes).digest('hex'),
   actual: {
     codec: video.codec_name,
-    width: Number(video.width),
-    height: Number(video.height),
+    width: actualWidth,
+    height: actualHeight,
+    aspectRatio: actualAspect,
     fps: actualFps,
     durationSeconds: duration,
   },
   sourceApprovalVerified: false,
-  requiredNextProof: ['playwright-playback', 'continuity-review'],
+  requiredNextProof: [
+    'playwright-playback',
+    'continuity-review',
+    'tone-review',
+    'audio-clarity-review',
+    'youtube-target-identity-review'
+  ],
   finalApprovalEligible: false,
+  publishEligible: false,
 };
 
 if (receiptPath) await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
