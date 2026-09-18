@@ -59,7 +59,7 @@ function unavailable<T>(message = 'Family Visit Mode is not configured yet.'): B
   return { ok: false, code: 'not_configured', message };
 }
 
-function serverError<T>(message: string): BridgeFamilyVisitResult<T> {
+function serverError<T>(message = 'Family Visit could not complete that action.'): BridgeFamilyVisitResult<T> {
   return { ok: false, code: 'server_error', message, retryable: true };
 }
 
@@ -146,7 +146,7 @@ export async function fetchBridgeFamilyVisitBundle(): Promise<BridgeFamilyVisitR
     .select('id,assignment_id,state,capture_mode,teen_acknowledged_at,parent_acknowledged_at,professional_acknowledged_at,started_at,ended_at,declined_by_role,created_at')
     .in('assignment_id', assignments.map((assignment) => assignment.id))
     .order('created_at', { ascending: false });
-  if (sessionsError) return serverError(sessionsError.message || 'Could not load Family Visit sessions.');
+  if (sessionsError) return serverError('Family Visit sessions could not be loaded.');
 
   const sessions = ((sessionsData ?? []) as SessionRow[]).map((row): BridgeFamilyVisitSession => ({
     id: row.id,
@@ -169,7 +169,7 @@ export async function fetchBridgeFamilyVisitBundle(): Promise<BridgeFamilyVisitR
       .select('id,session_id,audience,content,limitations,generated_at,used_fallback')
       .in('session_id', sessions.map((session) => session.id))
       .order('generated_at', { ascending: false });
-    if (summariesError) return serverError(summariesError.message || 'Could not load Family Visit summaries.');
+    if (summariesError) return serverError('Family Visit summaries could not be loaded.');
 
     summaries = ((summariesData ?? []) as SummaryRow[]).map((row) => ({
       id: row.id,
@@ -203,9 +203,13 @@ async function rpc<T>(name: string, params: Record<string, unknown>): Promise<Br
   if (error) {
     const lower = error.message?.toLowerCase() ?? '';
     if (lower.includes('required') || lower.includes('not current') || lower.includes('authority')) {
-      return { ok: false, code: 'not_authorized', message: error.message };
+      return {
+        ok: false,
+        code: 'not_authorized',
+        message: 'That Family Visit action is not available for this account or session.',
+      };
     }
-    return serverError(error.message || `Could not complete ${name}.`);
+    return serverError();
   }
   return { ok: true, value: data as T };
 }
@@ -278,16 +282,39 @@ export async function generateBridgeFamilyVisitHumanSummaries(sessionId: string)
     const body = await response.json().catch(() => null) as { status?: string; failureCode?: string } | null;
     if (!response.ok) {
       if (response.status === 403 || response.status === 409) {
-        let message = 'This Family Visit session is not ready for summary generation.';
         if (body?.failureCode === 'family_visit_mode_disabled') {
-          message = 'Family Visit summary generation is not enabled for this account yet.';
-        } else if (body?.failureCode === 'participant_reflections_required') {
-          message = 'Waiting for the child, parent, and professional to each save a structured reflection.';
+          return {
+            ok: false,
+            code: 'not_authorized',
+            message: 'Family Visit summary generation is not enabled for this account yet.',
+          };
+        }
+        if (body?.failureCode === 'participant_reflections_required') {
+          return {
+            ok: false,
+            code: 'not_authorized',
+            message: 'Waiting for the child, parent, and professional to each save a structured reflection.',
+          };
+        }
+        if (body?.failureCode === 'professional_authority_changed') {
+          return {
+            ok: false,
+            code: 'not_authorized',
+            message: 'Professional Family Visit authority changed. A current verified assignment is required.',
+          };
+        }
+        if (body?.failureCode === 'evidence_changed_retry' || body?.failureCode === 'session_changed_retry') {
+          return {
+            ok: false,
+            code: 'server_error',
+            message: 'The visit reflection changed while summaries were being prepared. Refresh and try again.',
+            retryable: true,
+          };
         }
         return {
           ok: false,
           code: 'not_authorized',
-          message,
+          message: 'This Family Visit session is not ready for summary generation.',
         };
       }
       return { ok: false, code: 'ai_unavailable', message: 'Se’kret could not prepare the summaries yet.', retryable: true };
