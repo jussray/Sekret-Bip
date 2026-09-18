@@ -92,3 +92,9 @@ test('raw Supabase and backend error strings are never forwarded into Family Vis
   assert.doesNotMatch(service, /serverError\(summariesError\.message/);
   assert.match(service, /Family Visit could not complete that action\./);
 });
+
+test('Family Visit failure logging is static and never serializes exception or credential-shaped data', () => {
+  assert.match(worker, /console\.error\('\[bridge-family-visit\] summary generation failed'\);/);
+  assert.doesNotMatch(worker, /console\.error\([^\n]*(?:errorName|error\.message|OPENAI_API_KEY|apiKey|Authorization)/);
+  assert.doesNotMatch(worker, /console\.warn\([^\n]*(?:OPENAI_API_KEY|apiKey|Authorization)/);
+});
