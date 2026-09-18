@@ -75,7 +75,7 @@ test('rejects professional/CYS internal framing from the parent summary', () => 
 test('requires professional humanReview items to remain explicit HUMAN_REVIEW', () => {
   const candidate = structuredClone(safe.professional);
   candidate.humanReview[0].classification = 'OBSERVED';
-  assert.equal(isProfessionalFamilyVisitSummary(candidate), false);
+  assert.equal(isProfessionalFamilyVisitSummary(candidate.professional ?? candidate), false);
 });
 
 test('rejects invented dialogue or transcript-like quoting', () => {
@@ -88,4 +88,22 @@ test('rejects extra fields that could smuggle hidden audience data', () => {
   const candidate = structuredClone(safe);
   candidate.parent.internalCaseNote = 'hidden';
   assert.equal(isFamilyVisitGeneratedSummaries(candidate), false);
+});
+
+test('model output cannot overwrite provider identity, prompt provenance, fallback status, or authority', () => {
+  for (const [field, value] of [
+    ['model', 'attacker-controlled-model'],
+    ['promptVersion', 'attacker-controlled-prompt'],
+    ['usedFallback', false],
+    ['verifiedProfessional', true],
+    ['caseAssignmentId', 'attacker-controlled-assignment'],
+  ]) {
+    const candidate = structuredClone(safe);
+    candidate[field] = value;
+    assert.equal(isFamilyVisitGeneratedSummaries(candidate), false, `unexpectedly accepted top-level ${field}`);
+  }
+
+  const nested = structuredClone(safe);
+  nested.professional.model = 'attacker-controlled-model';
+  assert.equal(isFamilyVisitGeneratedSummaries(nested), false);
 });
