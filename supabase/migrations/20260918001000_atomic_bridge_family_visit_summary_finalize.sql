@@ -53,6 +53,25 @@ begin
     raise exception 'family visit session not found' using errcode = 'P0002';
   end if;
 
+  select * into v_assignment
+  from public.bridge_case_assignments
+  where id = v_session.assignment_id;
+
+  -- Authority is rechecked even when another generation request has already
+  -- frozen the pair. A revoked/expired professional must not receive a stale
+  -- success receipt merely because the content itself is already immutable.
+  if not found
+     or v_assignment.status <> 'active'
+     or (v_assignment.expires_at is not null and v_assignment.expires_at <= now())
+     or not exists (
+       select 1
+       from public.bridge_professional_profiles pp
+       where pp.user_id = v_assignment.professional_user_id
+         and pp.verification_status = 'verified'
+     ) then
+    return 'authority_changed';
+  end if;
+
   -- Another valid request may have completed while this request was generating.
   -- Never overwrite the frozen pair in that case.
   if v_session.state = 'ready' then
@@ -69,22 +88,6 @@ begin
      or v_session.parent_acknowledged_at is null
      or v_session.professional_acknowledged_at is null then
     return 'session_invalid';
-  end if;
-
-  select * into v_assignment
-  from public.bridge_case_assignments
-  where id = v_session.assignment_id;
-
-  if not found
-     or v_assignment.status <> 'active'
-     or (v_assignment.expires_at is not null and v_assignment.expires_at <= now())
-     or not exists (
-       select 1
-       from public.bridge_professional_profiles pp
-       where pp.user_id = v_assignment.professional_user_id
-         and pp.verification_status = 'verified'
-     ) then
-    return 'authority_changed';
   end if;
 
   select count(distinct actor_role)
