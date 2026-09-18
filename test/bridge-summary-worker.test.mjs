@@ -6,11 +6,13 @@ const indexPath = new URL('../worker/index.ts', import.meta.url);
 const observedPath = new URL('../worker/observed-index.ts', import.meta.url);
 const handlerPath = new URL('../worker/bridge-summary.ts', import.meta.url);
 const storePath = new URL('../worker/bridge-summary-store.ts', import.meta.url);
+const parentInboxPath = new URL('../src/features/bridge/ParentBridgeSummaryInbox.tsx', import.meta.url);
 
 const indexSource = await readFile(indexPath, 'utf8');
 const observedSource = await readFile(observedPath, 'utf8');
 const handlerSource = await readFile(handlerPath, 'utf8');
 const storeSource = await readFile(storePath, 'utf8');
+const parentInboxSource = await readFile(parentInboxPath, 'utf8');
 
 test('Worker exposes Bridge summary generation route behind API auth', () => {
   assert.match(indexSource, /api\/bridge\/summary\/generate/);
@@ -80,6 +82,14 @@ test('Bridge provider calls are time bounded and do not persist raw exception te
   assert.match(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', 'server_error'\)/);
   assert.doesNotMatch(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', message\.slice/);
   assert.doesNotMatch(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', failure\.slice/);
+});
+
+test('Bridge fallback provenance is persisted and visible to the parent audience', () => {
+  assert.match(handlerSource, /No provider model output was accepted; Se’kret used its conservative built-in fallback\./);
+  assert.match(handlerSource, /usedFallback: true/);
+  assert.match(parentInboxSource, /item\.usedFallback/);
+  assert.match(parentInboxSource, /CONSERVATIVE FALLBACK/);
+  assert.match(parentInboxSource, /No provider model output was accepted for this summary/);
 });
 
 test('Bridge summary route does not expose notification or email delivery behavior', () => {
