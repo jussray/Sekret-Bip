@@ -75,7 +75,7 @@ const FALLBACK_SUMMARY = {
   conversationStarters: [
     'I saw you wanted me to understand something. Do you want to talk about what support would feel helpful?',
   ],
-  limitations: 'This is context, not the teen’s full private content, a diagnosis, or proof of what happened.',
+  limitations: 'This is context, not the teen’s full private content, a diagnosis, or proof of what happened. No provider model output was accepted; Se’kret used its conservative built-in fallback.',
 };
 
 function requireUser(principal: Principal): string {
