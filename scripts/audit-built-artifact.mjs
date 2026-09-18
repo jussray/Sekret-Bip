@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const DEFAULT_MAX_TEXT_BYTES = 2 * 1024 * 1024;
+const DEFAULT_MAX_TEXT_BYTES = 32 * 1024 * 1024;
 
 const FORBIDDEN_PATH_PATTERNS = [
   /(^|\/)\.git(?:\/|$)/i,
