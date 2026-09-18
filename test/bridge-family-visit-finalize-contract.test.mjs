@@ -29,6 +29,10 @@ test('Family Visit finalization rechecks live authority and all three reflection
   assert.match(functionBlock, /pp\.verification_status = 'verified'/i);
   assert.match(functionBlock, /count\(distinct actor_role\)/i);
   assert.match(functionBlock, /v_reflection_roles <> 3/i);
+
+  const authorityCheck = functionBlock.indexOf("return 'authority_changed'");
+  const alreadyReady = functionBlock.indexOf("return 'already_ready'");
+  assert.ok(authorityCheck >= 0 && alreadyReady > authorityCheck);
 });
 
 test('both audience rows and ready state are written inside the same database function', () => {
