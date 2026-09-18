@@ -8,6 +8,7 @@ const handlerPath = new URL('../worker/bridge-summary.ts', import.meta.url);
 const storePath = new URL('../worker/bridge-summary-store.ts', import.meta.url);
 const parentInboxPath = new URL('../src/features/bridge/ParentBridgeSummaryInbox.tsx', import.meta.url);
 const parentServicePath = new URL('../src/services/parentBridgeSummaryService.ts', import.meta.url);
+const teenServicePath = new URL('../src/services/bridgeSummaryService.ts', import.meta.url);
 
 const indexSource = await readFile(indexPath, 'utf8');
 const observedSource = await readFile(observedPath, 'utf8');
@@ -15,6 +16,7 @@ const handlerSource = await readFile(handlerPath, 'utf8');
 const storeSource = await readFile(storePath, 'utf8');
 const parentInboxSource = await readFile(parentInboxPath, 'utf8');
 const parentServiceSource = await readFile(parentServicePath, 'utf8');
+const teenServiceSource = await readFile(teenServicePath, 'utf8');
 
 test('Worker exposes Bridge summary generation route behind API auth', () => {
   assert.match(indexSource, /api\/bridge\/summary\/generate/);
@@ -84,6 +86,18 @@ test('Bridge provider calls are time bounded and do not persist raw exception te
   assert.match(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', 'server_error'\)/);
   assert.doesNotMatch(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', message\.slice/);
   assert.doesNotMatch(handlerSource, /patchRequestStatus\(requestId, userId, 'failed', failure\.slice/);
+});
+
+test('teen Bridge client uses a bounded summary request and does not forward raw Supabase errors', () => {
+  assert.match(teenServiceSource, /BRIDGE_SUMMARY_REQUEST_TIMEOUT_MS = 15_000/);
+  assert.match(teenServiceSource, /signal: controller\.signal/);
+  assert.match(teenServiceSource, /clearTimeout\(timeoutId\)/);
+  assert.doesNotMatch(teenServiceSource, /message:\s*error\?\.message/);
+  assert.doesNotMatch(teenServiceSource, /message:\s*error\.message/);
+  assert.doesNotMatch(teenServiceSource, /message:\s*requestError\.message/);
+  assert.doesNotMatch(teenServiceSource, /message:\s*summaryError\.message/);
+  assert.doesNotMatch(teenServiceSource, /message:\s*sourceError\.message/);
+  assert.match(teenServiceSource, /Bridge could not complete that action\./);
 });
 
 test('Bridge fallback provenance is persisted and visible to the parent audience', () => {
