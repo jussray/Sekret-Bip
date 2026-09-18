@@ -7,12 +7,14 @@ const observedPath = new URL('../worker/observed-index.ts', import.meta.url);
 const handlerPath = new URL('../worker/bridge-summary.ts', import.meta.url);
 const storePath = new URL('../worker/bridge-summary-store.ts', import.meta.url);
 const parentInboxPath = new URL('../src/features/bridge/ParentBridgeSummaryInbox.tsx', import.meta.url);
+const parentServicePath = new URL('../src/services/parentBridgeSummaryService.ts', import.meta.url);
 
 const indexSource = await readFile(indexPath, 'utf8');
 const observedSource = await readFile(observedPath, 'utf8');
 const handlerSource = await readFile(handlerPath, 'utf8');
 const storeSource = await readFile(storePath, 'utf8');
 const parentInboxSource = await readFile(parentInboxPath, 'utf8');
+const parentServiceSource = await readFile(parentServicePath, 'utf8');
 
 test('Worker exposes Bridge summary generation route behind API auth', () => {
   assert.match(indexSource, /api\/bridge\/summary\/generate/);
@@ -90,6 +92,14 @@ test('Bridge fallback provenance is persisted and visible to the parent audience
   assert.match(parentInboxSource, /item\.usedFallback/);
   assert.match(parentInboxSource, /CONSERVATIVE FALLBACK/);
   assert.match(parentInboxSource, /No provider model output was accepted for this summary/);
+});
+
+test('Parent Bridge inbox never forwards raw Supabase error strings into UI messages', () => {
+  assert.doesNotMatch(parentServiceSource, /message:\s*requestError\.message/);
+  assert.doesNotMatch(parentServiceSource, /message:\s*summaryError\.message/);
+  assert.doesNotMatch(parentServiceSource, /message:\s*viewError\.message/);
+  assert.doesNotMatch(parentServiceSource, /message:\s*existingError\.message/);
+  assert.match(parentServiceSource, /Bridge Summaries could not complete that action\./);
 });
 
 test('Bridge summary route does not expose notification or email delivery behavior', () => {
