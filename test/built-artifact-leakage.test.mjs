@@ -27,7 +27,7 @@ test('built artifact audit permits public release identity and EXPO_PUBLIC confi
     'assets/app.js': 'const url="https://api.sekretbip.net"; const key="EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY";',
   });
   try {
-    assert.deepEqual(auditBuiltArtifact(root).violations, []);
+    assert.deepEqual(auditBuiltArtifact(root, { env: {} }).violations, []);
   } finally {
     cleanup(root);
   }
@@ -36,7 +36,7 @@ test('built artifact audit permits public release identity and EXPO_PUBLIC confi
 test('built artifact audit rejects credential and environment files', () => {
   const root = fixture({ '.env.production': 'EXPO_PUBLIC_BACKEND_URL=https://api.sekretbip.net', 'assets/app.js': 'safe' });
   try {
-    assert.ok(auditBuiltArtifact(root).violations.some((value) => value.includes('.env.production: forbidden packaged path')));
+    assert.ok(auditBuiltArtifact(root, { env: {} }).violations.some((value) => value.includes('.env.production: forbidden packaged path')));
   } finally {
     cleanup(root);
   }
@@ -45,12 +45,25 @@ test('built artifact audit rejects credential and environment files', () => {
 test('built artifact audit rejects server-only secret markers and key material', () => {
   const root = fixture({
     'assets/app.js': 'const leaked = process.env.SUPABASE_SERVICE_ROLE_KEY;',
-    'assets/other.js': 'const token = "github_pat_123456789012345678901234";',
+    'assets/other.js': 'const token = "github_pat_123456789012345678901234"; const supabase="sb_secret_12345678901234567890";',
   });
   try {
-    const violations = auditBuiltArtifact(root).violations.join('\n');
+    const violations = auditBuiltArtifact(root, { env: {} }).violations.join('\n');
     assert.match(violations, /Supabase service-role key marker/);
     assert.match(violations, /GitHub fine-grained token material/);
+    assert.match(violations, /Supabase secret key material/);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('built artifact audit detects configured secret values without exposing them in the receipt', () => {
+  const secret = 'custom-build-secret-value-1234';
+  const root = fixture({ 'assets/app.js': `const accidentallyInlined = "${secret}";` });
+  try {
+    const violations = auditBuiltArtifact(root, { env: { OPENAI_API_KEY: secret } }).violations;
+    assert.deepEqual(violations, ['assets/app.js: configured OPENAI_API_KEY value']);
+    assert.equal(violations.join('\n').includes(secret), false);
   } finally {
     cleanup(root);
   }
