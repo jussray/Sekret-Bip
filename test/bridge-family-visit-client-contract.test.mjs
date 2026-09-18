@@ -84,3 +84,11 @@ test('professional gets a specific wait state until all three reflections exist'
   assert.match(service, /participant_reflections_required/);
   assert.match(service, /Waiting for the child, parent, and professional to each save a structured reflection\./);
 });
+
+test('raw Supabase and backend error strings are never forwarded into Family Visit UI messages', () => {
+  assert.doesNotMatch(service, /serverError\(error\.message/);
+  assert.doesNotMatch(service, /message:\s*error\.message/);
+  assert.doesNotMatch(service, /serverError\(sessionsError\.message/);
+  assert.doesNotMatch(service, /serverError\(summariesError\.message/);
+  assert.match(service, /Family Visit could not complete that action\./);
+});
