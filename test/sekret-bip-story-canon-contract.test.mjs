@@ -58,21 +58,30 @@ test('short engine fails closed before video and guards paid generation', () => 
   assert.match(engine, /if still_status != APPROVED:/);
   assert.match(engine, /estimate the requested generation cost/);
   assert.match(engine, /never spend video credits to discover identity or cast errors/);
-  assert.match(engine, /review all seven final shot keyframes before animating any of them/);
+  assert.match(engine, /review all ten final shot keyframes/);
+  assert.match(engine, /Google Gemini image models/);
+  assert.match(engine, /1920 × 1080 minimum/);
+  assert.match(engine, /16:9 widescreen/);
 });
 
-test('Episode 001 preserves the final seven-shot story and exact default cast', () => {
+test('Episode 001 preserves the final ten-shot YouTube story and exact default cast', () => {
   const episode = read('season-01/01-the-bridge-that-listens.md');
 
   assert.match(episode, /Episode 001 — The Bridge That Listens/);
+  assert.match(episode, /Runtime target: \*\*64 seconds\*\*/);
+  assert.match(episode, /1920 × 1080 minimum/);
+  assert.match(episode, /16:9 widescreen/);
+  assert.match(episode, /Audience: \*\*young children\*\*/);
+  assert.match(episode, /curious → magical → playful → exciting → reassuring/);
   assert.match(episode, /Belonging through cooperation/);
   assert.match(episode, /bridge cannot be activated by one character alone/i);
   assert.match(episode, /Bip Jr\. is \*\*not in the default Episode 001 cast\*\*/);
-  assert.match(episode, /Shot 3 world keyframe is reused/);
-  assert.match(episode, /Seven approved final shot keyframes exist/);
+  assert.match(episode, /Ten approved final shot keyframes exist/);
+  assert.match(episode, /Wait… did you see that\?/);
+  assert.match(episode, /Keep smiling, keep learning, and remember to be kind! See you next time!/);
 
-  for (const shot of ['| 1 |', '| 2 |', '| 3 |', '| 4 |', '| 5 |', '| 6 |', '| 7 |']) {
-    assert.ok(episode.includes(shot), `missing ${shot}`);
+  for (let shot = 1; shot <= 10; shot += 1) {
+    assert.ok(episode.includes(`| ${shot} |`), `missing shot ${shot}`);
   }
 
   for (const trigger of ['@NIGHT_CANON', '@SUHANA_CANON', '@SY_CANON', '@CLOUD_CANON']) {
