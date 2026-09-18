@@ -340,8 +340,7 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
     }, 200, cors);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'server_error';
-    const errorName = error instanceof Error ? error.name : 'UnknownError';
-    console.error('[bridge-family-visit] summary generation failed', { errorName });
+    console.error('[bridge-family-visit] summary generation failed');
     if (message === 'user_jwt_required') return json({ error: message }, 403, cors);
     if (message === 'family_visit_evidence_changed' || message === 'family_visit_reflections_changed') {
       return json({ sessionId, status: 'blocked', failureCode: 'evidence_changed_retry' }, 409, cors);
