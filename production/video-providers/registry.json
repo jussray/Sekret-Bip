@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-14",
+  "updatedAt": "2026-09-18",
   "authority": {
     "canonAuthority": "sekret-bip-character-canon/registry.json + approved episode keyframe evidence",
     "providerAuthority": "animation-only",
@@ -28,6 +28,26 @@
       "requiresPlaywrightPlayback": true,
       "requiresCostPreflight": true,
       "notes": "Existing production route. This registry does not expand its authority."
+    },
+    {
+      "id": "openart-gemini-omni-1-1-flash",
+      "kind": "external-service",
+      "task": "image-to-video",
+      "modelId": "gemini-omni-1-1-flash",
+      "provider": "openart",
+      "license": "external-service-terms",
+      "commercialUseStatus": "service-terms",
+      "priority": 15,
+      "canaryEligible": true,
+      "productionEligible": false,
+      "identityCanaryPassed": false,
+      "requiresApprovedKeyframe": true,
+      "requiresCharacterCanon": true,
+      "textOnlyIdentityAllowed": false,
+      "requiresIdentityQa": true,
+      "requiresPlaywrightPlayback": true,
+      "requiresCostPreflight": true,
+      "notes": "Google Gemini Omni 1.1 Flash execution candidate. Production remains fail-closed until an exact Bip identity canary, playback proof, and service-budget preflight pass."
     },
     {
       "id": "hf-wan22-i2v-a14b",
