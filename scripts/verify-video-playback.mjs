@@ -14,9 +14,19 @@ function fail(message, details = {}) {
   process.exit(1);
 }
 
+function parseAspect(value) {
+  const match = /^(\d+):(\d+)$/.exec(String(value ?? ''));
+  if (!match) return NaN;
+  return Number(match[1]) / Number(match[2]);
+}
+
 function assertManifestPolicy(manifest) {
   if (manifest.$schema !== 'sekret-bip-video-master@v1') fail('UNSUPPORTED_MANIFEST_SCHEMA');
+  if (manifest.delivery?.platform !== 'youtube') fail('YOUTUBE_DELIVERY_REQUIRED');
+  if (manifest.delivery?.audience !== 'young-children') fail('YOUNG_CHILD_AUDIENCE_REQUIRED');
+  if (manifest.delivery?.aspectRatio !== '16:9') fail('WIDESCREEN_16_9_REQUIRED');
   if (manifest.editor?.role !== 'post-production-only') fail('EDITOR_AUTHORITY_TOO_BROAD');
+  if (manifest.master?.dimensionPolicy !== 'minimum') fail('MINIMUM_DIMENSION_POLICY_REQUIRED');
   if (manifest.sourcePolicy?.requireApprovedShotEvidence !== true) fail('APPROVED_SHOT_EVIDENCE_REQUIRED');
   if (manifest.sourcePolicy?.allowUnapprovedSource !== false) fail('UNAPPROVED_SOURCE_MUST_BE_FORBIDDEN');
   if (manifest.sourcePolicy?.allowIdentityRegeneration !== false) fail('IDENTITY_REGENERATION_MUST_BE_FORBIDDEN');
@@ -24,6 +34,9 @@ function assertManifestPolicy(manifest) {
   if (manifest.sourcePolicy?.allowWorldAuthorityAsCharacterAuthority !== false) fail('WORLD_AUTHORITY_AS_CHARACTER_AUTHORITY_MUST_BE_FORBIDDEN');
   if (manifest.proof?.playwrightPlayback !== 'required') fail('PLAYWRIGHT_PROOF_MUST_BE_REQUIRED');
   if (manifest.proof?.continuityReview !== 'required') fail('CONTINUITY_REVIEW_MUST_BE_REQUIRED');
+  if (manifest.proof?.toneReview !== 'required') fail('TONE_REVIEW_MUST_BE_REQUIRED');
+  if (manifest.proof?.audioClarityReview !== 'required') fail('AUDIO_CLARITY_REVIEW_MUST_BE_REQUIRED');
+  if (manifest.proof?.youtubeTargetIdentityReview !== 'required-before-publish') fail('YOUTUBE_TARGET_IDENTITY_REVIEW_MUST_BE_REQUIRED');
   if (manifest.proof?.finalMasterApprovalAfterAllProof !== true) fail('FINAL_APPROVAL_MUST_REQUIRE_ALL_PROOF');
 }
 
@@ -42,6 +55,7 @@ const [mediaBytes, manifestText] = await Promise.all([
 const manifest = JSON.parse(manifestText);
 assertManifestPolicy(manifest);
 const expected = manifest.master;
+const expectedAspect = parseAspect(manifest.delivery.aspectRatio);
 const mediaSha256 = createHash('sha256').update(mediaBytes).digest('hex');
 
 const server = createServer((req, res) => {
@@ -105,10 +119,12 @@ try {
     paused: v.paused,
   }));
 
+  const actualAspect = before.height ? before.width / before.height : NaN;
   const checks = {
     ready: before.readyState >= 3 && after.readyState >= 3,
-    width: before.width === expected.width,
-    height: before.height === expected.height,
+    widthMinimum: before.width >= expected.width,
+    heightMinimum: before.height >= expected.height,
+    aspectRatio: Number.isFinite(actualAspect) && Math.abs(actualAspect - expectedAspect) <= 0.001,
     duration: Math.abs(before.duration - expected.durationSeconds) <= expected.durationToleranceSeconds,
     playbackAdvanced: after.currentTime > before.currentTime + 0.2,
   };
@@ -125,8 +141,14 @@ try {
     after,
     checks,
     sourceApprovalVerified: false,
-    requiredNextProof: ['continuity-review'],
+    requiredNextProof: [
+      'continuity-review',
+      'tone-review',
+      'audio-clarity-review',
+      'youtube-target-identity-review'
+    ],
     finalApprovalEligible: false,
+    publishEligible: false,
   };
   if (receiptPath) await writeFile(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
   console.log(JSON.stringify(receipt, null, 2));
