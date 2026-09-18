@@ -69,6 +69,7 @@ interface BridgeSummaryResponse {
 }
 
 const PROMPT_VERSION = 'bridge-summary-v3';
+const BRIDGE_OPENAI_REQUEST_TIMEOUT_MS = 12_000;
 const FALLBACK_SUMMARY = {
   themes: ['A teen chose to share emotional context with you.'],
   conversationStarters: [
@@ -106,6 +107,7 @@ async function requestSummaryCompletion(apiKey: string, model: string, snippets:
       response_format: { type: 'json_schema', json_schema: BRIDGE_JSON_SCHEMA },
       messages,
     }),
+    signal: AbortSignal.timeout(BRIDGE_OPENAI_REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`openai_${res.status}`);
   const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
@@ -193,8 +195,8 @@ export async function handleBridgeSummaryGenerate(request: Request, env: BridgeS
     } catch (error) {
       const sourceFailure = error instanceof Error ? error.message : 'source_lookup_failed';
       if (sourceFailure === 'source_not_available') {
-        await store.patchRequestStatus(requestId, userId, 'failed', sourceFailure);
-        return json({ requestId, status: 'failed', failureCode: sourceFailure }, 422, cors);
+        await store.patchRequestStatus(requestId, userId, 'failed', 'source_not_available');
+        return json({ requestId, status: 'failed', failureCode: 'source_not_available' }, 422, cors);
       }
       throw error;
     }
@@ -241,13 +243,13 @@ export async function handleBridgeSummaryGenerate(request: Request, env: BridgeS
     };
     return json(response, 200, cors);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'server_error';
-    if (message === 'user_jwt_required') return json({ error: message }, 403, cors);
+    const failure = error instanceof Error ? error.message : 'server_error';
+    if (failure === 'user_jwt_required') return json({ error: 'user_jwt_required' }, 403, cors);
     if (userId) {
       try {
-        await store.patchRequestStatus(requestId, userId, 'failed', message.slice(0, 80));
+        await store.patchRequestStatus(requestId, userId, 'failed', 'server_error');
       } catch {
-        // Preserve the original failure.
+        // Preserve the original failure while keeping persistence bounded.
       }
     }
     return json({ requestId, status: 'failed', failureCode: 'server_error' }, 500, cors);
