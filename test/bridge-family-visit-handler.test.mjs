@@ -11,6 +11,17 @@ const ENV = {
   BRIDGE_FAMILY_VISITS_ROLLOUT: 'enabled',
 };
 
+const DEFAULT_SESSION = {
+  id: 'session-1',
+  assignment_id: 'assignment-1',
+  state: 'reflection',
+  capture_mode: 'none',
+  teen_acknowledged_at: '2026-09-07T20:00:00Z',
+  parent_acknowledged_at: '2026-09-07T20:01:00Z',
+  professional_acknowledged_at: '2026-09-07T20:02:00Z',
+  updated_at: '2026-09-07T20:21:00Z',
+};
+
 function request(sessionId = 'session-1') {
   return new Request('https://api.sekretbip.net/api/bridge/summary/generate', {
     method: 'POST',
@@ -70,15 +81,7 @@ function installSupabaseMock(overrides = {}) {
     const method = init.method ?? 'GET';
 
     if (url.includes('/bridge_family_visit_sessions?') && method === 'GET') {
-      return jsonResponse([overrides.session ?? {
-        id: 'session-1',
-        assignment_id: 'assignment-1',
-        state: 'reflection',
-        capture_mode: 'none',
-        teen_acknowledged_at: '2026-09-07T20:00:00Z',
-        parent_acknowledged_at: '2026-09-07T20:01:00Z',
-        professional_acknowledged_at: '2026-09-07T20:02:00Z',
-      }]);
+      return jsonResponse([{ ...DEFAULT_SESSION, ...(overrides.session ?? {}) }]);
     }
     if (url.includes('/bridge_case_assignments?') && method === 'GET') {
       return jsonResponse([overrides.assignment ?? {
@@ -104,14 +107,10 @@ function installSupabaseMock(overrides = {}) {
     if (url.includes('/bridge_family_visit_reflections?') && method === 'GET') {
       return jsonResponse(overrides.reflections ?? completeReflections());
     }
-    if (url.includes('/bridge_family_visit_summaries?') && method === 'POST') {
+    if (url.includes('/rpc/finalize_bridge_family_visit_summaries') && method === 'POST') {
       const body = JSON.parse(String(init.body ?? '{}'));
-      writes.push({ kind: 'summary', body });
-      return new Response(null, { status: 201 });
-    }
-    if (url.includes('/bridge_family_visit_sessions?') && method === 'PATCH') {
-      writes.push({ kind: 'session', body: JSON.parse(String(init.body ?? '{}')) });
-      return jsonResponse([{ id: 'session-1' }]);
+      writes.push({ kind: 'finalize', body });
+      return jsonResponse(overrides.finalizeResult ?? 'ready');
     }
 
     throw new Error(`unexpected fetch: ${method} ${url}`);
@@ -131,7 +130,7 @@ test('family visit rollout fails closed unless enabled or allowlisted', () => {
   assert.equal(isBridgeFamilyVisitsRolloutAllowed({ BRIDGE_FAMILY_VISITS_ROLLOUT: 'other' }, 'pro-user'), false);
 });
 
-test('authorized professional generation stores separate audience rows but returns no summary content', async () => {
+test('authorized generation sends one atomic audience pair and returns no summary content', async () => {
   const mock = installSupabaseMock();
   try {
     const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
@@ -145,15 +144,80 @@ test('authorized professional generation stores separate audience rows but retur
     assert.equal('parent' in body, false);
     assert.equal('professional' in body, false);
 
-    const summaryWrites = mock.writes.filter((write) => write.kind === 'summary');
-    assert.equal(summaryWrites.length, 2);
-    assert.deepEqual(summaryWrites.map((write) => write.body.audience).sort(), ['parent', 'professional']);
-    assert.equal(summaryWrites.find((write) => write.body.audience === 'parent').body.content.disposition, undefined);
-    assert.equal(summaryWrites.find((write) => write.body.audience === 'professional').body.content.disposition, 'insufficient_evidence');
+    const finalizations = mock.writes.filter((write) => write.kind === 'finalize');
+    assert.equal(finalizations.length, 1);
+    const payload = finalizations[0].body;
+    assert.equal(payload.p_session_id, 'session-1');
+    assert.equal(payload.p_expected_updated_at, DEFAULT_SESSION.updated_at);
+    assert.equal(payload.p_parent_content.disposition, undefined);
+    assert.equal(payload.p_professional_content.disposition, 'insufficient_evidence');
+    assert.equal(payload.p_used_fallback, true);
+    assert.equal(payload.p_prompt_version, 'bridge-family-visit-human-v1');
+    assert.equal(payload.p_model, null);
+  } finally {
+    mock.restore();
+  }
+});
 
-    const sessionWrites = mock.writes.filter((write) => write.kind === 'session');
-    assert.equal(sessionWrites.length, 1);
-    assert.equal(sessionWrites[0].body.state, 'ready');
+test('concurrent winner reuses frozen summaries without claiming losing-request provenance', async () => {
+  const mock = installSupabaseMock({ finalizeResult: 'already_ready' });
+  try {
+    const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.status, 'ready');
+    assert.equal(body.reusedExisting, true);
+    assert.equal('usedFallback' in body, false);
+    assert.equal('promptVersion' in body, false);
+    assert.equal(mock.writes.filter((write) => write.kind === 'finalize').length, 1);
+  } finally {
+    mock.restore();
+  }
+});
+
+test('evidence mutation during generation returns a retryable conflict and no partial write path exists', async () => {
+  const mock = installSupabaseMock({ finalizeResult: 'evidence_changed' });
+  try {
+    const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
+    const body = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(body.status, 'blocked');
+    assert.equal(body.failureCode, 'evidence_changed_retry');
+    assert.equal(mock.writes.length, 1);
+    assert.equal(mock.writes[0].kind, 'finalize');
+  } finally {
+    mock.restore();
+  }
+});
+
+test('authority mutation during generation is reported separately from evidence drift', async () => {
+  const mock = installSupabaseMock({ finalizeResult: 'authority_changed' });
+  try {
+    const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
+    const body = await response.json();
+
+    assert.equal(response.status, 409);
+    assert.equal(body.failureCode, 'professional_authority_changed');
+    assert.equal(mock.writes.length, 1);
+  } finally {
+    mock.restore();
+  }
+});
+
+test('already-ready session returns frozen status without generating or claiming provenance', async () => {
+  const mock = installSupabaseMock({ session: { state: 'ready' } });
+  try {
+    const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
+    const body = await response.json();
+
+    assert.equal(response.status, 200);
+    assert.equal(body.status, 'ready');
+    assert.equal(body.reusedExisting, true);
+    assert.equal('usedFallback' in body, false);
+    assert.equal('promptVersion' in body, false);
+    assert.equal(mock.writes.length, 0);
   } finally {
     mock.restore();
   }
@@ -175,17 +239,7 @@ test('generation waits for teen, parent, and professional reflections before fre
 });
 
 test('generation blocks before data sharing when one visible acknowledgement is missing', async () => {
-  const mock = installSupabaseMock({
-    session: {
-      id: 'session-1',
-      assignment_id: 'assignment-1',
-      state: 'reflection',
-      capture_mode: 'none',
-      teen_acknowledged_at: '2026-09-07T20:00:00Z',
-      parent_acknowledged_at: null,
-      professional_acknowledged_at: '2026-09-07T20:02:00Z',
-    },
-  });
+  const mock = installSupabaseMock({ session: { parent_acknowledged_at: null } });
   try {
     const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
     const body = await response.json();
@@ -198,17 +252,7 @@ test('generation blocks before data sharing when one visible acknowledgement is 
 });
 
 test('generation blocks any capture-mode drift away from none', async () => {
-  const mock = installSupabaseMock({
-    session: {
-      id: 'session-1',
-      assignment_id: 'assignment-1',
-      state: 'reflection',
-      capture_mode: 'audio',
-      teen_acknowledged_at: '2026-09-07T20:00:00Z',
-      parent_acknowledged_at: '2026-09-07T20:01:00Z',
-      professional_acknowledged_at: '2026-09-07T20:02:00Z',
-    },
-  });
+  const mock = installSupabaseMock({ session: { capture_mode: 'audio' } });
   try {
     const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
     const body = await response.json();
@@ -267,17 +311,7 @@ test('generation blocks stale assignment and wrong session state', async () => {
     expired.restore();
   }
 
-  const active = installSupabaseMock({
-    session: {
-      id: 'session-1',
-      assignment_id: 'assignment-1',
-      state: 'active',
-      capture_mode: 'none',
-      teen_acknowledged_at: '2026-09-07T20:00:00Z',
-      parent_acknowledged_at: '2026-09-07T20:01:00Z',
-      professional_acknowledged_at: '2026-09-07T20:02:00Z',
-    },
-  });
+  const active = installSupabaseMock({ session: { state: 'active' } });
   try {
     const response = await handleBridgeFamilyVisitSummaryGenerate(request(), ENV, PRINCIPAL, CORS);
     assert.equal(response.status, 409);
