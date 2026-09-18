@@ -276,7 +276,7 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
     }
 
     if (session.state === 'ready') {
-      return json({ sessionId, status: 'ready', summariesGenerated: ['parent', 'professional'] }, 200, cors);
+      return json({ sessionId, status: 'ready', summariesGenerated: ['parent', 'professional'], reusedExisting: true }, 200, cors);
     }
     if (session.state !== 'reflection') {
       return json({ sessionId, status: 'blocked', failureCode: 'reflection_state_required' }, 409, cors);
@@ -300,26 +300,36 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
     const model = generated?.model ?? null;
     const usedFallback = !generated;
 
-    // Persist audience rows separately. The professional caller receives no
-    // summary content here; RLS keeps all summary rows unreadable until the
-    // exact evidence version observed above is successfully frozen as ready.
-    await store.upsertSummary(sessionId, {
-      audience: 'parent',
-      content: summaries.parent as unknown as Record<string, unknown>,
-      limitations: summaries.parent.limitations,
-      promptVersion: PROMPT_VERSION,
-      model,
-      usedFallback,
-    });
-    await store.upsertSummary(sessionId, {
-      audience: 'professional',
-      content: summaries.professional as unknown as Record<string, unknown>,
-      limitations: summaries.professional.limitations,
-      promptVersion: PROMPT_VERSION,
-      model,
-      usedFallback,
-    });
-    await store.markSessionReady(sessionId);
+    // Freeze both audience rows and the evidence version in one database
+    // transaction. A concurrent winner leaves this request with no write path.
+    const finalization = await store.finalizeSummaries(
+      sessionId,
+      {
+        audience: 'parent',
+        content: summaries.parent as unknown as Record<string, unknown>,
+        limitations: summaries.parent.limitations,
+        promptVersion: PROMPT_VERSION,
+        model,
+        usedFallback,
+      },
+      {
+        audience: 'professional',
+        content: summaries.professional as unknown as Record<string, unknown>,
+        limitations: summaries.professional.limitations,
+        promptVersion: PROMPT_VERSION,
+        model,
+        usedFallback,
+      },
+    );
+
+    if (finalization === 'already_ready') {
+      return json({
+        sessionId,
+        status: 'ready',
+        summariesGenerated: ['parent', 'professional'],
+        reusedExisting: true,
+      }, 200, cors);
+    }
 
     return json({
       sessionId,
@@ -333,8 +343,14 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
     const errorName = error instanceof Error ? error.name : 'UnknownError';
     console.error('[bridge-family-visit] summary generation failed', { errorName });
     if (message === 'user_jwt_required') return json({ error: message }, 403, cors);
-    if (message === 'family_visit_evidence_changed') {
+    if (message === 'family_visit_evidence_changed' || message === 'family_visit_reflections_changed') {
       return json({ sessionId, status: 'blocked', failureCode: 'evidence_changed_retry' }, 409, cors);
+    }
+    if (message === 'family_visit_authority_changed') {
+      return json({ sessionId, status: 'blocked', failureCode: 'professional_authority_changed' }, 409, cors);
+    }
+    if (message === 'family_visit_session_invalid') {
+      return json({ sessionId, status: 'blocked', failureCode: 'session_changed_retry' }, 409, cors);
     }
     return json({ sessionId, status: 'failed', failureCode: 'server_error' }, 500, cors);
   }
