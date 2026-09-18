@@ -56,6 +56,15 @@ function serverError<T>(message = 'Bridge could not complete that action.'): Rel
   return { ok: false, code: 'server_error', message, retryable: true };
 }
 
+function summaryUnavailable(): RelationshipResult<CreateBridgeShareRequestValue> {
+  return {
+    ok: false,
+    code: 'ai_unavailable',
+    message: 'The share was saved, but the summary is still being prepared.',
+    retryable: true,
+  };
+}
+
 export function buildBridgeSharePreview(
   parentUserId: string,
   sources: BridgeShareSourceRef[],
@@ -124,19 +133,23 @@ export async function createBridgeShareRequest(
       };
     }
 
-    const headers = await backendAuthHeaders();
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), BRIDGE_SUMMARY_REQUEST_TIMEOUT_MS);
     let response: Response;
     try {
-      response = await fetch(`${BASE_URL}/api/bridge/summary/generate`, {
-        method: 'POST',
-        headers: { ...headers, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId: data, idempotencyKey: input.idempotencyKey }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
+      const headers = await backendAuthHeaders();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), BRIDGE_SUMMARY_REQUEST_TIMEOUT_MS);
+      try {
+        response = await fetch(`${BASE_URL}/api/bridge/summary/generate`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId: data, idempotencyKey: input.idempotencyKey }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    } catch {
+      return summaryUnavailable();
     }
 
     if (!response.ok) {
@@ -144,7 +157,7 @@ export async function createBridgeShareRequest(
       if (failure?.failureCode === 'source_not_available' || failure?.failureCode === 'no_sources') {
         return { ok: false, code: 'invalid_input', message: 'That entry could not be found to share — try again in a moment.', retryable: true };
       }
-      return { ok: false, code: 'ai_unavailable', message: 'The share was saved, but the summary is still being prepared.', retryable: true };
+      return summaryUnavailable();
     }
 
     return { ok: true, value: { requestId: data, status: 'ready' } };
