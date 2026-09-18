@@ -147,6 +147,15 @@ export function ParentBridgeSummaryInbox({ audience = 'public' }: ParentBridgeSu
               })}
             </Text>
 
+            {item.usedFallback ? (
+              <View style={styles.fallbackBanner}>
+                <Text style={styles.fallbackKicker}>CONSERVATIVE FALLBACK</Text>
+                <Text style={styles.fallbackText}>
+                  No provider model output was accepted for this summary. Se’kret used its built-in privacy-safe fallback instead.
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={styles.sectionLabel}>Themes noticed</Text>
             {summary.themes.map((theme) => (
               <Text key={theme} style={styles.bodyText}>• {theme}</Text>
@@ -172,6 +181,9 @@ const styles = StyleSheet.create({
   previewBanner: { borderRadius: 14, borderWidth: 1, borderColor: '#f59e0b66', backgroundColor: '#4a230a55', padding: 12 },
   previewKicker: { color: '#fde68a', fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
   previewText: { color: '#d7c39b', fontSize: 10, lineHeight: 16, marginTop: 4 },
+  fallbackBanner: { borderRadius: 12, borderWidth: 1, borderColor: 'rgba(245,158,11,0.38)', backgroundColor: 'rgba(245,158,11,0.10)', padding: 11, marginBottom: 2 },
+  fallbackKicker: { color: '#fde68a', fontSize: 9, fontWeight: '900', letterSpacing: 1.05 },
+  fallbackText: { color: '#ead8b4', fontSize: 11, lineHeight: 17, marginTop: 4 },
   card: {
     backgroundColor: 'rgba(46,26,16,0.92)',
     borderWidth: 1,
