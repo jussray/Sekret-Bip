@@ -54,6 +54,7 @@ export interface StoredFamilyVisitSummary {
   usedFallback: boolean;
 }
 
+export type FamilyVisitFinalizeResult = 'ready' | 'already_ready';
 export type BridgeFamilyVisitFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 
 function requireSupabase(env: BridgeFamilyVisitStoreEnv): { url: string; key: string } {
@@ -125,41 +126,47 @@ export function createBridgeFamilyVisitStore(env: BridgeFamilyVisitStoreEnv, fet
     return await response.json() as BridgeFamilyVisitReflectionRow[];
   }
 
-  async function upsertSummary(sessionId: string, summary: StoredFamilyVisitSummary): Promise<void> {
-    const { url, key } = requireSupabase(env);
-    const response = await fetchImpl(`${url}/rest/v1/bridge_family_visit_summaries?on_conflict=session_id,audience`, {
-      method: 'POST',
-      headers: { ...serviceHeaders(key), Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({
-        session_id: sessionId,
-        audience: summary.audience,
-        content: summary.content,
-        limitations: summary.limitations,
-        prompt_version: summary.promptVersion,
-        model: summary.model,
-        used_fallback: summary.usedFallback,
-        generated_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      }),
-    });
-    if (!response.ok) throw new Error('family_visit_summary_write_failed');
-  }
-
-  async function markSessionReady(sessionId: string): Promise<void> {
+  async function finalizeSummaries(
+    sessionId: string,
+    parentSummary: StoredFamilyVisitSummary,
+    professionalSummary: StoredFamilyVisitSummary,
+  ): Promise<FamilyVisitFinalizeResult> {
     const { url, key } = requireSupabase(env);
     const expectedUpdatedAt = observedSessionVersions.get(sessionId);
     if (!expectedUpdatedAt) throw new Error('family_visit_session_version_missing');
-    const response = await fetchImpl(
-      `${url}/rest/v1/bridge_family_visit_sessions?id=eq.${encodeURIComponent(sessionId)}&state=eq.reflection&updated_at=eq.${encodeURIComponent(expectedUpdatedAt)}`,
-      {
-        method: 'PATCH',
-        headers: { ...serviceHeaders(key), Prefer: 'return=representation' },
-        body: JSON.stringify({ state: 'ready', updated_at: new Date().toISOString() }),
-      },
-    );
-    if (!response.ok) throw new Error('family_visit_session_ready_failed');
-    const rows = await response.json() as Array<{ id?: string }>;
-    if (!rows[0]?.id) throw new Error('family_visit_evidence_changed');
+    if (parentSummary.audience !== 'parent' || professionalSummary.audience !== 'professional') {
+      throw new Error('family_visit_summary_audience_invalid');
+    }
+    if (parentSummary.promptVersion !== professionalSummary.promptVersion
+        || parentSummary.model !== professionalSummary.model
+        || parentSummary.usedFallback !== professionalSummary.usedFallback) {
+      throw new Error('family_visit_summary_provenance_mismatch');
+    }
+
+    const response = await fetchImpl(`${url}/rest/v1/rpc/finalize_bridge_family_visit_summaries`, {
+      method: 'POST',
+      headers: serviceHeaders(key),
+      body: JSON.stringify({
+        p_session_id: sessionId,
+        p_expected_updated_at: expectedUpdatedAt,
+        p_parent_content: parentSummary.content,
+        p_parent_limitations: parentSummary.limitations,
+        p_professional_content: professionalSummary.content,
+        p_professional_limitations: professionalSummary.limitations,
+        p_prompt_version: parentSummary.promptVersion,
+        p_model: parentSummary.model,
+        p_used_fallback: parentSummary.usedFallback,
+      }),
+    });
+    if (!response.ok) throw new Error('family_visit_summary_finalize_failed');
+
+    const result = await response.json() as string;
+    if (result === 'ready' || result === 'already_ready') return result;
+    if (result === 'evidence_changed') throw new Error('family_visit_evidence_changed');
+    if (result === 'authority_changed') throw new Error('family_visit_authority_changed');
+    if (result === 'reflections_incomplete') throw new Error('family_visit_reflections_changed');
+    if (result === 'session_invalid') throw new Error('family_visit_session_invalid');
+    throw new Error('family_visit_summary_finalize_invalid_result');
   }
 
   return Object.freeze({
@@ -168,7 +175,6 @@ export function createBridgeFamilyVisitStore(env: BridgeFamilyVisitStoreEnv, fet
     fetchProfessionalProfile,
     fetchMarkers,
     fetchReflections,
-    upsertSummary,
-    markSessionReady,
+    finalizeSummaries,
   });
 }
