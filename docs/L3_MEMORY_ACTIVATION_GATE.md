@@ -6,12 +6,15 @@ This document is a release gate, not a claim that durable memory is live.
 
 - `src/contracts/agentMemory.ts`
 - `src/services/ai/agentMemory.ts`
-- `supabase/migrations/20260918234500_agent_memories_l3_contract.sql`
+- `supabase/candidates/20260918234500_agent_memories_l3_contract.sql`
+- `supabase/migrations/20260918234500_agent_memories_l3_contract.sql` — receipt-only, no schema changes
 - `.agents/skills/bip-l4-memory/SKILL.md`
+
+The Supabase GitHub integration evaluates canonical migration files after merge. Until this gate is satisfied, schema-changing L3 SQL must remain outside `supabase/migrations`. The canonical `20260918234500` file is permanently receipt-only; future production activation must use a new migration version after approval.
 
 ## Required before production activation
 
-1. Exact candidate migration replays on a fresh Supabase preview database.
+1. Exact candidate SQL replays after the canonical migration set on a fresh ephemeral Supabase database.
 2. Anonymous-authenticated users see zero `agent_memories` rows and cannot call the owner-delete RPC successfully.
 3. User A cannot select or delete User B memory.
 4. Direct authenticated insert/update/delete remain denied.
@@ -26,6 +29,7 @@ This document is a release gate, not a claim that durable memory is live.
 13. The two custom-auth Edge Functions retain live negative-auth proof.
 14. Supabase leaked-password protection is enabled and re-observed green.
 15. Exact-production `app.sekretbip.net` authority is restored before any UI/runtime L3 claim.
+16. A new activation migration is reviewed at an exact candidate head; do not mutate the already-integrated receipt into schema SQL.
 
 ## Launch flag rule
 
@@ -34,4 +38,4 @@ A launch-enabling flag may turn true only when its named prerequisites above hav
 
 ## Rollback
 
-Before activation, rollback is branch/PR closure only. After a future reviewed deployment, disable memory retrieval first, then revert the deployment/migration according to the release receipt. Never preserve a false green status after rollback.
+Before activation, rollback is candidate-code disable/revert only because production has no L3 schema. After a future reviewed activation, disable memory retrieval first, then revert using a new migration/release receipt. Never rewrite an applied migration or preserve a false green status after rollback.
