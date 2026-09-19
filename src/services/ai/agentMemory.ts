@@ -67,7 +67,14 @@ export function isMemoryEligibleForRetrieval(
   if (memory.lifecycleState !== 'active') return false;
   if (!['user_stated', 'user_confirmed'].includes(memory.reviewState)) return false;
   if (!memory.admissionReviewedAt) return false;
+
+  // Phase 1 validates only that a non-secret fingerprint marker is present and
+  // well-shaped. Production activation must add trusted-runtime recomputation;
+  // this marker can invalidate continuity but can never create authority.
   if (!/^[0-9a-f]{64}$/.test(memory.integrityFingerprint)) return false;
+
+  if (memory.sensitivity === 'restricted') return false;
+  if (memory.sensitivity === 'sensitive' && memory.reviewState !== 'user_confirmed') return false;
   if (isExpired(memory, nowMs)) return false;
   if (looksInstructionShaped(memory.summary)) return false;
 
