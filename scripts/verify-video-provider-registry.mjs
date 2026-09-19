@@ -51,12 +51,42 @@ if (registry.authority.providerMayOverrideCast !== false) fail('providers may no
 if (registry.authority.providerMayPromoteCanon !== false) fail('providers may not promote canon');
 if (!Array.isArray(registry.providers) || registry.providers.length === 0) fail('providers must be a non-empty array');
 
+const routePolicy = registry.openSourceRoutePolicy;
+if (!routePolicy || routePolicy.workflow !== 'LEEVIZE') fail('open-source route must be governed by LEEVIZE');
+if (routePolicy.shotContract !== 'shot-dna@v1') fail('open-source route must use shot-dna@v1');
+if (JSON.stringify(routePolicy.compileOrder) !== JSON.stringify(['director-brief', 'model-neutral-shot-spec', 'renderer-adapter'])) {
+  fail('open-source route compile order drifted');
+}
+if (routePolicy.openSourceFirst !== true) fail('open-source-first routing must be enabled');
+if (JSON.stringify(routePolicy.deterministicPostTools) !== JSON.stringify(['ffmpeg', 'ffprobe'])) {
+  fail('deterministic post-production must require ffmpeg + ffprobe');
+}
+if (routePolicy.candidateAvailabilityIsRuntimeFact !== true) fail('candidate availability must remain a runtime fact');
+if (routePolicy.openSourceLabelDoesNotProveProductionEligibility !== true) fail('open-source label must not imply production eligibility');
+if (routePolicy.permissiveLicenseRequiredForCanary !== true) fail('canary eligibility must require a permissive license');
+if (routePolicy.commercialUseStatusRequired !== true) fail('commercial use status must be explicit');
+if (routePolicy.exactModelIdRequired !== true) fail('exact model identity must be required');
+if (routePolicy.approvedKeyframeRequired !== true) fail('approved keyframe must remain required');
+if (routePolicy.identityQaRequired !== true) fail('identity QA must remain required');
+if (routePolicy.playwrightPlaybackRequired !== true) fail('Playwright playback proof must remain required');
+if (routePolicy.costOrResourcePreflightRequired !== true) fail('cost/resource preflight must remain required');
+if (routePolicy.rendererAdaptersReplaceable !== true) fail('renderer adapters must remain replaceable');
+if (routePolicy.generatedUiMayProveProductBehavior !== false) fail('generated UI may not prove product behavior');
+if (routePolicy.realProductCaptureRequiresPlaywright !== true) fail('real product capture must require Playwright');
+if (routePolicy.finalAudioPrecedesCaptionTiming !== true) fail('final audio must precede caption timing');
+if (routePolicy.attack6000?.reasoningPressureBudget !== 6000) fail('ATTACK6000 reasoning budget must equal 6000');
+if (routePolicy.attack6000?.externalTestCountClaimed !== false) fail('ATTACK6000 must not claim 6000 external tests');
+if (routePolicy.attack6000?.deduplicateFailureClasses !== true) fail('ATTACK6000 must deduplicate failure classes');
+
 const ids = new Set();
 for (const provider of registry.providers) {
   if (!provider.id || ids.has(provider.id)) fail(`provider id missing or duplicated: ${provider.id ?? '<missing>'}`);
   ids.add(provider.id);
 
   if (provider.task !== 'image-to-video') fail(`${provider.id}: only image-to-video providers are allowed in this registry`);
+  if (!provider.modelId) fail(`${provider.id}: exact modelId is required`);
+  if (!provider.license) fail(`${provider.id}: license metadata is required`);
+  if (!provider.commercialUseStatus) fail(`${provider.id}: commercialUseStatus is required`);
   if (provider.requiresApprovedKeyframe !== true) fail(`${provider.id}: approved keyframe gate is required`);
   if (provider.requiresCharacterCanon !== true) fail(`${provider.id}: character canon gate is required`);
   if (provider.textOnlyIdentityAllowed !== false) fail(`${provider.id}: prompt-only identity must stay forbidden`);
@@ -65,7 +95,7 @@ for (const provider of registry.providers) {
   if (provider.requiresCostPreflight !== true) fail(`${provider.id}: cost/allowance preflight is required`);
 
   if (provider.kind === 'huggingface') {
-    if (!provider.modelId || !provider.modelId.includes('/')) fail(`${provider.id}: Hugging Face modelId must be owner/repo`);
+    if (!provider.modelId.includes('/')) fail(`${provider.id}: Hugging Face modelId must be owner/repo`);
     if (!provider.library) fail(`${provider.id}: Hugging Face library metadata is required`);
 
     const license = String(provider.license ?? '').toLowerCase();
@@ -106,5 +136,5 @@ if (selectCanary) {
     requiresPlaywrightPlayback: candidate.requiresPlaywrightPlayback
   })}\n`);
 } else {
-  console.log(`VIDEO_PROVIDER_REGISTRY_OK providers=${registry.providers.length} hfCanaries=${hfCanaries.length} default=${defaultProvider.id}`);
+  console.log(`VIDEO_PROVIDER_REGISTRY_OK providers=${registry.providers.length} hfCanaries=${hfCanaries.length} default=${defaultProvider.id} workflow=${routePolicy.workflow} shot=${routePolicy.shotContract}`);
 }
