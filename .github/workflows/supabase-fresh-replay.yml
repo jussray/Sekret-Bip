@@ -56,6 +56,15 @@ jobs:
           test -s supabase/reference/legacy_migrations/20260627_point_ledger.sql
           test -s supabase/reference/legacy_migrations/20260701010000_circle_kind_add_parent_community.sql
 
+      - name: Run focused L3 memory contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test \
+            test/agent-memory-l3-contract.test.mjs \
+            test/l3-l4-memory-safety.test.mjs \
+            test/l3-memory-activation-gate.test.mjs
+
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1
         with:
@@ -70,6 +79,16 @@ jobs:
         run: |
           set -euo pipefail
           supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Prove L3 memory owner and anonymous denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v psql >/dev/null
+          PGPASSWORD=postgres psql \
+            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/probes/agent_memories_l3_phase1.sql
 
       - name: Stop ephemeral Supabase
         if: always()
