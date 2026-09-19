@@ -6,12 +6,15 @@ This document is a release gate, not a claim that durable memory is live.
 
 - `src/contracts/agentMemory.ts`
 - `src/services/ai/agentMemory.ts`
-- `supabase/migrations/20260918234500_agent_memories_l3_contract.sql`
+- `supabase/migrations/20260918234500_agent_memories_l3_contract.sql` — immutable reviewed migration source
+- `supabase/candidates/20260918234500_agent_memories_l3_contract.sql` — non-authoritative pointer only
 - `.agents/skills/bip-l4-memory/SKILL.md`
+
+The canonical migration entered repository history in PR #1100 and is therefore immutable. It must not be rewritten, retimestamped, copied under a new timestamp, or replaced with a receipt. Production application remains separately gated by the repository's manual exact-current-main Supabase workflow and canonical project authority. A GitHub Supabase app surface that identifies a different/unstable project cannot authorize canonical production mutation.
 
 ## Required before production activation
 
-1. Exact candidate migration replays on a fresh Supabase preview database.
+1. Exact canonical migration replays on a fresh Supabase preview database.
 2. Anonymous-authenticated users see zero `agent_memories` rows and cannot call the owner-delete RPC successfully.
 3. User A cannot select or delete User B memory.
 4. Direct authenticated insert/update/delete remain denied.
@@ -26,6 +29,7 @@ This document is a release gate, not a claim that durable memory is live.
 13. The two custom-auth Edge Functions retain live negative-auth proof.
 14. Supabase leaked-password protection is enabled and re-observed green.
 15. Exact-production `app.sekretbip.net` authority is restored before any UI/runtime L3 claim.
+16. Production apply targets canonical project `tbsevonvegdnlyjgplmm` from exact current `main` through the guarded manual workflow; foreign/unstable Supabase app checks cannot substitute.
 
 ## Launch flag rule
 
@@ -34,4 +38,4 @@ A launch-enabling flag may turn true only when its named prerequisites above hav
 
 ## Rollback
 
-Before activation, rollback is branch/PR closure only. After a future reviewed deployment, disable memory retrieval first, then revert the deployment/migration according to the release receipt. Never preserve a false green status after rollback.
+Before production activation, rollback is code/runtime disable or PR revert because canonical production still has no L3 schema. After a future reviewed production apply, disable memory retrieval first, then use a new reviewed migration/release receipt for any schema reversal. Never rewrite an applied migration or preserve a false green status after rollback.
