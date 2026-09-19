@@ -1,12 +1,39 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-09-18",
+  "updatedAt": "2026-09-19",
   "authority": {
     "canonAuthority": "sekret-bip-character-canon/registry.json + approved episode keyframe evidence",
     "providerAuthority": "animation-only",
     "providerMayCreateIdentity": false,
     "providerMayOverrideCast": false,
     "providerMayPromoteCanon": false
+  },
+  "openSourceRoutePolicy": {
+    "workflow": "LEEVIZE",
+    "shotContract": "shot-dna@v1",
+    "compileOrder": ["director-brief", "model-neutral-shot-spec", "renderer-adapter"],
+    "openSourceFirst": true,
+    "deterministicPostTools": ["ffmpeg", "ffprobe"],
+    "optionalOpenSourceCandidates": ["remotion", "comfyui", "whisper-compatible"],
+    "candidateAvailabilityIsRuntimeFact": true,
+    "openSourceLabelDoesNotProveProductionEligibility": true,
+    "permissiveLicenseRequiredForCanary": true,
+    "commercialUseStatusRequired": true,
+    "exactModelIdRequired": true,
+    "approvedKeyframeRequired": true,
+    "identityQaRequired": true,
+    "playwrightPlaybackRequired": true,
+    "costOrResourcePreflightRequired": true,
+    "rendererAdaptersReplaceable": true,
+    "generatedUiMayProveProductBehavior": false,
+    "realProductCaptureRequiresPlaywright": true,
+    "finalAudioPrecedesCaptionTiming": true,
+    "attack6000": {
+      "reasoningPressureBudget": 6000,
+      "externalTestCountClaimed": false,
+      "deduplicateFailureClasses": true,
+      "requiredFamilies": ["story", "continuity", "identity", "physics", "audio", "captions", "product-truth", "evidence", "platform", "license", "release"]
+    }
   },
   "defaultProductionProvider": "higgsfield-existing",
   "providers": [
