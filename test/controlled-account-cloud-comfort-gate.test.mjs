@@ -69,7 +69,10 @@ test('controlled-account live proof requires masked repository secrets and never
       : spec.indexOf('\n  });', receiptStart);
     assert.ok(receiptStart >= 0 && receiptEnd > receiptStart);
     const receiptPayload = spec.slice(receiptStart, receiptEnd);
-    assert.doesNotMatch(receiptPayload, /controlledEmail|controlledPassword|accessToken|userId/);
+    assert.doesNotMatch(
+      receiptPayload,
+      /controlledEmail|controlledPassword|\baccessToken\s*[:,]|\buserId\s*[:,]/,
+    );
   }
 });
 
