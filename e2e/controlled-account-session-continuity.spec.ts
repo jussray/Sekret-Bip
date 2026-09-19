@@ -272,7 +272,7 @@ test('controlled account clears mounted/device-private state on logout and recov
     });
   } finally {
     if (fixturePresent) {
-      await mutateDurableFixture(providerSession, 'delete').catch(() => undefined);
+      await mutateDurableFixture(providerSession, 'delete');
     }
   }
 });
