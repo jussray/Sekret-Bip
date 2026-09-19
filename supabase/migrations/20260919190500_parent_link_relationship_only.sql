@@ -68,7 +68,7 @@ begin
       '' order by i
     )
     into v_code
-    from (select gen_random_bytes(8) as raw_bytes) entropy
+    from (select extensions.gen_random_bytes(8) as raw_bytes) entropy
     cross join generate_series(0, 7) as positions(i);
 
     exit when not exists (
