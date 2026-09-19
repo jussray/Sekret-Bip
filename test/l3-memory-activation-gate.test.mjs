@@ -4,7 +4,8 @@ import test from 'node:test';
 
 const gate = fs.readFileSync('docs/L3_MEMORY_ACTIVATION_GATE.md', 'utf8');
 const productDesign = fs.readFileSync('e2e/product-design-review.spec.ts', 'utf8');
-const migration = fs.readFileSync('supabase/migrations/20260918234500_agent_memories_l3_contract.sql', 'utf8');
+const candidate = fs.readFileSync('supabase/candidates/20260918234500_agent_memories_l3_contract.sql', 'utf8');
+const receipt = fs.readFileSync('supabase/migrations/20260918234500_agent_memories_l3_contract.sql', 'utf8');
 
 test('L3 activation requires exact production and database proof rather than flag flips', () => {
   for (const required of [
@@ -33,6 +34,9 @@ test('memory instruction authority is structurally false and never treated as a 
   assert.match(gate, /memory instruction authority are evidence\/trust state, not launch toggles/);
 });
 
-test('candidate migration does not silently create an enabled runtime feature flag', () => {
-  assert.doesNotMatch(migration, /L3_MEMORY_ENABLED|MEMORY_ROLLOUT|enabled\s*=\s*true/i);
+test('candidate SQL cannot be auto-applied by the canonical migration lane', () => {
+  assert.match(candidate, /NOT A PRODUCTION MIGRATION/);
+  assert.match(receipt, /No schema changes/);
+  assert.doesNotMatch(receipt, /create table\s+if not exists\s+public\.agent_memories/i);
+  assert.doesNotMatch(candidate, /L3_MEMORY_ENABLED|MEMORY_ROLLOUT|enabled\s*=\s*true/i);
 });
