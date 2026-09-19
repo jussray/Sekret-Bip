@@ -32,7 +32,7 @@ export const SCREEN_PURPOSES: ScreenPurpose[] = [
   { id: 'voicebip', side: 'parent', title: 'Parent Voice Bip', purpose: 'Voice reflection and optional spoken Bridge replies.', owns: ['private recording', 'playback', 'transcript', 'reflection reply', 'save to Parent Pages'], mustNotBecome: ['teen voice-note access', 'a text chat clone', 'a second journal editor'] },
   { id: 'circle', side: 'parent', title: 'Parent Circle', purpose: 'Parent-to-parent community and support.', owns: ['parent community posts', 'reactions', 'resources', 'moderation', 'anonymous identity'], mustNotBecome: ['teen Circle access', 'Bridge', 'family monitoring'] },
   { id: 'bridge', side: 'parent', title: 'Parent Bridge', purpose: 'Private parent-to-teen connection and replies.', owns: ['Doorbell signals', 'S2Tell shares', 'parent replies', 'shared moments', 'connection history'], mustNotBecome: ['Parent Circle', 'teen activity tracking', 'journal access'] },
-  { id: 'more', side: 'parent', title: 'Parent More', purpose: 'Parent feature drawer, connection management, and settings.', owns: ['Parent Profile', 'Parent Circle', 'Bip Jr profiles', 'Settings', 'Resources', 'Parent Link', 'Help and legal'], mustNotBecome: ['a second Parent Room', 'Bridge', 'a flat junk drawer'] },
+  { id: 'more', side: 'parent', title: 'Parent More', purpose: 'Parent feature drawer, connection management, verification tools, and settings.', owns: ['Parent Profile', 'Parent Circle', 'Bip Jr profiles', 'Teen age assurance', 'Settings', 'Resources', 'Parent Link', 'Help and legal'], mustNotBecome: ['a second Parent Room', 'Bridge', 'a flat junk drawer'] },
 ];
 
 export interface FeatureDrawerItem { emoji: string; label: string; route: string; description: string; }
@@ -52,7 +52,7 @@ export const TEEN_MORE_GROUPS: FeatureDrawerGroup[] = [
     { emoji: '⭐', label: 'Bip Points', route: 'points', description: 'See the private receipts from showing up for yourself.' },
   ] },
   { title: 'ACCOUNT & SAFETY', items: [
-    { emoji: '🔗', label: 'Parent Link', route: 'parent-link-verify', description: 'Manage verification and the trusted connection.' },
+    { emoji: '🔗', label: 'Parent Link', route: 'parent-link-verify', description: 'Manage the trusted adult connection used by Bridge. Verification is a separate action.' },
     { emoji: '🧠', label: 'Memory & Continuity', route: 'l4', description: 'See what Bip remembers now and what stays protected until long-term memory is ready.' },
     { emoji: '⚙️', label: 'Settings', route: 'settings', description: 'Theme, companion, privacy, notifications, and account.' },
     { emoji: '🛟', label: 'Help & Safety', route: 'resources', description: 'Support, safety tools, and legal information.' },
@@ -74,8 +74,9 @@ export const PARENT_MORE_GROUPS: FeatureDrawerGroup[] = [
   ] },
   { title: 'ACCOUNT & RESOURCES', items: [
     { emoji: '🪺', label: 'Bip Jr', route: 'bip-jr', description: 'Create and manage supervised child profiles under your verified Parent account.' },
+    { emoji: '🛡️', label: 'Teen Verification', route: 'teen-verification', description: 'Explicitly confirm a linked Teen age range without gaining private account access.' },
     { emoji: '👤', label: 'Parent Profile', route: 'profile', description: 'Your parent-side identity and preferences.' },
-    { emoji: '🔗', label: 'Parent Link', route: 'parent-link', description: 'Manage the trusted teen connection.' },
+    { emoji: '🔗', label: 'Parent Link', route: 'parent-link', description: 'Manage the trusted Teen connection. Linking alone does not verify the Teen.' },
     { emoji: '⚙️', label: 'Settings', route: 'settings', description: 'Privacy, notifications, and account.' },
     { emoji: '📚', label: 'Resources', route: 'resources', description: 'Guides, support, and legal information.' },
     { emoji: '🚪', label: 'Sign out', route: 'logout', description: 'Securely sign out and clear private device state.' },
