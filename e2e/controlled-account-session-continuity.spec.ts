@@ -5,6 +5,7 @@ const controlledEmail = process.env.SEKRET_CONTROLLED_ACCOUNT_EMAIL?.trim();
 const controlledPassword = process.env.SEKRET_CONTROLLED_ACCOUNT_PASSWORD?.trim();
 const expectedHeadSha = process.env.EXPECTED_HEAD_SHA?.trim().toLowerCase();
 const SENTINEL = 'CI_ACCOUNT_A_PRIVATE_CACHE_SENTINEL';
+const SENTINEL_ENTRY_ID = 99119911;
 const PRIVATE_CACHE_KEYS = ['entries', 'circlePosts', 'roomMemory', 'teen_profile_data'];
 const DURABLE_TABLES = new Set([
   'journal_entries',
@@ -55,21 +56,36 @@ function writeReceipt(value: Record<string, unknown>) {
   );
 }
 
-test('controlled account clears device-private cache on logout and rehydrates durable state after relogin', async ({ page }) => {
+test('controlled account clears mounted and device-private state on logout, then rehydrates durable state after relogin', async ({ page }) => {
   test.setTimeout(150_000);
   test.skip(!expectedHeadSha, 'EXPECTED_HEAD_SHA is required for exact-production proof.');
 
   await signInTeen(page);
 
-  await page.evaluate(({ sentinel, privateKeys }) => {
-    localStorage.setItem('entries', JSON.stringify([{ id: 99119911, text: sentinel }]));
+  await page.evaluate(({ sentinel, entryId, privateKeys }) => {
+    localStorage.setItem('entries', JSON.stringify([{
+      id: entryId,
+      text: sentinel,
+      mood: 'okay',
+      date: '9/18/2026',
+      time: '9:00 PM',
+      source: 'me',
+      activeTab: 'me',
+      entryMode: 'typed',
+    }]));
     localStorage.setItem('circlePosts', JSON.stringify([{ id: 99119912, text: sentinel }]));
     localStorage.setItem('roomMemory', JSON.stringify({ lastHotspot: sentinel }));
     localStorage.setItem('teen_profile_data', JSON.stringify({ displayName: sentinel, gender: 'girl' }));
     for (const key of privateKeys) {
       if (!localStorage.getItem(key)) throw new Error(`Failed to seed private cache key ${key}`);
     }
-  }, { sentinel: SENTINEL, privateKeys: PRIVATE_CACHE_KEYS });
+  }, { sentinel: SENTINEL, entryId: SENTINEL_ENTRY_ID, privateKeys: PRIVATE_CACHE_KEYS });
+
+  // Force the signed-in app to hydrate the synthetic device cache into mounted
+  // state before logout. Otherwise a storage-only test could falsely pass.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.goto(`/pages/${SENTINEL_ENTRY_ID}`);
+  await expect(page.getByText(SENTINEL, { exact: true })).toBeVisible({ timeout: 30_000 });
 
   await page.goto('/logout');
   await expect(page).toHaveURL(/\/login(?:\?|$)/, { timeout: 45_000 });
@@ -94,6 +110,9 @@ test('controlled account clears device-private cache on logout and rehydrates du
     timeout: 45_000,
   }).toBeGreaterThan(0);
 
+  await page.goto(`/pages/${SENTINEL_ENTRY_ID}`);
+  await expect(page.getByText(SENTINEL, { exact: true })).toHaveCount(0);
+
   const visibleBody = await page.locator('body').innerText();
   expect(visibleBody).not.toContain(SENTINEL);
   expect(visibleBody).not.toContain(controlledEmail!);
@@ -107,11 +126,12 @@ test('controlled account clears device-private cache on logout and rehydrates du
     checkpoints: {
       firstSignIn: 'passed',
       privateDeviceCacheSeeded: 'passed-with-synthetic-sentinel',
+      sentinelLoadedIntoMountedState: 'passed',
       logoutReachedSignedOutLogin: 'passed',
       privateDeviceCacheCleared: 'passed',
       secondSignIn: 'passed',
       durableAccountReadsAfterRelogin: [...durableReads].sort(),
-      staleSentinelNotRendered: 'passed',
+      staleSentinelNotRecovered: 'passed',
     },
     privacy: {
       screenshotsCaptured: false,
