@@ -14,8 +14,10 @@ test('L3 activation requires exact production and database proof rather than fla
     'custom-auth Edge Functions retain live negative-auth proof',
     'leaked-password protection is enabled',
     'Exact-production `app.sekretbip.net` authority is restored',
+    'trusted server retrieval path recomputes and verifies the integrity fingerprint',
+    'Restricted memory is excluded from companion context by default',
   ]) {
-    assert.match(gate, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+    assert.match(gate, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'));
   }
 });
 
