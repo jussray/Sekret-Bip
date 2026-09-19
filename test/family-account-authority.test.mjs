@@ -42,7 +42,7 @@ test('parent link is relationship consent and cannot grant or remove teen verifi
   assert.match(relationshipOnly, /set parent_link_state = 'revoked'/);
   assert.doesNotMatch(relationshipOnly, /set\s+verification_state\s*=/i);
 
-  assert.match(relationshipOnly, /gen_random_bytes\(8\)/);
+  assert.match(relationshipOnly, /extensions\.gen_random_bytes\(8\)/);
   assert.match(relationshipOnly, /ABCDEFGHJKLMNPQRSTUVWXYZ23456789/);
   assert.match(relationshipOnly, /get_byte\(raw_bytes, i\) % 32/);
   assert.doesNotMatch(relationshipOnly, /md5\(gen_random_uuid\(\)::text\)/);
