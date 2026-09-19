@@ -59,7 +59,8 @@ test('Teen Room keeps one canonical companion visual with bounded, discoverable 
   await expect(moodButton).toBeVisible({ timeout: 15_000 });
   await expect(returnButton).toBeVisible({ timeout: 15_000 });
   await expect(roomGuide).toBeVisible({ timeout: 15_000 });
-  await expect(roomGuidePanel).toBeHidden();
+  await expect(roomGuidePanel).toHaveCSS('opacity', '0');
+  await expect(roomGuidePanel).toHaveCSS('pointer-events', 'none');
   await expect(companionVisual).toHaveCount(1);
   await expect(page.getByText(/Suhana's Room/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Suhana is nearby.', { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -101,7 +102,8 @@ test('Teen Room keeps one canonical companion visual with bounded, discoverable 
   await saveEvidence(page, '01-room-companion-first-composition');
 
   await roomGuide.click();
-  await expect(roomGuidePanel).toBeVisible();
+  await expect(roomGuidePanel).toHaveCSS('pointer-events', 'auto');
+  await expect(roomGuidePanel).toHaveCSS('opacity', '1', { timeout: 5_000 });
   await expect(page.getByText('Room shortcuts', { exact: true })).toBeVisible();
   await expect(page.getByText('Tap objects in the room, or use a shortcut here.', { exact: true })).toBeVisible();
   for (const name of ['Open Journal', 'Open Voice Bip', 'Open Calm', 'Open Bridge', 'Open Circle', 'Open Growth']) {
