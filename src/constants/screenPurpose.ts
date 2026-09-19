@@ -32,7 +32,7 @@ export const SCREEN_PURPOSES: ScreenPurpose[] = [
   { id: 'voicebip', side: 'parent', title: 'Parent Voice Bip', purpose: 'Voice reflection and optional spoken Bridge replies.', owns: ['private recording', 'playback', 'transcript', 'reflection reply', 'save to Parent Pages'], mustNotBecome: ['teen voice-note access', 'a text chat clone', 'a second journal editor'] },
   { id: 'circle', side: 'parent', title: 'Parent Circle', purpose: 'Parent-to-parent community and support.', owns: ['parent community posts', 'reactions', 'resources', 'moderation', 'anonymous identity'], mustNotBecome: ['teen Circle access', 'Bridge', 'family monitoring'] },
   { id: 'bridge', side: 'parent', title: 'Parent Bridge', purpose: 'Private parent-to-teen connection and replies.', owns: ['Doorbell signals', 'S2Tell shares', 'parent replies', 'shared moments', 'connection history'], mustNotBecome: ['Parent Circle', 'teen activity tracking', 'journal access'] },
-  { id: 'more', side: 'parent', title: 'Parent More', purpose: 'Parent feature drawer, connection management, and settings.', owns: ['Parent Profile', 'Parent Circle', 'Settings', 'Resources', 'Parent Link', 'Help and legal'], mustNotBecome: ['a second Parent Room', 'Bridge', 'a flat junk drawer'] },
+  { id: 'more', side: 'parent', title: 'Parent More', purpose: 'Parent feature drawer, connection management, and settings.', owns: ['Parent Profile', 'Parent Circle', 'Bip Jr profiles', 'Settings', 'Resources', 'Parent Link', 'Help and legal'], mustNotBecome: ['a second Parent Room', 'Bridge', 'a flat junk drawer'] },
 ];
 
 export interface FeatureDrawerItem { emoji: string; label: string; route: string; description: string; }
@@ -73,6 +73,7 @@ export const PARENT_MORE_GROUPS: FeatureDrawerGroup[] = [
     { emoji: '🤝', label: 'Parent Circle', route: 'circle', description: 'Parent-to-parent support and community.' },
   ] },
   { title: 'ACCOUNT & RESOURCES', items: [
+    { emoji: '🪺', label: 'Bip Jr', route: 'bip-jr', description: 'Create and manage supervised child profiles under your verified Parent account.' },
     { emoji: '👤', label: 'Parent Profile', route: 'profile', description: 'Your parent-side identity and preferences.' },
     { emoji: '🔗', label: 'Parent Link', route: 'parent-link', description: 'Manage the trusted teen connection.' },
     { emoji: '⚙️', label: 'Settings', route: 'settings', description: 'Privacy, notifications, and account.' },
