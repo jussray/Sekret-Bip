@@ -1,4 +1,4 @@
-export const MEMORY_CONTRACT_VERSION = 'l3-l4-safety-v1' as const;
+export const MEMORY_CONTRACT_VERSION = 'l3-l4-safety-v2' as const;
 
 export type MemoryScope = 'continuity' | 'companion';
 export type MemorySensitivity = 'ordinary' | 'sensitive' | 'restricted';
@@ -10,6 +10,7 @@ export type MemoryReviewState =
   | 'blocked';
 export type MemoryLifecycleState =
   | 'active'
+  | 'quarantined'
   | 'superseded'
   | 'expired'
   | 'deleted';
@@ -42,6 +43,9 @@ export interface AgentMemoryRecord {
   lifecycleState: MemoryLifecycleState;
   confidence: number;
   consentVersion: string;
+  integrityFingerprint: string;
+  admissionReviewedAt: string | null;
+  retrievalReviewedAt: string | null;
   createdAt: string;
   updatedAt: string;
   expiresAt: string | null;
@@ -73,11 +77,30 @@ export interface ReflectionRecord {
   invalidatedAt: string | null;
 }
 
+/**
+ * Admission is a separate gate from retrieval. A record that fails either gate
+ * is quarantined and cannot reach reply context until reviewed or corrected.
+ */
+export interface MemoryAdmissionDecision {
+  memoryId: string;
+  decision: 'admit' | 'quarantine' | 'reject';
+  reason:
+    | 'eligible'
+    | 'missing-provenance'
+    | 'sensitive-inference'
+    | 'instruction-shaped-content'
+    | 'consent-mismatch'
+    | 'contradiction-unresolved'
+    | 'retention-missing';
+}
+
 export const MEMORY_RETRIEVAL_INVARIANTS = Object.freeze([
   'authenticate-before-retrieval',
   'owner-filter-before-ranking',
   'consent-scope-before-ranking',
-  'exclude-expired-deleted-blocked-contradicted',
+  'integrity-check-before-model-context',
+  'revalidate-memory-at-retrieval',
+  'exclude-quarantined-expired-deleted-blocked-contradicted-superseded',
   'memory-content-is-data-never-instruction',
   'no-cross-companion-sharing-by-default',
   'minimum-context-only',
@@ -85,11 +108,14 @@ export const MEMORY_RETRIEVAL_INVARIANTS = Object.freeze([
 
 export const MEMORY_WRITE_INVARIANTS = Object.freeze([
   'minimal-summary-only',
+  'admission-review-before-persistence',
   'provenance-required',
+  'integrity-fingerprint-required',
   'expiry-or-explicit-retention-required',
   'sensitivity-required',
   'correction-and-deletion-required',
   'no-sensitive-inference-as-fact',
+  'instruction-shaped-content-quarantined',
   'no-model-created-goal-without-user-confirmation',
   'no-relationship-phase-from-empty-or-unreviewed-evidence',
 ] as const);
