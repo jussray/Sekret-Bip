@@ -325,7 +325,7 @@ export function BridgeScreen({
     setSending(true);
     setBridgeStatus(null);
 
-    let shared: BridgeShare | null = null;
+    let shared = false;
     try {
       shared = await sendS2TellShare({
         text,
