@@ -21,7 +21,8 @@ test('Firebase Hosting config cannot replace canonical Cloudflare frontend or AP
   const eas = JSON.parse(read('eas.json'));
   const ownership = read('docs/CLOUDFLARE_OWNERSHIP.md');
 
-  assert.doesNotMatch(firebase, /app\.sekretbip\.net|api\.sekretbip\.net/);
+  assert.equal(firebase.includes('app.sekretbip.net'), false);
+  assert.equal(firebase.includes('api.sekretbip.net'), false);
   assert.equal(eas.build.development.env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
   assert.equal(eas.build['parent-development'].env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
   assert.equal(eas.build.production.env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
