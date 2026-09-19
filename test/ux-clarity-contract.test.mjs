@@ -15,6 +15,12 @@ test('Room keeps cinematic hotspots but exposes an explicit shortcut guide', asy
   assert.match(guide, /Room shortcuts/);
   assert.match(guide, /Tap objects in the room, or use a shortcut here\./);
   assert.match(guide, /accessibilityLabel=\{open \? 'Hide room shortcuts' : 'Show room shortcuts'\}/);
+  assert.match(guide, /react-native-reanimated/);
+  assert.match(guide, /useSharedValue\(0\)/);
+  assert.match(guide, /useAnimatedStyle/);
+  assert.match(guide, /withSpring\(1/);
+  assert.match(guide, /withTiming\(0, \{ duration: 180 \}\)/);
+  assert.match(guide, /pointerEvents=\{open \? 'auto' : 'none'\}/);
 });
 
 test('Parent Room unlocks relationship routes only from server-backed link authority', async () => {
