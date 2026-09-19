@@ -100,6 +100,16 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/family_account_authority_phase1.sql
 
+      - name: Prove Parent Link receiver authority boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v psql >/dev/null
+          PGPASSWORD=postgres psql \
+            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/probes/parent_link_receiver_authority_phase1.sql
+
       - name: Stop ephemeral Supabase
         if: always()
         shell: bash
