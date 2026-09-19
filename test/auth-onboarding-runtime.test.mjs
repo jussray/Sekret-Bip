@@ -16,6 +16,7 @@ const reflection = read('app/(onboarding)/reflection.tsx');
 const parentSetup = read('app/(onboarding)/parent-setup.tsx');
 const bootstrap = read('src/services/auth/postAuthBootstrap.ts');
 const founderAudit = read('src/services/founderAudit.ts');
+const verificationContext = read('src/context/VerificationContext.tsx');
 const ageAssurance = read('src/features/onboarding/ageAssurance.ts');
 const manifest = JSON.parse(read('.control-room/repository.manifest.json'));
 
@@ -76,6 +77,22 @@ test('profile hydration failure preserves auth and fails closed through onboardi
     /prehydratedProfile === undefined\s*\? await hydrateAccountProfileForRouting\(requestedSide\)/,
   );
   assert.match(bootstrap, /if \(!requiredConsentsComplete\) return `\/\(onboarding\)\/consent\?side=\$\{side\}`;/);
+});
+
+test('verification read failure stays fail-closed without erasing permanent auth truth', () => {
+  assert.match(
+    verificationContext,
+    /const permanentSession = Boolean\(session && !session\.user\.is_anonymous\);[\s\S]*setSession\(session\);[\s\S]*setAuthenticated\(permanentSession\);[\s\S]*setSnapshot\(INITIAL_VERIFICATION_SNAPSHOT\);/,
+  );
+
+  const realtimeLoadStart = verificationContext.indexOf('void loadVerificationForSession(session)');
+  const realtimeFinally = verificationContext.indexOf('.finally(() => {', realtimeLoadStart);
+  const realtimeFailureRegion = verificationContext.slice(realtimeLoadStart, realtimeFinally);
+  assert.ok(realtimeLoadStart >= 0 && realtimeFinally > realtimeLoadStart);
+  assert.doesNotMatch(realtimeFailureRegion, /setSession\(null\)/);
+  assert.doesNotMatch(realtimeFailureRegion, /setAuthenticated\(false\)/);
+
+  assert.match(rootLayout, /if \(isSupabaseConfigured && !isAuthenticated\)/);
 });
 
 test('authorized founder login routes before public consent and onboarding gates', () => {

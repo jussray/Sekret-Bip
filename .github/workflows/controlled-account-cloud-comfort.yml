@@ -12,8 +12,13 @@ on:
   workflow_dispatch:
     inputs:
       target_sha:
-        description: 'Exact deployed current-main SHA to verify'
+        description: 'Exact deployed SHA to verify'
         required: true
+        type: string
+      target_url:
+        description: 'Owned deployed origin: canonical production or sekret-bip Pages preview'
+        required: true
+        default: 'https://sekretbip.net'
         type: string
       confirm_controlled_account_use:
         description: 'Allow one login-only proof with the controlled permanent account'
@@ -32,8 +37,7 @@ env:
   CI: true
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.target_sha || github.event.pull_request.head.sha }}
-  SEKRET_CONTROLLED_ACCOUNT_BASE_URL: https://sekretbip.net
-  PRODUCTION_RELEASE_URL: https://sekretbip.net/.well-known/sekret-release.json
+  SEKRET_CONTROLLED_ACCOUNT_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.target_url || 'https://sekretbip.net' }}
 
 jobs:
   validate:
@@ -79,7 +83,7 @@ jobs:
 
   proof:
     if: github.event_name == 'workflow_dispatch'
-    name: Exact-production authenticated Cloud and Comfort
+    name: Exact-deployment authenticated auth boundary, Cloud and Comfort
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -98,7 +102,35 @@ jobs:
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
-      - name: Require requested head to equal current main
+      - name: Bind controlled-account target to an owned origin
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const raw = process.env.SEKRET_CONTROLLED_ACCOUNT_BASE_URL?.trim();
+          if (!raw) throw new Error('Missing controlled-account target URL.');
+
+          const url = new URL(raw);
+          const cleanPath = url.pathname.replace(/\/+$/, '');
+          if (url.protocol !== 'https:' || cleanPath !== '' || url.search || url.hash) {
+            throw new Error(`Controlled-account target must be a bare HTTPS origin: ${raw}`);
+          }
+
+          const isProduction = url.origin === 'https://sekretbip.net';
+          const isOwnedPreview = url.hostname.endsWith('.sekret-bip.pages.dev');
+          if (!isProduction && !isOwnedPreview) {
+            throw new Error(`Controlled-account target is not an owned Se'kret Bip origin: ${url.origin}`);
+          }
+
+          const kind = isProduction ? 'production' : 'preview';
+          fs.appendFileSync(process.env.GITHUB_ENV, `CONTROLLED_TARGET_KIND=${kind}\n`);
+          fs.appendFileSync(process.env.GITHUB_ENV, `CONTROLLED_TARGET_ORIGIN=${url.origin}\n`);
+          console.log(`Controlled-account target bound to ${kind} origin ${url.origin}.`);
+          NODE
+
+      - name: Require production target to equal current main
+        if: env.CONTROLLED_TARGET_KIND == 'production'
         shell: bash
         run: |
           set -euo pipefail
@@ -107,15 +139,17 @@ jobs:
           printf 'requested=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
           test "$current_main" = "$EXPECTED_HEAD_SHA"
 
-      - name: Verify canonical production serves exact current main
+      - name: Verify target origin serves the exact requested release
         shell: bash
         run: |
           set -euo pipefail
           node <<'NODE'
           const expected = process.env.EXPECTED_HEAD_SHA?.trim().toLowerCase();
-          const releaseUrl = process.env.PRODUCTION_RELEASE_URL;
-          if (!expected || !releaseUrl) throw new Error('Missing exact-production verification inputs.');
+          const origin = process.env.CONTROLLED_TARGET_ORIGIN;
+          const kind = process.env.CONTROLLED_TARGET_KIND;
+          if (!expected || !origin || !kind) throw new Error('Missing exact-deployment verification inputs.');
 
+          const releaseUrl = `${origin}/.well-known/sekret-release.json`;
           const deadline = Date.now() + 240_000;
           let last = null;
           while (Date.now() < deadline) {
@@ -131,13 +165,15 @@ jobs:
                 environment: body?.environment ?? null,
                 branch: body?.branch ?? null,
               };
-              if (
-                response.ok &&
-                String(body?.commitSha ?? '').toLowerCase() === expected &&
-                body?.environment === 'production' &&
-                body?.branch === 'main'
-              ) {
-                console.log(`Canonical production verified at exact current main ${expected}.`);
+
+              const exactSha = String(body?.commitSha ?? '').toLowerCase() === expected;
+              const exactEnvironment = body?.environment === kind;
+              const branchBoundary = kind === 'production'
+                ? body?.branch === 'main'
+                : Boolean(body?.branch && body.branch !== 'main');
+
+              if (response.ok && exactSha && exactEnvironment && branchBoundary) {
+                console.log(`Controlled target verified at exact ${kind} release ${expected}.`);
                 process.exit(0);
               }
             } catch (error) {
@@ -145,7 +181,7 @@ jobs:
             }
             await new Promise(resolve => setTimeout(resolve, 5000));
           }
-          throw new Error(`Canonical production did not reach exact current main ${expected}: ${JSON.stringify(last)}`);
+          throw new Error(`Controlled target did not reach exact ${kind} release ${expected}: ${JSON.stringify(last)}`);
           NODE
 
       - name: Require explicit controlled-account authority
@@ -182,7 +218,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Prove authenticated Cloud and Comfort without private content
+      - name: Prove auth-failure boundary, Cloud and Comfort without private content
         env:
           SEKRET_CONTROLLED_ACCOUNT_EMAIL: ${{ secrets.SEKRET_CONTROLLED_ACCOUNT_EMAIL }}
           SEKRET_CONTROLLED_ACCOUNT_PASSWORD: ${{ secrets.SEKRET_CONTROLLED_ACCOUNT_PASSWORD }}
