@@ -80,8 +80,6 @@ create temp table family_authority_runtime (
 
 grant all on family_authority_results, family_authority_runtime to authenticated;
 
--- Permanent signups must be provisioned by the auth.users trigger even before
--- a client-side authenticated session exists.
 insert into family_authority_results
 select
   'permanent_signup_gets_server_onboarding_baseline',
@@ -120,7 +118,6 @@ select
   ), false),
   'Anonymous-to-permanent upgrade creates the server-owned onboarding baseline';
 
--- Establish the synthetic product-side account shapes used by the RPCs.
 insert into public.app_profiles (
   user_id,
   role,
@@ -182,12 +179,7 @@ set verification_state = excluded.verification_state,
     parent_link_state = excluded.parent_link_state,
     verification_reason = excluded.verification_reason;
 
--- Teen creates the relationship invitation. Verification remains independent.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'teen'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'teen'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -206,20 +198,13 @@ insert into family_authority_results
 select
   'teen_invite_changes_relationship_not_verification',
   coalesce((
-    select verification_state = 'UNVERIFIED'
-      and parent_link_state = 'pending'
+    select verification_state = 'UNVERIFIED' and parent_link_state = 'pending'
     from public.account_verification
     where user_id = (select user_id from family_authority_context where label = 'teen')
   ), false),
   'Invite creation leaves teen verification independent while relationship becomes pending';
 
--- Verified Parent redeems the teen-issued code. The relationship becomes active
--- but must never mint VERIFIED_TEEN.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'parent'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'parent'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -231,9 +216,7 @@ select set_config(
 );
 set local role authenticated;
 insert into family_authority_runtime(key, value)
-select
-  'redeemed_rows',
-  count(*)::text
+select 'redeemed_rows', count(*)::text
 from public.redeem_parent_link_invite(
   (select value from family_authority_runtime where key = 'parent_link_code')
 );
@@ -244,8 +227,7 @@ select
   'parent_redemption_activates_relationship_without_minting_teen_verification',
   (select value = '1' from family_authority_runtime where key = 'redeemed_rows')
   and coalesce((
-    select verification_state = 'UNVERIFIED'
-      and parent_link_state = 'active'
+    select verification_state = 'UNVERIFIED' and parent_link_state = 'active'
     from public.account_verification
     where user_id = (select user_id from family_authority_context where label = 'teen')
   ), false)
@@ -258,13 +240,7 @@ select
   ), false),
   'Parent redemption activates only the teen-issued relationship';
 
--- A Parent account that has not passed guardian verification cannot turn the
--- active relationship into Teen verification.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'unverified_parent'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'unverified_parent'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -297,13 +273,7 @@ end
 $probe$;
 reset role;
 
--- A different verified guardian is still denied because the active relationship
--- scopes which guardian may perform the separate assurance action.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'other_parent'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'other_parent'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -336,12 +306,7 @@ end
 $probe$;
 reset role;
 
--- The linked verified guardian now takes an explicit, separate assurance action.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'parent'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'parent'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -353,9 +318,7 @@ select set_config(
 );
 set local role authenticated;
 insert into family_authority_runtime(key, value)
-select
-  'guardian_assurance_rows',
-  count(*)::text
+select 'guardian_assurance_rows', count(*)::text
 from public.confirm_linked_teen_age_assurance(
   (select user_id from family_authority_context where label = 'teen')
 );
@@ -388,13 +351,7 @@ select
   ), false),
   'A separate verified-guardian action creates assurance authority while Bridge relationship stays unchanged';
 
--- The linked Teen can revoke the relationship after verification. Revoking the
--- relationship must not erase or manufacture age-assurance truth.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'teen'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'teen'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -429,13 +386,7 @@ select
   ),
   'Teen revocation closes the relationship but leaves the separate assurance receipt intact';
 
--- A completed 18-19 Teen has a separate explicit self-assurance path and does
--- not require Parent Link at all.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'adult_teen'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'adult_teen'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -447,9 +398,7 @@ select set_config(
 );
 set local role authenticated;
 insert into family_authority_runtime(key, value)
-select
-  'adult_teen_assurance_rows',
-  count(*)::text
+select 'adult_teen_assurance_rows', count(*)::text
 from public.confirm_own_self_declared_adult_teen_age_assurance();
 reset role;
 
@@ -469,18 +418,13 @@ select
     from public.teen_age_assurance_receipts
     where teen_user_id = (select user_id from family_authority_context where label = 'adult_teen')
       and guardian_user_id is null
-      and method = 'self_declared_18_19'
+      and method = 'self_declared_age_bucket'
       and age_bucket = '18-19'
       and superseded_at is null
   ),
   '18-19 Teen self-assurance is explicit and independent from Parent Link';
 
--- Verified guardian creates a supervised Bip Jr profile plus consent receipt.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'parent'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'parent'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -520,12 +464,7 @@ select
   ),
   'Bip Jr identity is a managed child profile, not a child auth user';
 
--- An unverified Parent account cannot create a child profile.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'unverified_parent'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'unverified_parent'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -556,12 +495,7 @@ end
 $probe$;
 reset role;
 
--- Another verified guardian cannot see or archive the first guardian's child.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'other_parent'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'other_parent'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -592,12 +526,7 @@ select
   and (select value = 'false' from family_authority_runtime where key = 'other_guardian_archive'),
   'A different verified guardian cannot read or archive the child profile';
 
--- Owner can archive and the explicit consent receipt records revocation.
-select set_config(
-  'request.jwt.claim.sub',
-  (select user_id::text from family_authority_context where label = 'parent'),
-  true
-);
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'parent'), true);
 select set_config(
   'request.jwt.claims',
   jsonb_build_object(
@@ -633,7 +562,6 @@ select
   ), false),
   'Owner archival closes the managed profile and records consent revocation';
 
--- Fail closed with one distinct receipt per behavior check.
 do $assertions$
 declare
   v_failed text;
