@@ -9,8 +9,12 @@ on:
       - 'scripts/playwright-executable.mjs'
       - 'e2e/live-onboarding-email.spec.ts'
       - 'app/(auth)/signup.tsx'
+      - 'src/context/VerificationContext.tsx'
+      - 'src/services/verificationState.ts'
+      - 'supabase/migrations/20260919190000_auth_signup_onboarding_baseline.sql'
       - 'scripts/live-signup-mailbox.mjs'
       - 'test/live-onboarding-email-gate.test.mjs'
+      - 'test/family-account-authority.test.mjs'
   workflow_dispatch:
     inputs:
       target_sha:
