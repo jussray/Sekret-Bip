@@ -35,10 +35,21 @@ test('canonical production target binds repo, environment, ref, and URL', async 
   });
 });
 
-test('missing target fails closed instead of guessing a Supabase account', async () => {
+test('explicit project ref resolves the one registered target without guessing the connected project', async () => {
+  const target = await resolveSupabaseTarget({
+    env: {
+      SUPABASE_PROJECT_REF: canonical.projectRef,
+      GITHUB_REPOSITORY: canonical.repository,
+    },
+  });
+  assert.equal(target.name, 'sekret-bip-production');
+  assert.equal(target.projectRef, canonical.projectRef);
+});
+
+test('missing target and ref fail closed instead of guessing a Supabase account', async () => {
   await assert.rejects(
     resolveSupabaseTarget({ env: {} }),
-    /SUPABASE_TARGET is required/,
+    /SUPABASE_TARGET or SUPABASE_PROJECT_REF is required/,
   );
 });
 
@@ -82,8 +93,9 @@ test('provider readback must resolve the exact registered project', async () => 
   assert.equal(marker.providerVerified, true);
   assert.equal(marker.browserCookie, false);
   assert.equal(marker.authority, false);
-  assert.equal(marker.identity.organizationId, 'org_test');
   assert.equal(marker.identity.projectName, "Se'kret Bip");
+  assert.match(marker.identity.organizationFingerprint, /^[0-9a-f]{64}$/);
+  assert.equal('organizationId' in marker.identity, false);
   assert.match(marker.fingerprint, /^[0-9a-f]{64}$/);
 });
 
@@ -109,6 +121,6 @@ test('static marker is explicitly non-authorizing and unverified', async () => {
   assert.equal(marker.providerVerified, false);
   assert.equal(marker.authority, false);
   assert.equal(marker.browserCookie, false);
-  assert.equal(marker.identity.organizationId, null);
+  assert.equal(marker.identity.organizationFingerprint, null);
   assert.equal(marker.identity.projectName, null);
 });
