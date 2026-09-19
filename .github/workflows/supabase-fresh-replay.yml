@@ -56,6 +56,15 @@ jobs:
           test -s supabase/reference/legacy_migrations/20260627_point_ledger.sql
           test -s supabase/reference/legacy_migrations/20260701010000_circle_kind_add_parent_community.sql
 
+      - name: Run focused L3 memory contract tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test \
+            test/agent-memory-l3-contract.test.mjs \
+            test/l3-l4-memory-safety.test.mjs \
+            test/l3-memory-activation-gate.test.mjs
+
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1
         with:
