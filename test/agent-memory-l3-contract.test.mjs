@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-const migration = fs.readFileSync('supabase/migrations/20260918234500_agent_memories_l3_contract.sql', 'utf8');
+const migration = fs.readFileSync('supabase/candidates/20260918234500_agent_memories_l3_contract.sql', 'utf8');
 const service = fs.readFileSync('src/services/ai/agentMemory.ts', 'utf8');
 
 test('L3 schema defaults to quarantine and cannot be directly written by authenticated clients', () => {
