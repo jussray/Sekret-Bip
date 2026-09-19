@@ -71,6 +71,16 @@ jobs:
           set -euo pipefail
           supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
+      - name: Prove L3 memory owner and anonymous denial
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v psql >/dev/null
+          PGPASSWORD=postgres psql \
+            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/probes/agent_memories_l3_phase1.sql
+
       - name: Stop ephemeral Supabase
         if: always()
         shell: bash
