@@ -220,7 +220,7 @@ test('Teen entry preserves the teen onboarding path', async ({ page }) => {
   await page.goto('/?bipDevAudience=teen', { waitUntil: 'networkidle' });
   await page.getByTestId('web-welcome-enter').click();
   await expect(page).toHaveURL(/\/welcome(?:\?|$)/);
-  await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Choose your age range', { exact: true })).toBeVisible({ timeout: 15_000 });
   await expectNoDocumentHorizontalOverflow(page);
 });
 
@@ -330,7 +330,7 @@ test('Founder Visual Truth: Teen first-five-minute packet', async ({ page }, tes
     currentStage = '02-teen-setup';
     await page.getByTestId('web-welcome-enter').click();
     await expect(page).toHaveURL(/\/welcome(?:\?|$)/);
-    await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByText('Choose your age range', { exact: true })).toBeVisible({ timeout: 15_000 });
     await expectNoDocumentHorizontalOverflow(page);
     await capture('02-teen-setup');
 
