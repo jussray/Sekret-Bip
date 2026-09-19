@@ -42,6 +42,14 @@ test('parent link is relationship consent and cannot grant or remove teen verifi
   assert.match(relationshipOnly, /set parent_link_state = 'revoked'/);
   assert.doesNotMatch(relationshipOnly, /set\s+verification_state\s*=/i);
 
+  const redeemStart = relationshipOnly.indexOf('create or replace function public.redeem_parent_link_invite');
+  const revokeStart = relationshipOnly.indexOf('create or replace function public.revoke_parent_link', redeemStart);
+  const redeemRegion = relationshipOnly.slice(redeemStart, revokeStart);
+  assert.ok(redeemStart >= 0 && revokeStart > redeemStart);
+  assert.match(redeemRegion, /v_parent_profile\.account_side <> 'parent'/);
+  assert.match(redeemRegion, /v_parent_profile\.onboarding_complete is not true/);
+  assert.doesNotMatch(redeemRegion, /verification_state\s*=\s*'VERIFIED_GUARDIAN'/i);
+
   assert.match(verificationState, /PARENT_APPROVED: \{ to: 'UNVERIFIED', parentLinkState: 'active' \}/);
   assert.match(verificationState, /PARENT_APPROVED: \{ to: 'VERIFIED_TEEN', parentLinkState: 'active' \}/);
   assert.match(verificationState, /VERIFICATION_CONFIRMED: \{ to: 'VERIFIED_TEEN' \}/);
