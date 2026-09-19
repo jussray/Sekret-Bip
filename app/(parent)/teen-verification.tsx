@@ -81,7 +81,7 @@ export default function ParentTeenVerificationScreen() {
         <Text style={styles.kicker}>TEEN AGE ASSURANCE</Text>
         <Text style={styles.title}>Confirm age.{`\n`}Not access.</Text>
         <Text style={styles.body}>
-          This is a separate verification action. Your Teen keeps ownership of their private account and Bridge sharing controls.
+          This is a separate verification action. It does not grant you private account access. Your Teen keeps ownership of their account and Bridge sharing controls.
         </Text>
 
         <View style={styles.boundaryCard}>
