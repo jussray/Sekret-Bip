@@ -136,5 +136,5 @@ if (selectCanary) {
     requiresPlaywrightPlayback: candidate.requiresPlaywrightPlayback
   })}\n`);
 } else {
-  console.log(`VIDEO_PROVIDER_REGISTRY_OK providers=${registry.providers.length} hfCanaries=${hfCanaries.length} default=${defaultProvider.id} workflow=${routePolicy.workflow} shot=${routePolicy.shotContract}`);
+  process.stdout.write(`VIDEO_PROVIDER_REGISTRY_OK providers=${registry.providers.length} hfCanaries=${hfCanaries.length} default=${defaultProvider.id} workflow=${routePolicy.workflow} shot=${routePolicy.shotContract}\n`);
 }
