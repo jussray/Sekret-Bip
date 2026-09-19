@@ -47,6 +47,7 @@ test('Teen Room keeps one canonical companion visual with bounded, discoverable 
     name: 'Show room shortcuts',
     exact: true,
   });
+  const roomGuidePanel = page.getByTestId('room-explore-guide-panel');
   const companionButton = page.getByRole('button', {
     name: 'Suhana is here. Tap to talk.',
     exact: true,
@@ -58,6 +59,7 @@ test('Teen Room keeps one canonical companion visual with bounded, discoverable 
   await expect(moodButton).toBeVisible({ timeout: 15_000 });
   await expect(returnButton).toBeVisible({ timeout: 15_000 });
   await expect(roomGuide).toBeVisible({ timeout: 15_000 });
+  await expect(roomGuidePanel).toBeHidden();
   await expect(companionVisual).toHaveCount(1);
   await expect(page.getByText(/Suhana's Room/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('Suhana is nearby.', { exact: true })).toBeVisible({ timeout: 15_000 });
@@ -99,7 +101,7 @@ test('Teen Room keeps one canonical companion visual with bounded, discoverable 
   await saveEvidence(page, '01-room-companion-first-composition');
 
   await roomGuide.click();
-  await expect(page.getByTestId('room-explore-guide-panel')).toBeVisible();
+  await expect(roomGuidePanel).toBeVisible();
   await expect(page.getByText('Room shortcuts', { exact: true })).toBeVisible();
   await expect(page.getByText('Tap objects in the room, or use a shortcut here.', { exact: true })).toBeVisible();
   for (const name of ['Open Journal', 'Open Voice Bip', 'Open Calm', 'Open Bridge', 'Open Circle', 'Open Growth']) {
