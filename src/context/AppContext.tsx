@@ -164,7 +164,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     previousAuthenticatedUserId.current = authenticatedUserId;
     // State reset is intentionally account-transition driven. The individual
     // setters are stable React state controls and must not retrigger this gate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authenticatedUserId]);
 
   useEffect(() => {
