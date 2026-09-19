@@ -1,35 +1,55 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import {
-  fetchBridgeSignals,
-  fetchLinkedTeenId,
+  fetchBridgeSignalsResult,
   type BridgeSignal,
 } from '@/utils/parentBridgeCompat';
 import { getBridgeResponsePreference } from '@/features/bridge/responsePreference';
+import { resolveParentEntryState } from '@/services/parentEntryState';
 
 export function ParentBridgeResponseRequestCard() {
   const [latest, setLatest] = useState<BridgeSignal | null>(null);
   const [loading, setLoading] = useState(true);
   const [linked, setLinked] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+
+    try {
+      const entryState = await resolveParentEntryState();
+      if (entryState.state !== 'ready') {
+        setLinked(false);
+        setLatest(null);
+        return;
+      }
+
+      setLinked(true);
+      const result = await fetchBridgeSignalsResult(entryState.teenUserId);
+      if (!result.ok) {
+        setLoadError(true);
+        setLatest(null);
+        return;
+      }
+
+      setLatest(result.signals.find(signal => Boolean(signal.response_preference)) ?? null);
+    } catch {
+      setLoadError(true);
+      setLatest(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     let active = true;
     void (async () => {
-      const teenId = await fetchLinkedTeenId();
       if (!active) return;
-      setLinked(Boolean(teenId));
-      if (!teenId) {
-        setLoading(false);
-        return;
-      }
-
-      const signals = await fetchBridgeSignals(teenId);
-      if (!active) return;
-      setLatest(signals.find(signal => Boolean(signal.response_preference)) ?? null);
-      setLoading(false);
+      await load();
     })();
     return () => { active = false; };
-  }, []);
+  }, [load]);
 
   const request = useMemo(
     () => getBridgeResponsePreference(latest?.response_preference),
@@ -38,9 +58,26 @@ export function ParentBridgeResponseRequestCard() {
 
   if (loading) {
     return (
-      <View style={styles.card}>
+      <View style={styles.card} accessibilityLabel="Loading latest Bridge response request">
         <ActivityIndicator color="#e9a04a" />
         <Text style={styles.loading}>checking the latest support request…</Text>
+      </View>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <View style={styles.card} accessibilityRole="alert">
+        <Text style={styles.eyebrow}>RESPONSE REQUEST</Text>
+        <Text style={styles.empty}>Couldn’t load the latest support request. We won’t call it empty unless the read succeeds.</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => void load()}
+          accessibilityRole="button"
+          accessibilityLabel="Retry loading Bridge response request"
+        >
+          <Text style={styles.retryText}>Try again</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -97,6 +134,16 @@ const styles = StyleSheet.create({
   loading: { color: 'rgba(245,232,200,0.68)', fontSize: 11, textAlign: 'center', marginTop: 8 },
   eyebrow: { color: '#e9a04a', fontSize: 9, fontWeight: '900', letterSpacing: 1.5, marginBottom: 10 },
   empty: { color: 'rgba(245,232,200,0.70)', fontSize: 12, lineHeight: 18 },
+  retryButton: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(233,160,74,0.55)',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  retryText: { color: '#e9a04a', fontSize: 12, fontWeight: '800' },
   requestRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   emoji: { fontSize: 28 },
   title: { color: '#f5e8c8', fontSize: 16, fontWeight: '900', lineHeight: 22 },

@@ -14,7 +14,8 @@ async function uid(): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return null;
   try {
-    const { data } = await sb.auth.getUser();
+    const { data, error } = await sb.auth.getUser();
+    if (error) return null;
     return data?.user?.id ?? null;
   } catch {
     return null;
@@ -56,6 +57,23 @@ export interface ParentNote {
   seen_by_teen: boolean;
 }
 
+export type ParentNotesReadFailure =
+  | 'service-unavailable'
+  | 'not-authenticated'
+  | 'query-failed';
+
+export type ParentNotesReadResult =
+  | { ok: true; notes: ParentNote[] }
+  | { ok: false; notes: []; reason: ParentNotesReadFailure };
+
+export type BridgeSignalsReadResult =
+  | { ok: true; signals: BridgeSignal[] }
+  | { ok: false; signals: []; reason: 'service-unavailable' | 'query-failed' };
+
+export type BridgeSignalWriteResult =
+  | { ok: true }
+  | { ok: false; reason: 'service-unavailable' | 'not-authenticated' | 'insert-failed' };
+
 export interface ParentEngagement {
   notesSent: number;
   tipsRead: number;
@@ -68,52 +86,87 @@ export async function sendBridgeSignal(params: {
   convMode: string | null;
   responsePreference?: BridgeResponsePreference | null;
   charKey: 'raylene' | 'rylane';
-}): Promise<void> {
+}): Promise<BridgeSignalWriteResult> {
   const sb = getSupabase();
-  const userId = await uid();
-  if (!sb || !userId) return;
+  if (!sb) return { ok: false, reason: 'service-unavailable' };
 
-  const responsePreference = params.responsePreference ?? await loadBridgeResponsePreference();
-  await sb.from('bridge_signals').insert({
-    teen_user_id: userId,
-    char_key: params.charKey,
-    share_type: params.shareType,
-    conv_mode: params.convMode ?? null,
-    response_preference: responsePreference,
-    sent_at: new Date().toISOString(),
-  });
+  const userId = await uid();
+  if (!userId) return { ok: false, reason: 'not-authenticated' };
+
+  try {
+    const responsePreference = params.responsePreference ?? await loadBridgeResponsePreference();
+    const { error } = await sb.from('bridge_signals').insert({
+      teen_user_id: userId,
+      char_key: params.charKey,
+      share_type: params.shareType,
+      conv_mode: params.convMode ?? null,
+      response_preference: responsePreference,
+      sent_at: new Date().toISOString(),
+    });
+    if (error) return { ok: false, reason: 'insert-failed' };
+    return { ok: true };
+  } catch {
+    return { ok: false, reason: 'insert-failed' };
+  }
+}
+
+async function readParentNotes(
+  ownerColumn: 'teen_user_id' | 'parent_user_id',
+  limit: number,
+  teenUserId?: string,
+): Promise<ParentNotesReadResult> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, notes: [], reason: 'service-unavailable' };
+
+  const userId = await uid();
+  if (!userId) return { ok: false, notes: [], reason: 'not-authenticated' };
+
+  try {
+    let query = sb
+      .from('parent_notes')
+      .select('id, content, sent_at, seen_by_teen')
+      .eq(ownerColumn, userId);
+
+    if (teenUserId) query = query.eq('teen_user_id', teenUserId);
+
+    const { data, error } = await query
+      .order('sent_at', { ascending: false })
+      .limit(limit);
+
+    if (error) return { ok: false, notes: [], reason: 'query-failed' };
+    return { ok: true, notes: (data ?? []) as ParentNote[] };
+  } catch {
+    return { ok: false, notes: [], reason: 'query-failed' };
+  }
+}
+
+export async function fetchParentNotesResult(): Promise<ParentNotesReadResult> {
+  return readParentNotes('teen_user_id', 20);
+}
+
+export async function fetchParentSentNotesResult(teenUserId?: string): Promise<ParentNotesReadResult> {
+  return readParentNotes('parent_user_id', 30, teenUserId);
 }
 
 export async function fetchParentNotes(): Promise<ParentNote[]> {
-  const sb = getSupabase();
-  const userId = await uid();
-  if (!sb || !userId) return [];
-  const { data } = await sb
-    .from('parent_notes')
-    .select('id, content, sent_at, seen_by_teen')
-    .eq('teen_user_id', userId)
-    .order('sent_at', { ascending: false })
-    .limit(20);
-  return (data ?? []) as ParentNote[];
+  const result = await fetchParentNotesResult();
+  return result.notes;
 }
 
-export async function fetchParentSentNotes(): Promise<ParentNote[]> {
-  const sb = getSupabase();
-  const userId = await uid();
-  if (!sb || !userId) return [];
-  const { data } = await sb
-    .from('parent_notes')
-    .select('id, content, sent_at, seen_by_teen')
-    .eq('parent_user_id', userId)
-    .order('sent_at', { ascending: false })
-    .limit(30);
-  return (data ?? []) as ParentNote[];
+export async function fetchParentSentNotes(teenUserId?: string): Promise<ParentNote[]> {
+  const result = await fetchParentSentNotesResult(teenUserId);
+  return result.notes;
 }
 
-export async function markParentNoteSeen(id: string): Promise<void> {
+export async function markParentNoteSeen(id: string): Promise<boolean> {
   const sb = getSupabase();
-  if (!sb) return;
-  await sb.from('parent_notes').update({ seen_by_teen: true }).eq('id', id);
+  if (!sb || !id) return false;
+  try {
+    const { error } = await sb.from('parent_notes').update({ seen_by_teen: true }).eq('id', id);
+    return !error;
+  } catch {
+    return false;
+  }
 }
 
 export async function subscribeToParentNotes(
@@ -130,37 +183,52 @@ export async function subscribeToParentNotes(
   return () => { void sb.removeChannel(channel); };
 }
 
-export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]> {
+export async function fetchBridgeSignalsResult(teenId: string): Promise<BridgeSignalsReadResult> {
   const sb = getSupabase();
-  if (!sb || !teenId) return [];
-  const { data } = await sb
-    .from('bridge_signals')
-    .select('id, share_type, conv_mode, response_preference, char_key, sent_at, created_at')
-    .eq('teen_user_id', teenId)
-    .order('sent_at', { ascending: false })
-    .limit(30);
-  return (data ?? []) as BridgeSignal[];
+  if (!sb) return { ok: false, signals: [], reason: 'service-unavailable' };
+  if (!teenId) return { ok: true, signals: [] };
+  try {
+    const { data, error } = await sb
+      .from('bridge_signals')
+      .select('id, share_type, conv_mode, response_preference, char_key, sent_at, created_at')
+      .eq('teen_user_id', teenId)
+      .order('sent_at', { ascending: false })
+      .limit(30);
+    if (error) return { ok: false, signals: [], reason: 'query-failed' };
+    return { ok: true, signals: (data ?? []) as BridgeSignal[] };
+  } catch {
+    return { ok: false, signals: [], reason: 'query-failed' };
+  }
+}
+
+export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]> {
+  const result = await fetchBridgeSignalsResult(teenId);
+  return result.signals;
 }
 
 export async function sendParentNote(teenId: string, content: string): Promise<boolean> {
   const sb = getSupabase();
   const userId = await uid();
   if (!sb || !userId || !teenId || !content.trim()) return false;
-  const { error } = await sb.from('parent_notes').insert({
-    teen_user_id: teenId,
-    parent_user_id: userId,
-    content: content.trim(),
-    sent_at: new Date().toISOString(),
-  });
+  try {
+    const { error } = await sb.from('parent_notes').insert({
+      teen_user_id: teenId,
+      parent_user_id: userId,
+      content: content.trim(),
+      sent_at: new Date().toISOString(),
+    });
 
-  if (error) return false;
+    if (error) return false;
 
-  void sendBridgePushAlert({
-    event: 'parent_bridge_reply',
-    teenId,
-  });
+    void sendBridgePushAlert({
+      event: 'parent_bridge_reply',
+      teenId,
+    });
 
-  return true;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export async function fetchParentEngagement(): Promise<ParentEngagement | null> {

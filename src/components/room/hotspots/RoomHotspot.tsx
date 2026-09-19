@@ -16,23 +16,22 @@
  *   />
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Dimensions,
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  withDelay,
+  cancelAnimation,
   Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
-
-const { width: W, height: H } = Dimensions.get('window');
 
 export interface HotspotConfig {
   id: string;
@@ -48,6 +47,7 @@ export interface HotspotConfig {
 type RoomHotspotProps = HotspotConfig;
 
 export function RoomHotspot({
+  id,
   x,
   y,
   width = 64,
@@ -55,38 +55,97 @@ export function RoomHotspot({
   label,
   onPress,
 }: RoomHotspotProps) {
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions();
   const [showLabel, setShowLabel] = useState(false);
+  const hideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const labelOpacity = useSharedValue(0);
+  const labelScale = useSharedValue(0.96);
+  const labelOffsetY = useSharedValue(6);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
 
   const hideLabel = useCallback(() => {
-    labelOpacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
-    setTimeout(() => setShowLabel(false), 310);
-  }, [labelOpacity]);
+    clearHideTimer();
+    labelOpacity.value = withTiming(0, {
+      duration: 180,
+      easing: Easing.out(Easing.ease),
+    });
+    labelScale.value = withSpring(0.96, {
+      damping: 18,
+      stiffness: 220,
+      mass: 0.7,
+    });
+    labelOffsetY.value = withTiming(4, {
+      duration: 180,
+      easing: Easing.out(Easing.ease),
+    });
 
-  useEffect(() => {
-    if (showLabel) {
-      labelOpacity.value = withTiming(1, { duration: 200 });
-      // Auto-dismiss after 2s.
-      const t = setTimeout(hideLabel, 2000);
-      return () => clearTimeout(t);
-    }
-  }, [showLabel, labelOpacity, hideLabel]);
+    hideTimerRef.current = setTimeout(() => {
+      setShowLabel(false);
+      hideTimerRef.current = null;
+    }, 190);
+  }, [clearHideTimer, labelOffsetY, labelOpacity, labelScale]);
 
-  const labelStyle = useAnimatedStyle(() => ({ opacity: labelOpacity.value }));
+  const revealLabel = useCallback(() => {
+    if (!label) return;
+
+    clearHideTimer();
+    setShowLabel(true);
+
+    labelOpacity.value = withTiming(1, {
+      duration: 160,
+      easing: Easing.out(Easing.ease),
+    });
+    labelScale.value = withSpring(1, {
+      damping: 14,
+      stiffness: 240,
+      mass: 0.65,
+    });
+    labelOffsetY.value = withSpring(0, {
+      damping: 16,
+      stiffness: 220,
+      mass: 0.7,
+    });
+
+    hideTimerRef.current = setTimeout(hideLabel, 2000);
+  }, [clearHideTimer, hideLabel, label, labelOffsetY, labelOpacity, labelScale]);
+
+  useEffect(() => () => {
+    clearHideTimer();
+    cancelAnimation(labelOpacity);
+    cancelAnimation(labelScale);
+    cancelAnimation(labelOffsetY);
+  }, [clearHideTimer, labelOffsetY, labelOpacity, labelScale]);
+
+  const labelStyle = useAnimatedStyle(() => ({
+    opacity: labelOpacity.value,
+    transform: [
+      { translateY: labelOffsetY.value },
+      { scale: labelScale.value },
+    ],
+  }));
 
   const handlePress = () => {
     onPress?.();
-    if (label) {
-      setShowLabel(true);
-    }
+    revealLabel();
   };
 
-  const left = W * x - width  / 2;
-  const top  = H * y - height / 2;
+  const left = viewportWidth * x - width / 2;
+  const top = viewportHeight * y - height / 2;
 
   return (
-    <View style={[styles.root, { left, top, width, height }]}>
+    <View
+      testID={`room-hotspot-${id}`}
+      style={[styles.root, { left, top, width, height }]}
+    >
       <TouchableOpacity
+        testID={`room-hotspot-${id}-button`}
         style={StyleSheet.absoluteFill}
         onPress={handlePress}
         activeOpacity={0.01}
@@ -94,7 +153,11 @@ export function RoomHotspot({
         accessibilityRole="button"
       />
       {showLabel && (
-        <Animated.View style={[styles.tooltip, labelStyle]}>
+        <Animated.View
+          testID={`room-hotspot-${id}-label`}
+          pointerEvents="none"
+          style={[styles.tooltip, labelStyle]}
+        >
           <Text style={styles.tooltipText}>{label}</Text>
         </Animated.View>
       )}

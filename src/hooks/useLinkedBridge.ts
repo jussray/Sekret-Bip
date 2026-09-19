@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLinkedTeen, type LinkedTeenData, type SharedJournalEntry } from '@/hooks/useLinkedTeen';
 import {
-  fetchBridgeShares,
+  fetchBridgeSharesResult,
   subscribeToBridgeShares,
   type BridgeShare,
 } from '@/features/bridge/bridgeShareCompat';
@@ -18,8 +18,12 @@ function toSharedEntry(share: BridgeShare): SharedJournalEntry {
 }
 
 export function useLinkedBridge(): LinkedTeenData {
-  const linked = useLinkedTeen();
+  // Bridge owns explicit signals/S2Tell content. Generated journal/mood summaries
+  // have their own consent-bounded inbox, so do not download raw shared rows here.
+  const linked = useLinkedTeen({ includeSharedContent: false });
   const [shares, setShares] = useState<BridgeShare[]>([]);
+  const [shareLoading, setShareLoading] = useState(false);
+  const [shareLoadError, setShareLoadError] = useState(false);
   const [testTeenId, setTestTeenId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,19 +31,62 @@ export function useLinkedBridge(): LinkedTeenData {
   }, []);
 
   useEffect(() => {
-    if (!linked.linkedTeenId || testTeenId) return;
+    if (!linked.linkedTeenId || linked.loadError || testTeenId) {
+      setShares([]);
+      setShareLoading(false);
+      setShareLoadError(false);
+      return;
+    }
+
+    let active = true;
     let unsubscribe = () => {};
-    void fetchBridgeShares(linked.linkedTeenId).then(setShares);
-    void subscribeToBridgeShares(linked.linkedTeenId, share => {
-      setShares(previous => [share, ...previous]);
-    }).then(fn => { unsubscribe = fn; });
-    return () => unsubscribe();
-  }, [linked.linkedTeenId, testTeenId]);
+    const teenId = linked.linkedTeenId;
+
+    setShares([]);
+    setShareLoading(true);
+    setShareLoadError(false);
+
+    void (async () => {
+      const result = await fetchBridgeSharesResult(teenId);
+      if (!active) return;
+      if (!result.ok) {
+        setShares([]);
+        setShareLoadError(true);
+        setShareLoading(false);
+        return;
+      }
+
+      setShares(result.shares);
+      setShareLoading(false);
+
+      try {
+        const fn = await subscribeToBridgeShares(teenId, share => {
+          if (active) setShares(previous => [share, ...previous]);
+        });
+        if (active) unsubscribe = fn;
+        else fn();
+      } catch {
+        // Do not surface provider error details here. The pull read above remains
+        // authoritative, while this warning preserves truthful realtime failure state.
+        console.warn('[Bridge] realtime share refresh unavailable; pull refresh remains authoritative.');
+      }
+    })().catch(() => {
+      if (!active) return;
+      setShares([]);
+      setShareLoadError(true);
+      setShareLoading(false);
+    });
+
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [linked.linkedTeenId, linked.loadError, testTeenId]);
 
   const sharedJournal = useMemo(
-    () => [...shares.map(toSharedEntry), ...linked.sharedJournal]
+    () => shares.map(toSharedEntry)
       .sort((a, b) => b.created_at.localeCompare(a.created_at)),
-    [shares, linked.sharedJournal],
+    [shares],
   );
 
   if (testTeenId) {
@@ -53,5 +100,10 @@ export function useLinkedBridge(): LinkedTeenData {
     };
   }
 
-  return { ...linked, sharedJournal };
+  return {
+    ...linked,
+    sharedJournal,
+    isLoading: linked.isLoading || shareLoading,
+    loadError: linked.loadError || shareLoadError,
+  };
 }

@@ -40,10 +40,10 @@ test('User Room compatibility renderer uses production furnished room artwork', 
     roomRenderer.includes('testID="room-production-art"'),
     'production room art needs a deterministic witness',
   );
-  assert.ok(roomRenderer.includes('IMAGES.bgRayleneRoomNight'));
-  assert.ok(roomRenderer.includes('IMAGES.bgRylaneRoomNight'));
-  assert.ok(roomRenderer.includes('IMAGES.bgCloudRoomNight'));
-  assert.ok(roomRenderer.includes('IMAGES.bgNightRoomNight'));
+  assert.ok(roomRenderer.includes("require('../../assets/images/archive/bg-raylene-room-night.png')"));
+  assert.ok(roomRenderer.includes("require('../../assets/images/archive/bg-rylane-room-night.png')"));
+  assert.ok(roomRenderer.includes("require('../../assets/images/archive/bg-cloud-room-night.png')"));
+  assert.ok(roomRenderer.includes("require('../../assets/images/archive/bg-night-room-night.png')"));
   assert.doesNotMatch(roomRenderer, /LinearGradient|windowOpening|skylineRow|curtainLeft/);
 });
 

@@ -24,7 +24,10 @@ test('parent inbox reads only summary tables', () => {
 
 test('view state uses parent-owned summary view records', () => {
   assert.match(serviceSource, /bridge_summary_views/);
-  assert.match(serviceSource, /\.insert\(\{ summary_id: summaryId, parent_user_id: parentUserId \}\)/);
+  assert.match(
+    serviceSource,
+    /\.insert\(\{\s*summary_id:\s*summaryId,\s*parent_user_id:\s*parentUserId,?\s*\}\)/,
+  );
   assert.doesNotMatch(serviceSource, /bridge_share_requests'[\s\S]*\.update\(/);
 });
 

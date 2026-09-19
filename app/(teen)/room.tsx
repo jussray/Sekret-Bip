@@ -10,6 +10,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { UserRoomScreen } from '@screens/UserRoomScreen';
 import { VisualCanonAtmosphere } from '../../components/rooms/VisualCanonAtmosphere';
+import { RoomExploreGuide } from '../../components/rooms/RoomExploreGuide';
 import { BipReturnOverlay } from '../../components/retention/BipReturnOverlay';
 import { DailyIntentionsCard } from '../../components/intentions/DailyIntentionsCard';
 import { useAppContext } from '@/context/AppContext';
@@ -82,6 +83,7 @@ export default function TeenRoomRoute() {
         updateRoomMemory={updateRoomMemory}
       />
       <VisualCanonAtmosphere />
+      <RoomExploreGuide side="teen" onNavigate={handleScreen} />
       <DailyIntentionsCard
         mood={mood}
         companionKey={companionKey}

@@ -5,52 +5,26 @@
  *
  * The teen's privacy is the default. Every item starts as 'private'.
  * Sharing requires an explicit, reversible teen action.
- *
- * Public surface:
- *   setItemVisibility()    — teen sets or changes visibility on one item
- *   revokeShare()          — shorthand to reset any item back to 'private'
- *   getItemVisibility()    — read current visibility for one item
- *   pullSharedWithParent() — parent side: fetch items the teen shared
- *
- * Tables supported: 'journal_entries' | 'mood_history'
- * (voice_notes, comfort_sessions, circle_posts have their own audience model)
- *
- * Security constraints:
- *   - Never throws — degraded gracefully if Supabase is unavailable
- *   - Only the teen can write their own visibility rows (RLS enforced server-side)
- *   - Parents read via a separate policy; they cannot modify visibility
  */
 
 import { getSupabase } from '@/utils/supabase';
 import type { TeenShareVisibility } from '../../../types/privacy';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-/**
- * Tables where item-level visibility is supported.
- * Mirrors the tables altered in 20260628_consent_visibility.sql.
- */
 export type ConsentableTable = 'journal_entries' | 'mood_history';
-
 export type VisibilityLevel = TeenShareVisibility;
 
 export interface ConsentRecord {
   id: number;
   table: ConsentableTable;
   visibility: VisibilityLevel;
-  /** ISO timestamp of the last visibility change */
   updatedAt: string;
 }
 
-// ── Teen-side writes ───────────────────────────────────────────────────────────
+export type SharedReadFailure = 'service-unavailable' | 'query-failed';
+export type SharedReadResult<T extends object> =
+  | { ok: true; items: T[] }
+  | { ok: false; items: []; reason: SharedReadFailure };
 
-/**
- * Set visibility on one item. The teen calls this when they tap
- * "share with parent" (or choose any other visibility level).
- *
- * Writes a PATCH to the item's own row — the visibility column is the
- * canonical record of consent.  Fire-and-forget; never throws.
- */
 export async function setItemVisibility(
   table: ConsentableTable,
   itemId: number,
@@ -71,10 +45,6 @@ export async function setItemVisibility(
   }
 }
 
-/**
- * Revoke a previous share — resets the item to 'private'.
- * The parent loses access immediately on their next pull.
- */
 export async function revokeShare(
   table: ConsentableTable,
   itemId: number,
@@ -82,12 +52,6 @@ export async function revokeShare(
   return setItemVisibility(table, itemId, 'private');
 }
 
-// ── Teen-side reads ────────────────────────────────────────────────────────────
-
-/**
- * Returns the current visibility level for one item.
- * Falls back to 'private' if the row or Supabase is unavailable.
- */
 export async function getItemVisibility(
   table: ConsentableTable,
   itemId: number,
@@ -110,10 +74,6 @@ export async function getItemVisibility(
   }
 }
 
-/**
- * Returns all items the teen has explicitly marked as shared with parent.
- * Used in the teen's own UI to show what a parent can currently see.
- */
 export async function getTeenSharedItems(
   table: ConsentableTable,
 ): Promise<Array<{ id: number; visibility: VisibilityLevel }>> {
@@ -134,23 +94,17 @@ export async function getTeenSharedItems(
   }
 }
 
-// ── Parent-side reads ─────────────────────────────────────────────────────────
-
 /**
- * Parent-side: fetch items a linked teen has shared.
- * Supabase RLS (20260628_consent_visibility.sql) ensures only
- * 'shared_with_parent' rows from an actively-linked teen are returned.
- *
- * `teenUserId` must be the linked teen's auth.uid.
- * Returns an empty array if the link is inactive, Supabase is down, or
- * the teen has not shared anything.
+ * Error-aware parent read. Raw provider errors never leave this module; callers
+ * receive only a bounded status so a failed read cannot masquerade as an empty
+ * sharing history and cannot leak backend details into UI/logs.
  */
-export async function pullSharedWithParent<T extends object>(
+export async function pullSharedWithParentResult<T extends object>(
   table: ConsentableTable,
   teenUserId: string,
-): Promise<T[]> {
+): Promise<SharedReadResult<T>> {
   const sb = getSupabase();
-  if (!sb) return [];
+  if (!sb) return { ok: false, items: [], reason: 'service-unavailable' };
   try {
     const { data, error } = await sb
       .from(table)
@@ -158,10 +112,21 @@ export async function pullSharedWithParent<T extends object>(
       .eq('user_id', teenUserId)
       .eq('visibility', 'shared_with_parent')
       .order('created_at', { ascending: false });
-    if (error) throw error;
-    return (data ?? []) as T[];
-  } catch (e) {
-    if (__DEV__) console.warn('[consent] pullSharedWithParent failed:', e);
-    return [];
+    if (error) return { ok: false, items: [], reason: 'query-failed' };
+    return { ok: true, items: (data ?? []) as T[] };
+  } catch {
+    return { ok: false, items: [], reason: 'query-failed' };
   }
+}
+
+/**
+ * Compatibility helper for existing callers that intentionally accept graceful
+ * degradation. User-facing truth surfaces should prefer the Result variant.
+ */
+export async function pullSharedWithParent<T extends object>(
+  table: ConsentableTable,
+  teenUserId: string,
+): Promise<T[]> {
+  const result = await pullSharedWithParentResult<T>(table, teenUserId);
+  return result.items;
 }
