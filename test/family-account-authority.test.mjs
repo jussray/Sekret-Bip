@@ -9,11 +9,15 @@ const read = relative => fs.readFileSync(path.join(ROOT, relative), 'utf8');
 
 const signupBaseline = read('supabase/migrations/20260919190000_auth_signup_onboarding_baseline.sql');
 const relationshipOnly = read('supabase/migrations/20260919190500_parent_link_relationship_only.sql');
+const teenAssuranceMigration = read('supabase/migrations/20260919190800_teen_age_assurance_authority.sql');
 const jrMigration = read('supabase/migrations/20260919191000_bip_jr_managed_child_profiles.sql');
 const verificationState = read('src/services/verificationState.ts');
 const verificationContext = read('src/context/VerificationContext.tsx');
 const bridge = read('src/bridge/index.ts');
 const screenPurpose = read('src/constants/screenPurpose.ts');
+const teenParentLinkScreen = read('app/(auth)/parent-link-verify.tsx');
+const parentTeenVerificationScreen = read('app/(parent)/teen-verification.tsx');
+const teenAssuranceService = read('src/services/teenAgeAssurance.ts');
 const jrScreen = read('app/(parent)/bip-jr.tsx');
 const jrService = read('src/services/bipJr.ts');
 const parentRoutes = read('src/parent/routes.ts');
@@ -46,6 +50,39 @@ test('parent link is relationship consent and cannot grant or remove teen verifi
   const pendingParentStart = verificationState.indexOf('PENDING_PARENT: {', unverifiedStart);
   const unverifiedRegion = verificationState.slice(unverifiedStart, pendingParentStart);
   assert.doesNotMatch(unverifiedRegion, /PARENT_APPROVED: \{ to: 'VERIFIED_TEEN'/);
+});
+
+
+test('Teen verification has separate explicit age-assurance authority', () => {
+  assert.match(teenAssuranceMigration, /create table if not exists public\.teen_age_assurance_receipts/);
+  assert.match(teenAssuranceMigration, /confirm_linked_teen_age_assurance/);
+  assert.match(teenAssuranceMigration, /confirm_own_self_declared_adult_teen_age_assurance/);
+  assert.match(teenAssuranceMigration, /verification_state = 'VERIFIED_GUARDIAN'/);
+  assert.match(teenAssuranceMigration, /verification_state = 'VERIFIED_TEEN'/);
+  assert.match(teenAssuranceMigration, /verification_reason = 'guardian_age_assurance'/);
+  assert.match(teenAssuranceMigration, /verification_reason = 'self_declared_18_19'/);
+  assert.match(teenAssuranceMigration, /pl\.status = 'active'/);
+  assert.doesNotMatch(teenAssuranceMigration, /raw[_ ]?(id|selfie|birth)|full[_ ]?birth/i);
+
+  assert.match(teenAssuranceService, /rpc\('confirm_linked_teen_age_assurance'/);
+  assert.match(teenAssuranceService, /rpc\('confirm_own_self_declared_adult_teen_age_assurance'/);
+  assert.match(parentTeenVerificationScreen, /Confirm age\.\{`\\n`\}Not access\./);
+  assert.match(parentTeenVerificationScreen, /does not.*gain.*private account access|without gaining private account access/is);
+  assert.match(parentTeenVerificationScreen, /Confirm Teen age assurance/);
+
+  assert.match(teenParentLinkScreen, /TRUSTED CONNECTION/);
+  assert.match(teenParentLinkScreen, /linking alone does not verify your account/);
+  assert.match(teenParentLinkScreen, /Confirm my 18–19 age range/);
+  assert.match(teenParentLinkScreen, /parentLinkState === 'active'/);
+});
+
+
+test('Teen assurance is reachable separately from Parent Link', () => {
+  assert.match(parentRoutes, /teenVerification:\s+'\/\(parent\)\/teen-verification'/);
+  assert.match(sharedRoutes, /'teen-verification': PARENT_ROUTES\.teenVerification/);
+  assert.match(screenPurpose, /label: 'Teen Verification', route: 'teen-verification'/);
+  assert.match(screenPurpose, /Verification is a separate action/);
+  assert.match(screenPurpose, /Linking alone does not verify the Teen/);
 });
 
 
