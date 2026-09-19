@@ -57,7 +57,7 @@ test('Teen verification has separate explicit age-assurance authority', () => {
   assert.match(teenAssuranceMigration, /create table if not exists public\.teen_age_assurance_receipts/);
   assert.match(teenAssuranceMigration, /confirm_linked_teen_age_assurance/);
   assert.match(teenAssuranceMigration, /confirm_own_self_declared_adult_teen_age_assurance/);
-  assert.match(teenAssuranceMigration, /verification_state = 'VERIFIED_GUARDIAN'/);
+  assert.match(teenAssuranceMigration, /v_guardian_state <> 'VERIFIED_GUARDIAN'/);
   assert.match(teenAssuranceMigration, /verification_state = 'VERIFIED_TEEN'/);
   assert.match(teenAssuranceMigration, /verification_reason = 'guardian_age_assurance'/);
   assert.match(teenAssuranceMigration, /verification_reason = 'self_declared_18_19'/);
