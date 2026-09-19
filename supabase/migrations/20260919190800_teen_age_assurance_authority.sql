@@ -8,7 +8,7 @@ begin;
 create table if not exists public.teen_age_assurance_receipts (
   id uuid primary key default gen_random_uuid(),
   teen_user_id uuid not null references auth.users(id) on delete cascade,
-  method text not null check (method in ('guardian_confirmation', 'self_declared_18_19')),
+  method text not null check (method in ('guardian_confirmation', 'self_declared_age_bucket')),
   age_bucket text not null check (age_bucket in ('13-15', '16-17', '18-19')),
   guardian_user_id uuid references auth.users(id) on delete set null,
   assurance_version text not null default 'teen-age-assurance-v1',
@@ -17,7 +17,7 @@ create table if not exists public.teen_age_assurance_receipts (
   created_at timestamptz not null default now(),
   constraint teen_age_assurance_guardian_shape check (
     (method = 'guardian_confirmation' and guardian_user_id is not null)
-    or (method = 'self_declared_18_19' and guardian_user_id is null)
+    or (method = 'self_declared_age_bucket' and guardian_user_id is null)
   )
 );
 
@@ -207,7 +207,7 @@ begin
     guardian_user_id
   ) values (
     v_teen_id,
-    'self_declared_18_19',
+    'self_declared_age_bucket',
     v_teen_profile.age_range,
     null
   )
@@ -241,7 +241,7 @@ revoke all on function public.confirm_own_self_declared_adult_teen_age_assurance
 grant execute on function public.confirm_own_self_declared_adult_teen_age_assurance() to authenticated, service_role;
 
 comment on table public.teen_age_assurance_receipts is
-  'Minimal Teen age-assurance receipts. No raw ID, selfie, full birth date, or Bridge content is stored.';
+  'Minimal Teen age-assurance receipts using the canonical age-assurance method taxonomy. No raw ID, selfie, full birth date, or Bridge content is stored.';
 comment on function public.confirm_linked_teen_age_assurance(uuid) is
   'Verified-guardian explicit confirmation for a linked 13-17 Teen. The active parent link scopes the target only; this function is the separate assurance authority.';
 comment on function public.confirm_own_self_declared_adult_teen_age_assurance() is
