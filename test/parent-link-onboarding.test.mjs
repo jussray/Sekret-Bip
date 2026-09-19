@@ -28,11 +28,15 @@ test('parent link screen validates consent before resolving backend entry state'
   assert.doesNotMatch(source, /parent_profile_done/);
 });
 
-test('unlinked parent routes remain gated', async () => {
+test('unlinked parent routes remain gated by server-backed relationship authority', async () => {
   const source = await read('app/(parent)/room.tsx');
-  assert.match(source, /linked_teen_id/);
+  assert.match(source, /resolveParentEntryState\(\)/);
+  assert.match(source, /state\.state === 'ready'/);
+  assert.match(source, /state\.state === 'parent_link_required'/);
   assert.match(source, /LINK_REQUIRED_ROUTES/);
+  assert.match(source, /linkState !== 'linked'/);
   assert.match(source, /No teen linked yet/);
   assert.match(source, /Link a Teen/);
   assert.match(source, /parent-link/);
+  assert.doesNotMatch(source, /AsyncStorage\.getItem\('linked_teen_id'\)/);
 });

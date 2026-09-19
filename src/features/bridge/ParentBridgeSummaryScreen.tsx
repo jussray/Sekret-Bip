@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { ParentBridgeResponseRequestCard } from '../../../components/bridge/ParentBridgeResponseRequestCard';
+import { ParentBridgeSharedThread } from '../../../components/bridge/ParentBridgeSharedThread';
 import { ParentBridgeSummaryInbox } from '@/features/bridge/ParentBridgeSummaryInbox';
 
 export function ParentBridgeSummaryScreen() {
@@ -13,18 +14,19 @@ export function ParentBridgeSummaryScreen() {
         <View style={styles.header}>
           <Text style={styles.emoji}>🌉</Text>
           <Text style={styles.title}>Parent Bridge</Text>
-          <Text style={styles.subtitle}>Only summaries and signals your teen deliberately chooses to share.</Text>
+          <Text style={styles.subtitle}>Only summaries, signals, S2Tell shares, and replies that intentionally passed through your linked Bridge.</Text>
         </View>
 
         <View style={styles.privacyCard}>
           <Text style={styles.privacyTitle}>Privacy boundary</Text>
           <Text style={styles.privacyText}>
             Linking accounts does not unlock journals, chats, mood history, media, or other private content.
-            Bridge shows generated context and support requests only after your teen confirms a share.
+            Bridge shows only relationship content your teen intentionally sends or explicitly shares, plus the notes you send back.
           </Text>
         </View>
 
         <ParentBridgeResponseRequestCard />
+        <ParentBridgeSharedThread />
         <ParentBridgeSummaryInbox />
       </ScrollView>
     </View>
@@ -42,7 +44,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 21,
     marginTop: 7,
-    maxWidth: 330,
+    maxWidth: 350,
   },
   privacyCard: {
     borderRadius: 18,

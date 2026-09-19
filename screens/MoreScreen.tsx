@@ -67,7 +67,7 @@ export function MoreScreen({
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         <Text style={styles.kicker}>FEATURE DRAWER</Text>
         <Text style={styles.logo}>More</Text>
-        <Text style={styles.subtitle}>The extra tools live here. Room, Pages, Calm, Voice Bip, and Circle keep their own jobs.</Text>
+        <Text style={styles.subtitle}>Use More for tools that do not need a permanent tab: Voice Bip, Bridge, profile, growth tools, settings, and safety.</Text>
 
         {founderPreview ? (
           <TouchableOpacity

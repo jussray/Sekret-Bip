@@ -5,7 +5,7 @@ test('teen front door leads directly into age-bucket onboarding', async ({ page 
   const enter = page.getByTestId('web-welcome-enter');
   await expect(enter).toBeVisible({ timeout: 30_000 });
   await enter.click();
-  await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Choose your age range', { exact: true })).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('button', { name: /13\s*[–-]\s*15 Teen mode starts/i })).toBeVisible();
 });
 
@@ -74,7 +74,7 @@ test('web welcome Enter supports keyboard activation', async ({ page }) => {
   await expect(enter).toBeVisible({ timeout: 30_000 });
   await enter.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Choose your age range', { exact: true })).toBeVisible({ timeout: 15_000 });
 });
 
 test('web welcome hero safe area keeps the primary action below teen artwork', async ({ page }) => {
@@ -180,7 +180,7 @@ test('login deep link renders current controls and survives refresh', async ({ p
 
 test('teen signup deep link enforces age assurance before account fields', async ({ page }) => {
   await page.goto('/signup');
-  await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Choose your age range', { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: /13\s*[–-]\s*15 Teen mode starts/i })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Email' })).not.toBeVisible();
 });

@@ -42,7 +42,8 @@ test('age onboarding screen stores assurance metadata instead of raw evidence', 
 test('welcome is a one-page onboarding entry without bypassing age assurance', async () => {
   const welcome = await read('app/(onboarding)/welcome.tsx');
 
-  assert.match(welcome, /One page/);
+  // Prove the single-screen contract from behavior and controls, not mutable marketing copy.
+  assert.match(welcome, /Choose your age range/);
   assert.match(welcome, /AGE_OPTIONS/);
   assert.match(welcome, /decideAgeAssurance/);
   assert.match(welcome, /persistDecision/);

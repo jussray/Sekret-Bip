@@ -130,11 +130,32 @@ export default function TeenLayout() {
   );
 
   useEffect(() => {
-    if (isTeenActive && !sessionLogged.current) {
+    if (!isTeenActive || founderPreview || sessionLogged.current) return;
+
+    let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const recordSession = async (attempt: number) => {
+      if (cancelled || sessionLogged.current) return;
       sessionLogged.current = true;
-      logEvent('session_start');
-    }
-  }, [isTeenActive]);
+
+      const result = await logEvent('session_start');
+      if (result.ok || cancelled) return;
+
+      sessionLogged.current = false;
+      if (result.retryable && attempt < 1) {
+        retryTimer = setTimeout(() => {
+          void recordSession(attempt + 1);
+        }, 1500);
+      }
+    };
+
+    void recordSession(0);
+    return () => {
+      cancelled = true;
+      if (retryTimer) clearTimeout(retryTimer);
+    };
+  }, [isTeenActive, founderPreview]);
 
   // Split View and exact-head browser proof can land on the teen copy of a
   // duplicate web URL first. Honor the explicit side before Founder Preview

@@ -3,10 +3,9 @@
 // Phase 1 polish: time-of-day backdrop, char-aware tone, mood glow,
 // staggered entrance, breath badge, sticky note, send confirmation glow.
 //
-// P6: handleSend now writes a signal row to `bridge_signals` in Supabase.
-// MESSAGE CONTENT IS NEVER STORED — only share_type, conv_mode, char_key,
-// and a timestamp leave the device. AsyncStorage flag kept as instant
-// parent-side nudge even when offline.
+// Bridge stores only content the teen intentionally sends into the linked
+// relationship: S2Tell text in bridge_shares and support metadata in
+// bridge_signals. Private journal/chat/voice/Circle content is never read here.
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
@@ -28,14 +27,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRoomBg, TimeOfDay } from '../constants/theme';
 import {
   sendBridgeSignal,
-  fetchParentNotes,
+  fetchParentNotesResult,
   markParentNoteSeen,
   subscribeToParentNotes,
   type ParentNote,
 } from '@/utils/sync';
 import { getSupabase } from '@/utils/supabase';
-import { fetchBridgeSignals, type BridgeSignal } from '@/utils/parentBridgeCompat';
-import { fetchBridgeShares, type BridgeShare } from '@/features/bridge/bridgeShareCompat';
+import { fetchBridgeSignalsResult, type BridgeSignal } from '@/utils/parentBridgeCompat';
+import {
+  fetchBridgeSharesResult,
+  sendS2TellShare,
+  type BridgeShare,
+} from '@/features/bridge/bridgeShareCompat';
 import {
   fetchTeenBridgeShareHistory,
   revokeBridgeShareRequest,
@@ -93,10 +96,14 @@ export function BridgeScreen({
   const [sent, setSent]             = useState(false);
   const [sending, setSending]       = useState(false);
   const [parentNotes, setParentNotes] = useState<ParentNote[]>([]);
+  const [parentNotesLoading, setParentNotesLoading] = useState(true);
+  const [parentNotesError, setParentNotesError] = useState(false);
+  const [parentNotesRefresh, setParentNotesRefresh] = useState(0);
   const [view, setView]             = useState<'share' | 'history'>('share');
   const [mySignals, setMySignals]   = useState<BridgeSignal[]>([]);
   const [myShares, setMyShares]     = useState<BridgeShare[]>([]);
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
   const [bridgeSummaryHistory, setBridgeSummaryHistory] = useState<BridgeSummaryListItem[]>([]);
   const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
 
@@ -129,34 +136,113 @@ export function BridgeScreen({
       ])
     );
     loop.start();
-
-    // Load parent notes + subscribe to new ones via Realtime
-    fetchParentNotes().then(setParentNotes);
-    let unsub = () => {};
-    subscribeToParentNotes((note) => {
-      setParentNotes(prev => [note, ...prev]);
-    }).then(fn => { unsub = fn; });
-
-    return () => { loop.stop(); unsub(); };
+    return () => loop.stop();
   }, [fade1, fade2, fade3, breath]);
 
   useEffect(() => {
+    let active = true;
+    let unsub = () => {};
+
+    setParentNotes([]);
+    setParentNotesLoading(true);
+    setParentNotesError(false);
+
+    void (async () => {
+      const result = await fetchParentNotesResult();
+      if (!active) return;
+      if (!result.ok) {
+        setParentNotes([]);
+        setParentNotesError(true);
+        setParentNotesLoading(false);
+        return;
+      }
+
+      setParentNotes(result.notes);
+      setParentNotesLoading(false);
+
+      try {
+        const fn = await subscribeToParentNotes(note => {
+          if (active) setParentNotes(prev => [note, ...prev]);
+        });
+        if (active) unsub = fn;
+        else fn();
+      } catch {
+        // The initial read remains authoritative. Do not serialize provider error
+        // details, but preserve truthful evidence that supplementary realtime failed.
+        console.warn('[Bridge] realtime parent-note refresh unavailable; pull refresh remains authoritative.');
+      }
+    })().catch(() => {
+      if (!active) return;
+      setParentNotes([]);
+      setParentNotesError(true);
+      setParentNotesLoading(false);
+    });
+
+    return () => {
+      active = false;
+      unsub();
+    };
+  }, [parentNotesRefresh]);
+
+  useEffect(() => {
     if (view !== 'history' || historyLoaded) return;
-    (async () => {
+    let active = true;
+
+    setHistoryError(false);
+    setMySignals([]);
+    setMyShares([]);
+    setBridgeSummaryHistory([]);
+
+    void (async () => {
       const sb = getSupabase();
-      const { data } = (await sb?.auth.getUser()) ?? { data: { user: null } };
+      if (!sb) {
+        if (active) {
+          setHistoryError(true);
+          setHistoryLoaded(true);
+        }
+        return;
+      }
+
+      const { data, error: authError } = await sb.auth.getUser();
       const myId = data.user?.id;
-      if (!myId) { setHistoryLoaded(true); return; }
-      const [signals, shares, summaryHistory] = await Promise.all([
-        fetchBridgeSignals(myId),
-        fetchBridgeShares(myId),
+      if (authError || !myId) {
+        if (active) {
+          setHistoryError(true);
+          setHistoryLoaded(true);
+        }
+        return;
+      }
+
+      const [signalResult, shareResult, summaryHistory] = await Promise.all([
+        fetchBridgeSignalsResult(myId),
+        fetchBridgeSharesResult(myId),
         fetchTeenBridgeShareHistory(),
       ]);
-      setMySignals(signals);
-      setMyShares(shares);
-      if (summaryHistory.ok) setBridgeSummaryHistory(summaryHistory.value);
+      if (!active) return;
+
+      if (!signalResult.ok || !shareResult.ok || !summaryHistory.ok) {
+        setMySignals([]);
+        setMyShares([]);
+        setBridgeSummaryHistory([]);
+        setHistoryError(true);
+        setHistoryLoaded(true);
+        return;
+      }
+
+      setMySignals(signalResult.signals);
+      setMyShares(shareResult.shares);
+      setBridgeSummaryHistory(summaryHistory.value);
       setHistoryLoaded(true);
-    })();
+    })().catch(() => {
+      if (!active) return;
+      setMySignals([]);
+      setMyShares([]);
+      setBridgeSummaryHistory([]);
+      setHistoryError(true);
+      setHistoryLoaded(true);
+    });
+
+    return () => { active = false; };
   }, [view, historyLoaded]);
 
   type HistoryItem = { id: string; emoji: string; label: string; detail?: string; timestamp: string };
@@ -200,7 +286,11 @@ export function BridgeScreen({
 
   const refreshBridgeSummaryHistory = async () => {
     const result = await fetchTeenBridgeShareHistory();
-    if (result.ok) setBridgeSummaryHistory(result.value);
+    if (result.ok) {
+      setBridgeSummaryHistory(result.value);
+      return;
+    }
+    setBridgeStatus('The Bridge action completed, but history could not refresh yet. Try the history view again.');
   };
 
   const handleCreateBridgeSummary = () => {
@@ -219,33 +309,66 @@ export function BridgeScreen({
     await refreshBridgeSummaryHistory();
   };
 
+  const retryBridgeReads = () => {
+    setHistoryError(false);
+    setHistoryLoaded(false);
+    setParentNotesRefresh(value => value + 1);
+  };
+
   const handleSend = async () => {
-    if (!shareType || !message.trim()) {
+    const text = message.trim();
+    if (!shareType || !text) {
       Alert.alert('almost there', 'pick a share type and write your message first.');
       return;
     }
 
     setSending(true);
-    try {
-      // Local flag for instant offline feedback
-      await AsyncStorage.setItem('parent_bridge_pending', 'true');
-      // Cloud: metadata signal only — message content stays on device
-      await sendBridgeSignal({ shareType, convMode, charKey });
-    } catch {
-      // Network failure: local experience unaffected
-    } finally {
+    setBridgeStatus(null);
+
+    // sendS2TellShare is the bounded durable-delivery Result boundary: it
+    // converts provider/auth/write exceptions to false instead of throwing.
+    const shared = await sendS2TellShare({
+      text,
+      tone: convMode ?? undefined,
+      shareType,
+    });
+
+    if (!shared) {
+      setBridgeStatus('Couldn’t send that note. Nothing was marked as delivered.');
       setSending(false);
+      return;
+    }
+
+    // This is only a local continuity hint. The bridge_shares row above is
+    // the authority that proves the note actually entered the linked Bridge.
+    await AsyncStorage.setItem('parent_bridge_pending', 'true').catch(() => {
+      console.warn('[Bridge] local continuity hint could not be stored; durable Bridge delivery remains authoritative.');
+    });
+
+    // sendBridgeSignal is a bounded secondary Result boundary. A signal
+    // failure cannot revoke the already-proven durable S2Tell delivery.
+    const signalResult = await sendBridgeSignal({ shareType, convMode, charKey });
+    if (!signalResult.ok) {
+      Alert.alert(
+        'Your note was shared',
+        'The S2Tell message reached Bridge, but the support signal could not be recorded. Your note was not lost.',
+      );
     }
 
     setSent(true);
     setMessage('');
     setShareType(null);
     setConvMode(null);
+    setHistoryLoaded(false);
+    setSending(false);
   };
 
   const heroCopy = isRylane
     ? "share something with your person. no pressure. no big speech."
     : "share something with your person — softly. no full explanation needed.";
+
+  const historyHasError = historyError || parentNotesError;
+  const historyLoading = !historyLoaded || parentNotesLoading;
 
   if (sent) {
     return (
@@ -264,7 +387,7 @@ export function BridgeScreen({
               <Animated.Text style={[styles.sentEmoji, { transform: [{ scale: breathScale }], opacity: breathOpacity }]}>💌</Animated.Text>
               <Text style={styles.sentTitle}>sent to your person.</Text>
               <Text style={styles.sentSub}>
-                they'll see it as a gentle note. you did something brave 💜
+                your S2Tell note is in the shared Bridge thread. you chose what crossed over 💜
               </Text>
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: glow, marginTop: 18 }]}
@@ -332,12 +455,30 @@ export function BridgeScreen({
         {view === 'history' && (
           <Animated.View style={cardStyle(fade2)}>
             <Text style={[styles.sectionLabel, { color: '#cbb6f7', marginBottom: 10 }]}>connection history</Text>
-            {historyItems.length === 0 && (
-              <Text style={styles.historyEmptyText}>
-                {historyLoaded ? "Nothing's passed through Bridge yet." : 'Loading…'}
-              </Text>
-            )}
-            {historyItems.map(item => (
+
+            {historyHasError ? (
+              <View style={[styles.card, { backgroundColor: 'rgba(30,18,55,0.75)', borderColor: glow + '44' }]} accessibilityRole="alert">
+                <Text style={styles.historyEmptyText}>Couldn’t verify the complete Bridge history. We won’t call it empty while a read is failing.</Text>
+                <TouchableOpacity
+                  onPress={retryBridgeReads}
+                  style={[styles.seenBtn, { borderColor: glow + '66', alignSelf: 'center' }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Retry loading Bridge history"
+                >
+                  <Text style={[styles.seenBtnText, { color: glow }]}>try again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
+            {!historyHasError && historyLoading ? (
+              <Text style={styles.historyEmptyText}>Loading…</Text>
+            ) : null}
+
+            {!historyHasError && !historyLoading && historyItems.length === 0 ? (
+              <Text style={styles.historyEmptyText}>Nothing's passed through Bridge yet.</Text>
+            ) : null}
+
+            {!historyHasError && !historyLoading ? historyItems.map(item => (
               <View key={item.id} style={[styles.card, { backgroundColor: 'rgba(30,18,55,0.75)', borderColor: glow + '44', marginBottom: 10 }]}>
                 <Text style={[styles.cardLabel, { color: glow, marginBottom: 4 }]}>{item.emoji} {item.label}</Text>
                 {!!item.detail && (
@@ -355,7 +496,7 @@ export function BridgeScreen({
                   </TouchableOpacity>
                 )}
               </View>
-            ))}
+            )) : null}
           </Animated.View>
         )}
 
@@ -438,12 +579,26 @@ export function BridgeScreen({
         </Animated.View>
         )}
 
-        {/* Parent notes received */}
-        {view === 'share' && parentNotes.length > 0 && (
+        {view === 'share' && parentNotesError ? (
           <Animated.View style={cardStyle(fade2)}>
-            <Text style={[styles.sectionLabel, { color: '#cbb6f7', marginBottom: 10 }]}>
-              💌 from your person
-            </Text>
+            <View style={[styles.card, { backgroundColor: 'rgba(30,18,55,0.75)', borderColor: glow + '44' }]} accessibilityRole="alert">
+              <Text style={styles.historyEmptyText}>Couldn’t load notes from your person. We won’t pretend there are none.</Text>
+              <TouchableOpacity
+                onPress={() => setParentNotesRefresh(value => value + 1)}
+                style={[styles.seenBtn, { borderColor: glow + '66', alignSelf: 'center' }]}
+                accessibilityRole="button"
+                accessibilityLabel="Retry loading parent Bridge notes"
+              >
+                <Text style={[styles.seenBtnText, { color: glow }]}>try again</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        ) : null}
+
+        {/* Parent notes received */}
+        {view === 'share' && !parentNotesError && parentNotes.length > 0 && (
+          <Animated.View style={cardStyle(fade2)}>
+            <Text style={[styles.sectionLabel, { color: '#cbb6f7', marginBottom: 10 }]}>💌 from your person</Text>
             {parentNotes.map(note => (
               <View
                 key={note.id}
@@ -456,20 +611,22 @@ export function BridgeScreen({
                   },
                 ]}
               >
-                {!note.seen_by_teen && (
-                  <View style={[styles.unseenDot, { backgroundColor: glow }]} />
-                )}
-                <Text style={[styles.noteText, { color: note.seen_by_teen ? '#9d8eb8' : '#e9defc' }]}>
-                  {note.content}
-                </Text>
+                {!note.seen_by_teen && <View style={[styles.unseenDot, { backgroundColor: glow }]} />}
+                <Text style={[styles.noteText, { color: note.seen_by_teen ? '#9d8eb8' : '#e9defc' }]}>{note.content}</Text>
                 <Text style={styles.noteTime}>
                   {new Date(note.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </Text>
                 {!note.seen_by_teen && (
                   <TouchableOpacity
                     onPress={() => {
-                      markParentNoteSeen(note.id);
-                      setParentNotes(prev => prev.map(n => n.id === note.id ? { ...n, seen_by_teen: true } : n));
+                      void (async () => {
+                        const ok = await markParentNoteSeen(note.id);
+                        if (!ok) {
+                          Alert.alert('Could not update', 'That note is still unread in Bridge. Try again in a moment.');
+                          return;
+                        }
+                        setParentNotes(prev => prev.map(n => n.id === note.id ? { ...n, seen_by_teen: true } : n));
+                      })();
                     }}
                     style={[styles.seenBtn, { borderColor: glow + '66' }]}
                   >
@@ -517,9 +674,7 @@ export function BridgeScreen({
             onPress={handleSend}
             disabled={!shareType || !message.trim() || sending}
           >
-            <Text style={styles.buttonText}>
-              {sending ? 'sending…' : '🌉 send to bridge'}
-            </Text>
+            <Text style={styles.buttonText}>{sending ? 'sending…' : '🌉 send to bridge'}</Text>
           </TouchableOpacity>
         </Animated.View>
         )}
@@ -544,34 +699,27 @@ const styles = StyleSheet.create({
   subtitle:        { fontSize: 14, color: '#cbb6f7', textAlign: 'center', marginBottom: 14, fontStyle: 'italic', lineHeight: 20 },
   energyBadge:     { alignSelf: 'center', borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 16 },
   energyText:      { fontSize: 12, fontWeight: '600' },
-
   viewToggleRow:   { flexDirection: 'row', gap: 8, marginBottom: 6 },
   viewToggleBtn:   { flex: 1, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 14, paddingVertical: 9, alignItems: 'center' },
   viewToggleText:  { fontSize: 13, fontWeight: '700' },
   historyEmptyText:{ color: '#9d8eb8', fontSize: 13, lineHeight: 20, textAlign: 'center', paddingVertical: 20 },
-
   sectionLabel:    { fontSize: 14, fontWeight: '600', marginBottom: 12 },
   typeRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   typeChip:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
   typeEmoji:       { fontSize: 18 },
   typeLabel:       { fontSize: 14, fontWeight: '600' },
-
   card:            { padding: 18, borderRadius: 20, marginBottom: 16, borderWidth: 1, shadowOpacity: 0.4, shadowRadius: 14 },
   cardLabel:       { fontSize: 14, fontWeight: '700', marginBottom: 10 },
   input:           { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, minHeight: 110, textAlignVertical: 'top', marginBottom: 8, backgroundColor: 'rgba(0,0,0,0.35)' },
   charCount:       { fontSize: 12, textAlign: 'right' },
-
   convModeHint:    { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 12 },
   convModeHintText: { fontSize: 13, fontStyle: 'italic', lineHeight: 19 },
-
   stickyNote:      { backgroundColor: '#fff8e7', borderColor: '#7c3aed', borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, padding: 12, marginBottom: 14, transform: [{ rotate: '-2deg' }] },
   stickyText:      { color: '#3a2461', fontSize: 13, fontStyle: 'italic', textAlign: 'center', lineHeight: 19 },
-
   button:          { padding: 16, borderRadius: 18, marginBottom: 12, alignItems: 'center' },
   buttonText:      { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   ghostButton:     { padding: 14, borderRadius: 18, marginBottom: 12, alignItems: 'center', borderWidth: 1 },
   ghostButtonText: { fontSize: 14, fontWeight: '600' },
-
   sentEmoji:       { fontSize: 56, textAlign: 'center', marginBottom: 12 },
   sentTitle:       { fontSize: 22, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 8 },
   sentSub:         { fontSize: 14, color: '#e9defc', textAlign: 'center', lineHeight: 21 },
