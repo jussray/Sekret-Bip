@@ -16,16 +16,16 @@ Observed against canonical Supabase project `tbsevonvegdnlyjgplmm` on 2026-09-19
 
 ## Post-merge authority correction
 
-PR #1100 merged to `main@05b9fadfa11d0f6e09286f3a927c5f63a1e6131c`. The GitHub Supabase check that ran after merge identified project `jvmbhralyktmdlvglrxk` and failed with `Remote migration versions not found in local migrations directory`.
+PR #1100 merged to `main@05b9fadfa11d0f6e09286f3a927c5f63a1e6131c`. The GitHub Supabase check surface identified project `jvmbhralyktmdlvglrxk` and failed with `Remote migration versions not found in local migrations directory`.
 
-That project is **not** the canonical Se'kret Bip production project `tbsevonvegdnlyjgplmm`. Therefore:
+Canonical Se'kret Bip production remains `tbsevonvegdnlyjgplmm`. The repository's protected production migration path is manual/exact-current-main and must confirm the canonical project before mutation. Therefore:
 
-- the failing GitHub Supabase app check is a real integration/configuration failure,
-- it is not evidence that canonical production schema drifted,
+- the failing GitHub Supabase app check is a real integration/binding failure,
+- it cannot authorize or disprove canonical production state by itself,
 - its migration history must not be copied into the canonical repo merely to make the check green,
-- L3 schema SQL must not remain in the auto-evaluated canonical migration lane while activation is blocked.
+- the already-merged canonical L3 migration is immutable repository history and must not be rewritten to compensate for the external integration.
 
-The L3 schema candidate is therefore kept under `supabase/candidates/`; canonical migration `20260918234500` is receipt-only/no-op. A future production activation requires a new reviewed migration version.
+The non-authoritative file under `supabase/candidates/` is only a pointer documenting this correction and contains no schema SQL.
 
 ## Advisor reconciliation receipts
 
@@ -53,7 +53,7 @@ Supabase reports anonymous-access-policy warnings across multiple tables because
 - No L4 goals/reflection runtime exists.
 - Leaked-password protection is not enabled.
 - Exact-production `app.sekretbip.net` authority is not established by this receipt.
-- The GitHub Supabase integration is not bound to canonical project `tbsevonvegdnlyjgplmm`.
+- The GitHub Supabase app surface is not stable/current proof of canonical project authority.
 
 ## Truth rule
 
