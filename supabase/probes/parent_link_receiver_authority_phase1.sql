@@ -59,6 +59,8 @@ select
   false
 from parent_link_receiver_context;
 
+-- auth.users provisioning already creates canonical profile shells. Shape those
+-- shells into the synthetic Teen/Parent identities this focused probe needs.
 insert into public.app_profiles (
   user_id,
   role,
@@ -82,7 +84,17 @@ select
   case when label = 'trusted_adult' then null else 'cloud' end,
   case when label = 'trusted_adult' then 'mom' else null end,
   case when label = 'trusted_adult' then 'support' else null end
-from parent_link_receiver_context;
+from parent_link_receiver_context
+on conflict (user_id) do update
+set role = excluded.role,
+    account_side = excluded.account_side,
+    private_display_name = excluded.private_display_name,
+    onboarding_complete = excluded.onboarding_complete,
+    age_range = excluded.age_range,
+    gender = excluded.gender,
+    selected_companion = excluded.selected_companion,
+    parent_room_style = excluded.parent_room_style,
+    parent_focus = excluded.parent_focus;
 
 insert into public.account_verification (
   user_id,
@@ -95,7 +107,11 @@ select
   'UNVERIFIED',
   'none',
   'synthetic_parent_link_receiver_probe'
-from parent_link_receiver_context;
+from parent_link_receiver_context
+on conflict (user_id) do update
+set verification_state = excluded.verification_state,
+    parent_link_state = excluded.parent_link_state,
+    verification_reason = excluded.verification_reason;
 
 create temp table parent_link_receiver_runtime (
   key text primary key,
