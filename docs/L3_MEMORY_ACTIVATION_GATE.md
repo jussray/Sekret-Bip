@@ -19,11 +19,13 @@ This document is a release gate, not a claim that durable memory is live.
 6. Retrieval filters owner before ranking and rejects quarantined, expired, deleted, blocked, contradicted and superseded memory.
 7. Instruction-shaped remembered content is quarantined/rejected and cannot become system, developer, tool or policy authority.
 8. Cross-companion retrieval is denied by default; continuity scope is explicit and consent-version bound.
-9. “Forget this” removes the primary row and any future derived/vector/index copies before retrieval can observe them again.
-10. Logs, traces, analytics, screenshots and Control Room surfaces contain metadata/counts only, never raw memory text.
-11. The two custom-auth Edge Functions retain live negative-auth proof.
-12. Supabase leaked-password protection is enabled and re-observed green.
-13. Exact-production `app.sekretbip.net` authority is restored before any UI/runtime L3 claim.
+9. Restricted memory is excluded from companion context by default; sensitive memory requires explicit user confirmation before retrieval.
+10. The trusted server retrieval path recomputes and verifies the integrity fingerprint before model context. Phase-1 format validation alone is not integrity proof.
+11. “Forget this” removes the primary row and any future derived/vector/index copies before retrieval can observe them again.
+12. Logs, traces, analytics, screenshots and Control Room surfaces contain metadata/counts only, never raw memory text.
+13. The two custom-auth Edge Functions retain live negative-auth proof.
+14. Supabase leaked-password protection is enabled and re-observed green.
+15. Exact-production `app.sekretbip.net` authority is restored before any UI/runtime L3 claim.
 
 ## Launch flag rule
 
