@@ -3,6 +3,10 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import * as core from './verify-supabase-production-schema-core.mjs';
+import {
+  resolveSupabaseTarget,
+  verifySupabaseManagementIdentity,
+} from './supabase-target-identity.mjs';
 
 export * from './verify-supabase-production-schema-core.mjs';
 
@@ -153,12 +157,13 @@ async function writeEvidence(evidencePath, evidence) {
   await fs.writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
 }
 
-function initialEvidence(config) {
+function initialEvidence(config, supabaseIdentity = null) {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     verified: false,
     status: 'initializing',
     projectRef: config.projectRef || null,
+    supabaseIdentity,
     authorityFloorVersion: core.PRODUCTION_HISTORY_AUTHORITY_FLOOR,
     expectedVersion: null,
     liveMaxVersion: null,
@@ -212,7 +217,7 @@ export function classifyManagementApiHttpFailure(status) {
 export async function verifySupabaseProductionSchema(options = {}) {
   const config = options.config ?? core.configFromEnv(options.env);
   const fetchImpl = options.fetchImpl ?? fetch;
-  const evidence = initialEvidence(config);
+  const evidence = initialEvidence(config, options.supabaseIdentity ?? null);
 
   let expectedVersion;
   let repositoryMigrations;
@@ -374,10 +379,15 @@ export async function verifySupabaseProductionSchema(options = {}) {
 }
 
 async function main() {
-  const evidence = await verifySupabaseProductionSchema();
+  const target = await resolveSupabaseTarget();
+  process.env.SUPABASE_PROJECT_REF = target.projectRef;
+  if (!clean(process.env.SUPABASE_URL)) process.env.SUPABASE_URL = target.projectUrl;
+  const supabaseIdentity = await verifySupabaseManagementIdentity({ target });
+  const evidence = await verifySupabaseProductionSchema({ supabaseIdentity });
   process.stdout.write(
     `Supabase production schema verified at ${evidence.expectedVersion}; `
-    + `pgjwt policy verified at ${evidence.pgjwtVersion}.\n`,
+    + `pgjwt policy verified at ${evidence.pgjwtVersion}; `
+    + `target fingerprint ${supabaseIdentity.fingerprint}.\n`,
   );
 }
 
