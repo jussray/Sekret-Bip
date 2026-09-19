@@ -4,7 +4,6 @@ Observed against Supabase project `tbsevonvegdnlyjgplmm` on 2026-09-19 UTC.
 
 ## Verified live
 
-- Project status was previously observed `ACTIVE_HEALTHY`; this receipt does not infer current project health from that older observation.
 - `is_non_anonymous_user()` returned false under a synthetic authenticated-anonymous JWT claim.
 - `is_founder()` returned false under that same claim.
 - `can_manage_guardian_reviews()` returned false under that same claim.
@@ -14,14 +13,33 @@ Observed against Supabase project `tbsevonvegdnlyjgplmm` on 2026-09-19 UTC.
   - `public.control_room_issues`
 - `account-delete` is currently ACTIVE with `verify_jwt=false`; a live POST from inside the Supabase project with its dedicated custom-auth credential intentionally absent returned HTTP `401`.
 - `safety-scan` is currently ACTIVE with `verify_jwt=false`; a live POST from inside the Supabase project with its dedicated custom-auth credential intentionally absent returned HTTP `401`.
-- The current Supabase Security Advisor still reports leaked-password protection disabled.
 - Production currently has no `public.agent_memories` table.
+- The current Supabase Security Advisor still reports leaked-password protection disabled.
 
-## Current advisor receipts that remain separate
+## Advisor reconciliation receipts
 
-- Supabase currently reports 29 `SECURITY DEFINER` functions executable by `authenticated`. This is an advisory inventory, not proof that all 29 are exploitable. Each function requires semantic authority review before grants are changed.
-- Supabase currently reports anonymous-access-policy warnings across multiple tables because anonymous Auth sessions use the `authenticated` role. Existing permanent-account guards already close some of these paths, so the advisor warning alone must not be converted into a vulnerability claim or a blanket revoke.
-- RLS-without-policy INFO findings exist for server/private tables including `account_deletion_receipts`, `app_config`, `app_private_config`, `guardian_verification_reviews`, and `runtime_contract_versions`. Their intended server-only access must be preserved and reviewed separately rather than adding client policies to silence the advisor.
+### SECURITY DEFINER inventory
+
+- Supabase currently reports 29 `SECURITY DEFINER` functions executable by `authenticated`.
+- Definition-level inventory found 27/29 directly reference `auth.uid()`, 6/29 directly reference `is_non_anonymous_user()`, 2/29 use `is_founder()`, and 2/29 use `can_manage_guardian_reviews()`.
+- The two functions without a direct `auth.uid()` reference are `list_guardian_verification_queue()` and `upsert_control_room_issue(...)`; transaction-only live probes under an authenticated-anonymous claim confirmed both calls are denied.
+- This closes the immediate anonymous-authority concern for those two functions. It does not convert the entire 29-function advisor inventory into a blanket green; future grant changes still require function-specific semantic review.
+
+### RLS enabled with no policy
+
+The five current INFO findings are intentionally server-only at the table-grant layer. Live privilege readback confirmed `anon=false`, `authenticated=false`, and `service_role=true` for SELECT on:
+
+- `public.account_deletion_receipts`
+- `public.app_config`
+- `public.app_private_config`
+- `public.guardian_verification_reviews`
+- `public.runtime_contract_versions`
+
+Do not add client RLS policies merely to silence this advisor finding.
+
+### Anonymous-policy warnings
+
+Supabase reports anonymous-access-policy warnings across multiple tables because anonymous Auth sessions use the `authenticated` role. Existing permanent-account guards already close some of these paths. The advisor warning alone is not proof of exploitable anonymous access and must not trigger a blanket revoke that breaks legitimate permanent-account behavior.
 
 ## Not upgraded to verified
 
