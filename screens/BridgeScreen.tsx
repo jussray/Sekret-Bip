@@ -325,18 +325,13 @@ export function BridgeScreen({
     setSending(true);
     setBridgeStatus(null);
 
-    let shared = false;
-    try {
-      shared = await sendS2TellShare({
-        text,
-        tone: convMode ?? undefined,
-        shareType,
-      });
-    } catch {
-      setBridgeStatus('Couldn’t send that note. Nothing was marked as delivered.');
-      setSending(false);
-      return;
-    }
+    // sendS2TellShare is the bounded durable-delivery Result boundary: it
+    // converts provider/auth/write exceptions to false instead of throwing.
+    const shared = await sendS2TellShare({
+      text,
+      tone: convMode ?? undefined,
+      shareType,
+    });
 
     if (!shared) {
       setBridgeStatus('Couldn’t send that note. Nothing was marked as delivered.');
@@ -350,15 +345,10 @@ export function BridgeScreen({
       console.warn('[Bridge] local continuity hint could not be stored; durable Bridge delivery remains authoritative.');
     });
 
-    try {
-      const signalResult = await sendBridgeSignal({ shareType, convMode, charKey });
-      if (!signalResult.ok) {
-        Alert.alert(
-          'Your note was shared',
-          'The S2Tell message reached Bridge, but the support signal could not be recorded. Your note was not lost.',
-        );
-      }
-    } catch {
+    // sendBridgeSignal is a bounded secondary Result boundary. A signal
+    // failure cannot revoke the already-proven durable S2Tell delivery.
+    const signalResult = await sendBridgeSignal({ shareType, convMode, charKey });
+    if (!signalResult.ok) {
       Alert.alert(
         'Your note was shared',
         'The S2Tell message reached Bridge, but the support signal could not be recorded. Your note was not lost.',
@@ -608,9 +598,7 @@ export function BridgeScreen({
         {/* Parent notes received */}
         {view === 'share' && !parentNotesError && parentNotes.length > 0 && (
           <Animated.View style={cardStyle(fade2)}>
-            <Text style={[styles.sectionLabel, { color: '#cbb6f7', marginBottom: 10 }]}>
-              💌 from your person
-            </Text>
+            <Text style={[styles.sectionLabel, { color: '#cbb6f7', marginBottom: 10 }]}>💌 from your person</Text>
             {parentNotes.map(note => (
               <View
                 key={note.id}
@@ -623,12 +611,8 @@ export function BridgeScreen({
                   },
                 ]}
               >
-                {!note.seen_by_teen && (
-                  <View style={[styles.unseenDot, { backgroundColor: glow }]} />
-                )}
-                <Text style={[styles.noteText, { color: note.seen_by_teen ? '#9d8eb8' : '#e9defc' }]}>
-                  {note.content}
-                </Text>
+                {!note.seen_by_teen && <View style={[styles.unseenDot, { backgroundColor: glow }]} />}
+                <Text style={[styles.noteText, { color: note.seen_by_teen ? '#9d8eb8' : '#e9defc' }]}>{note.content}</Text>
                 <Text style={styles.noteTime}>
                   {new Date(note.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </Text>
@@ -690,9 +674,7 @@ export function BridgeScreen({
             onPress={handleSend}
             disabled={!shareType || !message.trim() || sending}
           >
-            <Text style={styles.buttonText}>
-              {sending ? 'sending…' : '🌉 send to bridge'}
-            </Text>
+            <Text style={styles.buttonText}>{sending ? 'sending…' : '🌉 send to bridge'}</Text>
           </TouchableOpacity>
         </Animated.View>
         )}
@@ -717,34 +699,27 @@ const styles = StyleSheet.create({
   subtitle:        { fontSize: 14, color: '#cbb6f7', textAlign: 'center', marginBottom: 14, fontStyle: 'italic', lineHeight: 20 },
   energyBadge:     { alignSelf: 'center', borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 16 },
   energyText:      { fontSize: 12, fontWeight: '600' },
-
   viewToggleRow:   { flexDirection: 'row', gap: 8, marginBottom: 6 },
   viewToggleBtn:   { flex: 1, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 14, paddingVertical: 9, alignItems: 'center' },
   viewToggleText:  { fontSize: 13, fontWeight: '700' },
   historyEmptyText:{ color: '#9d8eb8', fontSize: 13, lineHeight: 20, textAlign: 'center', paddingVertical: 20 },
-
   sectionLabel:    { fontSize: 14, fontWeight: '600', marginBottom: 12 },
   typeRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   typeChip:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
   typeEmoji:       { fontSize: 18 },
   typeLabel:       { fontSize: 14, fontWeight: '600' },
-
   card:            { padding: 18, borderRadius: 20, marginBottom: 16, borderWidth: 1, shadowOpacity: 0.4, shadowRadius: 14 },
   cardLabel:       { fontSize: 14, fontWeight: '700', marginBottom: 10 },
   input:           { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, minHeight: 110, textAlignVertical: 'top', marginBottom: 8, backgroundColor: 'rgba(0,0,0,0.35)' },
   charCount:       { fontSize: 12, textAlign: 'right' },
-
   convModeHint:    { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 12 },
   convModeHintText: { fontSize: 13, fontStyle: 'italic', lineHeight: 19 },
-
   stickyNote:      { backgroundColor: '#fff8e7', borderColor: '#7c3aed', borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, padding: 12, marginBottom: 14, transform: [{ rotate: '-2deg' }] },
   stickyText:      { color: '#3a2461', fontSize: 13, fontStyle: 'italic', textAlign: 'center', lineHeight: 19 },
-
   button:          { padding: 16, borderRadius: 18, marginBottom: 12, alignItems: 'center' },
   buttonText:      { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   ghostButton:     { padding: 14, borderRadius: 18, marginBottom: 12, alignItems: 'center', borderWidth: 1 },
   ghostButtonText: { fontSize: 14, fontWeight: '600' },
-
   sentEmoji:       { fontSize: 56, textAlign: 'center', marginBottom: 12 },
   sentTitle:       { fontSize: 22, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 8 },
   sentSub:         { fontSize: 14, color: '#e9defc', textAlign: 'center', lineHeight: 21 },
