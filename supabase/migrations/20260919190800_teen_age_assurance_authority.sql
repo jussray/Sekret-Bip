@@ -93,9 +93,9 @@ begin
     raise exception 'completed parent profile required' using errcode = '42501';
   end if;
 
-  select verification_state into v_guardian_state
-  from public.account_verification
-  where user_id = v_guardian_id;
+  select av.verification_state into v_guardian_state
+  from public.account_verification as av
+  where av.user_id = v_guardian_id;
 
   if v_guardian_state <> 'VERIFIED_GUARDIAN' then
     raise exception 'verified guardian required' using errcode = '42501';
@@ -141,12 +141,12 @@ begin
   )
   returning * into v_receipt;
 
-  update public.account_verification
+  update public.account_verification as av
   set verification_state = 'VERIFIED_TEEN',
       verification_reason = 'guardian_age_assurance',
       verification_updated_at = now()
-  where user_id = p_teen_user_id
-    and verification_state not in ('SUSPENDED', 'MANUAL_REVIEW');
+  where av.user_id = p_teen_user_id
+    and av.verification_state not in ('SUSPENDED', 'MANUAL_REVIEW');
 
   if not found then
     raise exception 'teen verification state is not eligible for confirmation' using errcode = '42501';
@@ -213,12 +213,12 @@ begin
   )
   returning * into v_receipt;
 
-  update public.account_verification
+  update public.account_verification as av
   set verification_state = 'VERIFIED_TEEN',
       verification_reason = 'self_declared_18_19',
       verification_updated_at = now()
-  where user_id = v_teen_id
-    and verification_state not in ('SUSPENDED', 'MANUAL_REVIEW');
+  where av.user_id = v_teen_id
+    and av.verification_state not in ('SUSPENDED', 'MANUAL_REVIEW');
 
   if not found then
     raise exception 'teen verification state is not eligible for confirmation' using errcode = '42501';
