@@ -16,6 +16,10 @@ import {
   normalizeOracleProfile,
 } from '../../../services/oracleDiscovery';
 import {
+  buildWellbeingContext,
+  loadWellbeingState,
+} from '../../../services/wellbeingState';
+import {
   getConversationPhase,
   buildConversationPhaseInstruction,
   isArrivalMessage,
@@ -73,22 +77,30 @@ async function resolveOracleContext(explicit?: string[]): Promise<string[]> {
     const profile = normalizeOracleProfile(JSON.parse(raw), 'teen');
     return buildOracleContext(profile, 'teen').slice(0, 8);
   } catch {
+    // Oracle context is optional enrichment, not reply authority. Continue
+    // without it, but make the degraded path visible without logging stored
+    // profile content or parser/provider details.
+    console.warn('Oracle context unavailable; continuing without optional context.');
     return [];
   }
 }
 
 /**
  * Load + advance the teen relationship profile, compute conversation phase,
- * recover bounded structured Oracle context, and assemble the reply request.
+ * recover bounded structured Oracle and wellbeing context, and assemble the
+ * reply request. Wellbeing context is a projection of existing user activity,
+ * not a diagnosis or a second clinical record.
  */
 export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<BuiltReplyRequest> {
   const history = ctx.history ?? [];
   const historyLength = history.length;
 
-  const [currentRelationship, oracleContext] = await Promise.all([
+  const [currentRelationship, oracleContext, wellbeingState] = await Promise.all([
     loadTeenRelationshipProfile(),
     resolveOracleContext(ctx.oracleContext),
+    loadWellbeingState(),
   ]);
+  const wellbeingContext = buildWellbeingContext(wellbeingState);
   const relationship = learnTeenRelationshipStyle(ctx.text, currentRelationship);
   await saveTeenRelationshipProfile(relationship);
 
@@ -102,10 +114,18 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
   );
   const isArrival = isArrivalMessage(ctx.text, historyLength);
 
+  // Surface-specific memory is allowed to add context, but it cannot override
+  // the canonical relationship/Oracle/wellbeing provenance fields below.
   const memory: Record<string, unknown> = {
+    ...(ctx.extraMemory ?? {}),
     relationshipStyle: relationshipProfileToOracleNote(relationship),
     ...(oracleContext.length > 0 ? { oracleContext } : {}),
-    ...(ctx.extraMemory ?? {}),
+    ...(wellbeingContext.length > 0 ? {
+      wellbeingContext: {
+        policy: 'Tentative, user-controlled observations only. Never diagnose, label, score, or treat these as clinical facts.',
+        observations: wellbeingContext,
+      },
+    } : {}),
   };
 
   return {

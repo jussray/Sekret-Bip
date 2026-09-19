@@ -96,6 +96,16 @@ const PRIVATE_ACCOUNT_KEYS = [
   STORAGE_KEYS.bipEnergyAdjustmentSeen,
   STORAGE_KEYS.bridgeResponsePreference,
   STORAGE_KEYS.savedContinuation,
+  // Account-scoped companion and relationship state.
+  'sekret_companion_memory',
+  'sekret_wellbeing_dismissed_v1',
+  'oracle_relationship_profile_teen',
+  // Private expression and account-specific UI state written outside loadState.
+  's2tell_saved',
+  's2tell_history',
+  'sleepWindow',
+  'parentOwnCycleDays',
+  'parentOwnCycleStart',
   'sekretbip_first_visit_done',
   'parent_bridge_pending',
   'sekret_self_discovery_profile',
@@ -145,9 +155,8 @@ export const saveState = async (stateUpdates: Record<string, any>): Promise<void
 };
 
 export async function clearPrivateAccountCache(): Promise<void> {
-  try {
-    await AsyncStorage.multiRemove([...PRIVATE_ACCOUNT_KEYS]);
-  } catch (error) {
-    console.error('clearPrivateAccountCache error:', error);
-  }
+  // Sign-out is a privacy boundary. If removal fails, propagate the failure so
+  // callers cannot report a secure account transition while old private state
+  // remains readable on a shared device.
+  await AsyncStorage.multiRemove([...PRIVATE_ACCOUNT_KEYS]);
 }
