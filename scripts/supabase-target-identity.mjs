@@ -50,17 +50,27 @@ function normalizeTarget(name, target) {
 
 export async function resolveSupabaseTarget(options = {}) {
   const env = options.env ?? process.env;
+  const registry = await readRegistry(options.registryPath);
   const targetName = clean(options.targetName ?? env.SUPABASE_TARGET);
-  if (!targetName) {
-    throw new Error('SUPABASE_TARGET is required; refusing to guess which Supabase account/project to use.');
+  const envProjectRef = clean(env.SUPABASE_PROJECT_REF);
+
+  let target;
+  if (targetName) {
+    const rawTarget = registry.targets[targetName];
+    if (!rawTarget) throw new Error(`SUPABASE_TARGET_UNKNOWN ${targetName}`);
+    target = normalizeTarget(targetName, rawTarget);
+  } else if (envProjectRef) {
+    const matches = Object.entries(registry.targets)
+      .map(([name, rawTarget]) => normalizeTarget(name, rawTarget))
+      .filter((candidate) => candidate.projectRef === envProjectRef);
+    if (matches.length !== 1) {
+      throw new Error(`SUPABASE_TARGET_UNRESOLVED projectRef=${envProjectRef}`);
+    }
+    [target] = matches;
+  } else {
+    throw new Error('SUPABASE_TARGET or SUPABASE_PROJECT_REF is required; refusing to guess which Supabase account/project to use.');
   }
 
-  const registry = await readRegistry(options.registryPath);
-  const rawTarget = registry.targets[targetName];
-  if (!rawTarget) throw new Error(`SUPABASE_TARGET_UNKNOWN ${targetName}`);
-  const target = normalizeTarget(targetName, rawTarget);
-
-  const envProjectRef = clean(env.SUPABASE_PROJECT_REF);
   if (envProjectRef && envProjectRef !== target.projectRef) {
     throw new Error(`SUPABASE_TARGET_REF_MISMATCH target=${target.projectRef} env=${envProjectRef}`);
   }
@@ -88,13 +98,14 @@ function observedProjectRef(payload) {
 }
 
 function buildMarker(target, observed = {}, providerVerified = false) {
+  const organizationId = clean(observed.organizationId);
   const identity = {
     target: target.name,
     repository: target.repository,
     environment: target.environment,
     projectRef: target.projectRef,
     projectUrl: target.projectUrl,
-    organizationId: clean(observed.organizationId) || null,
+    organizationFingerprint: organizationId ? fingerprint({ organizationId }) : null,
     projectName: clean(observed.projectName) || null,
   };
   const identityFingerprint = fingerprint(identity);
@@ -112,7 +123,7 @@ function buildMarker(target, observed = {}, providerVerified = false) {
       'environment',
       'projectRef',
       'projectUrl',
-      'organizationId',
+      'organizationFingerprint',
       'projectName',
     ],
   };
