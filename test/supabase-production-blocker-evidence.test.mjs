@@ -57,7 +57,8 @@ test('missing Supabase token fails closed and retains redacted schema evidence',
   assert.equal(fs.existsSync(evidencePath), true);
   const evidenceText = fs.readFileSync(evidencePath, 'utf8');
   const evidence = JSON.parse(evidenceText);
-  assert.equal(evidence.schemaVersion, 2);
+  assert.equal(evidence.schemaVersion, 3);
+  assert.equal(evidence.supabaseIdentity, null);
   assert.equal(evidence.verified, false);
   assert.equal(evidence.status, 'configuration-invalid');
   assert.equal(evidence.error, 'missing_supabase_access_token');
@@ -98,7 +99,8 @@ test('response-body transport failure retains provider-query evidence', async ()
   assert.equal(fs.existsSync(evidencePath), true);
   const evidenceText = fs.readFileSync(evidencePath, 'utf8');
   const evidence = JSON.parse(evidenceText);
-  assert.equal(evidence.schemaVersion, 2);
+  assert.equal(evidence.schemaVersion, 3);
+  assert.equal(evidence.supabaseIdentity, null);
   assert.equal(evidence.verified, false);
   assert.equal(evidence.status, 'provider-query-failed');
   assert.equal(evidence.error, 'management_api_response_read_failed');
