@@ -135,7 +135,7 @@ test('production schema CLI verifies target identity before querying schema and 
   const verifyIdentityIndex = mainBlock.indexOf('await verifySupabaseManagementIdentity');
   const schemaIndex = mainBlock.indexOf('await verifySupabaseProductionSchema');
   assert.ok(resolveIndex >= 0 && verifyIdentityIndex > resolveIndex && schemaIndex > verifyIdentityIndex);
-  assert.match(schemaVerifier, /supabaseIdentity: options\.supabaseIdentity \?\? null/);
+  assert.match(schemaVerifier, /initialEvidence\(config, options\.supabaseIdentity \?\? null\)/);
   assert.match(schemaVerifier, /schemaVersion: 3/);
 });
 
