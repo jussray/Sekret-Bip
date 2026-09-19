@@ -1,0 +1,97 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const read = relative => fs.readFileSync(path.join(ROOT, relative), 'utf8');
+
+const signupBaseline = read('supabase/migrations/20260919190000_auth_signup_onboarding_baseline.sql');
+const relationshipOnly = read('supabase/migrations/20260919190500_parent_link_relationship_only.sql');
+const jrMigration = read('supabase/migrations/20260919191000_bip_jr_managed_child_profiles.sql');
+const verificationState = read('src/services/verificationState.ts');
+const verificationContext = read('src/context/VerificationContext.tsx');
+const bridge = read('src/bridge/index.ts');
+const screenPurpose = read('src/constants/screenPurpose.ts');
+const jrScreen = read('app/(parent)/bip-jr.tsx');
+const jrService = read('src/services/bipJr.ts');
+const parentRoutes = read('src/parent/routes.ts');
+const sharedRoutes = read('src/shared/routes.ts');
+
+
+test('permanent signup creates onboarding authority server-side, including anonymous upgrade', () => {
+  assert.match(signupBaseline, /initialize_onboarding_state_from_auth/);
+  assert.match(signupBaseline, /if coalesce\(new\.is_anonymous, false\) then/);
+  assert.match(signupBaseline, /insert into public\.user_onboarding_state/);
+  assert.match(signupBaseline, /after insert on auth\.users/);
+  assert.match(signupBaseline, /after update of is_anonymous on auth\.users/);
+  assert.match(signupBaseline, /old\.is_anonymous is true and new\.is_anonymous is false/);
+  assert.match(signupBaseline, /'signed_up'/);
+});
+
+
+test('parent link is relationship consent and cannot grant or remove teen verification', () => {
+  assert.match(relationshipOnly, /set parent_link_state = 'pending'/);
+  assert.match(relationshipOnly, /set parent_link_state = 'active'/);
+  assert.match(relationshipOnly, /set parent_link_state = 'expired'/);
+  assert.match(relationshipOnly, /set parent_link_state = 'revoked'/);
+  assert.doesNotMatch(relationshipOnly, /set\s+verification_state\s*=/i);
+
+  assert.match(verificationState, /PARENT_APPROVED: \{ to: 'UNVERIFIED', parentLinkState: 'active' \}/);
+  assert.match(verificationState, /PARENT_APPROVED: \{ to: 'VERIFIED_TEEN', parentLinkState: 'active' \}/);
+  assert.match(verificationState, /VERIFICATION_CONFIRMED: \{ to: 'VERIFIED_TEEN' \}/);
+
+  const unverifiedStart = verificationState.indexOf('UNVERIFIED: {');
+  const pendingParentStart = verificationState.indexOf('PENDING_PARENT: {', unverifiedStart);
+  const unverifiedRegion = verificationState.slice(unverifiedStart, pendingParentStart);
+  assert.doesNotMatch(unverifiedRegion, /PARENT_APPROVED: \{ to: 'VERIFIED_TEEN'/);
+});
+
+
+test('Bip Jr is a verified-parent-managed child profile, never a child auth identity', () => {
+  assert.match(jrMigration, /create table if not exists public\.jr_child_profiles/);
+  assert.match(jrMigration, /create table if not exists public\.jr_parental_consent_receipts/);
+  assert.match(jrMigration, /verification_state = 'VERIFIED_GUARDIAN'/);
+  assert.match(jrMigration, /create_own_jr_child_profile/);
+  assert.match(jrMigration, /'bip-jr-parental-consent-v1'/);
+  assert.doesNotMatch(jrMigration, /insert into\s+auth\.users/i);
+  assert.doesNotMatch(jrMigration, /child_email|child_password/i);
+
+  assert.match(jrService, /rpc\('create_own_jr_child_profile'/);
+  assert.match(jrService, /rpc\('archive_own_jr_child_profile'/);
+  assert.match(jrScreen, /do not get a separate email, password, or Teen account/);
+  assert.match(jrScreen, /Different from Teen \+ Bridge/);
+  assert.match(jrScreen, /parent or legal guardian and I consent/);
+});
+
+
+test('Bip Jr is reachable from Parent More', () => {
+  assert.match(parentRoutes, /bipJr:\s+'\/\(parent\)\/bip-jr'/);
+  assert.match(sharedRoutes, /'bip-jr': PARENT_ROUTES\.bipJr/);
+  assert.match(screenPurpose, /label: 'Bip Jr', route: 'bip-jr'/);
+});
+
+
+test('Circle pseudonymity and Bridge teen control remain separate from account identity', () => {
+  assert.match(screenPurpose, /public anonymous posts/);
+  assert.match(screenPurpose, /anonymous identity/);
+  assert.match(bridge, /teenInitiatesOnly:\s*true/);
+  assert.match(bridge, /parentCannotPullTeenData:\s*true/);
+  assert.match(bridge, /teenCanRevokeShare:\s*true/);
+});
+
+
+test('verification read failure remains fail-closed without impersonating logout', () => {
+  assert.match(
+    verificationContext,
+    /const permanentSession = Boolean\(session && !session\.user\.is_anonymous\);[\s\S]*setSession\(session\);[\s\S]*setAuthenticated\(permanentSession\);[\s\S]*setSnapshot\(INITIAL_VERIFICATION_SNAPSHOT\);/,
+  );
+
+  const realtimeLoadStart = verificationContext.indexOf('void loadVerificationForSession(session)');
+  const realtimeFinally = verificationContext.indexOf('.finally(() => {', realtimeLoadStart);
+  const realtimeFailureRegion = verificationContext.slice(realtimeLoadStart, realtimeFinally);
+  assert.ok(realtimeLoadStart >= 0 && realtimeFinally > realtimeLoadStart);
+  assert.doesNotMatch(realtimeFailureRegion, /setSession\(null\)/);
+  assert.doesNotMatch(realtimeFailureRegion, /setAuthenticated\(false\)/);
+});
