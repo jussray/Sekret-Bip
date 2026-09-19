@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 
-const migration = fs.readFileSync('supabase/candidates/20260918234500_agent_memories_l3_contract.sql', 'utf8');
+const migration = fs.readFileSync('supabase/migrations/20260918234500_agent_memories_l3_contract.sql', 'utf8');
 const service = fs.readFileSync('src/services/ai/agentMemory.ts', 'utf8');
 
 test('L3 schema defaults to quarantine and cannot be directly written by authenticated clients', () => {
@@ -20,22 +20,10 @@ test('L3 owner select is permanent-account scoped and parent access is not grant
 
 test('L3 memory stores minimal reviewed summaries with provenance, consent, retention and integrity', () => {
   for (const token of [
-    'summary',
-    'provenance_kind',
-    'provenance_source_id',
-    'provenance_source_created_at',
-    'sensitivity',
-    'review_state',
-    'consent_version',
-    'integrity_fingerprint',
-    'admission_reviewed_at',
-    'retention_mode',
-    'expires_at',
-    'retention_reason',
-    'supersedes_id',
-  ]) {
-    assert.match(migration, new RegExp(`\\b${token}\\b`));
-  }
+    'summary', 'provenance_kind', 'provenance_source_id', 'provenance_source_created_at',
+    'sensitivity', 'review_state', 'consent_version', 'integrity_fingerprint',
+    'admission_reviewed_at', 'retention_mode', 'expires_at', 'retention_reason', 'supersedes_id',
+  ]) assert.match(migration, new RegExp(`\\b${token}\\b`));
   assert.doesNotMatch(migration, /raw_transcript|chain_of_thought|raw_audio|journal_text/i);
 });
 
@@ -60,16 +48,10 @@ test('owner forget path is permanent-account scoped and cannot delete another us
 
 test('retrieval revalidates owner, consent, lifecycle, expiry, integrity marker shape and instruction-shaped content', () => {
   for (const token of [
-    'memory.userId !== input.userId',
-    'memory.consentVersion !== input.consentVersion',
-    "memory.lifecycleState !== 'active'",
-    'memory.admissionReviewedAt',
-    'integrityFingerprint',
-    'isExpired(memory, nowMs)',
-    'looksInstructionShaped(memory.summary)',
-  ]) {
-    assert.match(service, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
-  }
+    'memory.userId !== input.userId', 'memory.consentVersion !== input.consentVersion',
+    "memory.lifecycleState !== 'active'", 'memory.admissionReviewedAt', 'integrityFingerprint',
+    'isExpired(memory, nowMs)', 'looksInstructionShaped(memory.summary)',
+  ]) assert.match(service, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   assert.match(service, /Phase 1 validates only that a non-secret fingerprint marker is present/);
   assert.match(service, /Production activation must add trusted-runtime recomputation/);
 });
