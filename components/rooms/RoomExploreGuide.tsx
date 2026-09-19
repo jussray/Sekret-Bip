@@ -1,5 +1,12 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Animated, {
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
 type RoomGuideSide = 'teen' | 'parent';
 
@@ -36,6 +43,31 @@ export function RoomExploreGuide({ side, onNavigate }: RoomExploreGuideProps) {
   const items = useMemo(() => (side === 'parent' ? PARENT_ITEMS : TEEN_ITEMS), [side]);
   const accent = side === 'parent' ? '#a7f3d0' : '#c4b5fd';
   const panelBackground = side === 'parent' ? 'rgba(4,16,12,0.96)' : 'rgba(18,8,36,0.96)';
+  const panelProgress = useSharedValue(0);
+
+  useEffect(() => {
+    if (open) {
+      panelProgress.value = withSpring(1, {
+        damping: 18,
+        stiffness: 220,
+        mass: 0.72,
+      });
+    } else {
+      panelProgress.value = withTiming(0, { duration: 180 });
+    }
+  }, [open, panelProgress]);
+
+  useEffect(() => () => {
+    cancelAnimation(panelProgress);
+  }, [panelProgress]);
+
+  const panelMotionStyle = useAnimatedStyle(() => ({
+    opacity: panelProgress.value,
+    transform: [
+      { translateY: (1 - panelProgress.value) * -8 },
+      { scale: 0.98 + panelProgress.value * 0.02 },
+    ],
+  }));
 
   return (
     <View pointerEvents="box-none" style={styles.shell}>
@@ -51,35 +83,40 @@ export function RoomExploreGuide({ side, onNavigate }: RoomExploreGuideProps) {
         <Text style={[styles.triggerText, { color: accent }]}>{open ? 'Hide shortcuts' : '✦ What can I tap?'}</Text>
       </TouchableOpacity>
 
-      {open ? (
-        <View
-          testID="room-explore-guide-panel"
-          accessibilityRole="summary"
-          style={[styles.panel, { borderColor: `${accent}55`, backgroundColor: panelBackground }]}
-        >
-          <Text style={styles.title}>Room shortcuts</Text>
-          <Text style={styles.body}>Tap objects in the room, or use a shortcut here.</Text>
-          {items.map(item => (
-            <TouchableOpacity
-              key={item.route}
-              accessibilityRole="button"
-              accessibilityLabel={`Open ${item.label}`}
-              activeOpacity={0.82}
-              onPress={() => {
-                setOpen(false);
-                onNavigate(item.route);
-              }}
-              style={styles.row}
-            >
-              <View style={styles.rowText}>
-                <Text style={styles.label}>{item.label}</Text>
-                <Text style={styles.description}>{item.description}</Text>
-              </View>
-              <Text style={[styles.arrow, { color: accent }]}>›</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      ) : null}
+      <Animated.View
+        testID="room-explore-guide-panel"
+        accessibilityRole="summary"
+        accessibilityElementsHidden={!open}
+        importantForAccessibility={open ? 'auto' : 'no-hide-descendants'}
+        pointerEvents={open ? 'auto' : 'none'}
+        style={[
+          styles.panel,
+          { borderColor: `${accent}55`, backgroundColor: panelBackground },
+          panelMotionStyle,
+        ]}
+      >
+        <Text style={styles.title}>Room shortcuts</Text>
+        <Text style={styles.body}>Tap objects in the room, or use a shortcut here.</Text>
+        {items.map(item => (
+          <TouchableOpacity
+            key={item.route}
+            accessibilityRole="button"
+            accessibilityLabel={`Open ${item.label}`}
+            activeOpacity={0.82}
+            onPress={() => {
+              setOpen(false);
+              onNavigate(item.route);
+            }}
+            style={styles.row}
+          >
+            <View style={styles.rowText}>
+              <Text style={styles.label}>{item.label}</Text>
+              <Text style={styles.description}>{item.description}</Text>
+            </View>
+            <Text style={[styles.arrow, { color: accent }]}>›</Text>
+          </TouchableOpacity>
+        ))}
+      </Animated.View>
     </View>
   );
 }
