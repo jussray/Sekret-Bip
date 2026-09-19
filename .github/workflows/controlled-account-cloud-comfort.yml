@@ -8,10 +8,18 @@ on:
       - 'playwright.controlled-account.config.ts'
       - 'scripts/playwright-executable.mjs'
       - 'src/context/AppContext.tsx'
+      - 'src/context/VerificationContext.tsx'
       - 'src/hooks/useSekretState.ts'
+      - 'src/services/verificationState.ts'
+      - 'src/services/bipJr.ts'
+      - 'app/(parent)/bip-jr.tsx'
+      - 'supabase/migrations/20260919190000_auth_signup_onboarding_baseline.sql'
+      - 'supabase/migrations/20260919190500_parent_link_relationship_only.sql'
+      - 'supabase/migrations/20260919191000_bip_jr_managed_child_profiles.sql'
       - 'e2e/controlled-account-cloud-comfort.spec.ts'
       - 'e2e/controlled-account-session-continuity.spec.ts'
       - 'test/auth-session-continuity.test.mjs'
+      - 'test/family-account-authority.test.mjs'
       - 'test/controlled-account-cloud-comfort-gate.test.mjs'
   workflow_dispatch:
     inputs:
@@ -71,7 +79,7 @@ jobs:
         run: npm ci
 
       - name: Run controlled-account safety contracts
-        run: node --test test/controlled-account-cloud-comfort-gate.test.mjs test/auth-session-continuity.test.mjs
+        run: node --test test/controlled-account-cloud-comfort-gate.test.mjs test/auth-session-continuity.test.mjs test/family-account-authority.test.mjs
 
       - name: Run zero-error TypeScript
         run: npm run type-check
