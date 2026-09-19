@@ -1,6 +1,6 @@
 import { getSupabase } from '@/utils/supabase';
 
-export type TeenAgeAssuranceMethod = 'guardian_confirmation' | 'self_declared_18_19';
+export type TeenAgeAssuranceMethod = 'guardian_confirmation' | 'self_declared_age_bucket';
 
 export interface TeenAgeAssuranceResult {
   teen_user_id: string;
