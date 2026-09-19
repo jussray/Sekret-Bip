@@ -39,6 +39,12 @@ test('L3 memory stores minimal reviewed summaries with provenance, consent, rete
   assert.doesNotMatch(migration, /raw_transcript|chain_of_thought|raw_audio|journal_text/i);
 });
 
+test('Phase 1 does not pre-install semantic vector storage before retrieval is authorized', () => {
+  assert.match(migration, /Phase 1 intentionally omits embeddings\/vector indexes/);
+  assert.doesNotMatch(migration, /create extension if not exists vector/i);
+  assert.doesNotMatch(migration, /\bembedding\s+vector\s*\(/i);
+});
+
 test('active memory requires admission review and an eligible review state', () => {
   assert.match(migration, /lifecycle_state <> 'active'/);
   assert.match(migration, /admission_reviewed_at is not null/);
