@@ -9,7 +9,7 @@ const receipt = fs.readFileSync('supabase/migrations/20260918234500_agent_memori
 
 test('L3 activation requires exact production and database proof rather than flag flips', () => {
   for (const required of [
-    'fresh Supabase preview database',
+    'fresh ephemeral Supabase database',
     'User A cannot select or delete User B memory',
     'Direct authenticated insert/update/delete remain denied',
     'custom-auth Edge Functions retain live negative-auth proof',
