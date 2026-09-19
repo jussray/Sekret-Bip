@@ -90,8 +90,8 @@ test('Parent-linked hooks fail closed and minimize raw shared-content reads', as
   assert.match(linkedTeen, /const clearLinkedSnapshot = useCallback\(\(\) => \{/);
   assert.match(linkedTeen, /setLinkedTeenId\(null\);[\s\S]*setIsLinked\(false\);[\s\S]*setSharedJournal\(\[\]\);[\s\S]*setSharedMoods\(\[\]\);[\s\S]*setSignals\(\[\]\);/);
   assert.match(linkedTeen, /setIsLoading\(true\);[\s\S]*setLoadError\(false\);[\s\S]*clearLinkedSnapshot\(\);[\s\S]*resolveParentEntryState\(\)/);
-  assert.match(linkedTeen, /includeSharedContent \? pullSharedWithParentResult<SharedJournalEntry>/);
-  assert.match(linkedTeen, /includeSharedContent \? pullSharedWithParentResult<SharedMoodEntry>/);
+  assert.match(linkedTeen, /includeSharedContent\s*\?\s*pullSharedWithParentResult<SharedJournalEntry>/);
+  assert.match(linkedTeen, /includeSharedContent\s*\?\s*pullSharedWithParentResult<SharedMoodEntry>/);
   assert.match(linkedBridge, /useLinkedTeen\(\{ includeSharedContent: false \}\)/);
   assert.match(linkedBridge, /fetchBridgeSharesResult\(teenId\)/);
   assert.match(linkedBridge, /setShares\(\[\]\);[\s\S]*setShareLoading\(true\);[\s\S]*setShareLoadError\(false\);/);
