@@ -107,7 +107,8 @@ test('history reconciliation cannot apply migration SQL', () => {
   assert.doesNotMatch(workflow, /apply_migration|psql\s|execute_sql/i);
 });
 
-test('workflow preserves precondition, before, midpoint, after, and dry-run evidence', () => {
+test('workflow preserves target, precondition, before, midpoint, after, and dry-run evidence', () => {
+  assert.match(workflow, /supabase-target-identity\.json/);
   assert.match(workflow, /supabase-history-precondition-state\.json/);
   assert.match(workflow, /supabase-migration-list-before-reconciliation\.txt/);
   assert.match(workflow, /supabase-history-canonical-applied\.txt/);
@@ -118,12 +119,20 @@ test('workflow preserves precondition, before, midpoint, after, and dry-run evid
   assert.match(workflow, /if: always\(\)/);
 });
 
-test('workflow uses the IPv4 session-pooler path and no stale Supabase management token', () => {
+test('workflow verifies exact Supabase provider identity before constructing the production pooler URL', () => {
+  assert.ok(workflow.split('\n').some((line) => line.trim() === 'SUPABASE_TARGET: sekret-bip-production'));
   assert.ok(workflow.split('\n').some((line) => line.trim() === 'SUPABASE_POOLER_HOST: aws-1-us-east-1.pooler.supabase.com'));
+  assert.match(workflow, /SUPABASE_ACCESS_TOKEN: \$\{\{ secrets\.SUPABASE_ACCESS_TOKEN \}\}/);
+  assert.match(workflow, /node scripts\/supabase-target-identity\.mjs/);
+  const verifyIdentity = workflow.indexOf('- name: Verify exact Supabase provider target');
+  const buildPooler = workflow.indexOf('- name: Build masked production session-pooler URL');
+  const firstRepair = workflow.indexOf('supabase migration repair');
+  assert.ok(verifyIdentity >= 0);
+  assert.ok(buildPooler > verifyIdentity);
+  assert.ok(firstRepair > buildPooler);
   assert.match(workflow, /postgres\.\$\{SUPABASE_PROJECT_REF\}/);
   assert.match(workflow, /supabase migration list --db-url/);
   assert.match(workflow, /supabase db push --db-url/);
-  assert.doesNotMatch(workflow, /SUPABASE_ACCESS_TOKEN/);
 });
 
 test('workflow pins repository and Supabase action identities', () => {
