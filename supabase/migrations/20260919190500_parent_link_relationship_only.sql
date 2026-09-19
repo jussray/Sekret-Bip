@@ -58,8 +58,19 @@ begin
     raise exception 'active parent link must be revoked first' using errcode = '42501';
   end if;
 
+  -- Keep the human-facing code at eight characters while avoiding the old
+  -- eight-hex-character (32-bit) ceiling. Each random byte maps uniformly to
+  -- one symbol in this 32-character, ambiguity-reduced alphabet, yielding
+  -- 40 bits of code entropy without changing the product/UI contract.
   loop
-    v_code := upper(substr(md5(gen_random_uuid()::text), 1, 8));
+    select string_agg(
+      substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', (get_byte(raw_bytes, i) % 32) + 1, 1),
+      '' order by i
+    )
+    into v_code
+    from (select gen_random_bytes(8) as raw_bytes) entropy
+    cross join generate_series(0, 7) as positions(i);
+
     exit when not exists (
       select 1 from public.parent_links where invite_code = v_code
     );
@@ -267,7 +278,7 @@ revoke all on function public.revoke_parent_link(uuid) from public, anon;
 grant execute on function public.revoke_parent_link(uuid) to authenticated, service_role;
 
 comment on function public.create_parent_link_invite() is
-  'Creates teen-controlled relationship consent without changing teen verification authority.';
+  'Creates an eight-character, 40-bit Teen-controlled relationship-consent code without changing Teen verification authority.';
 comment on function public.redeem_parent_link_invite(text) is
   'Redeems teen-issued relationship consent for a completed Parent-side account; it mirrors parent_link_state only and does not grant VERIFIED_TEEN or guardian authority.';
 comment on function public.revoke_parent_link(uuid) is
