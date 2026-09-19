@@ -324,23 +324,33 @@ export function BridgeScreen({
 
     setSending(true);
     setBridgeStatus(null);
+
+    let shared: BridgeShare | null = null;
     try {
-      const shared = await sendS2TellShare({
+      shared = await sendS2TellShare({
         text,
         tone: convMode ?? undefined,
         shareType,
       });
-      if (!shared) {
-        setBridgeStatus('Couldn’t send that note. Nothing was marked as delivered.');
-        return;
-      }
+    } catch {
+      setBridgeStatus('Couldn’t send that note. Nothing was marked as delivered.');
+      setSending(false);
+      return;
+    }
 
-      // This is only a local continuity hint. The bridge_shares row above is
-      // the authority that proves the note actually entered the linked Bridge.
-      await AsyncStorage.setItem('parent_bridge_pending', 'true').catch(() => {
-        console.warn('[Bridge] local continuity hint could not be stored; durable Bridge delivery remains authoritative.');
-      });
+    if (!shared) {
+      setBridgeStatus('Couldn’t send that note. Nothing was marked as delivered.');
+      setSending(false);
+      return;
+    }
 
+    // This is only a local continuity hint. The bridge_shares row above is
+    // the authority that proves the note actually entered the linked Bridge.
+    await AsyncStorage.setItem('parent_bridge_pending', 'true').catch(() => {
+      console.warn('[Bridge] local continuity hint could not be stored; durable Bridge delivery remains authoritative.');
+    });
+
+    try {
       const signalResult = await sendBridgeSignal({ shareType, convMode, charKey });
       if (!signalResult.ok) {
         Alert.alert(
@@ -348,17 +358,19 @@ export function BridgeScreen({
           'The S2Tell message reached Bridge, but the support signal could not be recorded. Your note was not lost.',
         );
       }
-
-      setSent(true);
-      setMessage('');
-      setShareType(null);
-      setConvMode(null);
-      setHistoryLoaded(false);
     } catch {
-      setBridgeStatus('Couldn’t send that note. Nothing was marked as delivered.');
-    } finally {
-      setSending(false);
+      Alert.alert(
+        'Your note was shared',
+        'The S2Tell message reached Bridge, but the support signal could not be recorded. Your note was not lost.',
+      );
     }
+
+    setSent(true);
+    setMessage('');
+    setShareType(null);
+    setConvMode(null);
+    setHistoryLoaded(false);
+    setSending(false);
   };
 
   const heroCopy = isRylane
