@@ -4,6 +4,8 @@
 --   * permanent auth identities receive onboarding state server-side;
 --   * anonymous preview identities do not until upgraded to permanent;
 --   * parent-link lifecycle changes relationship state only, never teen verification;
+--   * Teen verification requires a separate assurance action and receipt;
+--   * 18-19 Teen self-assurance is independent from Parent Link;
 --   * Bip Jr is a verified-parent-managed profile with an explicit consent receipt;
 --   * cross-guardian access and mutation remain denied.
 --
@@ -19,6 +21,7 @@ create temp table family_authority_context (
 insert into family_authority_context(label, user_id)
 values
   ('teen', gen_random_uuid()),
+  ('adult_teen', gen_random_uuid()),
   ('parent', gen_random_uuid()),
   ('other_parent', gen_random_uuid()),
   ('unverified_parent', gen_random_uuid()),
@@ -83,10 +86,10 @@ insert into family_authority_results
 select
   'permanent_signup_gets_server_onboarding_baseline',
   (
-    select count(*) = 4
+    select count(*) = 5
     from public.user_onboarding_state uos
     join family_authority_context c on c.user_id = uos.user_id
-    where c.label in ('teen', 'parent', 'other_parent', 'unverified_parent')
+    where c.label in ('teen', 'adult_teen', 'parent', 'other_parent', 'unverified_parent')
       and uos.stage = 'signed_up'
   ),
   'All permanent synthetic identities have signed_up onboarding rows';
@@ -132,17 +135,21 @@ insert into public.app_profiles (
 )
 select
   user_id,
-  case when label = 'teen' then 'teen' else 'parent' end,
-  case when label = 'teen' then 'teen' else 'parent' end,
+  case when label in ('teen', 'adult_teen') then 'teen' else 'parent' end,
+  case when label in ('teen', 'adult_teen') then 'teen' else 'parent' end,
   'Synthetic ' || label,
   true,
-  case when label = 'teen' then '16-17' else null end,
-  case when label = 'teen' then 'other' else null end,
-  case when label = 'teen' then 'cloud' else null end,
-  case when label <> 'teen' then 'mom' else null end,
-  case when label <> 'teen' then 'support' else null end
+  case
+    when label = 'teen' then '16-17'
+    when label = 'adult_teen' then '18-19'
+    else null
+  end,
+  case when label in ('teen', 'adult_teen') then 'other' else null end,
+  case when label in ('teen', 'adult_teen') then 'cloud' else null end,
+  case when label not in ('teen', 'adult_teen') then 'mom' else null end,
+  case when label not in ('teen', 'adult_teen') then 'support' else null end
 from family_authority_context
-where label in ('teen', 'parent', 'other_parent', 'unverified_parent')
+where label in ('teen', 'adult_teen', 'parent', 'other_parent', 'unverified_parent')
 on conflict (user_id) do update
 set role = excluded.role,
     account_side = excluded.account_side,
@@ -169,7 +176,7 @@ select
   'none',
   'synthetic_family_authority_probe'
 from family_authority_context
-where label in ('teen', 'parent', 'other_parent', 'unverified_parent')
+where label in ('teen', 'adult_teen', 'parent', 'other_parent', 'unverified_parent')
 on conflict (user_id) do update
 set verification_state = excluded.verification_state,
     parent_link_state = excluded.parent_link_state,
@@ -251,8 +258,138 @@ select
   ), false),
   'Parent redemption activates only the teen-issued relationship';
 
--- The linked teen can revoke the relationship without losing or gaining
--- independent verification authority.
+-- A Parent account that has not passed guardian verification cannot turn the
+-- active relationship into Teen verification.
+select set_config(
+  'request.jwt.claim.sub',
+  (select user_id::text from family_authority_context where label = 'unverified_parent'),
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  jsonb_build_object(
+    'sub', (select user_id::text from family_authority_context where label = 'unverified_parent'),
+    'role', 'authenticated',
+    'is_anonymous', false
+  )::text,
+  true
+);
+set local role authenticated;
+do $probe$
+begin
+  begin
+    perform public.confirm_linked_teen_age_assurance(
+      (select user_id from family_authority_context where label = 'teen')
+    );
+    insert into family_authority_results values (
+      'unverified_parent_cannot_confirm_teen_age_assurance',
+      false,
+      'Unverified Parent unexpectedly confirmed Teen age assurance'
+    );
+  exception when insufficient_privilege then
+    insert into family_authority_results values (
+      'unverified_parent_cannot_confirm_teen_age_assurance',
+      true,
+      'Unverified Parent correctly denied Teen age assurance authority'
+    );
+  end;
+end
+$probe$;
+reset role;
+
+-- A different verified guardian is still denied because the active relationship
+-- scopes which guardian may perform the separate assurance action.
+select set_config(
+  'request.jwt.claim.sub',
+  (select user_id::text from family_authority_context where label = 'other_parent'),
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  jsonb_build_object(
+    'sub', (select user_id::text from family_authority_context where label = 'other_parent'),
+    'role', 'authenticated',
+    'is_anonymous', false
+  )::text,
+  true
+);
+set local role authenticated;
+do $probe$
+begin
+  begin
+    perform public.confirm_linked_teen_age_assurance(
+      (select user_id from family_authority_context where label = 'teen')
+    );
+    insert into family_authority_results values (
+      'unlinked_verified_guardian_cannot_confirm_teen_age_assurance',
+      false,
+      'Unlinked verified guardian unexpectedly confirmed Teen age assurance'
+    );
+  exception when insufficient_privilege then
+    insert into family_authority_results values (
+      'unlinked_verified_guardian_cannot_confirm_teen_age_assurance',
+      true,
+      'Only the linked verified guardian can perform the separate confirmation'
+    );
+  end;
+end
+$probe$;
+reset role;
+
+-- The linked verified guardian now takes an explicit, separate assurance action.
+select set_config(
+  'request.jwt.claim.sub',
+  (select user_id::text from family_authority_context where label = 'parent'),
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  jsonb_build_object(
+    'sub', (select user_id::text from family_authority_context where label = 'parent'),
+    'role', 'authenticated',
+    'is_anonymous', false
+  )::text,
+  true
+);
+set local role authenticated;
+insert into family_authority_runtime(key, value)
+select
+  'guardian_assurance_rows',
+  count(*)::text
+from public.confirm_linked_teen_age_assurance(
+  (select user_id from family_authority_context where label = 'teen')
+);
+reset role;
+
+insert into family_authority_results
+select
+  'explicit_guardian_assurance_verifies_teen_without_changing_bridge',
+  (select value = '1' from family_authority_runtime where key = 'guardian_assurance_rows')
+  and coalesce((
+    select verification_state = 'VERIFIED_TEEN'
+      and parent_link_state = 'active'
+      and verification_reason = 'guardian_age_assurance'
+    from public.account_verification
+    where user_id = (select user_id from family_authority_context where label = 'teen')
+  ), false)
+  and exists (
+    select 1
+    from public.teen_age_assurance_receipts receipt
+    where receipt.teen_user_id = (select user_id from family_authority_context where label = 'teen')
+      and receipt.guardian_user_id = (select user_id from family_authority_context where label = 'parent')
+      and receipt.method = 'guardian_confirmation'
+      and receipt.age_bucket = '16-17'
+      and receipt.superseded_at is null
+  )
+  and coalesce((
+    select status = 'active' and is_active = true
+    from public.parent_links
+    where teen_user_id = (select user_id from family_authority_context where label = 'teen')
+  ), false),
+  'A separate verified-guardian action creates assurance authority while Bridge relationship stays unchanged';
+
+-- The linked Teen can revoke the relationship after verification. Revoking the
+-- relationship must not erase or manufacture age-assurance truth.
 select set_config(
   'request.jwt.claim.sub',
   (select user_id::text from family_authority_context where label = 'teen'),
@@ -274,15 +411,69 @@ reset role;
 
 insert into family_authority_results
 select
-  'teen_revoke_changes_relationship_not_verification',
+  'teen_revoke_changes_relationship_not_assurance',
   (select value = 'true' from family_authority_runtime where key = 'teen_revoked')
   and coalesce((
-    select verification_state = 'UNVERIFIED'
+    select verification_state = 'VERIFIED_TEEN'
       and parent_link_state = 'revoked'
+      and verification_reason = 'guardian_age_assurance'
     from public.account_verification
     where user_id = (select user_id from family_authority_context where label = 'teen')
-  ), false),
-  'Teen revocation changes only the relationship state';
+  ), false)
+  and exists (
+    select 1
+    from public.teen_age_assurance_receipts
+    where teen_user_id = (select user_id from family_authority_context where label = 'teen')
+      and method = 'guardian_confirmation'
+      and superseded_at is null
+  ),
+  'Teen revocation closes the relationship but leaves the separate assurance receipt intact';
+
+-- A completed 18-19 Teen has a separate explicit self-assurance path and does
+-- not require Parent Link at all.
+select set_config(
+  'request.jwt.claim.sub',
+  (select user_id::text from family_authority_context where label = 'adult_teen'),
+  true
+);
+select set_config(
+  'request.jwt.claims',
+  jsonb_build_object(
+    'sub', (select user_id::text from family_authority_context where label = 'adult_teen'),
+    'role', 'authenticated',
+    'is_anonymous', false
+  )::text,
+  true
+);
+set local role authenticated;
+insert into family_authority_runtime(key, value)
+select
+  'adult_teen_assurance_rows',
+  count(*)::text
+from public.confirm_own_self_declared_adult_teen_age_assurance();
+reset role;
+
+insert into family_authority_results
+select
+  'adult_teen_self_assurance_requires_no_parent_link',
+  (select value = '1' from family_authority_runtime where key = 'adult_teen_assurance_rows')
+  and coalesce((
+    select verification_state = 'VERIFIED_TEEN'
+      and parent_link_state = 'none'
+      and verification_reason = 'self_declared_18_19'
+    from public.account_verification
+    where user_id = (select user_id from family_authority_context where label = 'adult_teen')
+  ), false)
+  and exists (
+    select 1
+    from public.teen_age_assurance_receipts
+    where teen_user_id = (select user_id from family_authority_context where label = 'adult_teen')
+      and guardian_user_id is null
+      and method = 'self_declared_18_19'
+      and age_bucket = '18-19'
+      and superseded_at is null
+  ),
+  '18-19 Teen self-assurance is explicit and independent from Parent Link';
 
 -- Verified guardian creates a supervised Bip Jr profile plus consent receipt.
 select set_config(
