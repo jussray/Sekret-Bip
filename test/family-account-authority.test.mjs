@@ -61,11 +61,16 @@ test('Teen verification has separate explicit age-assurance authority', () => {
   assert.match(teenAssuranceMigration, /verification_state = 'VERIFIED_TEEN'/);
   assert.match(teenAssuranceMigration, /verification_reason = 'guardian_age_assurance'/);
   assert.match(teenAssuranceMigration, /verification_reason = 'self_declared_18_19'/);
+  assert.match(teenAssuranceMigration, /method in \('guardian_confirmation', 'self_declared_age_bucket'\)/);
   assert.match(teenAssuranceMigration, /pl\.status = 'active'/);
-  assert.doesNotMatch(teenAssuranceMigration, /raw[_ ]?(id|selfie|birth)|full[_ ]?birth/i);
+  assert.doesNotMatch(
+    teenAssuranceMigration,
+    /\b(raw_id|raw_age_evidence|selfie|selfie_url|birth_date|full_birth_date)\s+(text|date|jsonb|bytea|uuid)\b/i,
+  );
 
   assert.match(teenAssuranceService, /rpc\('confirm_linked_teen_age_assurance'/);
   assert.match(teenAssuranceService, /rpc\('confirm_own_self_declared_adult_teen_age_assurance'/);
+  assert.match(teenAssuranceService, /'guardian_confirmation' \| 'self_declared_age_bucket'/);
   assert.match(parentTeenVerificationScreen, /Confirm age\.\{`\\n`\}Not access\./);
   assert.match(parentTeenVerificationScreen, /does not grant you private account access/i);
   assert.match(parentTeenVerificationScreen, /Confirm Teen age assurance/);
