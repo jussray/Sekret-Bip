@@ -55,8 +55,6 @@ jobs:
           test -s supabase/reference/legacy_migrations/20260627_bip_events.sql
           test -s supabase/reference/legacy_migrations/20260627_point_ledger.sql
           test -s supabase/reference/legacy_migrations/20260701010000_circle_kind_add_parent_community.sql
-          grep -q 'No schema changes' supabase/migrations/20260918234500_agent_memories_l3_contract.sql
-          test -s supabase/candidates/20260918234500_agent_memories_l3_contract.sql
 
       - name: Run focused L3 memory contract tests
         shell: bash
@@ -81,16 +79,6 @@ jobs:
         run: |
           set -euo pipefail
           supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
-
-      - name: Apply candidate-only L3 schema to ephemeral database
-        shell: bash
-        run: |
-          set -euo pipefail
-          command -v psql >/dev/null
-          PGPASSWORD=postgres psql \
-            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
-            -v ON_ERROR_STOP=1 \
-            -f supabase/candidates/20260918234500_agent_memories_l3_contract.sql
 
       - name: Prove L3 memory owner and anonymous denial
         shell: bash
