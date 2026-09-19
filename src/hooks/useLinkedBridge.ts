@@ -66,8 +66,9 @@ export function useLinkedBridge(): LinkedTeenData {
         if (active) unsubscribe = fn;
         else fn();
       } catch {
-        // The initial authoritative read succeeded, so keep that snapshot.
-        // Realtime subscription is supplementary and must not fabricate a read failure.
+        // Do not surface provider error details here. The pull read above remains
+        // authoritative, while this warning preserves truthful realtime failure state.
+        console.warn('[Bridge] realtime share refresh unavailable; pull refresh remains authoritative.');
       }
     })().catch(() => {
       if (!active) return;
