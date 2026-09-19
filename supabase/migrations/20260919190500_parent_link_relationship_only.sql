@@ -121,11 +121,27 @@ set search_path = public, auth
 as $$
 declare
   v_parent_id uuid := auth.uid();
+  v_parent_profile public.app_profiles%rowtype;
   v_link public.parent_links%rowtype;
 begin
   if v_parent_id is null
      or coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
     raise exception 'unauthorized' using errcode = '42501';
+  end if;
+
+  -- Bridge adult eligibility is intentionally weaker than guardian authority:
+  -- the receiver must have completed Parent Side, but does not need
+  -- VERIFIED_GUARDIAN merely to accept Teen-controlled relationship consent.
+  -- Guardian-only powers such as Teen age assurance and Bip Jr remain gated by
+  -- their own explicit VERIFIED_GUARDIAN checks.
+  select * into v_parent_profile
+  from public.app_profiles
+  where user_id = v_parent_id;
+
+  if not found
+     or v_parent_profile.account_side <> 'parent'
+     or v_parent_profile.onboarding_complete is not true then
+    raise exception 'completed parent or trusted-adult profile required' using errcode = '42501';
   end if;
 
   if p_invite_code is null
@@ -253,7 +269,7 @@ grant execute on function public.revoke_parent_link(uuid) to authenticated, serv
 comment on function public.create_parent_link_invite() is
   'Creates teen-controlled relationship consent without changing teen verification authority.';
 comment on function public.redeem_parent_link_invite(text) is
-  'Redeems teen-issued relationship consent and mirrors parent_link_state only; it does not grant VERIFIED_TEEN.';
+  'Redeems teen-issued relationship consent for a completed Parent-side account; it mirrors parent_link_state only and does not grant VERIFIED_TEEN or guardian authority.';
 comment on function public.revoke_parent_link(uuid) is
   'Revokes relationship consent and mirrors parent_link_state only; teen verification remains independent.';
 
