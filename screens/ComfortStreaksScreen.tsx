@@ -8,8 +8,8 @@
 // comfort tool. No fire emoji. No "don't break it" pressure.
 //
 // Voice:
-//   • Rylane: "respect, you kept showing up · the streak is the work"
-//   • Raylene: "look at you, soft and consistent 💜 · cozy on cozy"
+//   • Sy: "respect, you kept showing up · the streak is the work"
+//   • Suhana: "look at you, soft and consistent 💜 · cozy on cozy"
 //
 // Pulls from comfortSessions[] — every time trackActivity() fires we log a
 // session. We compute current streak, longest streak, by-type tallies, and
@@ -231,7 +231,7 @@ export function ComfortStreaksScreen({
             ]}
           >
             <Text style={[styles.pillText, { color: softAccent }]}>
-              {isRylane ? '\u{1F9CD} rylane is here' : '☁\uFE0F raylene is here'}
+              {isRylane ? '\u{1F9CD} sy is here' : '☁\uFE0F suhana is here'}
             </Text>
           </Animated.View>
 
@@ -352,7 +352,7 @@ export function ComfortStreaksScreen({
         <Animated.View style={[styles.sticky, enter(noteAnim)]}>
           <Text style={styles.stickyText}>{stickyAffirmation}</Text>
           <Text style={styles.stickySig}>
-            {isRylane ? '— rylane' : '— raylene'}
+            {isRylane ? '— sy' : '— suhana'}
           </Text>
         </Animated.View>
 
