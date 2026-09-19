@@ -5,7 +5,7 @@ import { readFile } from 'node:fs/promises';
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('D7 retention is anchored to each user first session and a complete D6-D8 window', async () => {
-  const migration = await read('supabase/migrations/20260917225500_fix_d7_retention_first_session.sql');
+  const migration = await read('supabase/migrations/20260919191500_fix_d7_retention_first_session.sql');
 
   assert.match(migration, /min\(created_at::date\) as first_day/i);
   assert.match(migration, /where event_type = 'session_start'[\s\S]*user_id is not null/i);
@@ -30,7 +30,7 @@ test('retention event source uses authenticated account identity and server time
 
 test('D7 and WAU analytics remain service-only instead of becoming teen-facing surveillance data', async () => {
   const foundation = await read('supabase/migrations/20260705_app_events.sql');
-  const correction = await read('supabase/migrations/20260917225500_fix_d7_retention_first_session.sql');
+  const correction = await read('supabase/migrations/20260919191500_fix_d7_retention_first_session.sql');
 
   assert.match(foundation, /revoke all on public\.v_d7_retention from public, anon, authenticated/i);
   assert.match(foundation, /grant select on public\.v_wau_trend to service_role/i);
