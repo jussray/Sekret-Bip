@@ -3,8 +3,8 @@
 -- This migration defines storage and access boundaries only. It does NOT wire
 -- memory into live companion prompts and does not activate L4 goals/reflection.
 -- Memory remains untrusted user-owned data and never creates model authority.
-
-create extension if not exists vector;
+-- Phase 1 intentionally omits embeddings/vector indexes; semantic retrieval is
+-- a later gate and must owner-filter before ranking.
 
 create table if not exists public.agent_memories (
   id                         uuid primary key default gen_random_uuid(),
@@ -28,7 +28,6 @@ create table if not exists public.agent_memories (
   expires_at                 timestamptz,
   retention_reason           text,
   supersedes_id              uuid references public.agent_memories(id) on delete set null,
-  embedding                  vector(1536),
   created_at                 timestamptz not null default now(),
   updated_at                 timestamptz not null default now(),
   constraint agent_memories_scope_companion_ck check (
