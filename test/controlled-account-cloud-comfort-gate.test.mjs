@@ -64,10 +64,12 @@ test('controlled-account live proof requires masked repository secrets and never
 
   for (const spec of [cloudSpec, continuitySpec]) {
     const receiptStart = spec.lastIndexOf('writeReceipt({');
-    const receiptEnd = spec.indexOf('\n  });', receiptStart);
+    const receiptEnd = spec.indexOf('\n    });', receiptStart) >= 0
+      ? spec.indexOf('\n    });', receiptStart)
+      : spec.indexOf('\n  });', receiptStart);
     assert.ok(receiptStart >= 0 && receiptEnd > receiptStart);
     const receiptPayload = spec.slice(receiptStart, receiptEnd);
-    assert.doesNotMatch(receiptPayload, /controlledEmail|controlledPassword/);
+    assert.doesNotMatch(receiptPayload, /controlledEmail|controlledPassword|accessToken|userId/);
   }
 });
 
@@ -94,15 +96,27 @@ test('Cloud proof remains explicitly synthetic and cannot be mistaken for provid
   assert.match(cloudSpec, /privateUserContentUsed: false/);
 });
 
-test('continuity proof exercises real logout, relogin, cache clearing, and durable account reads', () => {
+test('continuity proof exercises real logout, relogin, durable recovery, and cleanup', () => {
   assert.match(continuitySpec, /page\.goto\('\/logout'\)/);
   assert.match(continuitySpec, /localStorage\.setItem\('entries'/);
   assert.match(continuitySpec, /localStorage\.getItem\(key\) === null/);
-  assert.match(continuitySpec, /\/rest\/v1\//);
-  assert.match(continuitySpec, /durableAccountReadsAfterRelogin/);
+  assert.match(continuitySpec, /\/rest\/v1\/journal_entries\?on_conflict=user_id,id/);
+  assert.match(continuitySpec, /method: 'DELETE'/);
+  assert.match(continuitySpec, /durableJournalReadAfterRelogin: 'passed'/);
+  assert.match(continuitySpec, /durableFixtureRecoveredAfterRelogin: 'passed'/);
+  assert.match(continuitySpec, /providerFixtureDeleted: 'passed'/);
   assert.match(continuitySpec, /privateResponseBodiesCaptured: false/);
-  assert.match(continuitySpec, /syntheticSentinelOnly: true/);
+  assert.match(continuitySpec, /authTokensWrittenToReceipt: false/);
+  assert.match(continuitySpec, /userIdsWrittenToReceipt: false/);
+  assert.match(continuitySpec, /syntheticSentinelsOnly: true/);
   assert.doesNotMatch(continuitySpec, /page\.route\(/);
+});
+
+test('continuity fixture uses only the public Supabase key and never a privileged key', () => {
+  assert.match(continuitySpec, /EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  assert.match(continuitySpec, /EXPO_PUBLIC_SUPABASE_ANON_KEY/);
+  assert.match(continuitySpec, /not\.toMatch\(\/\^sb_secret_\//);
+  assert.doesNotMatch(continuitySpec, /SUPABASE_SERVICE_ROLE_KEY|sb_secret_/);
 });
 
 test('Comfort proof checks authenticated controls without emitting completion', () => {
