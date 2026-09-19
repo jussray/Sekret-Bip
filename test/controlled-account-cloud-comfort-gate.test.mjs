@@ -116,7 +116,7 @@ test('continuity fixture uses only the public Supabase key and never a privilege
   assert.match(continuitySpec, /EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
   assert.match(continuitySpec, /EXPO_PUBLIC_SUPABASE_ANON_KEY/);
   assert.match(continuitySpec, /not\.toMatch\(\/\^sb_secret_\//);
-  assert.doesNotMatch(continuitySpec, /SUPABASE_SERVICE_ROLE_KEY|sb_secret_/);
+  assert.doesNotMatch(continuitySpec, /SUPABASE_SERVICE_ROLE_KEY/);
 });
 
 test('Comfort proof checks authenticated controls without emitting completion', () => {
