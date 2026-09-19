@@ -67,7 +67,7 @@ test('Teen verification has separate explicit age-assurance authority', () => {
   assert.match(teenAssuranceService, /rpc\('confirm_linked_teen_age_assurance'/);
   assert.match(teenAssuranceService, /rpc\('confirm_own_self_declared_adult_teen_age_assurance'/);
   assert.match(parentTeenVerificationScreen, /Confirm age\.\{`\\n`\}Not access\./);
-  assert.match(parentTeenVerificationScreen, /does not.*gain.*private account access|without gaining private account access/is);
+  assert.match(parentTeenVerificationScreen, /does not grant you private account access/i);
   assert.match(parentTeenVerificationScreen, /Confirm Teen age assurance/);
 
   assert.match(teenParentLinkScreen, /TRUSTED CONNECTION/);
