@@ -167,7 +167,9 @@ export function BridgeScreen({
         if (active) unsub = fn;
         else fn();
       } catch {
-        // Initial read remains authoritative. Realtime is supplementary.
+        // The initial read remains authoritative. Do not serialize provider error
+        // details, but preserve truthful evidence that supplementary realtime failed.
+        console.warn('[Bridge] realtime parent-note refresh unavailable; pull refresh remains authoritative.');
       }
     })().catch(() => {
       if (!active) return;
@@ -335,7 +337,9 @@ export function BridgeScreen({
 
       // This is only a local continuity hint. The bridge_shares row above is
       // the authority that proves the note actually entered the linked Bridge.
-      await AsyncStorage.setItem('parent_bridge_pending', 'true').catch(() => {});
+      await AsyncStorage.setItem('parent_bridge_pending', 'true').catch(() => {
+        console.warn('[Bridge] local continuity hint could not be stored; durable Bridge delivery remains authoritative.');
+      });
 
       const signalResult = await sendBridgeSignal({ shareType, convMode, charKey });
       if (!signalResult.ok) {
