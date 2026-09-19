@@ -52,7 +52,7 @@ test('owner forget path is permanent-account scoped and cannot delete another us
   assert.match(migration, /revoke all on function public\.delete_own_agent_memory\(uuid\) from anon/);
 });
 
-test('retrieval revalidates owner, consent, lifecycle, expiry, integrity and instruction-shaped content', () => {
+test('retrieval revalidates owner, consent, lifecycle, expiry, integrity marker shape and instruction-shaped content', () => {
   for (const token of [
     'memory.userId !== input.userId',
     'memory.consentVersion !== input.consentVersion',
@@ -64,6 +64,13 @@ test('retrieval revalidates owner, consent, lifecycle, expiry, integrity and ins
   ]) {
     assert.match(service, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
+  assert.match(service, /Phase 1 validates only that a non-secret fingerprint marker is present/);
+  assert.match(service, /Production activation must add trusted-runtime recomputation/);
+});
+
+test('restricted memory is excluded and sensitive recall requires explicit confirmation', () => {
+  assert.match(service, /memory\.sensitivity === 'restricted'/);
+  assert.match(service, /memory\.sensitivity === 'sensitive' && memory\.reviewState !== 'user_confirmed'/);
 });
 
 test('retrieval output remains explicitly non-authoritative untrusted data', () => {
