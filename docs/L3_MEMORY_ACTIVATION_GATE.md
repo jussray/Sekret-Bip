@@ -6,15 +6,15 @@ This document is a release gate, not a claim that durable memory is live.
 
 - `src/contracts/agentMemory.ts`
 - `src/services/ai/agentMemory.ts`
-- `supabase/candidates/20260918234500_agent_memories_l3_contract.sql`
-- `supabase/migrations/20260918234500_agent_memories_l3_contract.sql` — receipt-only, no schema changes
+- `supabase/migrations/20260918234500_agent_memories_l3_contract.sql` — immutable reviewed migration source
+- `supabase/candidates/20260918234500_agent_memories_l3_contract.sql` — non-authoritative pointer only
 - `.agents/skills/bip-l4-memory/SKILL.md`
 
-The Supabase GitHub integration evaluates canonical migration files after merge. Until this gate is satisfied, schema-changing L3 SQL must remain outside `supabase/migrations`. The canonical `20260918234500` file is permanently receipt-only; future production activation must use a new migration version after approval.
+The canonical migration entered repository history in PR #1100 and is therefore immutable. It must not be rewritten, retimestamped, copied under a new timestamp, or replaced with a receipt. Production application remains separately gated by the repository's manual exact-current-main Supabase workflow and canonical project authority. A GitHub Supabase app surface that identifies a different/unstable project cannot authorize canonical production mutation.
 
 ## Required before production activation
 
-1. Exact candidate SQL replays after the canonical migration set on a fresh ephemeral Supabase database.
+1. Exact canonical migration replays on a fresh Supabase preview database.
 2. Anonymous-authenticated users see zero `agent_memories` rows and cannot call the owner-delete RPC successfully.
 3. User A cannot select or delete User B memory.
 4. Direct authenticated insert/update/delete remain denied.
@@ -29,7 +29,7 @@ The Supabase GitHub integration evaluates canonical migration files after merge.
 13. The two custom-auth Edge Functions retain live negative-auth proof.
 14. Supabase leaked-password protection is enabled and re-observed green.
 15. Exact-production `app.sekretbip.net` authority is restored before any UI/runtime L3 claim.
-16. A new activation migration is reviewed at an exact candidate head; do not mutate the already-integrated receipt into schema SQL.
+16. Production apply targets canonical project `tbsevonvegdnlyjgplmm` from exact current `main` through the guarded manual workflow; foreign/unstable Supabase app checks cannot substitute.
 
 ## Launch flag rule
 
@@ -38,4 +38,4 @@ A launch-enabling flag may turn true only when its named prerequisites above hav
 
 ## Rollback
 
-Before activation, rollback is candidate-code disable/revert only because production has no L3 schema. After a future reviewed activation, disable memory retrieval first, then revert using a new migration/release receipt. Never rewrite an applied migration or preserve a false green status after rollback.
+Before production activation, rollback is code/runtime disable or PR revert because canonical production still has no L3 schema. After a future reviewed production apply, disable memory retrieval first, then use a new reviewed migration/release receipt for any schema reversal. Never rewrite an applied migration or preserve a false green status after rollback.
