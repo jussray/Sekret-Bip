@@ -10,6 +10,9 @@ import {
 
 const registry = JSON.parse(fs.readFileSync('config/supabase-targets.json', 'utf8'));
 const canonical = registry.targets['sekret-bip-production'];
+const schemaVerifier = fs.readFileSync('scripts/verify-supabase-production-schema.mjs', 'utf8');
+const advisorIngest = fs.readFileSync('scripts/control-room-ingest-supabase-advisors.mjs', 'utf8');
+const authEmail = fs.readFileSync('scripts/configure-supabase-auth-email.mjs', 'utf8');
 
 function response(status, payload) {
   return {
@@ -123,4 +126,31 @@ test('static marker is explicitly non-authorizing and unverified', async () => {
   assert.equal(marker.browserCookie, false);
   assert.equal(marker.identity.organizationFingerprint, null);
   assert.equal(marker.identity.projectName, null);
+});
+
+test('production schema CLI verifies target identity before querying schema and carries it into evidence', () => {
+  const mainStart = schemaVerifier.indexOf('async function main()');
+  const mainBlock = schemaVerifier.slice(mainStart);
+  const resolveIndex = mainBlock.indexOf('await resolveSupabaseTarget()');
+  const verifyIdentityIndex = mainBlock.indexOf('await verifySupabaseManagementIdentity');
+  const schemaIndex = mainBlock.indexOf('await verifySupabaseProductionSchema');
+  assert.ok(resolveIndex >= 0 && verifyIdentityIndex > resolveIndex && schemaIndex > verifyIdentityIndex);
+  assert.match(schemaVerifier, /supabaseIdentity: options\.supabaseIdentity \?\? null/);
+  assert.match(schemaVerifier, /schemaVersion: 3/);
+});
+
+test('advisor ingestion refuses writes until the target is provider-verified and does not echo provider bodies in errors', () => {
+  assert.match(advisorIngest, /verifySupabaseManagementIdentity/);
+  assert.match(advisorIngest, /supabaseIdentity\?\.providerVerified/);
+  assert.match(advisorIngest, /supabase_identity_fingerprint/);
+  assert.doesNotMatch(advisorIngest, /body\.slice\(/);
+  assert.doesNotMatch(advisorIngest, /text\.slice\(/);
+});
+
+test('auth email mutation verifies Supabase target before reading or patching Auth config', () => {
+  const verifyIndex = authEmail.indexOf('await verifySupabaseManagementIdentity');
+  const beforeRead = authEmail.indexOf('const before = await request');
+  const patch = authEmail.indexOf("await request(projectRef, accessToken, { method: 'PATCH'");
+  assert.ok(verifyIndex >= 0 && beforeRead > verifyIndex && patch > verifyIndex);
+  assert.match(authEmail, /supabaseIdentity,/);
 });
