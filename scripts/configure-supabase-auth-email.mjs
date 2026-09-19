@@ -1,6 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  buildStaticSupabaseIdentityMarker,
+  resolveSupabaseTarget,
+  verifySupabaseManagementIdentity,
+} from './supabase-target-identity.mjs';
+
 const API_BASE = 'https://api.supabase.com/v1';
 const RESEND_API_BASE = 'https://api.resend.com';
 
@@ -134,13 +140,15 @@ async function writeReceipt(receipt) {
 
 async function main() {
   const apply = process.argv.includes('--apply');
-  const projectRef = env('SUPABASE_PROJECT_REF', 'tbsevonvegdnlyjgplmm');
+  const target = await resolveSupabaseTarget();
+  const projectRef = target.projectRef;
   const desiredPublic = desiredConfig({ smtpPass: '[redacted]' });
 
   if (!apply) {
     const receipt = {
       mode: 'plan',
       projectRef,
+      supabaseIdentity: buildStaticSupabaseIdentityMarker(target),
       provider: 'resend-smtp',
       desired: redact(desiredPublic),
       confirmationRequired: true,
@@ -158,6 +166,7 @@ async function main() {
   const accessToken = required('SUPABASE_ACCESS_TOKEN');
   const smtpPass = required('RESEND_API_KEY');
   const desired = desiredConfig({ smtpPass });
+  const supabaseIdentity = await verifySupabaseManagementIdentity({ target, accessToken });
   const resendDomain = await assertResendDomainVerified(smtpPass, desired.smtp_admin_email);
 
   const before = await request(projectRef, accessToken);
@@ -168,6 +177,7 @@ async function main() {
   const receipt = {
     mode: 'apply',
     projectRef,
+    supabaseIdentity,
     provider: 'resend-smtp',
     confirmationRequired: true,
     productionMutation: true,
