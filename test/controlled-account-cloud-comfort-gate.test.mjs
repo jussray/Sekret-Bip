@@ -76,11 +76,12 @@ test('controlled-account live proof requires masked repository secrets and never
   }
 });
 
-test('controlled-account browser proof disables sensitive capture surfaces', () => {
+test('controlled-account browser proof disables sensitive capture surfaces while retaining skip receipts', () => {
   assert.match(config, /trace: 'off'/);
   assert.match(config, /screenshot: 'off'/);
   assert.match(config, /video: 'off'/);
-  assert.match(config, /reporter: 'line'/);
+  assert.match(config, /reporter: \[\['line'\], \[controlRoomSkipReporter\]\]/);
+  assert.match(config, /control-room-playwright-skip-reporter\.mjs/);
   assert.match(config, /workers: 1/);
   assert.match(config, /retries: 0/);
   assert.match(config, /controlled-account-cloud-comfort\.spec\.ts/);
