@@ -156,7 +156,11 @@ async function main() {
   };
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  console.log(`SUPABASE_ADVISOR_REPORT_COMPLETE findings=${report.finding_count} ingested=${ingestedCount} errors=${errors.length}`);
+
+  // Log only the repository-owned target label, never provider response material.
+  // In report-only mode no provider identity is resolved, so make that state explicit.
+  const targetLabel = target?.name || 'report-only';
+  console.log(`SUPABASE_ADVISOR_REPORT target=${targetLabel} findings=${report.finding_count} ingested=${ingestedCount} errors=${errors.length}`);
   if (errors.length) process.exitCode = 1;
 }
 
