@@ -45,6 +45,48 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function gitText(args) {
+  const result = spawnSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    shell: false,
+  });
+  return result.status === 0 ? String(result.stdout || '').trim() : null;
+}
+
+function repositoryFromRemote(remote) {
+  if (!remote) return null;
+  const value = String(remote).trim().replace(/\.git$/, '');
+  const https = value.match(/^https?:\/\/github\.com\/([^/]+\/[^/]+)$/i);
+  if (https) return https[1];
+  const scp = value.match(/^git@github\.com:([^/]+\/[^/]+)$/i);
+  if (scp) return scp[1];
+  const ssh = value.match(/^ssh:\/\/git@github\.com\/([^/]+\/[^/]+)$/i);
+  return ssh ? ssh[1] : null;
+}
+
+function gitIdentity() {
+  const headSha = gitText(['rev-parse', 'HEAD']);
+  const branch = gitText(['rev-parse', '--abbrev-ref', 'HEAD']);
+  const status = gitText(['status', '--porcelain=v1', '--untracked-files=all']);
+  const repository = repositoryFromRemote(gitText(['config', '--get', 'remote.origin.url']))
+    || process.env.GITHUB_REPOSITORY
+    || null;
+  const clean = status !== null && status.length === 0;
+  const validHead = typeof headSha === 'string' && /^[0-9a-f]{40}$/i.test(headSha);
+  const validRepository = typeof repository === 'string' && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository);
+  const dirtyEntryCount = status ? status.split('\n').filter(Boolean).length : status === '' ? 0 : null;
+
+  return {
+    repository: validRepository ? repository : null,
+    branch: branch || null,
+    head_sha: validHead ? headSha.toLowerCase() : null,
+    clean,
+    dirty_entry_count: dirtyEntryCount,
+    correlatable: Boolean(validRepository && validHead && clean),
+  };
+}
+
 function classifyStatus(check, exitCode, stdout, stderr) {
   const combined = `${stdout}\n${stderr}`;
   if (exitCode === 0 && combined.includes(TEST_SKIP_MARKER)) return 'warning';
@@ -106,7 +148,7 @@ function summarize(results) {
   };
 }
 
-function writeReports(results, summary) {
+function writeReports(results, summary, sourceIdentity) {
   fs.mkdirSync(reportDir, { recursive: true });
 
   const report = {
@@ -114,6 +156,7 @@ function writeReports(results, summary) {
     mode: 'local-control-room',
     purpose: 'Free local verification when GitHub Actions minutes are unavailable.',
     registry: path.relative(root, registryPath),
+    git: sourceIdentity,
     summary,
     checks: results,
     guardrails: [
@@ -122,6 +165,8 @@ function writeReports(results, summary) {
       'Do not run fixture audits on real teen private content.',
       'Use GitHub Actions only as a release/PR backup while minutes are constrained.',
       'Skipped tests are warning evidence, never silent green proof.',
+      'Only a clean local worktree with an exact repository and HEAD may correlate to a GitHub failure incident.',
+      'Dirty local work remains local evidence and cannot impersonate exact-head GitHub proof.',
     ],
   };
 
@@ -131,6 +176,9 @@ function writeReports(results, summary) {
   lines.push('# Bip Control Room — local report');
   lines.push('');
   lines.push(`Generated: ${report.generatedAt}`);
+  lines.push(`Repository: ${sourceIdentity.repository || 'unknown'}`);
+  lines.push(`HEAD: ${sourceIdentity.head_sha || 'unknown'}`);
+  lines.push(`Worktree: ${sourceIdentity.clean ? 'clean' : 'dirty or unavailable'} · cross-source correlation: ${sourceIdentity.correlatable ? 'eligible' : 'blocked'}`);
   lines.push('');
   lines.push(`Status: **${summary.status.toUpperCase()}**`);
   lines.push(`Score: **${summary.score}%**`);
@@ -205,6 +253,7 @@ function writeReports(results, summary) {
 console.log('Bip Control Room: running local verification...');
 console.log('GitHub Actions minutes are not required for this command.');
 
+const sourceIdentity = gitIdentity();
 const results = [];
 for (const check of checks) {
   process.stdout.write(`- ${check.label}... `);
@@ -214,7 +263,7 @@ for (const check of checks) {
 }
 
 const summary = summarize(results);
-writeReports(results, summary);
+writeReports(results, summary, sourceIdentity);
 
 console.log('');
 console.log(`Control Room status: ${summary.status.toUpperCase()}`);
