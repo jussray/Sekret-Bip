@@ -247,6 +247,7 @@ function containsCredentialShapedContent(value) {
   const serialized = JSON.stringify(value);
   return serialized.includes('ghp_')
     || serialized.includes('github_pat_')
+    || serialized.includes('SUPABASE_SECRET_KEY')
     || serialized.includes('SUPABASE_SERVICE_ROLE_KEY')
     || serialized.includes('AKIA')
     || /\bsk-[A-Za-z0-9_-]{16,}/.test(serialized)
