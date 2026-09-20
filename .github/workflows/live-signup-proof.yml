@@ -8,13 +8,25 @@ on:
       - 'playwright.live-onboarding.config.ts'
       - 'scripts/playwright-executable.mjs'
       - 'e2e/live-onboarding-email.spec.ts'
+      - 'e2e/live-family-authority.spec.ts'
       - 'app/(auth)/signup.tsx'
+      - 'app/(auth)/parent-link-verify.tsx'
+      - 'app/(onboarding)/parent-link.tsx'
+      - 'app/(parent)/teen-verification.tsx'
+      - 'app/(parent)/bip-jr.tsx'
+      - 'screens/BridgeScreen.tsx'
+      - 'components/bridge/ParentBridgeResponseRequestCard.tsx'
+      - 'src/utils/parentBridgeCompat.ts'
       - 'src/context/VerificationContext.tsx'
       - 'src/services/verificationState.ts'
       - 'supabase/migrations/20260919190000_auth_signup_onboarding_baseline.sql'
+      - 'supabase/migrations/20260919190500_parent_link_relationship_only.sql'
+      - 'supabase/migrations/20260919190800_teen_age_assurance_authority.sql'
+      - 'supabase/migrations/20260919191000_bip_jr_managed_child_profiles.sql'
       - 'scripts/live-signup-mailbox.mjs'
       - 'test/live-onboarding-email-gate.test.mjs'
       - 'test/family-account-authority.test.mjs'
+      - 'test/humane-retention-loops.test.mjs'
   workflow_dispatch:
     inputs:
       target_sha:
@@ -27,6 +39,11 @@ on:
         type: string
       confirm_live_write:
         description: 'Allow one disposable signup/email confirmation transaction'
+        required: true
+        default: false
+        type: boolean
+      confirm_family_authority_write:
+        description: 'After signup, allow the exact-preview family authority journey with the controlled verified guardian'
         required: true
         default: false
         type: boolean
@@ -47,7 +64,7 @@ env:
 jobs:
   live-signup-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Check out exact proof head
@@ -76,6 +93,24 @@ jobs:
           else
             echo 'enabled=false' >> "$GITHUB_OUTPUT"
             echo 'Readiness-only mode: no account or email write will occur.'
+          fi
+
+      - name: Resolve family-authority write authority
+        id: family_opt_in
+        shell: bash
+        env:
+          CONFIRM_LIVE_WRITE: ${{ inputs.confirm_live_write || false }}
+          CONFIRM_FAMILY_AUTHORITY_WRITE: ${{ inputs.confirm_family_authority_write || false }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ] \
+            && [ "$CONFIRM_LIVE_WRITE" = 'true' ] \
+            && [ "$CONFIRM_FAMILY_AUTHORITY_WRITE" = 'true' ]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+            echo 'Family authority live-write proof explicitly enabled for this exact head.'
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Family authority proof disabled; no relationship, Bridge, verification, or Bip Jr write will occur.'
           fi
 
       - name: Resolve isolated preview URL
@@ -376,6 +411,21 @@ jobs:
           LIVE_SIGNIN_RETRY_MS: '5000'
         run: npx playwright test --config=playwright.live-onboarding.config.ts
 
+      - name: Prove exact-preview family authority boundaries
+        if: steps.family_opt_in.outputs.enabled == 'true'
+        shell: bash
+        env:
+          LIVE_ONBOARDING_PHASE: family
+          SEKRET_CONTROLLED_GUARDIAN_EMAIL: ${{ secrets.SEKRET_CONTROLLED_GUARDIAN_EMAIL }}
+          SEKRET_CONTROLLED_GUARDIAN_PASSWORD: ${{ secrets.SEKRET_CONTROLLED_GUARDIAN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SEKRET_CONTROLLED_GUARDIAN_EMAIL:-}" ] || [ -z "${SEKRET_CONTROLLED_GUARDIAN_PASSWORD:-}" ]; then
+            echo 'CONTROLLED_GUARDIAN_FIXTURE_MISSING' >&2
+            exit 78
+          fi
+          npx playwright test e2e/live-family-authority.spec.ts --config=playwright.live-onboarding.config.ts
+
       - name: Remove disposable mailbox
         if: always() && steps.opt_in.outputs.enabled == 'true'
         run: node scripts/live-signup-mailbox.mjs cleanup
@@ -389,6 +439,7 @@ jobs:
             artifacts/live-signup-readiness.json
             artifacts/live-signup-proof-account.json
             artifacts/live-signup-confirmation.json
+            artifacts/live-family-authority.json
             artifacts/live-signup-mailbox-cleanup.json
             playwright-report-live-onboarding/
             test-results/
