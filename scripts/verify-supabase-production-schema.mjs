@@ -193,6 +193,13 @@ async function failWithEvidence(config, evidence, status, errorCode, error) {
 
 export function classifySupabaseTargetIdentityFailure(error) {
   const message = errorMessage(error);
+  if (message.startsWith('SUPABASE_ACCESS_TOKEN is required')) {
+    return {
+      status: 'configuration-invalid',
+      errorCode: 'missing_supabase_access_token',
+      detail: 'SUPABASE_ACCESS_TOKEN is required for live Supabase target verification.',
+    };
+  }
   if (message === 'SUPABASE_TARGET_VERIFY_HTTP_401') {
     return {
       status: 'provider-auth-failed',
