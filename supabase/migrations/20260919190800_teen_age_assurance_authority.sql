@@ -123,10 +123,10 @@ begin
     raise exception 'guardian confirmation is only for completed minor teen profiles' using errcode = '42501';
   end if;
 
-  update public.teen_age_assurance_receipts
+  update public.teen_age_assurance_receipts as assurance
   set superseded_at = now()
-  where teen_user_id = p_teen_user_id
-    and superseded_at is null;
+  where assurance.teen_user_id = p_teen_user_id
+    and assurance.superseded_at is null;
 
   insert into public.teen_age_assurance_receipts (
     teen_user_id,
@@ -195,10 +195,10 @@ begin
     raise exception 'self-declared adult teen assurance requires a completed 18-19 teen profile' using errcode = '42501';
   end if;
 
-  update public.teen_age_assurance_receipts
+  update public.teen_age_assurance_receipts as assurance
   set superseded_at = now()
-  where teen_user_id = v_teen_id
-    and superseded_at is null;
+  where assurance.teen_user_id = v_teen_id
+    and assurance.superseded_at is null;
 
   insert into public.teen_age_assurance_receipts (
     teen_user_id,
