@@ -126,27 +126,25 @@ test('trigger_safety_scan does not regress the historical dynamic-field-access b
   assert.doesNotMatch(fn, /NEW\.user_id\b/);
 });
 
-// KNOWN GAP, tracked not hidden. auto_resolve_issue_on_event_resolve is
-// SECURITY DEFINER but currently has no effective search_path pin. Existing
-// deployed migrations should not be edited after deployment; when the gap is
-// repaired, a follow-up migration may use ALTER FUNCTION ... SET search_path or
-// a replacement function definition. This test reads the full migration corpus
-// so the future effective configuration is what matters, not only the original
-// historical definition.
-test(
-  'auto_resolve_issue_on_event_resolve pins search_path (SECURITY DEFINER)',
-  { todo: 'known gap — SECURITY DEFINER without effective search_path pin, see SPRINT.md "SECURITY DEFINER trigger assurance"' },
-  async () => {
-    const source = await read('supabase/migrations/20260701_control_room_normalization.sql');
-    const corpus = await readMigrationCorpus();
-    const fn = source.match(/create or replace function public\.auto_resolve_issue_on_event_resolve\(\)[\s\S]*?\$\$;/)?.[0];
-    assert.ok(fn, 'expected auto_resolve_issue_on_event_resolve() definition');
+// The historical definition omitted hardening, but the repository now carries
+// a follow-up migration that pins search_path and revokes direct client EXECUTE.
+// Keep this as an ordinary regression gate rather than a TODO so a future
+// removal or weakening fails CI instead of looking like an accepted gap.
+test('auto_resolve_issue_on_event_resolve is effectively pinned and not directly callable', async () => {
+  const source = await read('supabase/migrations/20260701_control_room_normalization.sql');
+  const corpus = await readMigrationCorpus();
+  const fn = source.match(/create or replace function public\.auto_resolve_issue_on_event_resolve\(\)[\s\S]*?\$\$;/)?.[0];
+  assert.ok(fn, 'expected auto_resolve_issue_on_event_resolve() definition');
 
-    assert.match(fn, /security definer/);
-    assert.match(
-      `${fn}\n${corpus}`,
-      /(set search_path = public|alter function public\.auto_resolve_issue_on_event_resolve\(\)\s+set search_path\s*=\s*(public|pg_catalog, pg_temp))/i,
-      'SECURITY DEFINER trigger functions must have an effective search_path pin — see SPRINT.md',
-    );
-  },
-);
+  assert.match(fn, /security definer/);
+  assert.match(
+    `${fn}\n${corpus}`,
+    /(set search_path = public|alter function public\.auto_resolve_issue_on_event_resolve\(\)\s+set search_path\s*=\s*(public|pg_catalog, pg_temp))/i,
+    'SECURITY DEFINER trigger functions must have an effective search_path pin — see SPRINT.md',
+  );
+  assert.match(
+    corpus,
+    /revoke all on function public\.auto_resolve_issue_on_event_resolve\(\) from public, anon, authenticated/i,
+    'SECURITY DEFINER trigger functions must not remain directly executable by client roles',
+  );
+});
