@@ -64,21 +64,23 @@ test('generic HTTP operation ids are stable and bounded without colliding with t
   assert.match(stableHttpOperationId('GET', '/'), /^get:root$/);
 });
 
-test('generic repo-operation gate can guard any stable scope and operation id', () => {
+test('generic repo-operation gate can guard any stable scope and operation id without logging gate state', () => {
   const script = new URL('../scripts/founder-operation-gate.mjs', import.meta.url);
   const allowed = spawnSync(process.execPath, [script.pathname, 'provider', 'supabase:migrations'], {
     encoding: 'utf8',
     env: { ...process.env, FOUNDER_OPERATION_KILL_SWITCH: 'off' },
   });
   assert.equal(allowed.status, 0);
-  assert.match(allowed.stdout, /FOUNDER_OPERATION_ALLOWED/);
+  assert.equal(allowed.stdout, '');
+  assert.doesNotMatch(allowed.stderr, /FOUNDER_OPERATION_(?:ALLOWED|PAUSED)/);
 
   const blocked = spawnSync(process.execPath, [script.pathname, 'provider', 'supabase:migrations'], {
     encoding: 'utf8',
     env: { ...process.env, FOUNDER_OPERATION_KILL_SWITCH: 'op:supabase:migrations' },
   });
   assert.equal(blocked.status, 75);
-  assert.match(blocked.stderr, /FOUNDER_OPERATION_PAUSED/);
+  assert.equal(blocked.stdout, '');
+  assert.doesNotMatch(blocked.stderr, /FOUNDER_OPERATION_(?:ALLOWED|PAUSED)/);
 });
 
 test('production worker keeps canonical voice-entry and enforces founder guard there', () => {
