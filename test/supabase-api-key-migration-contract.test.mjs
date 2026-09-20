@@ -24,6 +24,19 @@ const privilegedFunctions = [
   'supabase/functions/send-push/index.ts',
 ].map(read);
 
+const privilegedServerFiles = [
+  'scripts/reconcile.ts',
+  'scripts/control-room-record-release.mjs',
+  'scripts/sweep-account-deletions.mjs',
+  'scripts/control-room-ingest-scans.mjs',
+  'scripts/control-room-ingest-worker-logs.mjs',
+  'scripts/control-room-ingest-supabase-advisors.mjs',
+  'scripts/control-room-ingest-local-report.mjs',
+  'scripts/control-room-ingest-github-failures.mjs',
+  'scripts/control-room-ingest-github-test-skips.mjs',
+  'worker/audit/persist-event.ts',
+].map((path) => ({ path, source: read(path) }));
+
 test('Edge Function key resolver prefers modern named dictionaries before legacy fallbacks', () => {
   assert.match(helper, /SUPABASE_PUBLISHABLE_KEYS/);
   assert.match(helper, /SUPABASE_SECRET_KEYS/);
@@ -49,6 +62,16 @@ test('privileged Edge Functions consume the shared secret-key resolver', () => {
   for (const source of privilegedFunctions) {
     assert.match(source, /getSupabaseSecretKey/);
     assert.doesNotMatch(source, /Deno\.env\.get\(['\"]SUPABASE_SERVICE_ROLE_KEY['\"]\)/);
+  }
+});
+
+test('privileged server and Worker consumers prefer the modern singular secret key', () => {
+  for (const { path, source } of privilegedServerFiles) {
+    const modern = source.indexOf('SUPABASE_SECRET_KEY');
+    const legacy = source.indexOf('SUPABASE_SERVICE_ROLE_KEY');
+    assert.ok(modern >= 0, `${path} must accept SUPABASE_SECRET_KEY`);
+    assert.ok(legacy >= 0, `${path} must retain the temporary rollback fallback during migration`);
+    assert.ok(modern < legacy, `${path} must prefer SUPABASE_SECRET_KEY before the legacy fallback`);
   }
 });
 
