@@ -10,6 +10,11 @@ const reportDir = path.join(root, 'reports', 'control-room');
 const jsonPath = path.join(reportDir, 'latest.json');
 const mdPath = path.join(reportDir, 'latest.md');
 const TEST_SKIP_MARKER = 'CONTROL_ROOM_TEST_SKIP_RECEIPT ';
+const SELF_GENERATED_LOCAL_REPORTS = new Set([
+  'reports/control-room/latest.json',
+  'reports/control-room/latest.md',
+  'reports/control-room/test-skips-latest.json',
+]);
 const SECRET_ENV_NAME = /(?:TOKEN|SECRET|PASSWORD|PASSCODE|PRIVATE|API[_-]?KEY|SERVICE[_-]?ROLE|AUTH)/i;
 const secretValues = Object.entries(process.env)
   .filter(([name, value]) => SECRET_ENV_NAME.test(name) && typeof value === 'string' && value.length >= 8)
@@ -83,6 +88,20 @@ function repositoryFromRemote(remote) {
   return ssh ? ssh[1] : null;
 }
 
+function porcelainPath(line) {
+  const raw = String(line || '').slice(3);
+  const target = raw.includes(' -> ') ? raw.split(' -> ').pop() : raw;
+  if (!target) return '';
+  if (target.startsWith('"') && target.endsWith('"')) {
+    try {
+      return JSON.parse(target);
+    } catch {
+      return target.slice(1, -1);
+    }
+  }
+  return target;
+}
+
 function gitIdentity() {
   const headSha = gitText(['rev-parse', 'HEAD']);
   const branch = gitText(['rev-parse', '--abbrev-ref', 'HEAD']);
@@ -90,17 +109,25 @@ function gitIdentity() {
   const repository = repositoryFromRemote(gitText(['config', '--get', 'remote.origin.url']))
     || process.env.GITHUB_REPOSITORY
     || null;
-  const clean = status !== null && status.length === 0;
+  const statusEntries = status === null ? null : status.split('\n').filter(Boolean);
+  const generatedReportEntries = statusEntries === null
+    ? null
+    : statusEntries.filter((line) => SELF_GENERATED_LOCAL_REPORTS.has(porcelainPath(line)));
+  const sourceDirtyEntries = statusEntries === null
+    ? null
+    : statusEntries.filter((line) => !SELF_GENERATED_LOCAL_REPORTS.has(porcelainPath(line)));
+  const clean = sourceDirtyEntries !== null && sourceDirtyEntries.length === 0;
   const validHead = typeof headSha === 'string' && /^[0-9a-f]{40}$/i.test(headSha);
   const validRepository = typeof repository === 'string' && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository);
-  const dirtyEntryCount = status ? status.split('\n').filter(Boolean).length : status === '' ? 0 : null;
 
   return {
     repository: validRepository ? repository : null,
     branch: branch || null,
     head_sha: validHead ? headSha.toLowerCase() : null,
     clean,
-    dirty_entry_count: dirtyEntryCount,
+    dirty_entry_count: sourceDirtyEntries?.length ?? null,
+    generated_report_dirty_count: generatedReportEntries?.length ?? null,
+    raw_dirty_entry_count: statusEntries?.length ?? null,
     correlatable: Boolean(validRepository && validHead && clean),
   };
 }
@@ -186,8 +213,9 @@ function writeReports(results, summary, sourceIdentity) {
       'Do not run fixture audits on real teen private content.',
       'Use GitHub Actions only as a release/PR backup while minutes are constrained.',
       'Skipped tests are warning evidence, never silent green proof.',
-      'Only a clean local worktree with an exact repository and HEAD may correlate to a GitHub failure incident.',
-      'Dirty local work remains local evidence and cannot impersonate exact-head GitHub proof.',
+      'Only source-clean local work with an exact repository and HEAD may correlate to a GitHub failure incident.',
+      'Only this verifier’s three known generated local receipt paths are excluded from source cleanliness; their dirty count remains visible.',
+      'Any other dirty local path blocks cross-source correlation and cannot impersonate exact-head GitHub proof.',
     ],
   };
 
@@ -199,7 +227,7 @@ function writeReports(results, summary, sourceIdentity) {
   lines.push(`Generated: ${report.generatedAt}`);
   lines.push(`Repository: ${sourceIdentity.repository || 'unknown'}`);
   lines.push(`HEAD: ${sourceIdentity.head_sha || 'unknown'}`);
-  lines.push(`Worktree: ${sourceIdentity.clean ? 'clean' : 'dirty or unavailable'} · cross-source correlation: ${sourceIdentity.correlatable ? 'eligible' : 'blocked'}`);
+  lines.push(`Source worktree: ${sourceIdentity.clean ? 'clean' : 'dirty or unavailable'} · generated receipt dirtiness: ${sourceIdentity.generated_report_dirty_count ?? 'unknown'} · cross-source correlation: ${sourceIdentity.correlatable ? 'eligible' : 'blocked'}`);
   lines.push('');
   lines.push(`Status: **${summary.status.toUpperCase()}**`);
   lines.push(`Score: **${summary.score}%**`);
