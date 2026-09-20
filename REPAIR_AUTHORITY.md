@@ -20,6 +20,16 @@ Any movement in a load-bearing identity expires predecessor authority/proof.
 
 Proof cookies and fingerprints are non-secret evidence markers only. They do not grant authentication, parent authority, teen consent, merge authority, deployment authority, provider authority, or permission to inspect private content.
 
+## Repair OS inheritance
+
+Se'kret Bip uses the portfolio fused repair loop:
+
+`LINDY → RED TEAM I → ATTACK TEN → OODA OBSERVE → OODA ORIENT → OODA DECIDE → L99 AUTHORITY → ACT → RED TEAM II → RECURSIVE HARDENING → VERIFY → LOOP/STOP`.
+
+The loop is subordinate to Se'kret Bip's stricter youth privacy and identity ceiling. Lindy selects the least coupled durable carrier; Red Team I attacks whether the change should exist; ATTACK TEN pressures subject identity, stale proof, privacy assumptions, unsafe fallback, hidden authority widening, and verification gaps; OODA reacquires the exact repo/runtime/provider/role state; L99 validates subject, authority, evidence, consent/privacy boundary, rollback, continuity, and consequence before Act; Red Team II attacks the applied change; recursive hardening pressures authority inversion, evidence falsification, human outcome, and temporal races; verification requires the highest applicable provider and Playwright evidence.
+
+Attack/Lindy/Red Team/OODA/L99 outputs may narrow, revise, or block a repair. They never create parent authority, teen consent, age-assurance state, private-content access, RLS authority, credentials, deployment permission, or merge approval.
+
 ## Source / GitHub repair authority
 
 Trusted repository operators may:
