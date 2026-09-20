@@ -126,6 +126,22 @@ test('bridge_delivery_preferences has only a teen owner policy, no parent policy
   assert.doesNotMatch(summaryContract, /bridge_delivery_preferences_parent/i);
 });
 
+test('active migration enforces permanent-account guards on legacy S2Tell bridge_shares', () => {
+  for (const policy of [
+    'bridge_shares_owner_select',
+    'bridge_shares_owner_insert',
+    'bridge_shares_owner_update',
+    'bridge_shares_owner_delete',
+  ]) {
+    assert.match(permanentBoundary, new RegExp(`alter policy ${policy}`, 'i'));
+  }
+  assert.match(permanentBoundary, /on public\.bridge_shares/i);
+  assert.match(permanentBoundary, /to authenticated/i);
+  assert.match(permanentBoundary, /public\.is_non_anonymous_user\(\)/i);
+  assert.match(permanentBoundary, /auth\.uid\(\) = user_id/i);
+  assert.doesNotMatch(permanentBoundary, /bridge_shares_linked_parent_select/i);
+});
+
 test('active migration enforces permanent-account guards on bridge_signals', () => {
   for (const policy of [
     'bridge_signals: teen read',
@@ -160,4 +176,5 @@ test('permanent-account boundary migration does not reopen raw private parent re
   assert.doesNotMatch(permanentBoundary, /journal_entries/);
   assert.doesNotMatch(permanentBoundary, /mood_history/);
   assert.doesNotMatch(permanentBoundary, /voice_notes/);
+  assert.doesNotMatch(permanentBoundary, /bridge_shares_linked_parent_select/);
 });
