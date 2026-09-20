@@ -84,6 +84,7 @@ jobs:
           DISPATCH_PREVIEW_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_url || '' }}
           PR_NUMBER: ${{ github.event.pull_request.number || '' }}
           GH_TOKEN: ${{ github.token }}
+          CONFIRM_LIVE_WRITE: ${{ inputs.confirm_live_write || false }}
         run: |
           set -euo pipefail
           mkdir -p artifacts
@@ -117,6 +118,9 @@ jobs:
               previewOrigin,
               cloudflareCommentCount,
               providerState,
+              previewIdentityVerified: false,
+              releaseMarkerStatus: null,
+              releaseMarkerEnvironment: null,
               liveWriteAuthorized: process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
                 && process.env.CONFIRM_LIVE_WRITE === 'true',
             }, null, 2)}\n`, 'utf8');
@@ -250,30 +254,84 @@ jobs:
         run: |
           set -euo pipefail
           node <<'NODE'
+          const { readFileSync, writeFileSync } = await import('node:fs');
+          const receiptPath = 'artifacts/live-signup-readiness.json';
           const base = process.env.LIVE_ONBOARDING_BASE_URL;
           const expected = process.env.EXPECTED_HEAD_SHA;
+
+          function updateReceipt(patch) {
+            let existing = {};
+            try {
+              existing = JSON.parse(readFileSync(receiptPath, 'utf8'));
+            } catch {
+              existing = {
+                schemaVersion: 1,
+                scope: 'live-signup-preview-readiness',
+                expectedHeadSha: expected,
+              };
+            }
+            writeFileSync(receiptPath, `${JSON.stringify({
+              ...existing,
+              ...patch,
+              observedAt: new Date().toISOString(),
+            }, null, 2)}\n`, 'utf8');
+          }
+
           const parsedBase = new URL(base);
           if (!parsedBase.hostname.endsWith('.pages.dev') || parsedBase.hostname === 'sekretbip.net') {
+            updateReceipt({
+              state: 'blocked',
+              classification: 'non-isolated-preview-rejected',
+              previewIdentityVerified: false,
+            });
             throw new Error(`Live signup PR proof must target an isolated Pages preview, got ${parsedBase.hostname}`);
           }
+
           const markerUrl = new URL('/.well-known/sekret-release.json', base);
           const deadline = Date.now() + 240_000;
           let last = null;
+          let lastStatus = null;
+          let lastEnvironment = null;
+          let sawReachableMarker = false;
           while (Date.now() < deadline) {
             try {
               const response = await fetch(`${markerUrl}?proof=${Date.now()}`, { cache: 'no-store' });
               const body = response.ok ? await response.json() : null;
-              last = { status: response.status, commitSha: body?.commitSha ?? null, environment: body?.environment ?? null };
+              lastStatus = response.status;
+              lastEnvironment = typeof body?.environment === 'string' ? body.environment : null;
+              sawReachableMarker = true;
+              last = {
+                status: response.status,
+                commitMatchesExpected: body?.commitSha === expected,
+                environment: lastEnvironment,
+              };
               if (response.ok && body?.commitSha === expected && body?.environment === 'preview') {
+                updateReceipt({
+                  state: 'exact-preview-verified',
+                  classification: null,
+                  providerState: 'preview-available',
+                  previewIdentityVerified: true,
+                  releaseMarkerStatus: response.status,
+                  releaseMarkerEnvironment: 'preview',
+                });
                 console.log(`Exact isolated preview verified: ${parsedBase.hostname} @ ${expected}`);
                 process.exit(0);
               }
-            } catch (error) {
-              last = { error: error instanceof Error ? error.message : String(error) };
+            } catch {
+              last = { markerReachable: false };
             }
             await new Promise((resolve) => setTimeout(resolve, 5000));
           }
-          throw new Error(`Exact preview did not reach ${expected}: ${JSON.stringify(last)}`);
+
+          updateReceipt({
+            state: 'blocked',
+            classification: 'exact-preview-identity-unproven',
+            providerState: sawReachableMarker ? 'release-marker-mismatch' : 'release-marker-unreachable',
+            previewIdentityVerified: false,
+            releaseMarkerStatus: lastStatus,
+            releaseMarkerEnvironment: lastEnvironment,
+          });
+          throw new Error(`Exact preview did not reach the requested head: ${JSON.stringify(last)}`);
           NODE
 
       - name: Set up Node
