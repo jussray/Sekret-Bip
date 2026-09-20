@@ -13,6 +13,7 @@ const canonical = registry.targets['sekret-bip-production'];
 const schemaVerifier = fs.readFileSync('scripts/verify-supabase-production-schema.mjs', 'utf8');
 const advisorIngest = fs.readFileSync('scripts/control-room-ingest-supabase-advisors.mjs', 'utf8');
 const authEmail = fs.readFileSync('scripts/configure-supabase-auth-email.mjs', 'utf8');
+const productionGate = fs.readFileSync('.github/workflows/production-gate-contract.yml', 'utf8');
 
 function response(status, payload) {
   return {
@@ -128,7 +129,7 @@ test('static marker is explicitly non-authorizing and unverified', async () => {
   assert.equal(marker.identity.projectName, null);
 });
 
-test('production schema CLI verifies target identity before querying schema and carries it into evidence', () => {
+test('production schema CLI verifies target identity before querying schema and retains preflight failure evidence', () => {
   const mainStart = schemaVerifier.indexOf('async function main()');
   const mainBlock = schemaVerifier.slice(mainStart);
   const resolveIndex = mainBlock.indexOf('await resolveSupabaseTarget()');
@@ -137,14 +138,20 @@ test('production schema CLI verifies target identity before querying schema and 
   assert.ok(resolveIndex >= 0 && verifyIdentityIndex > resolveIndex && schemaIndex > verifyIdentityIndex);
   assert.match(schemaVerifier, /initialEvidence\(config, options\.supabaseIdentity \?\? null\)/);
   assert.match(schemaVerifier, /schemaVersion: 3/);
+  assert.match(schemaVerifier, /retainSupabaseTargetIdentityFailureEvidence/);
+  assert.match(schemaVerifier, /supabase_target_provider_ref_mismatch/);
+  assert.match(schemaVerifier, /SUPABASE_PRODUCTION_SCHEMA_VERIFY_FAILED/);
 });
 
-test('advisor ingestion refuses writes until the target is provider-verified and keeps provider material out of logs', () => {
+test('advisor ingestion refuses writes until the target is provider-verified, fails closed on malformed JSON, and keeps provider material out of logs', () => {
   assert.match(advisorIngest, /verifySupabaseManagementIdentity/);
   assert.match(advisorIngest, /supabaseIdentity\?\.providerVerified/);
   assert.match(advisorIngest, /supabase_identity_fingerprint/);
   assert.doesNotMatch(advisorIngest, /body\.slice\(/);
   assert.doesNotMatch(advisorIngest, /text\.slice\(/);
+  assert.doesNotMatch(advisorIngest, /response\.json\(\)\.catch/);
+  assert.match(advisorIngest, /_JSON_INVALID/);
+  assert.match(advisorIngest, /_SHAPE_INVALID/);
   assert.doesNotMatch(advisorIngest, /console\.log\(JSON\.stringify\(report/);
   assert.match(advisorIngest, /SUPABASE_ADVISOR_REPORT target=/);
   assert.match(advisorIngest, /SUPABASE_ADVISOR_REPORT_FAILED/);
@@ -161,4 +168,15 @@ test('auth email mutation verifies target and emits only bounded log summaries',
   assert.match(authEmail, /AUTH_EMAIL_PROVIDER_PLAN/);
   assert.match(authEmail, /AUTH_EMAIL_PROVIDER_APPLIED/);
   assert.match(authEmail, /AUTH_EMAIL_PROVIDER_FAILED/);
+});
+
+test('identity-only changes trigger and execute the production identity contract gate', () => {
+  for (const filePath of [
+    'config/supabase-targets.json',
+    'scripts/supabase-target-identity.mjs',
+    'test/supabase-target-identity.test.mjs',
+  ]) {
+    assert.match(productionGate, new RegExp(filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  }
+  assert.match(productionGate, /test\/supabase-target-identity\.test\.mjs/);
 });
