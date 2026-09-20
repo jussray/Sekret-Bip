@@ -6,14 +6,19 @@
   "acceptanceCriteria": [
     "The scanner captures exact workflow-run, job, pull-request or main-branch, and head-SHA evidence without mutating source code or workflow state.",
     "Failed jobs with no executed steps or logs are classified as runner_startup_failure or workflow_no_jobs rather than application regressions.",
+    "Each failed GitHub job or step retains its own non-authorizing proof receipt instead of collapsing an entire failed run into one evidence receipt.",
+    "A clean local failure and a GitHub failure may share one source-neutral incident fingerprint only when repository, exact head SHA, and canonical failure key agree; dirty or unidentified local work is never cross-source correlatable.",
+    "Failure proof cookies are source-specific evidence markers with authority=false, merge_authority=false, proof_satisfied=false, browser_cookie=false, and authorizing=false.",
     "Skipped unit and Playwright witnesses emit non-secret exact-head fingerprints and proof cookies with authority=false, remain investigation-required, and cannot satisfy complete proof.",
     "Completed GitHub workflows are inspected for emitted test-skip receipts and skipped jobs even when the workflow conclusion is success.",
     "Local verification reports skipped tests as warning evidence instead of silent green, and opt-in ingestion preserves each skip under its own fingerprint.",
+    "Local verification redacts environment-held secrets and common credential shapes before writing command-output tails; external failure ingestion does not publish raw stdout or stderr.",
     "Scan-only reporting works without Supabase credentials and all credentials remain environment-only and absent from reports."
   ],
   "contractPaths": [
     "batches/481/03-github-failure-routing.md",
-    "docs/CONTROL_ROOM_GITHUB_FAILURES.md"
+    "docs/CONTROL_ROOM_GITHUB_FAILURES.md",
+    "scripts/control-room-failure-identity.cjs"
   ],
   "testPaths": [
     "test/control-room-github-failure-routing.test.mjs",
@@ -22,6 +27,6 @@
   ],
   "verification": {
     "state": "partial",
-    "evidence": "Source contracts cover exact failed-run routing plus local and GitHub skipped-proof observation. Exact-head workflow, real skipped-run rehearsal, full suite, and Playwright remain required before main may move."
+    "evidence": "Source contracts now cover cross-source exact-head incident identity, per-step failure proof receipts, dirty-worktree non-correlation, redacted local reports, exact failed-run routing, and local/GitHub skipped-proof observation. Exact-head workflow, real failed/skipped-run rehearsal, full suite, type/lint, Playwright, artifact inspection, review, and current-main ancestry remain required before merge."
   }
 }
