@@ -68,7 +68,7 @@ test('real CI command names map only to their existing local verification identi
   assert.equal(canonicalFailureKey('Export Expo web bundle'), 'export-expo-web-bundle');
 });
 
-test('dirty local work cannot impersonate exact-head GitHub evidence', () => {
+test('dirty local work cannot impersonate exact-head GitHub evidence or collapse unrelated dirty runs', () => {
   const common = {
     repository: 'jussray/Sekret-Bip',
     headSha: 'b'.repeat(40),
@@ -78,7 +78,13 @@ test('dirty local work cannot impersonate exact-head GitHub evidence', () => {
     ...common,
     correlatable: false,
     source: 'local_control_room',
-    evidence: { worktree: 'dirty', command: 'npm run type-check' },
+    evidence: { report_generated_at: '2026-09-20T20:00:00Z', worktree_clean: false, command: 'npm run type-check', exit_code: 1 },
+  });
+  const differentDirtyLocal = buildFailureIdentity({
+    ...common,
+    correlatable: false,
+    source: 'local_control_room',
+    evidence: { report_generated_at: '2026-09-20T20:01:00Z', worktree_clean: false, command: 'npm run type-check', exit_code: 1 },
   });
   const github = buildFailureIdentity({
     ...common,
@@ -90,6 +96,7 @@ test('dirty local work cannot impersonate exact-head GitHub evidence', () => {
   assert.equal(dirtyLocal.failure_key, 'type-check');
   assert.equal(dirtyLocal.correlatable, false);
   assert.notEqual(dirtyLocal.incident_fingerprint, github.incident_fingerprint);
+  assert.notEqual(dirtyLocal.incident_fingerprint, differentDirtyLocal.incident_fingerprint);
 });
 
 test('incident identity expires when exact head changes', () => {
