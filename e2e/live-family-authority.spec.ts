@@ -106,6 +106,7 @@ test('exact preview preserves permanent identity, Circle pseudonymity, Teen-cont
   );
   expect(guardianProfiles[0]).toMatchObject({ account_side: 'parent', onboarding_complete: true });
   expect(guardianVerification[0]?.verification_state).toBe('VERIFIED_GUARDIAN');
+
   await signIn(page, 'teen', teenEmail, teenPassword);
 
   await page.goto('/age');
