@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getSupabasePublishableKey, getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -48,13 +49,13 @@ Deno.serve(async (request) => {
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
-  const anonKey = Deno.env.get('SUPABASE_ANON_KEY');
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  if (!supabaseUrl || !anonKey || !serviceRoleKey) {
+  const publishableKey = getSupabasePublishableKey();
+  const secretKey = getSupabaseSecretKey();
+  if (!supabaseUrl || !publishableKey || !secretKey) {
     return json({ error: 'Push service is not configured.' }, 503);
   }
 
-  const authClient = createClient(supabaseUrl, anonKey, {
+  const authClient = createClient(supabaseUrl, publishableKey, {
     global: { headers: { Authorization: authorization } },
     auth: { persistSession: false },
   });
@@ -74,7 +75,7 @@ Deno.serve(async (request) => {
   }
   const event = rawEvent as PushEvent;
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
+  const admin = createClient(supabaseUrl, secretKey, {
     auth: { persistSession: false },
   });
 
