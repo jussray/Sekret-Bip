@@ -1,5 +1,5 @@
 name = "sekret-backend"
-main = "worker/founder-guard-entry.ts"
+main = "worker/voice-entry.ts"
 compatibility_date = "2026-06-13"
 compatibility_flags = ["nodejs_compat"]
 logpush = true

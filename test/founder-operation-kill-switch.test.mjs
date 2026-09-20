@@ -59,9 +59,9 @@ test('reason codes cannot leak arbitrary environment text', () => {
   assert.equal(founderKillSwitchReason('X'.repeat(200)), 'founder_pause');
 });
 
-test('generic HTTP operation ids are stable and bounded', () => {
-  assert.equal(stableHttpOperationId('POST', '/api/something/do-it'), 'http:post:api-something-do-it');
-  assert.match(stableHttpOperationId('GET', '/'), /^http:get:root$/);
+test('generic HTTP operation ids are stable and bounded without colliding with target syntax', () => {
+  assert.equal(stableHttpOperationId('POST', '/api/something/do-it'), 'post:api-something-do-it');
+  assert.match(stableHttpOperationId('GET', '/'), /^get:root$/);
 });
 
 test('generic repo-operation gate can guard any stable scope and operation id', () => {
@@ -81,17 +81,24 @@ test('generic repo-operation gate can guard any stable scope and operation id', 
   assert.match(blocked.stderr, /FOUNDER_OPERATION_PAUSED/);
 });
 
-test('production worker is wrapped by the founder guard entrypoint', () => {
+test('production worker keeps canonical voice-entry and enforces founder guard there', () => {
   const wrangler = fs.readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
-  const wrapper = fs.readFileSync(new URL('../worker/founder-guard-entry.ts', import.meta.url), 'utf8');
-  assert.match(wrangler, /main = "worker\/founder-guard-entry\.ts"/);
-  assert.match(wrapper, /operation: 'sekret:reply'/);
-  assert.match(wrapper, /operation: 'sekret:voice'/);
-  assert.match(wrapper, /operation: 'sekret:transcribe'/);
-  assert.match(wrapper, /operation: 'bridge:summary-generate'/);
-  assert.match(wrapper, /operation: 'email:inbound'/);
-  assert.match(wrapper, /FOUNDER_OPERATION_PAUSED/);
-  assert.doesNotMatch(wrapper, /scope: decision\.scope,\n\s+operation: decision\.operation,\n\s+reason: decision\.reason,\n\s+}\), \{/);
+  const frontDoor = fs.readFileSync(new URL('../worker/voice-entry.ts', import.meta.url), 'utf8');
+  const alias = fs.readFileSync(new URL('../worker/founder-guard-entry.ts', import.meta.url), 'utf8');
+  assert.match(wrangler, /main = "worker\/voice-entry\.ts"/);
+  assert.match(frontDoor, /operation: 'sekret:reply'/);
+  assert.match(frontDoor, /operation: 'sekret:voice'/);
+  assert.match(frontDoor, /operation: 'sekret:transcribe'/);
+  assert.match(frontDoor, /operation: 'bridge:summary-generate'/);
+  assert.match(frontDoor, /operation: 'email:inbound'/);
+  assert.match(frontDoor, /FOUNDER_OPERATION_PAUSED/);
+  assert.match(alias, /export \{ default \} from '\.\/voice-entry'/);
+
+  const healthIndex = frontDoor.indexOf("request.method === 'GET' && path === '/health'");
+  const guardIndex = frontDoor.indexOf('const founderPaused = enforceFounderOperationKillSwitch');
+  const authIndex = frontDoor.indexOf('const auth = await authenticate');
+  assert.ok(healthIndex >= 0 && guardIndex > healthIndex, 'health must remain observable during a pause');
+  assert.ok(authIndex > guardIndex, 'founder pause must stop requests before auth/provider work');
 });
 
 test('direct Control Room mission execution checks the same founder switch before spawn', () => {
