@@ -38,7 +38,7 @@ test('clean local and GitHub evidence converge on one source-neutral incident fi
   const github = buildFailureIdentity({
     repository,
     headSha,
-    failureKey: canonicalFailureKey('Unit tests'),
+    failureKey: canonicalFailureKey('Run npm test'),
     correlatable: true,
     source: 'github_actions',
     evidence: { workflow_id: 1, run_id: 2, job_id: 3, step_number: 4, conclusion: 'failure' },
@@ -55,6 +55,17 @@ test('clean local and GitHub evidence converge on one source-neutral incident fi
     assert.equal(receipt.browser_cookie, false);
     assert.equal(receipt.authorizing, false);
   }
+});
+
+test('real CI command names map only to their existing local verification identities', () => {
+  assert.equal(canonicalFailureKey('Run npm test'), 'unit-tests');
+  assert.equal(canonicalFailureKey('Run npm run type-check'), 'type-check');
+  assert.equal(canonicalFailureKey('Run npm run lint'), 'lint');
+  assert.equal(canonicalFailureKey('Run npm run test:oracle'), 'oracle');
+  assert.equal(canonicalFailureKey('Run npm run test:voice-intelligence'), 'voice-intelligence');
+  assert.equal(canonicalFailureKey('Run npm run audit:runtime-assets'), 'runtime-assets');
+  assert.equal(canonicalFailureKey('Run npm run verify:room-archives'), 'room-archives');
+  assert.equal(canonicalFailureKey('Export Expo web bundle'), 'export-expo-web-bundle');
 });
 
 test('dirty local work cannot impersonate exact-head GitHub evidence', () => {
@@ -134,9 +145,12 @@ test('local verification binds failures to git identity and refuses dirty-worktr
   assert.match(localRunner, /rev-parse/);
   assert.match(localRunner, /status.*--porcelain/);
   assert.match(localRunner, /correlatable/);
+  assert.match(localRunner, /redactOutput/);
   assert.match(localIngest, /buildFailureIdentity/);
   assert.match(localIngest, /incident_fingerprint/);
   assert.match(localIngest, /proof_cookie/);
+  assert.doesNotMatch(localIngest, /stdout_tail/);
+  assert.doesNotMatch(localIngest, /stderr_tail/);
 });
 
 test('scanner supports exact current runs and completed main push failures', () => {
