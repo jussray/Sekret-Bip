@@ -153,9 +153,6 @@ function enforceFounderOperationKillSwitch(
   });
   if (!decision.blocked) return null;
 
-  // Founder pause state is observable without echoing request-derived operation
-  // ids or environment-provided reasons into logs.
-  console.warn('FOUNDER_OPERATION_PAUSED');
   return founderPauseResponse(cors);
 }
 
@@ -461,8 +458,6 @@ export default {
       operation: 'email:inbound',
     });
     if (decision.blocked) {
-      // Do not echo environment-provided pause reasons into runtime logs.
-      console.warn('FOUNDER_OPERATION_PAUSED');
       const rejectable = message as Parameters<typeof emailRouter.email>[0] & { setReject?: (reason: string) => void };
       if (typeof rejectable.setReject === 'function') {
         rejectable.setReject("Se'kret Bip email processing is temporarily paused.");
