@@ -4,11 +4,11 @@
 //
 // Required env:
 //   SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY
+//   SUPABASE_SECRET_KEY (legacy SUPABASE_SERVICE_ROLE_KEY accepted during migration)
 //   ACCOUNT_DELETION_PROCESS_SECRET
 
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
-const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const PROCESS_SECRET = process.env.ACCOUNT_DELETION_PROCESS_SECRET || '';
 
 function fail(message) {
@@ -17,7 +17,7 @@ function fail(message) {
 }
 
 if (!SUPABASE_URL) fail('missing SUPABASE_URL');
-if (!SERVICE_ROLE_KEY) fail('missing SUPABASE_SERVICE_ROLE_KEY');
+if (!SERVICE_ROLE_KEY) fail('missing SUPABASE_SECRET_KEY (legacy SUPABASE_SERVICE_ROLE_KEY accepted during migration)');
 if (!PROCESS_SECRET) fail('missing ACCOUNT_DELETION_PROCESS_SECRET');
 
 async function fetchExpiredPendingRequests() {
