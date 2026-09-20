@@ -18,6 +18,16 @@ For Se'kret Bip, high-signal fingerprints include: Bridge, parent links, teen/pa
 
 If a fingerprint could belong to another project, verify the exact repo, branch, files, issue/PR, and current `main` before acting.
 
+## Supabase multi-account target rule
+
+Supabase credentials are not a project identity. Before a Supabase provider read or mutation, resolve the intended registered target and bind the action to its repository, environment, project ref, and canonical project URL. When Management API authority is available, read the exact project back from Supabase and require the returned project ref to match before continuing.
+
+The resulting `juss/supabase-proof-cookie@v1` marker is a non-secret continuity receipt, not a browser cookie and not an authority token. It may carry the registered target, repository, environment, project ref/URL, provider project name, a one-way organization fingerprint, provider-verification state, and invalidation fields. It must not contain access tokens, service-role keys, database passwords, raw organization IDs, or private user data.
+
+A static/plan marker is always unverified. A provider-verified marker becomes stale when any bound identity field changes or newer provider evidence contradicts it. Separate Supabase projects keep separate markers and receipts; evidence from one project must never satisfy another project's gate.
+
+This rule does not change the browser/session contract. Se'kret Bip still has a zero-cookie browser policy; Supabase auth persistence remains in the existing SecureStore/AsyncStorage path.
+
 ## Genesis fingerprint
 
 When asked when this project started, do not infer genesis from the oldest visible chat. Resolve in this order:

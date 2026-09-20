@@ -8,6 +8,7 @@ on:
       - '.github/workflows/deploy-cloudflare.yml'
       - '.github/workflows/deploy-supabase-migrations.yml'
       - '.github/workflows/production-gate-contract.yml'
+      - 'config/supabase-targets.json'
       - 'e2e/production-smoke.spec.ts'
       - 'playwright.production.config.ts'
       - 'scripts/playwright-executable.mjs'
@@ -17,6 +18,7 @@ on:
       - 'scripts/bootstrap-release-metadata-source.mjs'
       - 'scripts/write-release-metadata.mjs'
       - 'scripts/verify-cloudflare-native-deploy.mjs'
+      - 'scripts/supabase-target-identity.mjs'
       - 'scripts/verify-supabase-production-schema.mjs'
       - 'scripts/verify-supabase-production-schema-core.mjs'
       - 'scripts/publish-production-release-observation.mjs'
@@ -26,6 +28,7 @@ on:
       - 'test/production-authority-workflow-contracts.test.mjs'
       - 'test/production-deployment-gate-contract.test.mjs'
       - 'test/production-release-observation.test.mjs'
+      - 'test/supabase-target-identity.test.mjs'
       - 'test/supabase-production-schema-witness.test.mjs'
       - 'test/supabase-verifier-legacy-receipts.test.mjs'
       - 'test/supabase-production-blocker-evidence.test.mjs'
@@ -86,6 +89,7 @@ jobs:
           test/production-authority-workflow-contracts.test.mjs
           test/production-deployment-gate-contract.test.mjs
           test/production-release-observation.test.mjs
+          test/supabase-target-identity.test.mjs
           test/supabase-production-schema-witness.test.mjs
           test/supabase-verifier-legacy-receipts.test.mjs
           test/supabase-production-blocker-evidence.test.mjs
