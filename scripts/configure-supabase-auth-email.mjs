@@ -73,13 +73,13 @@ async function assertResendDomainVerified(apiKey, email) {
   const domains = Array.isArray(payload?.data) ? payload.data : [];
   const domain = domains.find((entry) => String(entry?.name || '').toLowerCase() === domainName);
   if (!domain) {
-    throw new Error(`RESEND_DOMAIN_NOT_FOUND ${domainName}`);
+    throw new Error('RESEND_DOMAIN_NOT_FOUND');
   }
   if (domain.status !== 'verified') {
-    throw new Error(`RESEND_DOMAIN_NOT_VERIFIED ${domainName}: status=${domain.status ?? 'unknown'}`);
+    throw new Error('RESEND_DOMAIN_NOT_VERIFIED');
   }
   if (domain.capabilities?.sending === 'disabled') {
-    throw new Error(`RESEND_DOMAIN_SENDING_DISABLED ${domainName}`);
+    throw new Error('RESEND_DOMAIN_SENDING_DISABLED');
   }
 
   return {
@@ -121,7 +121,7 @@ function assertApplied(actual, desired) {
   const d = comparable(desired);
   for (const key of Object.keys(d)) {
     if (a[key] !== d[key]) {
-      throw new Error(`AUTH_EMAIL_CONFIG_MISMATCH ${key}`);
+      throw new Error(`AUTH_EMAIL_CONFIG_MISMATCH_${key}`);
     }
   }
 }
@@ -136,10 +136,8 @@ async function writeReceipt(receipt) {
   );
 }
 
-function printReceiptSummary(label, receipt) {
-  const targetName = receipt?.supabaseIdentity?.identity?.target ?? 'unknown';
-  const identityFingerprint = receipt?.supabaseIdentity?.fingerprint ?? 'unverified';
-  console.log(`${label} target=${targetName} fingerprint=${identityFingerprint}`);
+function printReceiptSummary(label) {
+  console.log(label);
 }
 
 async function main() {
@@ -159,12 +157,12 @@ async function main() {
       productionMutation: false,
     };
     await writeReceipt(receipt);
-    printReceiptSummary('AUTH_EMAIL_PROVIDER_PLAN', receipt);
+    printReceiptSummary('AUTH_EMAIL_PROVIDER_PLAN');
     return;
   }
 
   if (env('GITHUB_REF_NAME') && env('GITHUB_REF_NAME') !== 'main') {
-    throw new Error(`AUTH_EMAIL_APPLY_NON_MAIN ${env('GITHUB_REF_NAME')}`);
+    throw new Error('AUTH_EMAIL_APPLY_NON_MAIN');
   }
 
   const accessToken = required('SUPABASE_ACCESS_TOKEN');
@@ -195,14 +193,17 @@ async function main() {
   };
 
   await writeReceipt(receipt);
-  printReceiptSummary('AUTH_EMAIL_PROVIDER_APPLIED', receipt);
+  printReceiptSummary('AUTH_EMAIL_PROVIDER_APPLIED');
 }
 
-main().catch(async (error) => {
-  const message = error instanceof Error ? error.message : String(error);
+main().catch(async () => {
   console.error('AUTH_EMAIL_PROVIDER_FAILED');
   try {
-    await writeReceipt({ mode: process.argv.includes('--apply') ? 'apply' : 'plan', ok: false, error: message });
+    await writeReceipt({
+      mode: process.argv.includes('--apply') ? 'apply' : 'plan',
+      ok: false,
+      error: 'AUTH_EMAIL_PROVIDER_FAILED',
+    });
   } catch {}
   process.exit(1);
 });
