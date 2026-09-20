@@ -26,7 +26,7 @@ if (missionId === 'help' || missionId === '--help' || missionId === '-h') {
 
 const mission = missions.get(missionId);
 if (!mission) {
-  console.error(`Unknown or disallowed mission: ${missionId}`);
+  console.error('Unknown or disallowed mission.');
   console.error(`Allowed missions: ${Array.from(missions.keys()).join(', ')}`);
   process.exit(64);
 }
@@ -38,7 +38,7 @@ const killSwitch = evaluateFounderOperationKillSwitch({
   operation: `mission:${missionId}`,
 });
 if (killSwitch.blocked) {
-  console.error(`FOUNDER_OPERATION_PAUSED scope=${killSwitch.scope} operation=${killSwitch.operation} reason=${killSwitch.reason}`);
+  console.error('FOUNDER_OPERATION_PAUSED');
   process.exit(75);
 }
 
