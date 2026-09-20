@@ -37,6 +37,7 @@ function canonicalFailureKey(value) {
   if (
     normalized === 'unit-tests' ||
     normalized === 'unit-test' ||
+    normalized === 'run-npm-test' ||
     /(^|-)unit(-|$)/.test(normalized) ||
     /complete-unit-suite/.test(normalized)
   ) return 'unit-tests';
@@ -45,18 +46,19 @@ function canonicalFailureKey(value) {
     normalized === 'type-check' ||
     normalized === 'typecheck' ||
     normalized === 'typescript' ||
+    normalized === 'run-npm-run-type-check' ||
     /type-?check/.test(normalized) ||
     /typescript.*zero-error/.test(normalized)
   ) return 'type-check';
 
-  if (normalized === 'lint' || /(^|-)lint($|-)/.test(normalized)) return 'lint';
-  if (/runtime-assets?/.test(normalized)) return 'runtime-assets';
+  if (normalized === 'lint' || normalized === 'run-npm-run-lint' || /(^|-)lint($|-)/.test(normalized)) return 'lint';
+  if (normalized === 'run-npm-run-audit-runtime-assets' || /runtime-assets?/.test(normalized)) return 'runtime-assets';
   if (/control-room.*structure/.test(normalized)) return 'control-room-structure';
   if (/control-room.*rls|supabase.*rls/.test(normalized)) return 'control-room-rls';
   if (/companion.*asset/.test(normalized)) return 'companions';
-  if (/voice.*intelligence/.test(normalized)) return 'voice-intelligence';
-  if (/oracle/.test(normalized)) return 'oracle';
-  if (/room.*archives?/.test(normalized)) return 'room-archives';
+  if (normalized === 'run-npm-run-test-voice-intelligence' || /voice.*intelligence/.test(normalized)) return 'voice-intelligence';
+  if (normalized === 'run-npm-run-test-oracle' || /oracle/.test(normalized)) return 'oracle';
+  if (normalized === 'run-npm-run-verify-room-archives' || /room.*archives?/.test(normalized)) return 'room-archives';
   if (/playwright|browser-e2e|e2e-browser/.test(normalized)) return 'playwright-e2e';
 
   return normalized;
