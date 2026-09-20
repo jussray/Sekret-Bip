@@ -86,8 +86,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          mkdir -p artifacts
           node <<'NODE'
-          const { appendFileSync } = await import('node:fs');
+          const { appendFileSync, writeFileSync } = await import('node:fs');
 
           const dispatchPreview = process.env.DISPATCH_PREVIEW_URL?.trim() || '';
           const expected = process.env.EXPECTED_HEAD_SHA;
@@ -95,27 +96,77 @@ jobs:
           const prNumber = process.env.PR_NUMBER?.trim() || '';
           const token = process.env.GH_TOKEN?.trim() || '';
           const environmentFile = process.env.GITHUB_ENV;
+          const receiptPath = 'artifacts/live-signup-readiness.json';
+          const shortSha = expected.slice(0, 7);
 
-          function persistPreview(url) {
+          function writeReadinessReceipt({
+            state,
+            classification = null,
+            previewOrigin = null,
+            cloudflareCommentCount = null,
+            providerState = null,
+          }) {
+            writeFileSync(receiptPath, `${JSON.stringify({
+              schemaVersion: 1,
+              scope: 'live-signup-preview-readiness',
+              observedAt: new Date().toISOString(),
+              expectedHeadSha: expected,
+              prNumber: prNumber || null,
+              state,
+              classification,
+              previewOrigin,
+              cloudflareCommentCount,
+              providerState,
+              liveWriteAuthorized: process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
+                && process.env.CONFIRM_LIVE_WRITE === 'true',
+            }, null, 2)}\n`, 'utf8');
+          }
+
+          function persistPreview(url, evidence = {}) {
             const parsed = new URL(url);
             if (!parsed.hostname.endsWith('.pages.dev') || parsed.hostname === 'sekretbip.net') {
+              writeReadinessReceipt({
+                state: 'blocked',
+                classification: 'non-isolated-preview-rejected',
+                cloudflareCommentCount: evidence.cloudflareCommentCount ?? null,
+                providerState: evidence.providerState ?? null,
+              });
               throw new Error(`Live signup proof must target an isolated Pages preview, got ${parsed.hostname}`);
             }
             appendFileSync(environmentFile, `LIVE_ONBOARDING_BASE_URL=${parsed.origin}\n`);
+            writeReadinessReceipt({
+              state: 'preview-resolved',
+              previewOrigin: parsed.origin,
+              cloudflareCommentCount: evidence.cloudflareCommentCount ?? null,
+              providerState: evidence.providerState ?? 'preview-available',
+            });
             console.log(`Resolved isolated Pages preview: ${parsed.origin}`);
           }
 
           if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
-            if (!dispatchPreview) throw new Error('workflow_dispatch requires preview_url.');
-            persistPreview(dispatchPreview);
+            if (!dispatchPreview) {
+              writeReadinessReceipt({
+                state: 'blocked',
+                classification: 'manual-preview-url-required',
+              });
+              throw new Error('workflow_dispatch requires preview_url.');
+            }
+            persistPreview(dispatchPreview, { providerState: 'manual-preview' });
             process.exit(0);
           }
 
-          if (!prNumber) throw new Error('Pull-request preview resolution requires PR_NUMBER.');
+          if (!prNumber) {
+            writeReadinessReceipt({
+              state: 'blocked',
+              classification: 'pull-request-number-required',
+            });
+            throw new Error('Pull-request preview resolution requires PR_NUMBER.');
+          }
 
-          const shortSha = expected.slice(0, 7);
           const deadline = Date.now() + 240_000;
           let last = null;
+          let lastCloudflareCommentCount = 0;
+          let lastProviderState = 'unknown';
 
           while (Date.now() < deadline) {
             try {
@@ -131,15 +182,27 @@ jobs:
               );
               if (!response.ok) {
                 last = { status: response.status };
+                lastProviderState = 'github-evidence-unavailable';
               } else {
                 const comments = await response.json();
                 const cloudflareComments = comments
                   .filter((comment) => comment?.user?.login === 'cloudflare-workers-and-pages[bot]')
                   .reverse();
+                lastCloudflareCommentCount = cloudflareComments.length;
 
                 for (const comment of cloudflareComments) {
                   const body = String(comment?.body || '');
                   if (!body.includes(`<code>${shortSha}</code>`)) continue;
+
+                  if (/Build in progress|Status:<\/strong><\/td><td>[^<]*Build in progress/i.test(body)) {
+                    lastProviderState = 'build-in-progress';
+                  } else if (/Build:\s*<\/b>\s*Success|Status:<\/strong><\/td><td>[^<]*(?:Success|Deployed)/i.test(body)) {
+                    lastProviderState = 'build-success';
+                  } else if (/Build:\s*<\/b>\s*(?:Failed|Failure)|Status:<\/strong><\/td><td>[^<]*(?:Failed|Failure)/i.test(body)) {
+                    lastProviderState = 'build-failed';
+                  } else {
+                    lastProviderState = 'exact-head-comment-present';
+                  }
 
                   const branchPreview = body.match(
                     /Branch Preview URL:[\s\S]{0,600}?href=['"]([^'"]+\.pages\.dev)['"]/i,
@@ -150,22 +213,33 @@ jobs:
                   const resolved = branchPreview?.[1] || immutablePreview?.[1] || null;
                   if (!resolved) continue;
 
-                  persistPreview(resolved);
+                  persistPreview(resolved, {
+                    cloudflareCommentCount: cloudflareComments.length,
+                    providerState: 'preview-available',
+                  });
                   process.exit(0);
                 }
 
                 last = {
                   cloudflareComments: cloudflareComments.length,
                   expectedShortSha: shortSha,
+                  providerState: lastProviderState,
                 };
               }
             } catch (error) {
               last = { error: error instanceof Error ? error.message : String(error) };
+              if (lastProviderState === 'unknown') lastProviderState = 'evidence-read-error';
             }
 
             await new Promise((resolve) => setTimeout(resolve, 5000));
           }
 
+          writeReadinessReceipt({
+            state: 'blocked',
+            classification: 'cloudflare-pages-preview-unavailable',
+            cloudflareCommentCount: lastCloudflareCommentCount,
+            providerState: lastProviderState,
+          });
           throw new Error(
             `Cloudflare PR preview for ${shortSha} was not discoverable from PR evidence: ${JSON.stringify(last)}`,
           );
@@ -254,6 +328,7 @@ jobs:
         with:
           name: live-signup-proof-${{ env.EXPECTED_HEAD_SHA }}
           path: |
+            artifacts/live-signup-readiness.json
             artifacts/live-signup-proof-account.json
             artifacts/live-signup-confirmation.json
             artifacts/live-signup-mailbox-cleanup.json
