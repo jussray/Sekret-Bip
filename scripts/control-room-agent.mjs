@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
+import { evaluateFounderOperationKillSwitch } from '../shared/founder-operation-kill-switch.js';
 
 const missions = new Map([
   ['continue-yesterday', { command: 'git', args: ['status', '--short', '--branch'], description: 'Inspect the current branch and worktree so the founder can resume from repository truth.' }],
@@ -16,6 +17,7 @@ const missionId = process.argv[2] ?? 'help';
 if (missionId === 'help' || missionId === '--help' || missionId === '-h') {
   console.log('Control Room Local Agent');
   console.log('Allowed missions only; arbitrary shell execution is intentionally unsupported.');
+  console.log('Founder kill switch targets: all | scope:control-room | op:mission:<mission-id>');
   for (const [id, mission] of missions) {
     console.log(`- ${id}: ${mission.description}`);
   }
@@ -27,6 +29,17 @@ if (!mission) {
   console.error(`Unknown or disallowed mission: ${missionId}`);
   console.error(`Allowed missions: ${Array.from(missions.keys()).join(', ')}`);
   process.exit(64);
+}
+
+const killSwitch = evaluateFounderOperationKillSwitch({
+  rawValue: process.env.FOUNDER_OPERATION_KILL_SWITCH,
+  rawReason: process.env.FOUNDER_OPERATION_KILL_SWITCH_REASON,
+  scope: 'control-room',
+  operation: `mission:${missionId}`,
+});
+if (killSwitch.blocked) {
+  console.error(`FOUNDER_OPERATION_PAUSED scope=${killSwitch.scope} operation=${killSwitch.operation} reason=${killSwitch.reason}`);
+  process.exit(75);
 }
 
 console.log(`Control Room Local Agent mission: ${missionId}`);

@@ -1,5 +1,5 @@
 name = "sekret-backend"
-main = "worker/voice-entry.ts"
+main = "worker/founder-guard-entry.ts"
 compatibility_date = "2026-06-13"
 compatibility_flags = ["nodejs_compat"]
 logpush = true
@@ -39,6 +39,13 @@ SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
 OPENAI_CHAT_MODEL = "gpt-4o"
 OPENAI_TTS_MODEL  = "gpt-4o-mini-tts"
 OPENAI_STT_MODEL  = "whisper-1"
+
+# Founder emergency brake is intentionally NOT committed with an engaged value.
+# Runtime authority is FOUNDER_OPERATION_KILL_SWITCH, supplied only through
+# trusted operator/provider configuration. Supported targets are documented in
+# shared/founder-operation-kill-switch.js. Absence or "off" means allow.
+# Examples: all | scope:companion | op:sekret:reply | scope:bridge
+# Optional FOUNDER_OPERATION_KILL_SWITCH_REASON must be a non-secret reason code.
 
 # Firebase App Check starts disabled. Moving this to `observe` or `enforce`
 # requires FIREBASE_PROJECT_NUMBER and FIREBASE_APP_IDS to be configured on
