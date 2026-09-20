@@ -21,10 +21,5 @@ try {
 }
 
 if (decision.blocked) {
-  // Keep founder pause logs machine-readable without echoing operation IDs,
-  // environment-provided reasons, or any other caller-controlled values.
-  console.error('FOUNDER_OPERATION_PAUSED');
   process.exit(75);
 }
-
-console.log('FOUNDER_OPERATION_ALLOWED');
