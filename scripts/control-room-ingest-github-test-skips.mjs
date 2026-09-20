@@ -12,7 +12,7 @@ const requestedRunId = process.env.CONTROL_ROOM_GITHUB_RUN_ID;
 const requestedHeadSha = process.env.CONTROL_ROOM_GITHUB_HEAD_SHA?.trim().toLowerCase() || null;
 const shouldIngest = process.env.CONTROL_ROOM_GITHUB_INGEST === '1';
 const supabaseUrl = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 function required(name, value) {
   if (!value) throw new Error(`${name} is required.`);
@@ -50,7 +50,7 @@ async function githubText(pathname) {
 async function supabaseRequest(pathname, options = {}) {
   if (!shouldIngest) return null;
   const url = required('SUPABASE_URL (or EXPO_PUBLIC_SUPABASE_URL)', supabaseUrl);
-  const key = required('SUPABASE_SERVICE_ROLE_KEY', serviceRoleKey);
+  const key = required('SUPABASE_SECRET_KEY (legacy SUPABASE_SERVICE_ROLE_KEY accepted during migration)', serviceRoleKey);
   const response = await fetch(`${url.replace(/\/$/, '')}${pathname}`, {
     ...options,
     headers: {
