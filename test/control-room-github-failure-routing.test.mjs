@@ -147,10 +147,16 @@ test('GitHub failure reports retain exact PR, branch, head, workflow, run, and p
   assert.match(scanner, /proof_cookie/);
 });
 
-test('local verification binds failures to git identity and refuses dirty-worktree correlation', () => {
+test('local verification binds failures to git identity and ignores only its own generated receipts', () => {
   assert.match(localRunner, /gitIdentity/);
   assert.match(localRunner, /rev-parse/);
   assert.match(localRunner, /status.*--porcelain/);
+  assert.match(localRunner, /SELF_GENERATED_LOCAL_REPORTS/);
+  assert.match(localRunner, /reports\/control-room\/latest\.json/);
+  assert.match(localRunner, /reports\/control-room\/latest\.md/);
+  assert.match(localRunner, /reports\/control-room\/test-skips-latest\.json/);
+  assert.match(localRunner, /sourceDirtyEntries/);
+  assert.match(localRunner, /generated_report_dirty_count/);
   assert.match(localRunner, /correlatable/);
   assert.match(localRunner, /redactOutput/);
   assert.match(localIngest, /buildFailureIdentity/);
