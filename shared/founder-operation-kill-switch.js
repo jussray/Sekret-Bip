@@ -25,23 +25,23 @@ export function parseFounderOperationKillSwitch(rawValue) {
     return { engaged: false, invalid: false, targets: [] };
   }
 
-  const tokens = raw.split(',').map((value) => value.trim()).filter(Boolean);
-  if (tokens.length === 0) {
+  const targetSpecs = raw.split(',').map((value) => value.trim()).filter(Boolean);
+  if (targetSpecs.length === 0) {
     return { engaged: false, invalid: false, targets: [] };
   }
 
   const targets = [];
-  for (const token of tokens) {
-    if (token === 'all') {
+  for (const targetSpec of targetSpecs) {
+    if (targetSpec === 'all') {
       targets.push('all');
       continue;
     }
-    const separator = token.indexOf(':');
+    const separator = targetSpec.indexOf(':');
     if (separator <= 0) {
       return { engaged: true, invalid: true, targets: ['all'] };
     }
-    const kind = token.slice(0, separator);
-    const id = token.slice(separator + 1);
+    const kind = targetSpec.slice(0, separator);
+    const id = targetSpec.slice(separator + 1);
     if ((kind !== 'scope' && kind !== 'op') || !TARGET_PATTERN.test(id)) {
       return { engaged: true, invalid: true, targets: ['all'] };
     }
@@ -88,5 +88,5 @@ export function stableHttpOperationId(method, pathname) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 72) || 'root';
-  return `http:${verb}:${route}`;
+  return `${verb}:${route}`;
 }
