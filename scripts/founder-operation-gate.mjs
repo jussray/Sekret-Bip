@@ -21,18 +21,5 @@ try {
 }
 
 if (decision.blocked) {
-  console.error(JSON.stringify({
-    receipt: 'FOUNDER_OPERATION_PAUSED',
-    scope: decision.scope,
-    operation: decision.operation,
-    reason: decision.reason,
-    invalidConfiguration: decision.invalidConfiguration,
-  }));
   process.exit(75);
 }
-
-console.log(JSON.stringify({
-  receipt: 'FOUNDER_OPERATION_ALLOWED',
-  scope: decision.scope,
-  operation: decision.operation,
-}));
