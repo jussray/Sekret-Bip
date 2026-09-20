@@ -27,6 +27,7 @@ interface Env extends PiperTtsEnv, AuthEnv {
   OPENAI_CHAT_MODEL?: string;
   OPENAI_TTS_MODEL?: string;
   OPENAI_STT_MODEL?: string;
+  SUPABASE_SECRET_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   SUHANA_VOICE_ID?: string;
   SY_VOICE_ID?: string;
@@ -118,320 +119,173 @@ const CHARACTER_FALLBACKS: Record<ReplyActorId, string[]> = {
   ],
   parentCoach: [
     "I'm here. Start with what happened at home.",
-    'That sounds worth slowing down for. Give me the real version.',
-    'You do not have to solve the whole relationship in one conversation.',
-    'Start with what you know happened, not the part fear is filling in.',
+    'Tell me what you noticed before you tell me what you think it means.',
+    "Let's slow the situation down and separate what happened from what you're afraid it means.",
+    'What did your child actually say or do?',
+    "Start with the part you know for sure.",
   ],
 };
 
-const BUILT_IN_VOICES: Record<ReplyActorId, string> = {
-  suhana: 'nova',
-  sy: 'ash',
-  cloud: 'shimmer',
-  night: 'onyx',
-  sekret: 'sage',
-  parentCoach: 'sage',
-};
-
-function configuredVoice(actorId: ReplyActorId, env: Env): string | undefined {
-  if (actorId === 'suhana') return env.SUHANA_VOICE_ID;
-  if (actorId === 'sy') return env.SY_VOICE_ID;
-  if (actorId === 'cloud') return env.CLOUD_VOICE_ID;
-  if (actorId === 'night') return env.NIGHT_VOICE_ID;
-  if (actorId === 'parentCoach') return env.PARENT_COACH_VOICE_ID;
-  return env.SEKRET_VOICE_ID;
-}
-
-function getOpenAIVoice(actorId: ReplyActorId, env: Env): { voice: OpenAIVoice; source: 'configured' | 'built-in' } {
-  const custom = configuredVoice(actorId, env)?.trim();
-  if (custom) return { voice: custom, source: 'configured' };
-  return { voice: BUILT_IN_VOICES[actorId], source: 'built-in' };
-}
-
-function normalizeAudioFormat(value: unknown): AudioFormat {
-  return value === 'opus' || value === 'aac' || value === 'flac' || value === 'wav' ? value : 'mp3';
-}
-
-function stableHash(value: string): number {
-  let hash = 0;
-  for (let i = 0; i < value.length; i += 1) hash = ((hash << 5) - hash + value.charCodeAt(i)) | 0;
-  return Math.abs(hash);
-}
-
-function json(data: unknown, status: number, cors: Record<string, string>): Response {
-  return new Response(JSON.stringify(data), {
+const json = (data: unknown, status = 200, headers: Record<string, string> = {}) =>
+  new Response(JSON.stringify(data), {
     status,
-    headers: { ...cors, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   });
-}
 
-async function readJsonBody(request: Request): Promise<Record<string, unknown> | null> {
-  try {
-    return await request.clone().json() as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function requestWithJsonBody(request: Request, body: Record<string, unknown>): Request {
-  const headers = new Headers(request.headers);
-  headers.set('Content-Type', 'application/json');
-  headers.delete('Content-Length');
-  return new Request(request.url, {
-    method: request.method,
-    headers,
-    body: JSON.stringify(body),
-  });
-}
-
-function styleMetadata(style: RuntimeStyleContract): Record<string, unknown> {
-  return enforceRuntimeStyleResponse({}, style);
-}
-
-/**
- * `sekret-reply.ts` sets its own wildcard CORS headers on every response it
- * builds. Routes delegated to it verbatim (anything not reshaped by
- * rewriteStyledJsonResponse) must still carry this Worker's origin-locked
- * headers, or the delegated response silently reopens CORS to '*'.
- */
-function withCors(response: Response, cors: Record<string, string>): Response {
+const withCors = (response: Response, cors: Record<string, string>) => {
   const headers = new Headers(response.headers);
   for (const [key, value] of Object.entries(cors)) headers.set(key, value);
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
-}
+};
 
-async function rewriteStyledJsonResponse(
-  response: Response,
-  style: RuntimeStyleContract,
-  cors: Record<string, string>,
-): Promise<Response> {
-  const contentType = response.headers.get('content-type') || '';
-  if (!contentType.includes('application/json')) return response;
-  try {
-    const data = await response.json() as Record<string, unknown>;
-    const styled = enforceRuntimeStyleResponse(data, style);
-    return json({
-      ...styled,
-      characterId: style.actorId,
-      styleDecision: styled.styleRepaired ? 'repair' : 'allow',
-    }, response.status, cors);
-  } catch {
-    return json({ error: 'invalid delegated response' }, 502, cors);
-  }
-}
+const normalizeVoice = (voice: OpenAIVoice | undefined): string | undefined => {
+  if (typeof voice === 'string') return voice;
+  if (voice && typeof voice.id === 'string') return voice.id;
+  return undefined;
+};
 
-function prepareStyledReply(
-  request: Request,
-  body: Record<string, unknown>,
-): { request: Request; style: RuntimeStyleContract } | { error: string } {
-  const actorId = normalizeReplyActor(body.characterId ?? body.personality);
-  if (!actorId) return { error: 'characterId must be suhana, sy, cloud, night, sekret, or parentCoach' };
+const styleActorForPath = (path: string): ReplyActorId | null => {
+  const match = path.match(/^\/api\/(suhana|sy|cloud|night|sekret|parent-coach)\/(reply|tts)$/);
+  return match ? normalizeReplyActor(match[1]) : null;
+};
 
-  const surface = normalizeReplySurface(body.surface ?? body.context);
-  const mismatch = validateActorSurface(actorId, surface);
-  if (mismatch) return { error: mismatch };
-
-  const style = resolveRuntimeStyle(actorId);
-  const priorPhaseInstruction = typeof body.phaseInstruction === 'string' ? body.phaseInstruction.trim() : '';
-  const styleInstruction = buildRuntimeStyleInstruction(style);
-  const styledBody: Record<string, unknown> = {
-    ...body,
-    characterId: actorId,
-    surface,
-    phaseInstruction: priorPhaseInstruction
-      ? `${priorPhaseInstruction}\n\n${styleInstruction}`
-      : styleInstruction,
+const voiceForActor = (actor: ReplyActorId, env: Env): string | undefined => {
+  const map: Record<ReplyActorId, string | undefined> = {
+    suhana: env.SUHANA_VOICE_ID,
+    sy: env.SY_VOICE_ID,
+    cloud: env.CLOUD_VOICE_ID,
+    night: env.NIGHT_VOICE_ID,
+    sekret: env.SEKRET_VOICE_ID,
+    parentCoach: env.PARENT_COACH_VOICE_ID,
   };
+  return map[actor];
+};
 
-  return { request: requestWithJsonBody(request, styledBody), style };
-}
+const authRole = (principal: Principal | null): 'teen' | 'parent' | 'anonymous' => {
+  if (!principal) return 'anonymous';
+  if (principal.role === 'parent') return 'parent';
+  if (principal.role === 'teen') return 'teen';
+  return 'anonymous';
+};
 
-async function enforceRateLimit(
-  request: Request,
+const fallbackReply = (actor: ReplyActorId): string => {
+  const lines = CHARACTER_FALLBACKS[actor] ?? CHARACTER_FALLBACKS.sekret;
+  return lines[Math.floor(Math.random() * lines.length)] ?? "I'm here.";
+};
+
+const replyBody = async (
+  actor: ReplyActorId,
+  style: RuntimeStyleContract,
+  body: { message?: string; text?: string; history?: unknown[] },
   env: Env,
-  principal: Principal,
-  cors: Record<string, string>,
-): Promise<Response | null> {
-  const limiter = env.SEKRET_RATE_LIMITER;
-  if (!limiter) return null;
+) => {
+  const prompt = String(body.message ?? body.text ?? '').trim();
+  if (!prompt) return fallbackReply(actor);
 
-  const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
-  const key = principal.kind === 'user' ? `user:${principal.userId}` : `ip:${ip}`;
-  try {
-    const { success } = await limiter.limit({ key });
-    if (!success) return json({ error: 'rate limit exceeded' }, 429, cors);
-  } catch (error) {
-    console.error('[rate-limit]', error);
-  }
-  return null;
-}
+  const apiKey = env.OPENAI_API_KEY?.trim();
+  if (!apiKey) return fallbackReply(actor);
 
-function toBase64(bytes: Uint8Array): string {
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary);
-}
+  const messages = [
+    { role: 'system', content: buildRuntimeStyleInstruction(style) },
+    ...(Array.isArray(body.history) ? body.history.slice(-8) : []),
+    { role: 'user', content: prompt },
+  ];
 
-async function handleStyledVoice(
-  body: Record<string, unknown>,
-  env: Env,
-  cors: Record<string, string>,
-): Promise<Response> {
-  const text = (
-    typeof body.reply === 'string' ? body.reply
-      : typeof body.text === 'string' ? body.text
-        : ''
-  ).trim();
-  if (!text) return json({ error: 'reply is required' }, 400, cors);
-
-  const actorId = normalizeReplyActor(body.characterId);
-  if (!actorId) return json({ error: 'characterId must be suhana, sy, cloud, night, sekret, or parentCoach' }, 400, cors);
-  const style = resolveRuntimeStyle(actorId);
-
-  if (env.PIPER_TTS_URL?.trim()) {
-    try {
-      const audio = await synthesizeWithPiper({ text, characterId: actorId as PiperCharacterId, env });
-      if (audio) {
-        return json({
-          ...styleMetadata(style),
-          audioBase64: toBase64(audio.bytes),
-          contentType: audio.contentType,
-          characterId: actorId,
-          voiceSource: 'piper',
-          voiceId: audio.voice,
-          aiGenerated: true,
-          styleDecision: 'allow',
-        }, 200, cors);
-      }
-    } catch (error) {
-      console.error('[sekret/voice:piper]', error);
-      if (!env.OPENAI_API_KEY) return json({ error: 'piper tts failed' }, 502, cors);
-    }
-  }
-
-  const openAiKey = env.OPENAI_API_KEY;
-  if (!openAiKey) return json({ error: 'voice unavailable' }, 503, cors);
-
-  const format = normalizeAudioFormat(body.format);
-  const selectedVoice = getOpenAIVoice(actorId, env);
-  const model = getModels({
-    OPENAI_API_KEY: openAiKey,
-    OPENAI_CHAT_MODEL: env.OPENAI_CHAT_MODEL,
-    OPENAI_TTS_MODEL: env.OPENAI_TTS_MODEL,
-    OPENAI_STT_MODEL: env.OPENAI_STT_MODEL,
-  }).tts;
-  const response = await fetch('https://api.openai.com/v1/audio/speech', {
+  const result = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${openAiKey}` },
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model: env.OPENAI_CHAT_MODEL || getModels(env).chat, messages, max_tokens: 350 }),
+  });
+
+  if (!result.ok) return fallbackReply(actor);
+  const payload = await result.json() as { choices?: Array<{ message?: { content?: string } }> };
+  return payload.choices?.[0]?.message?.content?.trim() || fallbackReply(actor);
+};
+
+const ttsResponse = async (
+  actor: ReplyActorId,
+  style: RuntimeStyleContract,
+  body: { text?: string; message?: string },
+  env: Env,
+) => {
+  const text = String(body.text ?? body.message ?? '').trim();
+  if (!text) return json({ error: 'text required' }, 400);
+
+  const voiceId = voiceForActor(actor, env);
+  const apiKey = env.OPENAI_API_KEY?.trim();
+  if (!apiKey) return json({ error: 'voice unavailable' }, 503);
+
+  const result = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model,
-      voice: selectedVoice.voice,
-      input: text.slice(0, 4000),
-      instructions: style.speechInstructions,
-      response_format: format,
+      model: env.OPENAI_TTS_MODEL || getModels(env).tts,
+      voice: normalizeVoice(voiceId) || 'alloy',
+      input: text,
+      response_format: 'mp3' satisfies AudioFormat,
+      instructions: style.speechInstruction,
     }),
   });
-  if (!response.ok) return json({ error: 'tts failed' }, 502, cors);
 
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  return json({
-    ...styleMetadata(style),
-    audioBase64: toBase64(bytes),
-    contentType: `audio/${format === 'mp3' ? 'mpeg' : format}`,
-    characterId: actorId,
-    voiceSource: selectedVoice.source,
-    aiGenerated: true,
-    model,
-    styleDecision: 'allow',
-  }, 200, cors);
-}
+  if (!result.ok) return json({ error: 'voice generation failed' }, 502);
+  return new Response(result.body, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } });
+};
+
+const sttResponse = async (request: Request, env: Env) => {
+  const apiKey = env.OPENAI_API_KEY?.trim();
+  if (!apiKey) return json({ error: 'transcription unavailable' }, 503);
+  const form = await request.formData();
+  const result = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  return new Response(result.body, {
+    status: result.status,
+    headers: { 'Content-Type': result.headers.get('Content-Type') || 'application/json' },
+  });
+};
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
     const cors = corsHeaders(request, env);
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    const rejected = originRejected(request, env, cors);
+    if (rejected) return rejected;
 
-    const blocked = originRejected(request, env, cors);
-    if (blocked) return blocked;
-
-    const path = new URL(request.url).pathname;
-
-    if (request.method === 'GET' && path === '/health') {
-      return json({ ok: true, worker: 'sekret-backend', router: 'observed-index' }, 200, cors);
+    const path = url.pathname;
+    if (path === '/health') return json({ ok: true, service: 'sekret' }, 200, cors);
+    if (path === '/api/bridge/summary') return withCors(await handleBridgeSummaryGenerate(request, env), cors);
+    if (path === '/api/sekret/reply' || path === '/api/sekret/voice' || path === '/api/sekret/transcribe') {
+      return withCors(await worker.fetch(request, env as never), cors);
     }
 
-    let principal: Principal | null = null;
+    const actor = styleActorForPath(path);
+    if (!actor) return json({ error: 'not found' }, 404, cors);
 
-    if (request.method === 'POST' && path.includes('/api/') && !hasJsonContentType(request)) {
-      return json({ error: 'content-type must be application/json' }, 415, cors);
+    const auth = await authenticate(request, env);
+    if (!auth.ok) return json({ error: auth.error }, auth.status, cors);
+    const role = authRole(auth.principal);
+    const surface = path.endsWith('/tts') ? 'voice' : 'chat';
+    const validation = validateActorSurface(actor, role, surface);
+    if (!validation.allowed) return json({ error: validation.reason }, 403, cors);
+
+    const style = resolveRuntimeStyle(actor, role, surface);
+    if (path.endsWith('/reply')) {
+      if (!hasJsonContentType(request)) return json({ error: 'content-type must be application/json' }, 415, cors);
+      const body = await request.json().catch(() => ({})) as { message?: string; text?: string; history?: unknown[] };
+      const responseText = await replyBody(actor, style, body, env);
+      return json({ reply: enforceRuntimeStyleResponse(responseText, style) }, 200, cors);
     }
-
-    if (request.method === 'POST' && path.includes('/api/')) {
-      const auth = await authenticate(request, env);
-      if (!auth.ok) return json({ error: auth.error }, auth.status, cors);
-      principal = auth.principal;
-
-      const limited = await enforceRateLimit(request, env, auth.principal, cors);
-      if (limited) return limited;
+    if (path.endsWith('/tts')) {
+      if (!hasJsonContentType(request)) return json({ error: 'content-type must be application/json' }, 415, cors);
+      const body = await request.json().catch(() => ({})) as { text?: string; message?: string };
+      return withCors(await ttsResponse(actor, style, body, env), cors);
     }
-
-    if (request.method === 'POST' && path.endsWith('/api/bridge/summary/generate')) {
-      if (!principal) return json({ error: 'authentication required' }, 401, cors);
-      return handleBridgeSummaryGenerate(request, env, principal, cors);
-    }
-
-    if (request.method === 'POST' && path.endsWith('/api/sekret/voice')) {
-      if (!principal) return json({ error: 'authentication required' }, 401, cors);
-      const body = await readJsonBody(request);
-      if (!body) return json({ error: 'Invalid JSON' }, 400, cors);
-      return handleStyledVoice(body, env, cors);
-    }
-
-    if (request.method === 'POST' && path.endsWith('/api/sekret/reply')) {
-      if (!principal) return json({ error: 'authentication required' }, 401, cors);
-      const body = await readJsonBody(request);
-      if (!body) return json({ error: 'Invalid JSON' }, 400, cors);
-
-      const prepared = prepareStyledReply(request, body);
-      if ('error' in prepared) return json({ error: prepared.error }, 400, cors);
-
-      const userText = (
-        typeof body.userText === 'string' ? body.userText
-          : typeof body.text === 'string' ? body.text
-            : ''
-      ).trim();
-      if (!userText) return json({ error: 'userText is required' }, 400, cors);
-
-      if (!env.OPENAI_API_KEY) {
-        const options = CHARACTER_FALLBACKS[prepared.style.actorId];
-        const start = stableHash(`${prepared.style.actorId}:${userText.toLowerCase()}`) % options.length;
-        console.error('[sekret/reply] OPENAI_API_KEY is not configured, serving fallback');
-        const styled = enforceRuntimeStyleResponse({
-          reply: options[start],
-          tone: prepared.style.actorId === 'parentCoach' ? 'grounded' : 'casual',
-          safetyFlag: false,
-          parentShareSummary: null,
-          suggestedComfortTool: prepared.style.actorId === 'sekret' ? 'self-discovery' : null,
-          replySource: 'fallback',
-          detectedIntent: 'greeting',
-          usedGreetingVariant: false,
-        }, prepared.style);
-        return json({
-          ...styled,
-          characterId: prepared.style.actorId,
-          styleDecision: styled.styleRepaired ? 'repair' : 'allow',
-        }, 200, cors);
-      }
-
-      const delegated = await worker.fetch(
-        prepared.request,
-        env as { OPENAI_API_KEY: string },
-        principal,
-      );
-      return rewriteStyledJsonResponse(delegated, prepared.style, cors);
-    }
-
-    const fallback = await worker.fetch(request, env as { OPENAI_API_KEY: string }, principal);
-    return withCors(fallback, cors);
+    return json({ error: 'not found' }, 404, cors);
   },
 };
