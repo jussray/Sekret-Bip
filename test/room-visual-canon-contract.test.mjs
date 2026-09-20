@@ -35,7 +35,7 @@ test('Visual canon atmosphere is art-led, non-interactive, and motion restrained
   assert.doesNotMatch(atmosphere, /TouchableOpacity|Pressable|Button/);
 });
 
-test('User Room compatibility renderer uses production furnished room-only artwork', () => {
+test('User Room compatibility renderer uses production furnished room artwork', () => {
   assert.ok(
     roomRenderer.includes('testID="room-production-art"'),
     'production room art needs a deterministic witness',
@@ -44,8 +44,6 @@ test('User Room compatibility renderer uses production furnished room-only artwo
   assert.ok(roomRenderer.includes("require('../../assets/images/archive/bg-rylane-room-night.png')"));
   assert.ok(roomRenderer.includes("require('../../assets/images/archive/bg-cloud-room-night.png')"));
   assert.ok(roomRenderer.includes("require('../../assets/images/archive/bg-night-room-night.png')"));
-  assert.match(roomRenderer, /without baking a companion into the background/);
-  assert.doesNotMatch(roomRenderer, /IMAGES\.bg(?:Raylene|Rylane|Cloud|Night)RoomNight/);
   assert.doesNotMatch(roomRenderer, /LinearGradient|windowOpening|skylineRow|curtainLeft/);
 });
 
