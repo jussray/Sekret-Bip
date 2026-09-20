@@ -149,6 +149,11 @@ test('PR live signup readiness fails closed until an isolated exact-head Pages p
   assert.match(workflow, /body\?\.commitSha === expected/);
   assert.match(workflow, /body\?\.environment === 'preview'/);
   assert.match(workflow, /Exact isolated preview verified/);
+  assert.match(workflow, /artifacts\/live-signup-readiness\.json/);
+  assert.match(workflow, /scope: 'live-signup-preview-readiness'/);
+  assert.match(workflow, /classification: 'cloudflare-pages-preview-unavailable'/);
+  assert.match(workflow, /providerState/);
+  assert.match(workflow, /liveWriteAuthorized/);
   assert.doesNotMatch(workflow, /fix-production-signup-age-co\.sekret-bip\.pages\.dev/);
   assert.doesNotMatch(workflow, /LIVE_ONBOARDING_BASE_URL: https:\/\/sekretbip\.net/);
 });
@@ -189,7 +194,7 @@ test('live signup proof workflow binds manual writes to an explicit exact head a
   assert.match(workflow, /EXPECTED_HEAD_SHA: \$\{\{ github\.event_name == 'workflow_dispatch' && inputs\.target_sha \|\| github\.event\.pull_request\.head\.sha \}\}/);
   assert.match(workflow, /DISPATCH_PREVIEW_URL:.*inputs\.preview_url/);
   assert.match(workflow, /process\.env\.GITHUB_EVENT_NAME === 'workflow_dispatch'/);
-  assert.match(workflow, /persistPreview\(dispatchPreview\)/);
+  assert.match(workflow, /persistPreview\(dispatchPreview/);
   assert.match(workflow, /test \"\$actual\" = \"\$EXPECTED_HEAD_SHA\"/);
   assert.match(workflow, /LIVE_ONBOARDING_PHASE: readiness/);
   assert.match(workflow, /LIVE_ONBOARDING_PHASE: signup/);
