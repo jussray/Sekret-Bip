@@ -9,7 +9,7 @@ const executablePath = resolvePlaywrightExecutablePath();
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['live-onboarding-email.spec.ts'],
+  testMatch: ['live-onboarding-email.spec.ts', 'live-family-authority.spec.ts'],
   timeout: 120_000,
   expect: { timeout: 60_000 },
   fullyParallel: false,

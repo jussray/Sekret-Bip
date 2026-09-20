@@ -116,6 +116,8 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'parent-profile', title: 'Parent Profile', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Parent identity, preferences, focus, and room style.', route: '/(parent)/profile' },
   { key: 'parent-settings', title: 'Parent Settings', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Privacy, notifications, and account controls.', route: '/(parent)/settings' },
   { key: 'parent-resources', title: 'Parent Resources', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Guides, support, and legal information.', route: '/(parent)/resources' },
+  { key: 'parent-bip-jr', title: 'Bip Jr', group: 'Parent · Account', side: 'parent', status: 'needs_setup', detail: 'Supervised child profiles require verified guardian authority. Bip Jr stays separate from Teen accounts and Bridge.', route: '/(parent)/bip-jr' },
+  { key: 'parent-teen-verification', title: 'Teen Verification', group: 'Parent · Connection', side: 'parent', status: 'needs_setup', detail: 'A verified guardian can explicitly confirm age assurance for an active linked 13–17 Teen without gaining access to the Teen’s private account.', route: '/(parent)/teen-verification' },
 
   // Founder/developer tools
   { key: 'control-room', title: 'Control Room', group: 'Founder · Operations', side: 'dev', status: 'needs_setup', detail: 'Requires a founder/admin/developer app profile with audit access.', route: '/(dev)/control-room' },
