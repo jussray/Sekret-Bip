@@ -34,7 +34,6 @@ type ProviderSession = { accessToken: string; userId: string };
 async function providerSession(email: string, password: string): Promise<ProviderSession> {
   expect(supabaseUrl).toMatch(/^https:\/\/[a-z0-9]+\.supabase\.co$/);
   expect(supabaseKey).toMatch(/^(sb_publishable_|eyJ)/);
-  expect(supabaseKey).not.toMatch(/^sb_secret_/);
 
   const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`, {
     method: 'POST',
@@ -107,7 +106,6 @@ test('exact preview preserves permanent identity, Circle pseudonymity, Teen-cont
   );
   expect(guardianProfiles[0]).toMatchObject({ account_side: 'parent', onboarding_complete: true });
   expect(guardianVerification[0]?.verification_state).toBe('VERIFIED_GUARDIAN');
-
   await signIn(page, 'teen', teenEmail, teenPassword);
 
   await page.goto('/age');
