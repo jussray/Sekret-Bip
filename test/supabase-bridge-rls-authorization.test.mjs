@@ -172,6 +172,21 @@ test('active migration enforces permanent-account guards on parent_notes', () =>
   assert.match(permanentBoundary, /pl\.is_active = true/i);
 });
 
+test('parent note acknowledgement cannot grant teen clients authority to rewrite parent-authored content', () => {
+  assert.match(
+    permanentBoundary,
+    /revoke update on table public\.parent_notes from anon, authenticated/i,
+  );
+  assert.match(
+    permanentBoundary,
+    /grant update\s*\(seen_by_teen\) on table public\.parent_notes to authenticated/i,
+  );
+  assert.doesNotMatch(
+    permanentBoundary,
+    /grant update on table public\.parent_notes to authenticated/i,
+  );
+});
+
 test('permanent-account boundary migration does not reopen raw private parent read paths', () => {
   assert.doesNotMatch(permanentBoundary, /journal_entries/);
   assert.doesNotMatch(permanentBoundary, /mood_history/);
