@@ -3,7 +3,8 @@
 -- Production drift was observed on 2026-09-20: several policies had fallen back
 -- to PUBLIC/auth.uid()-only predicates even though repository history and product
 -- semantics require permanent authenticated accounts. Keep this migration narrow:
--- it changes policy role/predicates only and does not modify user data.
+-- it changes policy role/predicates and the parent-note acknowledgement privilege
+-- only; it does not modify user data.
 --
 -- The legacy S2Tell compatibility path still uses bridge_shares. Production
 -- currently has its owner policies hardened, but the active migration chain must
@@ -133,3 +134,11 @@ with check (
   public.is_non_anonymous_user()
   and auth.uid() = teen_user_id
 );
+
+-- RLS constrains which rows a Teen can update, not which columns. Production
+-- preflight proved the previous table-level UPDATE grant let a Teen rewrite the
+-- parent-authored note body. Keep the only supported Teen mutation column-bound:
+-- acknowledgement may change seen_by_teen, but content, sender, recipient and
+-- timestamp remain immutable through the client role.
+revoke update on table public.parent_notes from anon, authenticated;
+grant update (seen_by_teen) on table public.parent_notes to authenticated;
