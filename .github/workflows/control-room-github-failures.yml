@@ -10,6 +10,7 @@ on:
       - Playwright Smoke and Guardrails
       - Production Smoke
       - Verify Cloudflare Native Deployment
+      - Audit Cloudflare Zone Access Coverage
       - Reconcile app.sekretbip.net Frontend Ownership
       - Live Signup Proof
       - Controlled Account Cloud Comfort Proof
