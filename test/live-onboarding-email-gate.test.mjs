@@ -152,8 +152,14 @@ test('PR live signup readiness fails closed until an isolated exact-head Pages p
   assert.match(workflow, /artifacts\/live-signup-readiness\.json/);
   assert.match(workflow, /scope: 'live-signup-preview-readiness'/);
   assert.match(workflow, /classification: 'cloudflare-pages-preview-unavailable'/);
+  assert.match(workflow, /classification: 'exact-preview-identity-unproven'/);
+  assert.match(workflow, /previewIdentityVerified/);
+  assert.match(workflow, /releaseMarkerStatus/);
+  assert.match(workflow, /releaseMarkerEnvironment/);
   assert.match(workflow, /providerState/);
   assert.match(workflow, /liveWriteAuthorized/);
+  assert.match(workflow, /CONFIRM_LIVE_WRITE: \$\{\{ inputs\.confirm_live_write \|\| false \}\}/);
+  assert.doesNotMatch(workflow, /releaseMarkerCommitSha/);
   assert.doesNotMatch(workflow, /fix-production-signup-age-co\.sekret-bip\.pages\.dev/);
   assert.doesNotMatch(workflow, /LIVE_ONBOARDING_BASE_URL: https:\/\/sekretbip\.net/);
 });
