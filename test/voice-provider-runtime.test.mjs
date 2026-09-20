@@ -4,9 +4,14 @@ import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('Wrangler activates the voice entry and Workers AI binding', async () => {
-  const wrangler = await read('wrangler.toml');
-  assert.match(wrangler, /main = "worker\/voice-entry\.ts"/);
+test('Wrangler activates the founder guard, canonical voice runtime, and Workers AI binding', async () => {
+  const [wrangler, founderGuard] = await Promise.all([
+    read('wrangler.toml'),
+    read('worker/founder-guard-entry.ts'),
+  ]);
+  assert.match(wrangler, /main = "worker\/founder-guard-entry\.ts"/);
+  assert.match(founderGuard, /import voiceEntry from ['"]\.\/voice-entry['"]/);
+  assert.match(founderGuard, /return voiceEntry\.fetch\(request, env as never, ctx\)/);
   assert.match(wrangler, /\[ai\]\s+binding = "AI"/s);
   assert.match(wrangler, /VOICE_PROVIDER_MODE = "hybrid"/);
   assert.doesNotMatch(wrangler, /ELEVENLABS_API_KEY\s*=/);
