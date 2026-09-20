@@ -7,6 +7,8 @@ const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf
 const helper = read('supabase/functions/_shared/supabase-api-keys.ts');
 const publicClient = read('utils/supabase/client.ts');
 const publicEnv = read('src/utils/env.ts');
+const mcpGuard = read('scripts/verify-mcp-config.mjs');
+const controlRoomServer = read('scripts/control-room-server.mjs');
 
 const publishableFunctions = [
   'supabase/functions/delete-account/index.ts',
@@ -72,6 +74,13 @@ test('privileged server and Worker consumers prefer the modern singular secret k
     assert.ok(modern >= 0, `${path} must accept SUPABASE_SECRET_KEY`);
     assert.ok(legacy >= 0, `${path} must retain the temporary rollback fallback during migration`);
     assert.ok(modern < legacy, `${path} must prefer SUPABASE_SECRET_KEY before the legacy fallback`);
+  }
+});
+
+test('secret detectors recognize modern and legacy privileged Supabase key names', () => {
+  for (const source of [mcpGuard, controlRoomServer]) {
+    assert.match(source, /SUPABASE_SECRET_KEY/);
+    assert.match(source, /SUPABASE_SERVICE_ROLE_KEY/);
   }
 });
 
