@@ -3,10 +3,10 @@
 // Phase 1 polish: time-of-day backdrop, char-aware tone, mood glow,
 // staggered entrance, breath badge, sticky note, send confirmation glow.
 //
-// P6: handleSend now writes a signal row to `bridge_signals` in Supabase.
+// P6: handleSend writes a signal row to `bridge_signals` in Supabase.
 // MESSAGE CONTENT IS NEVER STORED — only share_type, conv_mode, char_key,
-// and a timestamp leave the device. AsyncStorage flag kept as instant
-// parent-side nudge even when offline.
+// response preference, and a timestamp leave the device. The UI reports sent
+// only after that metadata write is confirmed.
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
@@ -130,7 +130,6 @@ export function BridgeScreen({
     );
     loop.start();
 
-    // Load parent notes + subscribe to new ones via Realtime
     fetchParentNotes().then(setParentNotes);
     let unsub = () => {};
     subscribeToParentNotes((note) => {
@@ -226,21 +225,20 @@ export function BridgeScreen({
     }
 
     setSending(true);
+    setBridgeStatus(null);
     try {
-      // Local flag for instant offline feedback
-      await AsyncStorage.setItem('parent_bridge_pending', 'true');
-      // Cloud: metadata signal only — message content stays on device
       await sendBridgeSignal({ shareType, convMode, charKey });
+      await AsyncStorage.setItem('parent_bridge_pending', 'true');
+      setSent(true);
+      setMessage('');
+      setShareType(null);
+      setConvMode(null);
     } catch {
-      // Network failure: local experience unaffected
+      setBridgeStatus('Bridge could not confirm delivery. Nothing was marked sent. Try again when the connection is available.');
+      Alert.alert('Could not send to Bridge', 'Nothing was marked sent. Check your connection and try again.');
     } finally {
       setSending(false);
     }
-
-    setSent(true);
-    setMessage('');
-    setShareType(null);
-    setConvMode(null);
   };
 
   const heroCopy = isRylane
@@ -438,7 +436,6 @@ export function BridgeScreen({
         </Animated.View>
         )}
 
-        {/* Parent notes received */}
         {view === 'share' && parentNotes.length > 0 && (
           <Animated.View style={cardStyle(fade2)}>
             <Text style={[styles.sectionLabel, { color: '#cbb6f7', marginBottom: 10 }]}>
@@ -544,34 +541,27 @@ const styles = StyleSheet.create({
   subtitle:        { fontSize: 14, color: '#cbb6f7', textAlign: 'center', marginBottom: 14, fontStyle: 'italic', lineHeight: 20 },
   energyBadge:     { alignSelf: 'center', borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 16 },
   energyText:      { fontSize: 12, fontWeight: '600' },
-
   viewToggleRow:   { flexDirection: 'row', gap: 8, marginBottom: 6 },
   viewToggleBtn:   { flex: 1, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 14, paddingVertical: 9, alignItems: 'center' },
   viewToggleText:  { fontSize: 13, fontWeight: '700' },
   historyEmptyText:{ color: '#9d8eb8', fontSize: 13, lineHeight: 20, textAlign: 'center', paddingVertical: 20 },
-
   sectionLabel:    { fontSize: 14, fontWeight: '600', marginBottom: 12 },
   typeRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   typeChip:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
   typeEmoji:       { fontSize: 18 },
   typeLabel:       { fontSize: 14, fontWeight: '600' },
-
   card:            { padding: 18, borderRadius: 20, marginBottom: 16, borderWidth: 1, shadowOpacity: 0.4, shadowRadius: 14 },
   cardLabel:       { fontSize: 14, fontWeight: '700', marginBottom: 10 },
   input:           { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, minHeight: 110, textAlignVertical: 'top', marginBottom: 8, backgroundColor: 'rgba(0,0,0,0.35)' },
   charCount:       { fontSize: 12, textAlign: 'right' },
-
   convModeHint:    { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 12 },
   convModeHintText: { fontSize: 13, fontStyle: 'italic', lineHeight: 19 },
-
   stickyNote:      { backgroundColor: '#fff8e7', borderColor: '#7c3aed', borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, padding: 12, marginBottom: 14, transform: [{ rotate: '-2deg' }] },
   stickyText:      { color: '#3a2461', fontSize: 13, fontStyle: 'italic', textAlign: 'center', lineHeight: 19 },
-
   button:          { padding: 16, borderRadius: 18, marginBottom: 12, alignItems: 'center' },
   buttonText:      { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   ghostButton:     { padding: 14, borderRadius: 18, marginBottom: 12, alignItems: 'center', borderWidth: 1 },
   ghostButtonText: { fontSize: 14, fontWeight: '600' },
-
   sentEmoji:       { fontSize: 56, textAlign: 'center', marginBottom: 12 },
   sentTitle:       { fontSize: 22, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 8 },
   sentSub:         { fontSize: 14, color: '#e9defc', textAlign: 'center', lineHeight: 21 },
