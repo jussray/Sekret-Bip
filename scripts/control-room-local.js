@@ -10,6 +10,11 @@ const reportDir = path.join(root, 'reports', 'control-room');
 const jsonPath = path.join(reportDir, 'latest.json');
 const mdPath = path.join(reportDir, 'latest.md');
 const TEST_SKIP_MARKER = 'CONTROL_ROOM_TEST_SKIP_RECEIPT ';
+const SECRET_ENV_NAME = /(?:TOKEN|SECRET|PASSWORD|PASSCODE|PRIVATE|API[_-]?KEY|SERVICE[_-]?ROLE|AUTH)/i;
+const secretValues = Object.entries(process.env)
+  .filter(([name, value]) => SECRET_ENV_NAME.test(name) && typeof value === 'string' && value.length >= 8)
+  .map(([, value]) => value)
+  .sort((a, b) => b.length - a.length);
 
 function loadVerificationRegistry() {
   let registry;
@@ -43,6 +48,19 @@ const checks = loadVerificationRegistry();
 
 function nowIso() {
   return new Date().toISOString();
+}
+
+function redactOutput(value) {
+  let text = String(value || '');
+  for (const secret of secretValues) {
+    text = text.split(secret).join('[redacted-env-secret]');
+  }
+  return text
+    .replace(/\bgh[pousr]_[A-Za-z0-9_]{20,}\b/g, '[redacted-github-token]')
+    .replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, '[redacted-api-key]')
+    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[redacted-aws-key]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b/gi, 'Bearer [redacted]')
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[redacted-jwt]');
 }
 
 function gitText(args) {
@@ -105,11 +123,13 @@ function runCheck(check) {
   });
 
   const durationMs = Date.now() - startedAt;
-  const stdout = result.stdout || '';
-  const stderr = result.stderr || '';
+  const rawStdout = result.stdout || '';
+  const rawStderr = result.stderr || '';
   const exitCode = typeof result.status === 'number' ? result.status : 1;
-  const status = classifyStatus(check, exitCode, stdout, stderr);
-  const skipped = `${stdout}\n${stderr}`.includes(TEST_SKIP_MARKER);
+  const status = classifyStatus(check, exitCode, rawStdout, rawStderr);
+  const skipped = `${rawStdout}\n${rawStderr}`.includes(TEST_SKIP_MARKER);
+  const stdout = redactOutput(rawStdout);
+  const stderr = redactOutput(rawStderr);
 
   return {
     ...check,
@@ -162,6 +182,7 @@ function writeReports(results, summary, sourceIdentity) {
     guardrails: [
       'No GitHub PAT is required or read by this script.',
       'No OpenAI key is required or read by this script.',
+      'Command output is redacted before report persistence; external ingestion never receives raw stdout/stderr tails.',
       'Do not run fixture audits on real teen private content.',
       'Use GitHub Actions only as a release/PR backup while minutes are constrained.',
       'Skipped tests are warning evidence, never silent green proof.',
