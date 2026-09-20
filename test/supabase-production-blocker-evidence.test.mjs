@@ -6,6 +6,7 @@ import test from 'node:test';
 
 import {
   PRODUCTION_HISTORY_AUTHORITY_FLOOR,
+  retainSupabaseTargetIdentityFailureEvidence,
   verifySupabaseProductionSchema,
 } from '../scripts/verify-supabase-production-schema.mjs';
 import { publishProductionReleaseBlocker } from '../scripts/publish-production-release-observation.mjs';
@@ -73,6 +74,32 @@ test('missing Supabase token fails closed and retains redacted schema evidence',
   assert.doesNotMatch(evidenceText, /Bearer|secret-token/i);
 });
 
+test('target identity HTTP 401 fails before schema query but still retains bounded redacted evidence', async () => {
+  const { migrationsDir, evidencePath } = migrationFixture('sekret-schema-target-block-');
+  const token = 'secret-token-must-not-be-retained';
+
+  const evidence = await retainSupabaseTargetIdentityFailureEvidence({
+    token,
+    projectRef: 'tbsevonvegdnlyjgplmm',
+    migrationsDir,
+    evidencePath,
+  }, new Error('SUPABASE_TARGET_VERIFY_HTTP_401'));
+
+  assert.equal(evidence.schemaVersion, 3);
+  assert.equal(evidence.supabaseIdentity, null);
+  assert.equal(evidence.verified, false);
+  assert.equal(evidence.status, 'provider-auth-failed');
+  assert.equal(evidence.error, 'supabase_access_token_rejected');
+  assert.equal(evidence.expectedVersion, SCHEMA_HEAD);
+  assert.equal(evidence.liveMaxVersion, null);
+  assert.equal(evidence.schemaComparisonPerformed, false);
+  assert.equal(evidence.detail, 'Supabase target verification failed with HTTP 401 before schema evaluation.');
+
+  const evidenceText = fs.readFileSync(evidencePath, 'utf8');
+  assert.doesNotMatch(evidenceText, new RegExp(token));
+  assert.doesNotMatch(evidenceText, /Bearer/i);
+});
+
 test('response-body transport failure retains provider-query evidence', async () => {
   const { migrationsDir, evidencePath } = migrationFixture('sekret-schema-response-block-');
   const token = 'secret-token-must-not-be-retained';
@@ -115,10 +142,11 @@ test('blocked release receipt names Supabase preflight failure without inventing
   const schemaEvidencePath = path.join(tmp, 'supabase-production-schema.json');
   const missingCloudflarePath = path.join(tmp, 'cloudflare-native-deploy.json');
   fs.writeFileSync(schemaEvidencePath, JSON.stringify({
-    schemaVersion: 2,
+    schemaVersion: 3,
     verified: false,
     status: 'configuration-invalid',
     projectRef: 'tbsevonvegdnlyjgplmm',
+    supabaseIdentity: null,
     authorityFloorVersion: PRODUCTION_HISTORY_AUTHORITY_FLOOR,
     expectedVersion: SCHEMA_HEAD,
     liveMaxVersion: null,
