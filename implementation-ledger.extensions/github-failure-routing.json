@@ -7,7 +7,9 @@
     "The scanner captures exact workflow-run, job, pull-request or main-branch, and head-SHA evidence without mutating source code or workflow state.",
     "Failed jobs with no executed steps or logs are classified as runner_startup_failure or workflow_no_jobs rather than application regressions.",
     "Each failed GitHub job or step retains its own non-authorizing proof receipt instead of collapsing an entire failed run into one evidence receipt.",
-    "A clean local failure and a GitHub failure may share one source-neutral incident fingerprint only when repository, exact head SHA, and canonical failure key agree; dirty or unidentified local work is never cross-source correlatable.",
+    "A source-clean local failure and a GitHub failure may share one source-neutral incident fingerprint only when repository, exact head SHA, and canonical failure key agree; dirty or unidentified source work is never cross-source correlatable.",
+    "Source cleanliness excludes only reports/control-room/latest.json, reports/control-room/latest.md, and reports/control-room/test-skips-latest.json because the local verifier itself rewrites those receipts; their dirty count remains observable and every other dirty path blocks correlation.",
+    "Distinct non-correlatable local evidence gets distinct structural incident identity so unrelated dirty runs do not collapse.",
     "Failure proof cookies are source-specific evidence markers with authority=false, merge_authority=false, proof_satisfied=false, browser_cookie=false, and authorizing=false.",
     "Skipped unit and Playwright witnesses emit non-secret exact-head fingerprints and proof cookies with authority=false, remain investigation-required, and cannot satisfy complete proof.",
     "Completed GitHub workflows are inspected for emitted test-skip receipts and skipped jobs even when the workflow conclusion is success.",
@@ -27,6 +29,6 @@
   ],
   "verification": {
     "state": "partial",
-    "evidence": "Source contracts now cover cross-source exact-head incident identity, per-step failure proof receipts, dirty-worktree non-correlation, redacted local reports, exact failed-run routing, and local/GitHub skipped-proof observation. Exact-head workflow, real failed/skipped-run rehearsal, full suite, type/lint, Playwright, artifact inspection, review, and current-main ancestry remain required before merge."
+    "evidence": "Source contracts now cover cross-source exact-head incident identity, per-step failure proof receipts, source-dirty non-correlation, self-generated receipt exclusion without directory-wide ignores, distinct dirty-run identity, redacted local reports, exact failed-run routing, and local/GitHub skipped-proof observation. Exact-head workflow, real failed/skipped-run rehearsal, full suite, type/lint, Playwright, artifact inspection, review, and current-main ancestry remain required before merge."
   }
 }
