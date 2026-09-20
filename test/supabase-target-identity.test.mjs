@@ -139,18 +139,26 @@ test('production schema CLI verifies target identity before querying schema and 
   assert.match(schemaVerifier, /schemaVersion: 3/);
 });
 
-test('advisor ingestion refuses writes until the target is provider-verified and does not echo provider bodies in errors', () => {
+test('advisor ingestion refuses writes until the target is provider-verified and keeps provider material out of logs', () => {
   assert.match(advisorIngest, /verifySupabaseManagementIdentity/);
   assert.match(advisorIngest, /supabaseIdentity\?\.providerVerified/);
   assert.match(advisorIngest, /supabase_identity_fingerprint/);
   assert.doesNotMatch(advisorIngest, /body\.slice\(/);
   assert.doesNotMatch(advisorIngest, /text\.slice\(/);
+  assert.doesNotMatch(advisorIngest, /console\.log\(JSON\.stringify\(report/);
+  assert.match(advisorIngest, /SUPABASE_ADVISOR_REPORT target=/);
+  assert.match(advisorIngest, /SUPABASE_ADVISOR_REPORT_FAILED/);
 });
 
-test('auth email mutation verifies Supabase target before reading or patching Auth config', () => {
+test('auth email mutation verifies target and emits only bounded log summaries', () => {
   const verifyIndex = authEmail.indexOf('await verifySupabaseManagementIdentity');
   const beforeRead = authEmail.indexOf('const before = await request');
   const patch = authEmail.indexOf("await request(projectRef, accessToken, { method: 'PATCH'");
   assert.ok(verifyIndex >= 0 && beforeRead > verifyIndex && patch > verifyIndex);
   assert.match(authEmail, /supabaseIdentity,/);
+  assert.doesNotMatch(authEmail, /console\.log\(JSON\.stringify\(receipt/);
+  assert.doesNotMatch(authEmail, /payload\?\.(?:message|error)/);
+  assert.match(authEmail, /AUTH_EMAIL_PROVIDER_PLAN/);
+  assert.match(authEmail, /AUTH_EMAIL_PROVIDER_APPLIED/);
+  assert.match(authEmail, /AUTH_EMAIL_PROVIDER_FAILED/);
 });
