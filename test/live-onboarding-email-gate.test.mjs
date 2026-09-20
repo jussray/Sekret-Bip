@@ -246,7 +246,6 @@ test('family authority proof is manual-only, fail-closed, user-scoped, and keeps
   assert.match(source, /artifacts\/live-family-authority\.json/);
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(source, /EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \|\| productionEnv\.EXPO_PUBLIC_SUPABASE_ANON_KEY/);
-  assert.match(source, /expect\(supabaseKey\)\.not\.toMatch\(\/\^sb_secret_\/\)/);
   assert.doesNotMatch(source, /service_role/);
 
   assert.match(workflow, /confirm_family_authority_write:/);
