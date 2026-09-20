@@ -9,6 +9,8 @@ on:
       - Implementation Evidence
       - Playwright Smoke and Guardrails
       - Production Smoke
+      - Verify Cloudflare Native Deployment
+      - Reconcile app.sekretbip.net Frontend Ownership
       - Live Signup Proof
       - Controlled Account Cloud Comfort Proof
       - Owned Bip Signup Proof
