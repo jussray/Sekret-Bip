@@ -4,6 +4,47 @@
 -- to PUBLIC/auth.uid()-only predicates even though repository history and product
 -- semantics require permanent authenticated accounts. Keep this migration narrow:
 -- it changes policy role/predicates only and does not modify user data.
+--
+-- The legacy S2Tell compatibility path still uses bridge_shares. Production
+-- currently has its owner policies hardened, but the active migration chain must
+-- reproduce that state from an empty database instead of depending on legacy-only
+-- reference SQL or live-only drift.
+
+alter policy bridge_shares_owner_select
+on public.bridge_shares
+to authenticated
+using (
+  public.is_non_anonymous_user()
+  and auth.uid() = user_id
+);
+
+alter policy bridge_shares_owner_insert
+on public.bridge_shares
+to authenticated
+with check (
+  public.is_non_anonymous_user()
+  and auth.uid() = user_id
+);
+
+alter policy bridge_shares_owner_update
+on public.bridge_shares
+to authenticated
+using (
+  public.is_non_anonymous_user()
+  and auth.uid() = user_id
+)
+with check (
+  public.is_non_anonymous_user()
+  and auth.uid() = user_id
+);
+
+alter policy bridge_shares_owner_delete
+on public.bridge_shares
+to authenticated
+using (
+  public.is_non_anonymous_user()
+  and auth.uid() = user_id
+);
 
 alter policy "bridge_signals: teen read"
 on public.bridge_signals
