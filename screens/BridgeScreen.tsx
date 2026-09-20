@@ -236,6 +236,7 @@ export function BridgeScreen({
     } catch {
       setBridgeStatus('Bridge could not confirm delivery. Nothing was marked sent. Try again when the connection is available.');
       Alert.alert('Could not send to Bridge', 'Nothing was marked sent. Check your connection and try again.');
+      return false;
     } finally {
       setSending(false);
     }
