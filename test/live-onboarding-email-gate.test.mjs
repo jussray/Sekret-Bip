@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const root = process.cwd();
 const specPath = path.join(root, 'e2e/live-onboarding-email.spec.ts');
+const familySpecPath = path.join(root, 'e2e/live-family-authority.spec.ts');
 const liveConfigPath = path.join(root, 'playwright.live-onboarding.config.ts');
 const workflowPath = path.join(root, '.github/workflows/live-signup-proof.yml');
 const mailboxPath = path.join(root, 'scripts/live-signup-mailbox.mjs');
@@ -31,6 +32,7 @@ test('live onboarding email smoke separates always-run readiness from explicit l
   assert.match(workflow, /target_sha:/);
   assert.match(workflow, /preview_url:/);
   assert.match(workflow, /confirm_live_write:/);
+  assert.match(workflow, /confirm_family_authority_write:/);
   assert.doesNotMatch(workflow, /\n  push:/);
   assert.match(workflow, /group: live-signup-/);
   assert.match(workflow, /github\.event_name == 'workflow_dispatch'.*'write'.*github\.event\.pull_request\.number/);
@@ -39,6 +41,7 @@ test('live onboarding email smoke separates always-run readiness from explicit l
   assert.match(workflow, /GITHUB_EVENT_NAME.*workflow_dispatch/);
   assert.match(workflow, /CONFIRM_LIVE_WRITE.*true/);
   assert.match(workflow, /steps\.opt_in\.outputs\.enabled == 'true'/);
+  assert.match(workflow, /steps\.family_opt_in\.outputs\.enabled == 'true'/);
   assert.doesNotMatch(workflow, /wrangler deploy|deploy:web:production|deploy:api:production/);
 });
 
@@ -121,13 +124,13 @@ test('live onboarding email smoke proves returning-user authentication with boun
   assert.match(source, /not\.toHaveURL\(\/\\\/login/);
 });
 
-test('live signup proof uses a dedicated exact-target Playwright config', () => {
+test('live signup proof uses one dedicated exact-target Playwright config for signup and family authority proof', () => {
   const config = readText(liveConfigPath);
   const workflow = readText(workflowPath);
 
   assert.match(config, /LIVE_ONBOARDING_BASE_URL/);
   assert.match(config, /PRODUCTION_BASE_URL/);
-  assert.match(config, /testMatch: \['live-onboarding-email\.spec\.ts'\]/);
+  assert.match(config, /testMatch: \['live-onboarding-email\.spec\.ts', 'live-family-authority\.spec\.ts'\]/);
   assert.match(config, /timeout: 120_000/);
   assert.match(config, /workers: 1/);
   assert.match(config, /retries: 0/);
@@ -135,6 +138,7 @@ test('live signup proof uses a dedicated exact-target Playwright config', () => 
   assert.doesNotMatch(config, /proxy:\s*\{/);
   assert.doesNotMatch(config, /production-smoke\.spec\.ts|production-signup-transport\.spec\.ts/);
   assert.match(workflow, /npx playwright test --config=playwright\.live-onboarding\.config\.ts/);
+  assert.match(workflow, /npx playwright test e2e\/live-family-authority\.spec\.ts --config=playwright\.live-onboarding\.config\.ts/);
 });
 
 test('PR live signup readiness fails closed until an isolated exact-head Pages preview exists', () => {
@@ -191,7 +195,18 @@ test('live signup proof mailbox is disposable, non-personal, single-pass decoded
   const signupStep = workflow.indexOf('Create disposable account through exact preview UI');
   const confirmStep = workflow.indexOf('Confirm disposable signup email');
   const signInStep = workflow.indexOf('Prove returning-user sign in');
-  assert.ok(previewStep >= 0 && previewStep < readinessStep && readinessStep < mailboxStep && mailboxStep < signupStep && signupStep < confirmStep && confirmStep < signInStep);
+  const familyStep = workflow.indexOf('Prove exact-preview family authority boundaries');
+  const cleanupStep = workflow.indexOf('Remove disposable mailbox');
+  assert.ok(
+    previewStep >= 0
+      && previewStep < readinessStep
+      && readinessStep < mailboxStep
+      && mailboxStep < signupStep
+      && signupStep < confirmStep
+      && confirmStep < signInStep
+      && signInStep < familyStep
+      && familyStep < cleanupStep,
+  );
 });
 
 test('live signup proof workflow binds manual writes to an explicit exact head and preview', () => {
@@ -205,7 +220,48 @@ test('live signup proof workflow binds manual writes to an explicit exact head a
   assert.match(workflow, /LIVE_ONBOARDING_PHASE: readiness/);
   assert.match(workflow, /LIVE_ONBOARDING_PHASE: signup/);
   assert.match(workflow, /LIVE_ONBOARDING_PHASE: signin/);
+  assert.match(workflow, /LIVE_ONBOARDING_PHASE: family/);
   assert.doesNotMatch(workflow, /SUPABASE_SERVICE_ROLE_KEY|CLOUDFLARE_API_TOKEN|wrangler deploy/);
+});
+
+test('family authority proof is manual-only, fail-closed, user-scoped, and keeps receipts separate', () => {
+  const source = readText(familySpecPath);
+  const workflow = readText(workflowPath);
+
+  assert.match(source, /phase === 'family' \|\| phase === 'all'/);
+  assert.match(source, /test\.skip\(!shouldRunFamily/);
+  assert.match(source, /SEKRET_CONTROLLED_GUARDIAN_EMAIL/);
+  assert.match(source, /SEKRET_CONTROLLED_GUARDIAN_PASSWORD/);
+  assert.match(source, /CONTROLLED_GUARDIAN_FIXTURE_MISSING/);
+  assert.match(source, /verification_state.*VERIFIED_GUARDIAN/);
+  assert.match(source, /parent_link_state.*active/);
+  assert.match(source, /verification_state\)\.not\.toBe\('VERIFIED_TEEN'\)/);
+  assert.match(source, /journal_entries\?select=id&user_id=eq\.\$\{teenProvider\.userId\}/);
+  assert.match(source, /expect\(forbiddenTeenJournal\)\.toEqual\(\[\]\)/);
+  assert.match(source, /circle_profiles/);
+  assert.match(source, /anonymous bip/);
+  assert.match(source, /bridge_signals/);
+  assert.match(source, /teen_age_assurance_receipts/);
+  assert.match(source, /jr_parental_consent_receipts/);
+  assert.match(source, /artifacts\/live-family-authority\.json/);
+  assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY|sb_secret_/);
+  assert.doesNotMatch(source, /service_role/);
+
+  assert.match(workflow, /confirm_family_authority_write:/);
+  assert.match(workflow, /CONFIRM_FAMILY_AUTHORITY_WRITE/);
+  assert.match(workflow, /CONFIRM_LIVE_WRITE.*true[\s\S]*CONFIRM_FAMILY_AUTHORITY_WRITE.*true/);
+  assert.match(workflow, /steps\.family_opt_in\.outputs\.enabled == 'true'/);
+  assert.match(workflow, /CONTROLLED_GUARDIAN_FIXTURE_MISSING/);
+  assert.match(workflow, /secrets\.SEKRET_CONTROLLED_GUARDIAN_EMAIL/);
+  assert.match(workflow, /secrets\.SEKRET_CONTROLLED_GUARDIAN_PASSWORD/);
+  assert.match(workflow, /artifacts\/live-family-authority\.json/);
+
+  const familyStep = workflow.slice(
+    workflow.indexOf('      - name: Prove exact-preview family authority boundaries'),
+    workflow.indexOf('\n      - name:', workflow.indexOf('      - name: Prove exact-preview family authority boundaries') + 1),
+  );
+  assert.match(familyStep, /if: steps\.family_opt_in\.outputs\.enabled == 'true'/);
+  assert.doesNotMatch(familyStep, /SUPABASE_SERVICE_ROLE_KEY|service_role|sb_secret_/);
 });
 
 test('live onboarding email smoke proves provider acceptance, not just code generation', () => {
