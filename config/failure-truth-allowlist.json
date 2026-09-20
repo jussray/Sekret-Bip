@@ -1,11 +1,4 @@
 {
   "schemaVersion": 1,
-  "entries": [
-    {
-      "path": "screens/BridgeScreen.tsx",
-      "contains": "Bridge could not confirm delivery. Nothing was marked sent.",
-      "classification": "failure",
-      "reason": "Bridge delivery failure is explicitly surfaced to the teen and never marks the signal sent; this catch contains no success fallback."
-    }
-  ]
+  "entries": []
 }
