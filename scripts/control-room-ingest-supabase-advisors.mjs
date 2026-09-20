@@ -137,7 +137,6 @@ async function main() {
         catch {
           errors.push({
             kind: result.kind,
-            fingerprint: fingerprint(projectRef, result.kind, lint),
             error: 'SUPABASE_ADVISOR_INGEST_FAILED',
           });
         }
@@ -157,11 +156,7 @@ async function main() {
   };
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  const targetName = supabaseIdentity?.identity?.target ?? target?.name ?? 'unknown';
-  const identityFingerprint = supabaseIdentity?.fingerprint ?? 'unverified';
-  console.log(
-    `SUPABASE_ADVISOR_REPORT target=${targetName} fingerprint=${identityFingerprint} findings=${report.finding_count} ingested=${ingestedCount} errors=${errors.length}`,
-  );
+  console.log(`SUPABASE_ADVISOR_REPORT_COMPLETE findings=${report.finding_count} ingested=${ingestedCount} errors=${errors.length}`);
   if (errors.length) process.exitCode = 1;
 }
 
