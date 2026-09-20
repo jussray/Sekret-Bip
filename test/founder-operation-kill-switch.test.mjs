@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import test from 'node:test';
 import {
@@ -63,6 +64,23 @@ test('generic HTTP operation ids are stable and bounded', () => {
   assert.match(stableHttpOperationId('GET', '/'), /^http:get:root$/);
 });
 
+test('generic repo-operation gate can guard any stable scope and operation id', () => {
+  const script = new URL('../scripts/founder-operation-gate.mjs', import.meta.url);
+  const allowed = spawnSync(process.execPath, [script.pathname, 'provider', 'supabase:migrations'], {
+    encoding: 'utf8',
+    env: { ...process.env, FOUNDER_OPERATION_KILL_SWITCH: 'off' },
+  });
+  assert.equal(allowed.status, 0);
+  assert.match(allowed.stdout, /FOUNDER_OPERATION_ALLOWED/);
+
+  const blocked = spawnSync(process.execPath, [script.pathname, 'provider', 'supabase:migrations'], {
+    encoding: 'utf8',
+    env: { ...process.env, FOUNDER_OPERATION_KILL_SWITCH: 'op:supabase:migrations' },
+  });
+  assert.equal(blocked.status, 75);
+  assert.match(blocked.stderr, /FOUNDER_OPERATION_PAUSED/);
+});
+
 test('production worker is wrapped by the founder guard entrypoint', () => {
   const wrangler = fs.readFileSync(new URL('../wrangler.toml', import.meta.url), 'utf8');
   const wrapper = fs.readFileSync(new URL('../worker/founder-guard-entry.ts', import.meta.url), 'utf8');
@@ -73,6 +91,7 @@ test('production worker is wrapped by the founder guard entrypoint', () => {
   assert.match(wrapper, /operation: 'bridge:summary-generate'/);
   assert.match(wrapper, /operation: 'email:inbound'/);
   assert.match(wrapper, /FOUNDER_OPERATION_PAUSED/);
+  assert.doesNotMatch(wrapper, /scope: decision\.scope,\n\s+operation: decision\.operation,\n\s+reason: decision\.reason,\n\s+}\), \{/);
 });
 
 test('direct Control Room mission execution checks the same founder switch before spawn', () => {
@@ -84,4 +103,13 @@ test('direct Control Room mission execution checks the same founder switch befor
   assert.match(agent, /scope: 'control-room'/);
   assert.match(agent, /operation: `mission:\$\{missionId\}`/);
   assert.match(agent, /process\.exit\(75\)/);
+});
+
+test('client preserves founder pause as a non-retryable error instead of voice failure', () => {
+  const contract = fs.readFileSync(new URL('../src/contracts/sekretApi.ts', import.meta.url), 'utf8');
+  const client = fs.readFileSync(new URL('../src/services/backend/sekretClient.ts', import.meta.url), 'utf8');
+  assert.match(contract, /\| 'FOUNDER_PAUSED'/);
+  assert.match(client, /serverCode === FOUNDER_PAUSE_CODE\) return 'FOUNDER_PAUSED'/);
+  assert.match(client, /serverCode === FOUNDER_PAUSE_CODE\) return false/);
+  assert.match(client, /typeof body\.retryable === 'boolean'/);
 });

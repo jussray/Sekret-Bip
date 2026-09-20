@@ -61,18 +61,11 @@ function securityAndCorsHeaders(request: Request, env: FounderKillSwitchEnv): Re
   return headers;
 }
 
-function pausedResponse(
-  request: Request,
-  env: FounderKillSwitchEnv,
-  decision: ReturnType<typeof evaluateFounderOperationKillSwitch>,
-): Response {
+function pausedResponse(request: Request, env: FounderKillSwitchEnv): Response {
   return new Response(JSON.stringify({
     error: "Se'kret Bip is temporarily paused by the founder.",
     code: 'FOUNDER_OPERATION_PAUSED',
     retryable: false,
-    scope: decision.scope,
-    operation: decision.operation,
-    reason: decision.reason,
   }), {
     status: 503,
     headers: securityAndCorsHeaders(request, env),
@@ -88,7 +81,15 @@ export default {
         rawReason: env.FOUNDER_OPERATION_KILL_SWITCH_REASON,
         ...guarded,
       });
-      if (decision.blocked) return pausedResponse(request, env, decision);
+      if (decision.blocked) {
+        console.warn('[founder-operation-kill-switch]', {
+          scope: decision.scope,
+          operation: decision.operation,
+          reason: decision.reason,
+          invalidConfiguration: decision.invalidConfiguration,
+        });
+        return pausedResponse(request, env);
+      }
     }
     return voiceEntry.fetch(request, env as never, ctx);
   },
@@ -104,6 +105,12 @@ export default {
       operation: 'email:inbound',
     });
     if (decision.blocked) {
+      console.warn('[founder-operation-kill-switch]', {
+        scope: decision.scope,
+        operation: decision.operation,
+        reason: decision.reason,
+        invalidConfiguration: decision.invalidConfiguration,
+      });
       const rejectable = message as Parameters<typeof voiceEntry.email>[0] & { setReject?: (reason: string) => void };
       if (typeof rejectable.setReject === 'function') {
         rejectable.setReject("Se'kret Bip email processing is temporarily paused.");
