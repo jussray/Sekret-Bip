@@ -86,15 +86,25 @@ Playwright paths that can currently skip tests load the Control Room skip report
 reports/control-room/playwright-test-skips-latest.json
 ```
 
-`npm run verify:local` records the current Git repository, exact HEAD, branch, whether the worktree was clean at verification start, and whether the result is eligible for cross-source correlation. It does not persist changed filenames or diff content merely to establish that identity.
+`npm run verify:local` records the current Git repository, exact HEAD, branch, whether **source work** was clean at verification start, and whether the result is eligible for cross-source correlation. It does not persist changed filenames or diff content merely to establish that identity.
+
+Source cleanliness deliberately excludes only the three local receipt files that this verification path itself rewrites:
+
+```text
+reports/control-room/latest.json
+reports/control-room/latest.md
+reports/control-room/test-skips-latest.json
+```
+
+Their dirty count is recorded separately as `generated_report_dirty_count`; they are not treated as source authority. No directory-wide ignore exists here. Any other modified or untracked path remains source dirtiness and blocks cross-source correlation.
 
 A local result is cross-source correlatable only when all of these are true:
 
 - the repository identity is valid;
 - the exact 40-character HEAD is known;
-- the worktree is clean.
+- source work is clean after excluding only the three verifier-generated receipt files above.
 
-Dirty or unidentified local work remains useful local evidence, but it receives a source-local incident subject and can never impersonate a GitHub exact-head failure.
+Dirty or unidentified source work remains useful local evidence, but it receives a source-local incident subject and can never impersonate a GitHub exact-head failure. Distinct non-correlatable local evidence gets a structural evidence fingerprint so unrelated dirty runs do not collapse into one incident.
 
 Before a local report is written, command output tails redact environment-held secret values and common credential shapes. Opt-in external ingestion deliberately omits raw stdout/stderr tails from issue metadata.
 
@@ -123,7 +133,7 @@ and is rendered as:
 test_failure:<sha256>
 ```
 
-A clean local `unit-tests` failure and a GitHub `Run npm test` failure at the same repository and exact HEAD therefore converge on the same incident fingerprint. A head change creates a new incident. Dirty local work never shares this source-neutral subject.
+A source-clean local `unit-tests` failure and a GitHub `Run npm test` failure at the same repository and exact HEAD therefore converge on the same incident fingerprint. A head change creates a new incident. Dirty local source work never shares this source-neutral subject.
 
 Canonical aliases are intentionally narrow and repository-grounded. For example, current CI step names such as `Run npm test`, `Run npm run type-check`, `Run npm run lint`, `Run npm run test:oracle`, `Run npm run test:voice-intelligence`, `Run npm run audit:runtime-assets`, and `Run npm run verify:room-archives` map to the corresponding existing local verification check IDs. Unknown step names keep their own normalized key rather than being guessed into an unrelated incident.
 
