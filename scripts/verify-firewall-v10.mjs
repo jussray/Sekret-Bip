@@ -76,9 +76,8 @@ for (const route of routes) {
 }
 
 require(/name = "sekret-backend"/.test(wrangler), 'wrangler Worker name must match policy');
-require(/main = "worker\/founder-guard-entry\.ts"/.test(wrangler), 'founder-guard-entry.ts must remain the authoritative Worker front door');
-require(/import voiceEntry from ['"]\.\/voice-entry['"]/.test(founderGuard), 'founder guard must delegate to the canonical voice runtime');
-require(/return voiceEntry\.fetch\(request, env as never, ctx\)/.test(founderGuard), 'founder guard fetch must preserve canonical voice runtime delegation');
+require(/main = "worker\/voice-entry\.ts"/.test(wrangler), 'voice-entry.ts must remain the authoritative Worker front door');
+require(/export \{ default \} from ['"]\.\/voice-entry['"]/.test(founderGuard), 'founder-guard-entry.ts must remain a compatibility-only alias to the canonical voice runtime');
 require(/\[\[ratelimits\]\][\s\S]*name = "SEKRET_RATE_LIMITER"[\s\S]*namespace_id = "1001"[\s\S]*simple = \{ limit = 60, period = 10 \}/.test(wrangler), 'Cloudflare rate-limit binding must use first-class Wrangler ratelimits syntax');
 require(!/\[\[unsafe\.bindings\]\][\s\S]*type = "ratelimit"/.test(wrangler), 'legacy unsafe ratelimit binding syntax must not return');
 require(/^workers_dev = false$/m.test(wrangler), 'production Worker must not expose a workers.dev hostname');
@@ -119,4 +118,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log('Founder Shield verified: founder guard and canonical voice runtime preserve repo controls; provider-managed custom-domain ownership and live Cloudflare controls remain separate proof authorities.');
+console.log('Founder Shield verified: canonical voice runtime preserves repo controls; founder-guard-entry remains a compatibility alias; provider-managed custom-domain ownership and live Cloudflare controls remain separate proof authorities.');
