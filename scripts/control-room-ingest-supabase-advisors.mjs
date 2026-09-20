@@ -62,8 +62,17 @@ async function main() {
       headers: { authorization: `Bearer ${token}` },
     });
     if (!response.ok) throw new Error(`SUPABASE_ADVISOR_${kind.toUpperCase()}_HTTP_${response.status}`);
-    const parsed = await response.json().catch(() => ({}));
-    return { kind, skipped: false, lints: Array.isArray(parsed.lints) ? parsed.lints : [] };
+
+    let parsed;
+    try {
+      parsed = await response.json();
+    } catch {
+      throw new Error(`SUPABASE_ADVISOR_${kind.toUpperCase()}_JSON_INVALID`);
+    }
+    if (!parsed || !Array.isArray(parsed.lints)) {
+      throw new Error(`SUPABASE_ADVISOR_${kind.toUpperCase()}_SHAPE_INVALID`);
+    }
+    return { kind, skipped: false, lints: parsed.lints };
   }
 
   async function ingest(kind, lint) {
