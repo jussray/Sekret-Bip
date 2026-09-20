@@ -191,6 +191,62 @@ async function failWithEvidence(config, evidence, status, errorCode, error) {
   throw error;
 }
 
+export function classifySupabaseTargetIdentityFailure(error) {
+  const message = errorMessage(error);
+  if (message === 'SUPABASE_TARGET_VERIFY_HTTP_401') {
+    return {
+      status: 'provider-auth-failed',
+      errorCode: 'supabase_access_token_rejected',
+      detail: 'Supabase target verification failed with HTTP 401 before schema evaluation.',
+    };
+  }
+  if (message === 'SUPABASE_TARGET_VERIFY_HTTP_403') {
+    return {
+      status: 'provider-auth-failed',
+      errorCode: 'supabase_access_token_forbidden',
+      detail: 'Supabase target verification failed with HTTP 403 before schema evaluation.',
+    };
+  }
+  if (message.startsWith('SUPABASE_TARGET_PROVIDER_REF_MISMATCH')) {
+    return {
+      status: 'target-identity-failed',
+      errorCode: 'supabase_target_provider_ref_mismatch',
+      detail: 'Supabase provider readback did not match the registered project target.',
+    };
+  }
+  if (message.startsWith('SUPABASE_TARGET_VERIFY_REQUEST_FAILED')) {
+    return {
+      status: 'provider-query-failed',
+      errorCode: 'supabase_target_verify_request_failed',
+      detail: 'Supabase target verification request failed before schema evaluation.',
+    };
+  }
+  return {
+    status: 'target-identity-failed',
+    errorCode: 'supabase_target_identity_verification_failed',
+    detail: 'Supabase target identity could not be verified before schema evaluation.',
+  };
+}
+
+export async function retainSupabaseTargetIdentityFailureEvidence(config, error) {
+  const evidence = initialEvidence(config, null);
+  try {
+    const repositoryMigrationCandidates = await core.deriveRepositoryMigrationIdentities(config.migrationsDir);
+    const repositoryMigrations = excludeProductionReceiptMarkers(repositoryMigrationCandidates);
+    evidence.expectedVersion = core.normalizeSchemaVersion(repositoryMigrations.at(-1)?.version ?? null);
+  } catch {
+    evidence.expectedVersion = null;
+  }
+
+  const failure = classifySupabaseTargetIdentityFailure(error);
+  evidence.status = failure.status;
+  evidence.error = failure.errorCode;
+  evidence.detail = failure.detail;
+  evidence.checkedAt = new Date().toISOString();
+  await writeEvidence(config.evidencePath, evidence);
+  return evidence;
+}
+
 export function classifyManagementApiHttpFailure(status) {
   const httpStatus = Number(status);
   if (httpStatus === 401) {
@@ -379,10 +435,26 @@ export async function verifySupabaseProductionSchema(options = {}) {
 }
 
 async function main() {
-  const target = await resolveSupabaseTarget();
-  process.env.SUPABASE_PROJECT_REF = target.projectRef;
-  if (!clean(process.env.SUPABASE_URL)) process.env.SUPABASE_URL = target.projectUrl;
-  const supabaseIdentity = await verifySupabaseManagementIdentity({ target });
+  let target;
+  try {
+    target = await resolveSupabaseTarget();
+    process.env.SUPABASE_PROJECT_REF = target.projectRef;
+    if (!clean(process.env.SUPABASE_URL)) process.env.SUPABASE_URL = target.projectUrl;
+  } catch (error) {
+    const config = core.configFromEnv(process.env);
+    await retainSupabaseTargetIdentityFailureEvidence(config, error);
+    throw new Error('SUPABASE_TARGET_RESOLUTION_FAILED');
+  }
+
+  let supabaseIdentity;
+  try {
+    supabaseIdentity = await verifySupabaseManagementIdentity({ target });
+  } catch (error) {
+    const config = core.configFromEnv(process.env);
+    await retainSupabaseTargetIdentityFailureEvidence(config, error);
+    throw new Error(classifySupabaseTargetIdentityFailure(error).errorCode);
+  }
+
   const evidence = await verifySupabaseProductionSchema({ supabaseIdentity });
   process.stdout.write(
     `Supabase production schema verified at ${evidence.expectedVersion}; `
@@ -392,8 +464,8 @@ async function main() {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  main().catch((error) => {
-    process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
+  main().catch(() => {
+    process.stderr.write('SUPABASE_PRODUCTION_SCHEMA_VERIFY_FAILED\n');
     process.exitCode = 1;
   });
 }
