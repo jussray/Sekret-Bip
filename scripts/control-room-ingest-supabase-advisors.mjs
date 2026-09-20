@@ -31,7 +31,7 @@ async function post(urlBase, pathname, body) {
     body: JSON.stringify(body),
   });
   const text = await response.text();
-  if (!response.ok) throw new Error(`Supabase control-room write failed with HTTP ${response.status}.`);
+  if (!response.ok) throw new Error(`SUPABASE_CONTROL_ROOM_WRITE_HTTP_${response.status}`);
   return text ? JSON.parse(text) : null;
 }
 
@@ -45,9 +45,8 @@ async function main() {
     try {
       target = await resolveSupabaseTarget();
       supabaseIdentity = await verifySupabaseManagementIdentity({ target, accessToken: token });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push({ kind: 'identity', error: message });
+    } catch {
+      errors.push({ kind: 'identity', error: 'SUPABASE_TARGET_IDENTITY_VERIFICATION_FAILED' });
     }
   }
 
@@ -62,7 +61,7 @@ async function main() {
     const response = await fetch(`https://api.supabase.com/v1/projects/${projectRef}/advisors/${kind}`, {
       headers: { authorization: `Bearer ${token}` },
     });
-    if (!response.ok) throw new Error(`${kind}: Supabase advisor request failed with HTTP ${response.status}.`);
+    if (!response.ok) throw new Error(`SUPABASE_ADVISOR_${kind.toUpperCase()}_HTTP_${response.status}`);
     const parsed = await response.json().catch(() => ({}));
     return { kind, skipped: false, lints: Array.isArray(parsed.lints) ? parsed.lints : [] };
   }
@@ -94,7 +93,7 @@ async function main() {
       resolved: false,
     });
     const eventId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
-    if (!eventId) throw new Error('Advisor audit event insert returned no id.');
+    if (!eventId) throw new Error('SUPABASE_ADVISOR_EVENT_ID_MISSING');
 
     return post(targetUrl, '/rest/v1/rpc/upsert_control_room_issue', {
       p_fingerprint: fingerprint(projectRef, kind, lint),
@@ -115,7 +114,7 @@ async function main() {
   if (!errors.length || reportOnly) {
     for (const kind of ['security', 'performance']) {
       try { results.push(await getAdvisors(kind)); }
-      catch (error) { errors.push({ kind, error: error instanceof Error ? error.message : String(error) }); }
+      catch { errors.push({ kind, error: `SUPABASE_ADVISOR_${kind.toUpperCase()}_REQUEST_FAILED` }); }
     }
   }
 
@@ -126,11 +125,11 @@ async function main() {
     for (const result of results) {
       for (const lint of result.lints) {
         try { await ingest(result.kind, lint); ingestedCount += 1; }
-        catch (error) {
+        catch {
           errors.push({
             kind: result.kind,
             fingerprint: fingerprint(projectRef, result.kind, lint),
-            error: error instanceof Error ? error.message : String(error),
+            error: 'SUPABASE_ADVISOR_INGEST_FAILED',
           });
         }
       }
@@ -149,11 +148,15 @@ async function main() {
   };
   fs.mkdirSync(path.dirname(reportPath), { recursive: true });
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
-  console.log(JSON.stringify(report, null, 2));
+  const targetName = supabaseIdentity?.identity?.target ?? target?.name ?? 'unknown';
+  const identityFingerprint = supabaseIdentity?.fingerprint ?? 'unverified';
+  console.log(
+    `SUPABASE_ADVISOR_REPORT target=${targetName} fingerprint=${identityFingerprint} findings=${report.finding_count} ingested=${ingestedCount} errors=${errors.length}`,
+  );
   if (errors.length) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+main().catch(() => {
+  console.error('SUPABASE_ADVISOR_REPORT_FAILED');
   process.exitCode = 1;
 });
