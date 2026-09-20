@@ -9,7 +9,7 @@ import {
 const reportOnly = process.env.CONTROL_ROOM_REPORT_ONLY === 'true';
 const token = process.env.SUPABASE_MANAGEMENT_API_TOKEN || process.env.SUPABASE_ACCESS_TOKEN;
 const url = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const reportPath = path.join(process.cwd(), 'artifacts', 'control-room', 'supabase-advisors-report.json');
 
 const severity = (level) => {
