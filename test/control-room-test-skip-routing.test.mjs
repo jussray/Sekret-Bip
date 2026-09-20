@@ -131,4 +131,6 @@ test('GitHub watcher scans successful, failed, and skipped launch-proof workflow
   assert.match(scanner, /github-test-skips-latest\.json/);
   assert.match(scanner, /p_fingerprint: item\.fingerprint/);
   assert.match(scanner, /authority: false/);
+  assert.match(scanner, /githubText\(pathname\)[\s\S]*headers: githubHeaders\(\)/);
+  assert.doesNotMatch(scanner, /githubHeaders\('text\/plain'\)/);
 });
