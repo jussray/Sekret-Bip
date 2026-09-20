@@ -3,7 +3,7 @@ import { evaluateFounderOperationKillSwitch } from '../shared/founder-operation-
 
 const [scope, operation] = process.argv.slice(2);
 if (!scope || !operation) {
-  console.error('Usage: node scripts/founder-operation-gate.mjs <scope> <operation>');
+  console.error('FOUNDER_OPERATION_GATE_USAGE_ERROR');
   process.exit(64);
 }
 
@@ -21,8 +21,10 @@ try {
 }
 
 if (decision.blocked) {
-  console.error(`FOUNDER_OPERATION_PAUSED scope=${decision.scope} operation=${decision.operation} reason=${decision.reason}`);
+  // Keep founder pause logs machine-readable without echoing operation IDs,
+  // environment-provided reasons, or any other caller-controlled values.
+  console.error('FOUNDER_OPERATION_PAUSED');
   process.exit(75);
 }
 
-console.log(`FOUNDER_OPERATION_ALLOWED scope=${decision.scope} operation=${decision.operation}`);
+console.log('FOUNDER_OPERATION_ALLOWED');
