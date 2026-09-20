@@ -87,6 +87,7 @@ function buildFailureIdentity({
   const head = normalizedHeadSha(headSha);
   const key = canonicalFailureKey(failureKey);
   const canCorrelate = correlatable === true && repo !== 'unknown/unknown' && head !== 'unknown';
+  const evidenceFingerprint = sha256(stableJson(evidence));
 
   const incidentSubject = canCorrelate
     ? { kind: 'git-head', repository: repo, head_sha: head, failure_key: key }
@@ -96,6 +97,7 @@ function buildFailureIdentity({
         base_head_sha: head,
         failure_key: key,
         source: slug(source),
+        evidence_fingerprint: evidenceFingerprint,
         correlatable: false,
       };
 
