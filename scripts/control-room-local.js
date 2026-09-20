@@ -9,6 +9,7 @@ const registryPath = path.join(root, 'src', 'config', 'controlRoomVerificationRe
 const reportDir = path.join(root, 'reports', 'control-room');
 const jsonPath = path.join(reportDir, 'latest.json');
 const mdPath = path.join(reportDir, 'latest.md');
+const TEST_SKIP_MARKER = 'CONTROL_ROOM_TEST_SKIP_RECEIPT ';
 
 function loadVerificationRegistry() {
   let registry;
@@ -46,6 +47,7 @@ function nowIso() {
 
 function classifyStatus(check, exitCode, stdout, stderr) {
   const combined = `${stdout}\n${stderr}`;
+  if (exitCode === 0 && combined.includes(TEST_SKIP_MARKER)) return 'warning';
   if (exitCode === 0) return 'pass';
   if (check.id === 'unit-tests' && exitCode === 2 && combined.includes('CONTROL_ROOM_NO_TESTS')) return 'warning';
   return 'fail';
@@ -65,6 +67,7 @@ function runCheck(check) {
   const stderr = result.stderr || '';
   const exitCode = typeof result.status === 'number' ? result.status : 1;
   const status = classifyStatus(check, exitCode, stdout, stderr);
+  const skipped = `${stdout}\n${stderr}`.includes(TEST_SKIP_MARKER);
 
   return {
     ...check,
@@ -75,7 +78,9 @@ function runCheck(check) {
     stdoutTail: stdout.split('\n').slice(-40).join('\n').trim(),
     stderrTail: stderr.split('\n').slice(-40).join('\n').trim(),
     recommendation: status === 'warning'
-      ? 'No unit tests were discovered. Add tests or correct the configured test location before release.'
+      ? skipped
+        ? 'One or more tests were skipped. Inspect the test-skip receipt; a skip is not a pass and cannot satisfy complete proof.'
+        : 'No unit tests were discovered. Add tests or correct the configured test location before release.'
       : null,
   };
 }
@@ -116,6 +121,7 @@ function writeReports(results, summary) {
       'No OpenAI key is required or read by this script.',
       'Do not run fixture audits on real teen private content.',
       'Use GitHub Actions only as a release/PR backup while minutes are constrained.',
+      'Skipped tests are warning evidence, never silent green proof.',
     ],
   };
 
@@ -152,6 +158,12 @@ function writeReports(results, summary) {
         lines.push('');
         lines.push('```text');
         lines.push(check.stderrTail);
+        lines.push('```');
+      }
+      if (check.stdoutTail) {
+        lines.push('');
+        lines.push('```text');
+        lines.push(check.stdoutTail);
         lines.push('```');
       }
     }
