@@ -1,4 +1,3 @@
-import path from 'node:path';
 import {
   buildSkipObservation,
   parseSkipMarker,
@@ -185,7 +184,7 @@ if (shouldIngest) {
   for (const observation of observations) await ingestObservation(observation);
 }
 
-const { report, reportPath } = writeSkipReport(observations, {
+writeSkipReport(observations, {
   root,
   filename: 'github-test-skips-latest.json',
   source: 'github_actions',
@@ -202,11 +201,4 @@ const { report, reportPath } = writeSkipReport(observations, {
   },
 });
 
-console.log(JSON.stringify({
-  report_path: path.relative(root, reportPath),
-  skip_count: report.skip_count,
-  workflow_skip_count: report.workflow_skip_count,
-  job_skip_count: report.job_skip_count,
-  marker_skip_count: report.marker_skip_count,
-  ingested: shouldIngest,
-}, null, 2));
+console.log('CONTROL_ROOM_GITHUB_TEST_SKIP_REPORT_WRITTEN');
