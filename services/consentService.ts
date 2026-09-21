@@ -106,7 +106,9 @@ async function persistConsent(
   });
 
   if (error) {
-    throw new Error(`consent_persistence_failed:${error.message}`);
+    // Keep provider details out of user-facing consent UI and logs. The caller
+    // receives a stable error code and must remain on the consent step.
+    throw new Error(`consent_persistence_failed:server_rejected_write`);
   }
 
   return normalizePersistedRecord(data, category, granted);
@@ -141,7 +143,7 @@ export const consentService = {
       .eq('user_id', userId);
 
     if (error) {
-      console.warn('[consentService] Failed to load consents:', error.message);
+      console.warn('[consentService] Consent state read failed; treating required consent as incomplete.');
       return;
     }
 
@@ -156,7 +158,8 @@ export const consentService = {
   },
 
   has(category: ConsentCategory): boolean {
-    return cache.get(category)?.granted === true;
+    const record = cache.get(category);
+    return record?.granted === true && record.version === CONSENT_VERSION;
   },
 
   async grant(userId: string, category: ConsentCategory): Promise<void> {
