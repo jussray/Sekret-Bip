@@ -50,11 +50,28 @@ test('sign-out still clears persisted private account caches below the UI layer'
   }
 });
 
-test('the consent singleton has an explicit sign-out reset contract and is consumed', () => {
-  const service = read('src/services/consentService.ts');
+test('all consent callers share the canonical server-backed singleton', () => {
+  const compatibilityService = read('src/services/consentService.ts');
+  const canonicalService = read('services/consentService.ts');
   const context = read('src/context/AppContext.tsx');
 
-  assert.match(service, /reset\(\): void/);
-  assert.match(service, /this\.granted\.clear\(\)/);
+  assert.match(compatibilityService, /from '\.\.\/\.\.\/services\/consentService'/);
+  assert.doesNotMatch(compatibilityService, /AsyncStorage/);
+  assert.doesNotMatch(compatibilityService, /Supabase write failed.*cached locally/);
+  assert.match(canonicalService, /reset\(\): void \{\s*cache\.clear\(\);\s*\}/);
   assert.match(context, /consentService\.reset\(\)/);
+});
+
+test('consent server reads fail closed and persistence receipts are exact', () => {
+  const service = read('services/consentService.ts');
+
+  const authGate = service.indexOf('if (authError || !user || user.id !== userId)');
+  const clearBeforeRead = service.indexOf('cache.clear();', authGate);
+  const serverRead = service.indexOf(".from('user_consents')", clearBeforeRead);
+  assert.ok(authGate >= 0 && clearBeforeRead > authGate && serverRead > clearBeforeRead);
+
+  assert.match(service, /if \(candidate\.category !== expectedCategory\)/);
+  assert.match(service, /if \(candidate\.granted !== expectedGranted\)/);
+  assert.match(service, /if \(candidate\.version !== CONSENT_VERSION\)/);
+  assert.match(service, /consent_persistence_missing_timestamp/);
 });
