@@ -44,8 +44,8 @@ function client() {
 
 function normalizePersistedRecord(
   value: unknown,
-  fallbackCategory: ConsentCategory,
-  fallbackGranted: boolean,
+  expectedCategory: ConsentCategory,
+  expectedGranted: boolean,
 ): ConsentRecord {
   const row = Array.isArray(value) ? value[0] : value;
   if (!row || typeof row !== 'object') {
@@ -53,11 +53,26 @@ function normalizePersistedRecord(
   }
 
   const candidate = row as Partial<ConsentRecord>;
+  if (candidate.category !== expectedCategory) {
+    throw new Error('consent_persistence_category_mismatch');
+  }
+  if (candidate.granted !== expectedGranted) {
+    throw new Error('consent_persistence_grant_mismatch');
+  }
+  if (candidate.version !== CONSENT_VERSION) {
+    throw new Error('consent_persistence_version_mismatch');
+  }
+
+  const timestamp = String(candidate.timestamp ?? '');
+  if (!timestamp) {
+    throw new Error('consent_persistence_missing_timestamp');
+  }
+
   return {
-    category: (candidate.category ?? fallbackCategory) as ConsentCategory,
-    granted: typeof candidate.granted === 'boolean' ? candidate.granted : fallbackGranted,
-    timestamp: String(candidate.timestamp ?? ''),
-    version: String(candidate.version ?? CONSENT_VERSION),
+    category: expectedCategory,
+    granted: expectedGranted,
+    timestamp,
+    version: CONSENT_VERSION,
   };
 }
 
@@ -94,12 +109,7 @@ async function persistConsent(
     throw new Error(`consent_persistence_failed:${error.message}`);
   }
 
-  const record = normalizePersistedRecord(data, category, granted);
-  if (!record.timestamp) {
-    throw new Error('consent_persistence_missing_timestamp');
-  }
-
-  return record;
+  return normalizePersistedRecord(data, category, granted);
 }
 
 export const consentService = {
@@ -120,6 +130,11 @@ export const consentService = {
       return;
     }
 
+    // Server state is authoritative. Clear any prior in-memory grants before the
+    // read so a failed/stale backend response can never preserve an older
+    // "complete" consent decision and bypass onboarding.
+    cache.clear();
+
     const { data, error } = await supabase
       .from('user_consents')
       .select('category, granted, timestamp, version')
@@ -130,7 +145,6 @@ export const consentService = {
       return;
     }
 
-    cache.clear();
     for (const row of data ?? []) {
       cache.set(row.category as ConsentCategory, {
         category: row.category as ConsentCategory,
@@ -164,6 +178,10 @@ export const consentService = {
   },
 
   clear(): void {
+    cache.clear();
+  },
+
+  reset(): void {
     cache.clear();
   },
 };
