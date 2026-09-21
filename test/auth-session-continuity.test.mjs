@@ -74,4 +74,7 @@ test('consent server reads fail closed and persistence receipts are exact', () =
   assert.match(service, /if \(candidate\.granted !== expectedGranted\)/);
   assert.match(service, /if \(candidate\.version !== CONSENT_VERSION\)/);
   assert.match(service, /consent_persistence_missing_timestamp/);
+  assert.match(service, /record\?\.granted === true && record\.version === CONSENT_VERSION/);
+  assert.match(service, /consent_persistence_failed:server_rejected_write/);
+  assert.doesNotMatch(service, /error\.message/);
 });
