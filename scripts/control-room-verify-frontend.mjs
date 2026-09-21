@@ -161,14 +161,13 @@ async function main() {
   console.log('Control Room: Verify Frontend mission starting...');
   const availability = await detectPlaywrightAvailability();
   const run = availability.available ? runPlaywright() : runFallback();
-  const { report, jsonPath, mdPath } = writeReports(availability, run);
+  const { report } = writeReports(availability, run);
   console.log(`Mode: ${report.run.mode}`);
   console.log(`Evidence: ${report.run.evidenceLevel}`);
   console.log(`Browser proof: ${report.run.browserProof ? 'YES' : 'NO'}`);
   console.log(`Complete browser proof: ${report.run.completeBrowserProof ? 'YES' : 'NO'}`);
   console.log(`Status: ${report.run.status.toUpperCase()}`);
-  console.log(`Report: ${path.relative(root, jsonPath)}`);
-  console.log(`Readable report: ${path.relative(root, mdPath)}`);
+  console.log('Frontend verification reports written.');
   process.exit(report.run.status === 'fail' ? 1 : 0);
 }
 
