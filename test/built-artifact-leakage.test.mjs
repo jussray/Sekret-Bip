@@ -68,3 +68,26 @@ test('built artifact audit detects configured secret values without exposing the
     cleanup(root);
   }
 });
+
+test('built artifact audit rejects symlinks instead of following them outside the canonical root', () => {
+  const root = fixture({ 'assets/app.js': 'safe' });
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'sekret-bip-artifact-outside-'));
+  try {
+    const outsideFile = path.join(outside, 'secret.txt');
+    fs.writeFileSync(outsideFile, 'SUPABASE_SERVICE_ROLE_KEY');
+    fs.symlinkSync(outsideFile, path.join(root, 'assets', 'outside-link.txt'));
+
+    const violations = auditBuiltArtifact(root, { env: {} }).violations;
+    assert.deepEqual(violations, ['assets/outside-link.txt: symbolic links are forbidden in built artifacts']);
+  } finally {
+    cleanup(root);
+    cleanup(outside);
+  }
+});
+
+test('built artifact audit refuses NUL-containing root paths', () => {
+  assert.throws(
+    () => auditBuiltArtifact(`dist\0outside`, { env: {} }),
+    /non-empty filesystem path/,
+  );
+});
