@@ -17,21 +17,53 @@ import {
   summarizeSekretMemory,
   type SekretMemory,
 } from '../../services/sekretMemory';
-import { buildSekretPresence } from '../../services/sekretPresence';
+import { buildSekretPresence, normalizeSekretPersonality } from '../../services/sekretPresence';
 import { buildSekretCheckIn } from '../../services/sekretCheckins';
 
 const STORAGE_KEY = 'sekret_companion_state';
 
 const PERSONALITY_LABELS: Record<string, string> = {
-  soft: "Raylene",
-  rylane: 'Rylane',
+  soft: 'Suhana',
+  raylene: 'Suhana',
+  suhana: 'Suhana',
+  rylane: 'Sy',
+  sy: 'Sy',
   cloud: "Cloud Se'kret",
-  night: 'Night Se\'kret',
+  night: "Night Se'kret",
 };
+
+function canonicalDisplayPersonality(value?: string): string {
+  const direct = value ? PERSONALITY_LABELS[value.trim().toLowerCase()] : undefined;
+  if (direct) return direct;
+
+  switch (normalizeSekretPersonality(value)) {
+    case 'sy':
+      return 'Sy';
+    case 'cloud':
+      return "Cloud Se'kret";
+    case 'night':
+      return "Night Se'kret";
+    default:
+      return 'Suhana';
+  }
+}
+
+function toPersistedPersonalityId(value?: string): 'soft' | 'rylane' | 'cloud' | 'night' {
+  switch (normalizeSekretPersonality(value)) {
+    case 'sy':
+      return 'rylane';
+    case 'cloud':
+      return 'cloud';
+    case 'night':
+      return 'night';
+    default:
+      return 'soft';
+  }
+}
 
 const DEFAULT_MEMORY_SUMMARY: MemorySummary = {
   favoriteMood: 'Thoughtful',
-  favoriteSekret: 'Raylene',
+  favoriteSekret: 'Suhana',
   commonTopics: ['breathing', 'rest'],
   streakDays: 0,
   lastCheckIn: 'Just met you.',
@@ -64,7 +96,7 @@ export const DEFAULT_COMPANION_STATE: CompanionState = {
   presenceMessage: 'I\u2019m here with you. No rush.',
   checkIn: null,
   lastUpdated: '',
-  personality: 'Raylene',
+  personality: 'Suhana',
 };
 
 function buildCompanionMemory(previous?: MemorySummary, input?: CompanionActivityInput): SekretMemory {
@@ -125,16 +157,24 @@ export function buildCheckIn(summary: MemorySummary, input: CompanionActivityInp
 }
 
 export function buildGreeting(personality: string, _level: CompanionLevel, _mood?: string) {
-  if (personality === 'Rylane') return 'Aight. What REALLY happened?';
-  if (personality === "Cloud Se'kret") return 'Something feels different today.';
-  if (personality === 'Night Se\'kret') return 'Rough night?';
-  return 'Friend... \uD83D\uDE2D okay, what happened?';
+  switch (normalizeSekretPersonality(personality)) {
+    case 'sy':
+      return 'Aight. What REALLY happened?';
+    case 'cloud':
+      return 'Something feels different today.';
+    case 'night':
+      return 'Rough night?';
+    default:
+      return 'Friend... \uD83D\uDE2D okay, what happened?';
+  }
 }
 
 export function buildCompanionSnapshot(input: CompanionActivityInput, previousState?: CompanionState) {
   const memorySummary = buildMemorySummary(input, previousState?.memorySummary);
   const companionLevel = buildCompanionLevel(memorySummary);
-  const personality = PERSONALITY_LABELS[input.selectedSekret || 'soft'] || previousState?.personality || 'Raylene';
+  const personality = input.selectedSekret
+    ? canonicalDisplayPersonality(input.selectedSekret)
+    : canonicalDisplayPersonality(previousState?.personality);
   const greeting = buildGreeting(personality, companionLevel, input.mood);
   const presenceMessage = getScreenPresence(input, memorySummary, personality);
   const checkIn = buildCheckIn(memorySummary, input, personality);
@@ -158,7 +198,7 @@ export async function loadCompanionState(): Promise<CompanionState> {
           streakDays: memory.streaks?.current || 0,
           lastCheckIn: memory.lastCheckIn || DEFAULT_MEMORY_SUMMARY.lastCheckIn,
         },
-        personality: PERSONALITY_LABELS[memory.selectedPersonality || 'soft'] || 'Raylene',
+        personality: canonicalDisplayPersonality(memory.selectedPersonality || 'soft'),
       };
     }
     const parsed = JSON.parse(raw) as CompanionState;
@@ -173,7 +213,7 @@ export async function loadCompanionState(): Promise<CompanionState> {
         lastCheckIn: parsed.memorySummary?.lastCheckIn || memory.lastCheckIn || DEFAULT_MEMORY_SUMMARY.lastCheckIn,
       },
       companionLevel: { ...DEFAULT_COMPANION_LEVEL, ...(parsed.companionLevel || {}) },
-      personality: parsed.personality || PERSONALITY_LABELS[memory.selectedPersonality || 'soft'] || 'Raylene',
+      personality: canonicalDisplayPersonality(parsed.personality || memory.selectedPersonality || 'soft'),
     };
   } catch (error) {
     console.warn('Unable to load companion state', error);
@@ -183,13 +223,14 @@ export async function loadCompanionState(): Promise<CompanionState> {
 
 export async function saveCompanionState(state: CompanionState) {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({
+      ...state,
+      personality: canonicalDisplayPersonality(state.personality),
+    }));
     const existing = await loadSekretMemory();
     const memory: SekretMemory = {
       ...existing,
-      selectedPersonality: state.personality?.toLowerCase().includes('rylane') ? 'rylane'
-        : state.personality?.toLowerCase().includes('cloud') ? 'cloud'
-        : state.personality?.toLowerCase().includes('night') ? 'night' : 'soft',
+      selectedPersonality: toPersistedPersonalityId(state.personality),
       streaks: {
         current: state.memorySummary?.streakDays || existing.streaks?.current || 0,
         longest: Math.max(existing.streaks?.longest || 0, state.memorySummary?.streakDays || 0),

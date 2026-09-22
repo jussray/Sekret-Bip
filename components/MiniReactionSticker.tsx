@@ -1,7 +1,7 @@
 // MiniReactionSticker — sticker layer companion for cards/screens
 // Oracle always hidden. Sticker-first → avatar fallback → null.
 // Avatar fallback is TEMPORARY until all sticker art is cut.
-// Tolan layer (Raylene/Rylane/Night): large avatar at mini size (40px) as stand-in.
+// Tolan layer (Suhana/Sy/Night): large avatar at mini size (40px) as stand-in.
 // Mascot layer (Cloud): large mascot avatar at mini size as stand-in.
 
 import React from 'react';

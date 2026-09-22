@@ -7,7 +7,7 @@
 //   - Time-of-day backdrop via getRoomBg(character, time) — 4 phases
 //   - Real LinearGradient scrim (top + bottom fade)
 //   - Cloud companion drifts above the room with breath loop
-//   - Character-aware copy: Raylene soft / Rylane direct / Cloud quiet
+//   - Character-aware copy: Suhana soft / Sy direct / Cloud quiet
 //   - Tips list adapts per companion
 //   - Listening pill mirrors JournalScreen pattern (breath loop)
 //   - Sticky-note hint ("tap the mic") with -2deg tilt
