@@ -101,8 +101,8 @@
     "expo-splash-screen": "~56.0.10",
     "expo-status-bar": "~56.0.4",
     "jose": "^6.2.3",
-    "react": "19.2.7",
-    "react-dom": "19.2.7",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "react-native": "0.85.3",
     "react-native-gesture-handler": "~2.31.1",
     "react-native-reanimated": "~4.3.1",
@@ -111,7 +111,7 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "~0.21.0",
     "react-native-worklets": "^0.8.3",
-    "react-server-dom-webpack": "~19.2.4"
+    "react-server-dom-webpack": "19.2.8"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
