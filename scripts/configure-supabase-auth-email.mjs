@@ -136,10 +136,6 @@ async function writeReceipt(receipt) {
   );
 }
 
-function printReceiptSummary(label) {
-  console.log(label);
-}
-
 async function main() {
   const apply = process.argv.includes('--apply');
   const target = await resolveSupabaseTarget();
@@ -157,7 +153,7 @@ async function main() {
       productionMutation: false,
     };
     await writeReceipt(receipt);
-    printReceiptSummary('AUTH_EMAIL_PROVIDER_PLAN');
+    console.log('AUTH_EMAIL_PROVIDER_PLAN');
     return;
   }
 
@@ -193,16 +189,18 @@ async function main() {
   };
 
   await writeReceipt(receipt);
-  printReceiptSummary('AUTH_EMAIL_PROVIDER_APPLIED');
+  console.log('AUTH_EMAIL_PROVIDER_APPLIED');
 }
 
-main().catch(async () => {
-  console.error('AUTH_EMAIL_PROVIDER_FAILED');
+main().catch(async (err) => {
+  const bounded = /^AUTH_EMAIL_[A-Z_]+$/.test(err?.message) ? err.message : 'AUTH_EMAIL_PROVIDER_FAILED';
+  console.error(bounded);
   try {
     await writeReceipt({
       mode: process.argv.includes('--apply') ? 'apply' : 'plan',
       ok: false,
-      error: 'AUTH_EMAIL_PROVIDER_FAILED',
+      errorCode: bounded,
+      mutationPhase: process.argv.includes('--apply') ? 'apply' : 'plan',
     });
   } catch {}
   process.exit(1);

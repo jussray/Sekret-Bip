@@ -36,6 +36,8 @@ on:
       - 'test/supabase-anonymous-boundary-production-receipt-alias.test.mjs'
       - 'test/release-metadata-bootstrap.test.mjs'
       - 'test/release-metadata.test.mjs'
+      - 'test/supabase-api-key-migration-contract.test.mjs'
+      - 'supabase/functions/_shared/supabase-api-keys.ts'
 
 permissions:
   contents: read
@@ -98,6 +100,7 @@ jobs:
           test/release-metadata.test.mjs
           test/release-metadata-bootstrap.test.mjs
           test/cloudflare-pages-build-environment.test.mjs
+          test/supabase-api-key-migration-contract.test.mjs
 
       - name: Prove direct Expo export retains the exact Cloudflare marker
         env:

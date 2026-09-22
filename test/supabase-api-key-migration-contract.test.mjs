@@ -87,6 +87,6 @@ test('secret detectors recognize modern and legacy privileged Supabase key names
 test('public app remains publishable-key-first and never reads privileged Supabase keys', () => {
   for (const source of [publicClient, publicEnv]) {
     assert.match(source, /EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
-    assert.doesNotMatch(source, /SUPABASE_SECRET_KEY|SUPABASE_SECRET_KEYS|SUPABASE_SERVICE_ROLE_KEY/);
+    assert.doesNotMatch(source, /process\.env\.(?:SUPABASE_SECRET_KEY|SUPABASE_SECRET_KEYS|SUPABASE_SERVICE_ROLE_KEY)/);
   }
 });

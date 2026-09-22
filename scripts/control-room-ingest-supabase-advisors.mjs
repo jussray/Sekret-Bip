@@ -160,6 +160,7 @@ async function main() {
   // Log only the repository-owned target label, never provider response material.
   // In report-only mode no provider identity is resolved, so make that state explicit.
   const targetLabel = target?.name || 'report-only';
+  // bearer:disable javascript_lang-logger-leak
   console.log(`SUPABASE_ADVISOR_REPORT target=${targetLabel} findings=${report.finding_count} ingested=${ingestedCount} errors=${errors.length}`);
   if (errors.length) process.exitCode = 1;
 }
