@@ -10,18 +10,39 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
-test('robots.txt exposes only exact public discovery paths', () => {
+const publicPaths = [
+  '/$',
+  '/auth.md$',
+  '/what-is-sekret-bip/',
+  '/how-it-works/',
+  '/privacy-and-safety/',
+  '/robots.txt$',
+  '/sitemap.xml$',
+  '/crawlers.json$',
+];
+
+function groupFor(robots, agent) {
+  const escaped = agent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = robots.match(new RegExp(`User-agent: ${escaped}\\n([\\s\\S]*?)(?=\\nUser-agent: |\\nSitemap: |$)`));
+  assert.ok(match, `missing robots group for ${agent}`);
+  return match[1];
+}
+
+test('robots.txt separates bounded discovery from training crawlers', () => {
   const robots = read('public/robots.txt');
 
-  assert.match(robots, /^User-agent: \*$/m);
-  assert.match(robots, /^Disallow: \/$/m);
-  assert.match(robots, /^Allow: \/\$$/m);
-  assert.match(robots, /^Allow: \/auth\.md\$$/m);
-  assert.match(robots, /^Allow: \/what-is-sekret-bip\/$/m);
-  assert.match(robots, /^Allow: \/how-it-works\/$/m);
-  assert.match(robots, /^Allow: \/privacy-and-safety\/$/m);
-  assert.match(robots, /^Allow: \/robots\.txt\$$/m);
-  assert.match(robots, /^Allow: \/sitemap\.xml\$$/m);
+  for (const agent of ['GPTBot', 'ClaudeBot', 'Google-Extended']) {
+    const group = groupFor(robots, agent);
+    assert.match(group, /^Disallow: \/$/m);
+    assert.doesNotMatch(group, /^Allow:/m);
+  }
+
+  for (const agent of ['OAI-SearchBot', 'ChatGPT-User', 'Claude-SearchBot', 'Claude-User', 'Googlebot', '*']) {
+    const group = groupFor(robots, agent);
+    assert.match(group, /^Disallow: \/$/m);
+    for (const allowed of publicPaths) assert.ok(group.includes(`Allow: ${allowed}`), `${agent} missing ${allowed}`);
+  }
+
   assert.match(robots, /^Sitemap: https:\/\/sekretbip\.net\/sitemap\.xml$/m);
 });
 
@@ -53,6 +74,21 @@ test('auth.md does not advertise external-agent user delegation', () => {
   assert.doesNotMatch(auth, /supports agents acting on behalf of an existing/);
 });
 
+test('crawler policy is machine-readable and cannot grant authority', () => {
+  const policy = JSON.parse(read('public/crawlers.json'));
+
+  assert.equal(policy.schema, 'juss/ai-crawler-contract@v1');
+  assert.equal(policy.policy.search_discovery, 'allow_bounded_public_paths');
+  assert.equal(policy.policy.user_directed_retrieval, 'allow_bounded_public_paths');
+  assert.equal(policy.policy.model_training, 'deny');
+  assert.equal(policy.policy.bulk_dataset_collection, 'deny');
+  assert.equal(policy.policy.write_or_action_authority, 'none');
+  assert.equal(policy.bots.GPTBot, 'deny');
+  assert.equal(policy.bots['OAI-SearchBot'], 'allow_bounded_public_paths');
+  assert.equal(policy.attribution.requested, true);
+  assert.ok(policy.private_scope.includes('authentication'));
+});
+
 test('Cloudflare headers deny training and agent input by default', () => {
   const headers = read('public/_headers');
 
@@ -64,6 +100,8 @@ test('Cloudflare headers deny training and agent input by default', () => {
   assert.match(headers, /^  Content-Type: text\/plain; charset=utf-8$/m);
   assert.match(headers, /^\/sitemap\.xml$/m);
   assert.match(headers, /^  Content-Type: application\/xml; charset=utf-8$/m);
+  assert.match(headers, /^\/crawlers\.json$/m);
+  assert.match(headers, /^  Content-Type: application\/json; charset=utf-8$/m);
 
   assert.match(headers, /^  X-Frame-Options: DENY$/m);
   assert.match(headers, /^  Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; object-src 'none'$/m);
