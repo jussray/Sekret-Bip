@@ -1,11 +1,14 @@
 {
   "id": "github-failure-routing",
-  "name": "Automatic GitHub Actions failure routing through Founder Control Room",
+  "name": "Automatic GitHub Actions failure and skipped-proof routing through Founder Control Room",
   "status": "contract",
   "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/607",
   "acceptanceCriteria": [
     "The scanner captures exact workflow-run, job, pull-request or main-branch, and head-SHA evidence without mutating source code or workflow state.",
     "Failed jobs with no executed steps or logs are classified as runner_startup_failure or workflow_no_jobs rather than application regressions.",
+    "Skipped unit and Playwright witnesses emit non-secret exact-head fingerprints and proof cookies with authority=false, remain investigation-required, and cannot satisfy complete proof.",
+    "Completed GitHub workflows are inspected for emitted test-skip receipts and skipped jobs even when the workflow conclusion is success.",
+    "Local verification reports skipped tests as warning evidence instead of silent green, and opt-in ingestion preserves each skip under its own fingerprint.",
     "Scan-only reporting works without Supabase credentials and all credentials remain environment-only and absent from reports."
   ],
   "contractPaths": [
@@ -13,10 +16,12 @@
     "docs/CONTROL_ROOM_GITHUB_FAILURES.md"
   ],
   "testPaths": [
-    "test/control-room-github-failure-routing.test.mjs"
+    "test/control-room-github-failure-routing.test.mjs",
+    "test/control-room-test-skip-routing.test.mjs",
+    "test/control-room-verify-frontend.test.mjs"
   ],
   "verification": {
     "state": "partial",
-    "evidence": "Focused source contract covers exact-run, open-PR, main-push, failed-job-only classification, CI routing, and credential boundaries; exact-head workflow execution remains required before merge."
+    "evidence": "Source contracts cover exact failed-run routing plus local and GitHub skipped-proof observation. Exact-head workflow, real skipped-run rehearsal, full suite, and Playwright remain required before main may move."
   }
 }

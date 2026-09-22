@@ -16,8 +16,10 @@ export const WORKER_BASE_URL = BACKEND_URL.replace(/\/$/, '');
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 const HEALTH_TIMEOUT_MS = 6_000;
+const FOUNDER_PAUSE_CODE = 'FOUNDER_OPERATION_PAUSED';
 
-function errorCodeForStatus(status: number): WorkerErrorCode {
+function errorCodeForStatus(status: number, serverCode?: string): WorkerErrorCode {
+  if (serverCode === FOUNDER_PAUSE_CODE) return 'FOUNDER_PAUSED';
   if (status === 0) return 'NETWORK_ERROR';
   if (status === 400 || status === 415 || status === 422) return 'INVALID_REQUEST';
   if (status === 401) return 'AUTH_REQUIRED';
@@ -29,7 +31,9 @@ function errorCodeForStatus(status: number): WorkerErrorCode {
   return 'UNKNOWN';
 }
 
-function retryableForStatus(status: number): boolean {
+function retryableForStatus(status: number, serverCode?: string, serverRetryable?: boolean): boolean {
+  if (serverCode === FOUNDER_PAUSE_CODE) return false;
+  if (typeof serverRetryable === 'boolean') return serverRetryable;
   return status === 0 || status === 408 || status === 429 || status >= 500;
 }
 
@@ -45,6 +49,7 @@ function failure(
   message: string,
   traceId?: string,
   code: WorkerErrorCode = errorCodeForStatus(status),
+  retryable: boolean = retryableForStatus(status),
 ): WorkerFailure {
   return {
     ok: false,
@@ -52,7 +57,7 @@ function failure(
       code,
       status,
       message,
-      retryable: retryableForStatus(status),
+      retryable,
       traceId,
     },
   };
@@ -98,7 +103,15 @@ async function request<T>(
       const message = typeof body.error === 'string'
         ? body.error
         : `Worker ${path} returned ${response.status}`;
-      return failure(response.status, message, traceId);
+      const serverCode = typeof body.code === 'string' ? body.code : undefined;
+      const serverRetryable = typeof body.retryable === 'boolean' ? body.retryable : undefined;
+      return failure(
+        response.status,
+        message,
+        traceId,
+        errorCodeForStatus(response.status, serverCode),
+        retryableForStatus(response.status, serverCode, serverRetryable),
+      );
     }
 
     const fallbackUsed = body.replySource === 'fallback' || body.usedFallback === true;

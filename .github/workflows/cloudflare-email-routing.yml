@@ -15,7 +15,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: cloudflare-email-routing-production
+  group: >-
+    ${{ (github.event_name == 'workflow_dispatch' ||
+         (github.event_name == 'issue_comment' &&
+          github.event.issue.number == 1066 &&
+          github.event.comment.user.login == github.repository_owner &&
+          github.event.comment.body == '/apply-resend-dns'))
+        && 'cloudflare-email-routing-production'
+        || format('cloudflare-email-routing-noop-{0}', github.run_id) }}
   cancel-in-progress: false
 
 env:
