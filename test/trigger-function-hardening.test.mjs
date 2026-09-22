@@ -52,7 +52,7 @@ test('guard_crew_member_write rejects anonymous sessions and owner/id mismatch',
   assert.match(fn, /raise exception 'crew_relationship_identity_is_immutable'/);
 });
 
-test('cleanup_crew_relationship_access is SECURITY DEFININER, effectively pinned, and not directly callable', async () => {
+test('cleanup_crew_relationship_access is SECURITY DEFINER, effectively pinned, and not directly callable', async () => {
   const definitionSource = await read('supabase/migrations/20260714183500_harden_crew_membership_paths.sql');
   const lockSource = await read('supabase/migrations/20260714183600_lock_crew_function_search_paths.sql');
   const fn = definitionSource.match(/create or replace function public\.cleanup_crew_relationship_access\(\)[\s\S]*?\$\$;/)?.[0];
