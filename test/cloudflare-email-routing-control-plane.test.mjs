@@ -70,6 +70,12 @@ test('email routing workflow is manual, secrets-backed, token-type-aware, and re
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /^\s*push:/m);
   assert.doesNotMatch(workflow, /^\s*schedule:/m);
+  assert.match(workflow, /cloudflare-email-routing-production/);
+  assert.match(workflow, /cloudflare-email-routing-noop-\{0\}/);
+  assert.match(workflow, /github\.run_id/);
+  assert.match(workflow, /github\.event\.issue\.number == 1066/);
+  assert.match(workflow, /github\.event\.comment\.user\.login == github\.repository_owner/);
+  assert.match(workflow, /github\.event\.comment\.body == '\/apply-resend-dns'/);
   assert.match(workflow, /secrets\.CLOUDFLARE_API_TOKEN/);
   assert.match(workflow, /secrets\.CLOUDFLARE_ZONE_ID/);
   assert.match(workflow, /secrets\.CLOUDFLARE_ACCOUNT_ID/);

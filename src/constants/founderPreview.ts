@@ -51,7 +51,7 @@ export const FOUNDER_PREVIEW_POINTS = 999;
 export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   // Teen core
   { key: 'teen-room', title: 'Room', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Companion home, mood atmosphere, feature hotspots, and Bip return receipts.', route: '/(teen)/room' },
-  { key: 'teen-pages', title: 'Pages', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Continuous journal with Raylene, Rylane, Cloud, Night, Me, and Oracle tabs.', route: '/(teen)/pages' },
+  { key: 'teen-pages', title: 'Pages', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Continuous journal with Suhana, Sy, Cloud, Night, Me, and Oracle tabs.', route: '/(teen)/pages' },
   { key: 'teen-pages-new', title: 'New Page', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Direct entry composer route.', route: '/(teen)/pages/new' },
   { key: 'teen-pages-history', title: 'Pages History', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Saved journal timeline and entry history.', route: '/(teen)/pages/history' },
   { key: 'teen-calm', title: 'Calm', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Comfort, grounding, regulation, and wind-down tools.', route: '/(teen)/calm' },
@@ -62,10 +62,10 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'teen-more', title: 'More', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Teen feature drawer and account tools.', route: '/(teen)/more' },
 
   // Teen companions and expression
-  { key: 'companions', title: 'All Se’kret Companions', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Raylene, Rylane, Cloud, and Night open without waiting for point thresholds.', route: '/(teen)/discover' },
+  { key: 'companions', title: 'All Se’kret Companions', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Suhana, Sy, Cloud, and Night open without waiting for point thresholds.', route: '/(teen)/discover' },
   { key: 'companion-picker', title: 'Companion Picker', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Choose a companion before entering chat.', route: '/(teen)/chat' },
-  { key: 'raylene-chat', title: 'Raylene Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Raylene conversation. Complete AI replies require the configured Worker and model provider.', route: '/(teen)/chat/raylene' },
-  { key: 'rylane-chat', title: 'Rylane Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Rylane conversation with preview point gating removed.', route: '/(teen)/chat/rylane' },
+  { key: 'raylene-chat', title: 'Suhana Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Suhana conversation. Complete AI replies require the configured Worker and model provider.', route: '/(teen)/chat/raylene' },
+  { key: 'rylane-chat', title: 'Sy Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Sy conversation with preview point gating removed.', route: '/(teen)/chat/rylane' },
   { key: 'cloud-chat', title: 'Cloud Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Cloud conversation with preview point gating removed.', route: '/(teen)/chat/cloud' },
   { key: 'night-chat', title: 'Night Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Night conversation with preview point gating removed.', route: '/(teen)/chat/night' },
   { key: 'cloud-thoughts', title: 'Cloud Thoughts', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Quiet release space for thoughts that need somewhere soft to land.', route: '/(teen)/cloud' },
@@ -116,6 +116,8 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'parent-profile', title: 'Parent Profile', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Parent identity, preferences, focus, and room style.', route: '/(parent)/profile' },
   { key: 'parent-settings', title: 'Parent Settings', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Privacy, notifications, and account controls.', route: '/(parent)/settings' },
   { key: 'parent-resources', title: 'Parent Resources', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Guides, support, and legal information.', route: '/(parent)/resources' },
+  { key: 'parent-bip-jr', title: 'Bip Jr', group: 'Parent · Account', side: 'parent', status: 'needs_setup', detail: 'Supervised child profiles require verified guardian authority. Bip Jr stays separate from Teen accounts and Bridge.', route: '/(parent)/bip-jr' },
+  { key: 'parent-teen-verification', title: 'Teen Verification', group: 'Parent · Connection', side: 'parent', status: 'needs_setup', detail: 'A verified guardian can explicitly confirm age assurance for an active linked 13–17 Teen without gaining access to the Teen’s private account.', route: '/(parent)/teen-verification' },
 
   // Founder/developer tools
   { key: 'control-room', title: 'Control Room', group: 'Founder · Operations', side: 'dev', status: 'needs_setup', detail: 'Requires a founder/admin/developer app profile with audit access.', route: '/(dev)/control-room' },

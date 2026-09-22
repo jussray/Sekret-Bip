@@ -1,7 +1,7 @@
 // screens/Bippin2Screen.tsx
 // Phase 1 polish: time-of-day backdrop, mood-tinted glow, char-aware greeting,
 // staggered entrance, breath loop on cloud + streak. Also fixes inverted
-// gender-polarity: Raylene → Womanhood content, Rylane → Manhood content
+// gender-polarity: Suhana → Womanhood content, Sy → Manhood content
 // (was swapped). No screens removed, no new features.
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -37,7 +37,7 @@ const ART: Record<string, Record<string, any>> = {
   },
 };
 
-// ─── Static data — Womanhood (Raylene) ─────────────────────────────────────────
+// ─── Static data — Womanhood (Suhana) ─────────────────────────────────────────
 const W_CHIPS = [
   { key: 'period',   emoji: '🩸', label: 'First Period\nSupport' },
   { key: 'cycle',    emoji: '🫶', label: 'Cycle\nWellness' },
@@ -64,7 +64,7 @@ const W_BIP_FLOW = [
   { icon: '🕊️', step: 'grow',     sub: 'keep bippin' },
 ];
 
-// ─── Static data — Manhood (Rylane) ───────────────────────────────────────────
+// ─── Static data — Manhood (Sy) ───────────────────────────────────────────
 const M_CHIPS = [
   { key: 'puberty',    emoji: '🪱', label: 'Puberty\nGuide' },
   { key: 'body',       emoji: '🧠', label: 'Body\nChanges' },
@@ -201,7 +201,7 @@ export function Bippin2Screen({
   const isRylane      = selectedSekret === 'rylane';
   const isNight       = selectedSekret === 'night';
   const isManhoodChar = isRylane || isNight;
-  const charName      = isRylane ? 'Rylane' : isNight ? 'Night' : 'Raylene';
+  const charName      = isRylane ? 'Sy' : isNight ? 'Night' : 'Suhana';
   const charEmoji     = isRylane ? '🪱' : isNight ? '🌙' : '🫶';
   const artKey        = isNight ? 'night' : (isRylane ? 'rylane' : 'raylene');
   const art           = ART[artKey];
@@ -210,7 +210,7 @@ export function Bippin2Screen({
   const time = useMemo(() => getTimeOfDay(), []);
   const bg   = useMemo(() => getRoomBg(charKey, time), [charKey, time]);
 
-  // Manhood chars (Rylane/Night): cool electric blue. Raylene: warm purple.
+  // Manhood chars (Sy/Night): cool electric blue. Suhana: warm purple.
   const idAccent   = isManhoodChar ? '#4DA3FF' : t.accent;
   const idSoft     = isManhoodChar ? '#B6DCFF' : t.soft;
   const glow       = useMemo(() => moodGlow(mood), [mood]);
@@ -603,7 +603,7 @@ export function Bippin2Screen({
           </ScrollView>
         </Animated.View>
 
-        {/* WOMANHOOD CARDS (Raylene only — no boy avatars here). */}
+        {/* WOMANHOOD CARDS (Suhana only — no boy avatars here). */}
         <Animated.View style={cardStyle(card3)}>
           {!isManhoodChar && (
             <>
@@ -683,7 +683,7 @@ export function Bippin2Screen({
             </>
           )}
 
-          {/* MANHOOD CARDS (Rylane or Night). */}
+          {/* MANHOOD CARDS (Sy or Night). */}
           {isManhoodChar && (
             <>
               <View style={styles.threeColRow}>

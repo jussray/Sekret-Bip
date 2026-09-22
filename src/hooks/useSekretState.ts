@@ -36,7 +36,7 @@ function parseRoomMemory(value: unknown): RoomMemory | null {
   }
 }
 
-export function useSekretState() {
+export function useSekretState(authenticatedUserId: string | null = null) {
   const [theme, setTheme] = useState('neon');
   const [mood, setMood] = useState('Happy');
   const [userSide, setUserSide] = useState<'teen' | 'parent' | null>(null);
@@ -123,8 +123,10 @@ export function useSekretState() {
   }, []);
 
   // Once local hydration is complete, merge durable account data from Supabase.
+  // Re-run when the permanent account changes so logout/relogin can recover the
+  // newly authenticated account instead of retaining a one-mount cloud snapshot.
   useEffect(() => {
-    if (isLoading || !isSupabaseConfigured) return;
+    if (isLoading || !isSupabaseConfigured || !authenticatedUserId) return;
     let cancelled = false;
 
     void (async () => {
@@ -135,7 +137,12 @@ export function useSekretState() {
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
         const user = data.session?.user;
-        if (!user || user.is_anonymous || cancelled) return;
+        if (
+          !user ||
+          user.is_anonymous ||
+          user.id !== authenticatedUserId ||
+          cancelled
+        ) return;
 
         const [cloud, teenPages, parentPages, cloudPeriodDays] = await Promise.all([
           pullAll(),
@@ -175,7 +182,7 @@ export function useSekretState() {
     })();
 
     return () => { cancelled = true; };
-  }, [isLoading]);
+  }, [authenticatedUserId, isLoading]);
 
   // Persist the merged state as the offline cache.
   useEffect(() => {
