@@ -8,6 +8,7 @@ const executablePath = resolvePlaywrightExecutablePath();
 const artifactDir = process.env.PLAYWRIGHT_ARTIFACT_DIR
   ? path.resolve(process.env.PLAYWRIGHT_ARTIFACT_DIR)
   : null;
+const controlRoomSkipReporter = path.resolve('./scripts/control-room-playwright-skip-reporter.mjs');
 
 export default defineConfig({
   testDir: './e2e',
@@ -25,10 +26,11 @@ export default defineConfig({
         ['line'],
         ['json', { outputFile: path.join(artifactDir, 'results.json') }],
         ['html', { open: 'never', outputFolder: path.join(artifactDir, 'html') }],
+        [controlRoomSkipReporter],
       ]
     : process.env.CI
-      ? [['line'], ['html', { open: 'never' }]]
-      : 'html',
+      ? [['line'], ['html', { open: 'never' }], [controlRoomSkipReporter]]
+      : [['html'], [controlRoomSkipReporter]],
   outputDir: artifactDir ? path.join(artifactDir, 'test-results') : undefined,
   use: {
     baseURL: BASE_URL,

@@ -7,7 +7,23 @@ on:
       - '.github/workflows/controlled-account-cloud-comfort.yml'
       - 'playwright.controlled-account.config.ts'
       - 'scripts/playwright-executable.mjs'
+      - 'src/context/AppContext.tsx'
+      - 'src/context/VerificationContext.tsx'
+      - 'src/hooks/useSekretState.ts'
+      - 'src/services/verificationState.ts'
+      - 'src/services/bipJr.ts'
+      - 'src/services/teenAgeAssurance.ts'
+      - 'app/(auth)/parent-link-verify.tsx'
+      - 'app/(parent)/bip-jr.tsx'
+      - 'app/(parent)/teen-verification.tsx'
+      - 'supabase/migrations/20260919190000_auth_signup_onboarding_baseline.sql'
+      - 'supabase/migrations/20260919190500_parent_link_relationship_only.sql'
+      - 'supabase/migrations/20260919190800_teen_age_assurance_authority.sql'
+      - 'supabase/migrations/20260919191000_bip_jr_managed_child_profiles.sql'
       - 'e2e/controlled-account-cloud-comfort.spec.ts'
+      - 'e2e/controlled-account-session-continuity.spec.ts'
+      - 'test/auth-session-continuity.test.mjs'
+      - 'test/family-account-authority.test.mjs'
       - 'test/controlled-account-cloud-comfort-gate.test.mjs'
   workflow_dispatch:
     inputs:
@@ -16,7 +32,7 @@ on:
         required: true
         type: string
       confirm_controlled_account_use:
-        description: 'Allow one login-only proof with the controlled permanent account'
+        description: 'Allow controlled permanent-account login proof'
         required: true
         default: false
         type: boolean
@@ -32,8 +48,8 @@ env:
   CI: true
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.target_sha || github.event.pull_request.head.sha }}
-  SEKRET_CONTROLLED_ACCOUNT_BASE_URL: https://sekretbip.net
-  PRODUCTION_RELEASE_URL: https://sekretbip.net/.well-known/sekret-release.json
+  SEKRET_CONTROLLED_ACCOUNT_BASE_URL: https://app.sekretbip.net
+  PRODUCTION_RELEASE_URL: https://app.sekretbip.net/.well-known/sekret-release.json
 
 jobs:
   validate:
@@ -66,8 +82,8 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
-      - name: Run controlled-account safety contract
-        run: node --test test/controlled-account-cloud-comfort-gate.test.mjs
+      - name: Run controlled-account safety contracts
+        run: node --test test/controlled-account-cloud-comfort-gate.test.mjs test/auth-session-continuity.test.mjs test/family-account-authority.test.mjs
 
       - name: Run zero-error TypeScript
         run: npm run type-check
@@ -79,7 +95,7 @@ jobs:
 
   proof:
     if: github.event_name == 'workflow_dispatch'
-    name: Exact-production authenticated Cloud and Comfort
+    name: Exact-production authenticated Cloud, Comfort, and continuity
     runs-on: ubuntu-24.04
     timeout-minutes: 20
 
@@ -182,17 +198,19 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Prove authenticated Cloud and Comfort without private content
+      - name: Prove authenticated Cloud, Comfort, logout, relogin, and durable rehydration without private content
         env:
           SEKRET_CONTROLLED_ACCOUNT_EMAIL: ${{ secrets.SEKRET_CONTROLLED_ACCOUNT_EMAIL }}
           SEKRET_CONTROLLED_ACCOUNT_PASSWORD: ${{ secrets.SEKRET_CONTROLLED_ACCOUNT_PASSWORD }}
         run: npx playwright test --config=playwright.controlled-account.config.ts
 
-      - name: Upload sanitized controlled-account receipt
+      - name: Upload sanitized controlled-account receipts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: controlled-account-cloud-comfort-${{ env.EXPECTED_HEAD_SHA }}
-          path: artifacts/controlled-account-cloud-comfort.json
+          name: controlled-account-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            artifacts/controlled-account-cloud-comfort.json
+            artifacts/controlled-account-session-continuity.json
           if-no-files-found: warn
           retention-days: 14
