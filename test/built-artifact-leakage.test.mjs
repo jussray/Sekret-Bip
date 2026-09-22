@@ -4,7 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
-const { auditBuiltArtifact } = await import('../scripts/audit-built-artifact.mjs');
+const {
+  auditBuiltArtifact,
+  buildSanitizedViolationReceipts,
+} = await import('../scripts/audit-built-artifact.mjs');
 
 function fixture(files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sekret-bip-artifact-'));
@@ -64,6 +67,35 @@ test('built artifact audit detects configured secret values without exposing the
     const violations = auditBuiltArtifact(root, { env: { OPENAI_API_KEY: secret } }).violations;
     assert.deepEqual(violations, ['assets/app.js: configured OPENAI_API_KEY value']);
     assert.equal(violations.join('\n').includes(secret), false);
+  } finally {
+    cleanup(root);
+  }
+});
+
+test('sanitized leakage receipts expose only safe path identity and coarse violation class', () => {
+  const secret = 'custom-build-secret-value-5678';
+  const root = fixture({
+    '_expo/static/js/web/entry-a1b2c3.js': `const marker = "OPENAI_API_KEY"; const value = "${secret}";`,
+    'assets/private-name.js': 'const marker = "SUPABASE_SERVICE_ROLE_KEY";',
+  });
+  try {
+    const violations = auditBuiltArtifact(root, { env: { RESEND_API_KEY: secret } }).violations;
+    const receipts = buildSanitizedViolationReceipts(violations);
+    const serialized = JSON.stringify(receipts);
+
+    assert.ok(receipts.some((receipt) => (
+      receipt.path === '_expo/static/js/web/entry-a1b2c3.js'
+      && receipt.category === 'server_secret_marker'
+    )));
+    assert.ok(receipts.some((receipt) => receipt.category === 'configured_secret_value'));
+    assert.ok(receipts.some((receipt) => (
+      receipt.path === '<redacted-path.js>'
+      && receipt.category === 'server_secret_marker'
+    )));
+    assert.match(serialized, /"pathFingerprint":"[a-f0-9]{12}"/);
+    assert.doesNotMatch(serialized, /OPENAI_API_KEY|SUPABASE_SERVICE_ROLE_KEY|RESEND_API_KEY/);
+    assert.equal(serialized.includes(secret), false);
+    assert.equal(serialized.includes('assets/private-name.js'), false);
   } finally {
     cleanup(root);
   }

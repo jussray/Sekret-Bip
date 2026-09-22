@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 
 const DEFAULT_MAX_TEXT_BYTES = 32 * 1024 * 1024;
@@ -38,6 +39,11 @@ const FORBIDDEN_TEXT_PATTERNS = [
   { label: 'GitHub classic token material', pattern: /\bghp_[A-Za-z0-9]{20,}/ },
   { label: 'GitHub fine-grained token material', pattern: /\bgithub_pat_[A-Za-z0-9_]{20,}/ },
   { label: 'Cloudflare account token material', pattern: /\bcfat_[A-Za-z0-9_-]{12,}/ },
+];
+
+const SAFE_PUBLIC_ARTIFACT_PATH_PATTERNS = [
+  /^_expo\/static\/js\/web\/entry-[a-f0-9]+\.js$/i,
+  /^(?:index\.html|metadata\.json|release\.json|\.well-known\/sekret-release\.json)$/,
 ];
 
 function normalizeRelative(root, file) {
@@ -113,6 +119,48 @@ function configuredSecrets(env) {
   });
 }
 
+function violationCategory(detail) {
+  if (detail === 'forbidden packaged path') return 'forbidden_path';
+  if (detail === 'symbolic links are forbidden in built artifacts') return 'symbolic_link';
+  if (/^configured .+ value$/.test(detail)) return 'configured_secret_value';
+  if (detail.endsWith(' marker')) return 'server_secret_marker';
+  if (detail.endsWith(' material')) return 'credential_material';
+  return 'sensitive_artifact';
+}
+
+function safeArtifactPath(relative) {
+  const normalized = String(relative).split(path.sep).join('/');
+  if (SAFE_PUBLIC_ARTIFACT_PATH_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return normalized;
+  }
+
+  const extension = path.extname(normalized).toLowerCase();
+  const safeExtension = /^[.][a-z0-9]{1,10}$/.test(extension) ? extension : '';
+  return `<redacted-path${safeExtension}>`;
+}
+
+export function buildSanitizedViolationReceipts(violations) {
+  const receipts = [];
+  const seen = new Set();
+
+  for (const violation of violations) {
+    const separator = violation.indexOf(': ');
+    const relative = separator >= 0 ? violation.slice(0, separator) : '';
+    const detail = separator >= 0 ? violation.slice(separator + 2) : violation;
+    const receipt = {
+      path: safeArtifactPath(relative),
+      pathFingerprint: createHash('sha256').update(relative).digest('hex').slice(0, 12),
+      category: violationCategory(detail),
+    };
+    const key = JSON.stringify(receipt);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    receipts.push(receipt);
+  }
+
+  return receipts;
+}
+
 export function auditBuiltArtifact(outputDirectory, options = {}) {
   const root = canonicalArtifactRoot(outputDirectory);
   const maxTextBytes = options.maxTextBytes ?? DEFAULT_MAX_TEXT_BYTES;
@@ -164,9 +212,12 @@ if (isDirectExecution) {
   const outputDirectory = process.argv[2] || 'dist';
   const result = auditBuiltArtifact(outputDirectory);
   if (result.violations.length > 0) {
-    // Do not echo artifact-derived paths, content, configured secret names, or
-    // values into CI logs. Detailed violations stay available to callers/tests.
     console.error('Built artifact leakage audit failed.');
+    for (const receipt of buildSanitizedViolationReceipts(result.violations)) {
+      console.error(
+        `ARTIFACT_LEAKAGE_VIOLATION path=${receipt.path} path_sha256=${receipt.pathFingerprint} category=${receipt.category}`,
+      );
+    }
     process.exitCode = 1;
   } else {
     console.log('Built artifact leakage audit passed.');
