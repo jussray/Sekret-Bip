@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { resolvePlaywrightExecutablePath } from './scripts/playwright-executable.mjs';
 
@@ -6,10 +7,11 @@ const BASE_URL =
   process.env.PRODUCTION_BASE_URL ||
   'https://sekretbip.net';
 const executablePath = resolvePlaywrightExecutablePath();
+const controlRoomSkipReporter = path.resolve('./scripts/control-room-playwright-skip-reporter.mjs');
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: ['live-onboarding-email.spec.ts'],
+  testMatch: ['live-onboarding-email.spec.ts', 'live-family-authority.spec.ts'],
   timeout: 120_000,
   expect: { timeout: 60_000 },
   fullyParallel: false,
@@ -17,8 +19,8 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: process.env.CI
-    ? [['line'], ['html', { open: 'never', outputFolder: 'playwright-report-live-onboarding' }]]
-    : 'html',
+    ? [['line'], ['html', { open: 'never', outputFolder: 'playwright-report-live-onboarding' }], [controlRoomSkipReporter]]
+    : [['html'], [controlRoomSkipReporter]],
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',

@@ -49,6 +49,12 @@ export function parsePlaywrightJsonFile(jsonPath) {
   return { passed, failed, skipped, timedOut, total: passed + failed + skipped + timedOut };
 }
 
+export function classifyPlaywrightEvidence(exitCode, parseError, counts) {
+  if (exitCode !== 0 || parseError) return { status: 'fail', browserProof: false, completeBrowserProof: false };
+  if ((counts?.skipped || 0) > 0) return { status: 'warning', browserProof: true, completeBrowserProof: false };
+  return { status: 'pass', browserProof: true, completeBrowserProof: true };
+}
+
 export function runPlaywright({ rootDir = root, env = process.env, generatedAt = new Date() } = {}) {
   const startedAt = Date.now();
   const stamp = generatedAt.toISOString().replace(/[:.]/g, '-');
@@ -71,11 +77,11 @@ export function runPlaywright({ rootDir = root, env = process.env, generatedAt =
   } catch (error) {
     parseError = error instanceof Error ? error.message : String(error);
   }
+  const evidence = classifyPlaywrightEvidence(exitCode, parseError, counts);
   return {
     mode: 'playwright',
     evidenceLevel: 'browser',
-    browserProof: exitCode === 0 && !parseError,
-    status: exitCode === 0 && !parseError ? 'pass' : 'fail',
+    ...evidence,
     exitCode,
     durationMs: Date.now() - startedAt,
     artifactDir,
@@ -100,6 +106,7 @@ export function runFallback({ rootDir = root, env = process.env } = {}) {
     mode: 'fallback-verify-local',
     evidenceLevel: 'non-browser-fallback',
     browserProof: false,
+    completeBrowserProof: false,
     status: exitCode === 0 ? 'pass' : 'fail',
     exitCode,
     durationMs: Date.now() - startedAt,
@@ -129,6 +136,7 @@ export function writeReports(availability, run, { outputDir = defaultReportDir, 
     `Mode: **${run.mode}**`,
     `Evidence: **${run.evidenceLevel}**`,
     `Browser proof: **${run.browserProof ? 'YES' : 'NO'}**`,
+    `Complete browser proof: **${run.completeBrowserProof ? 'YES' : 'NO'}**`,
     `Status: **${run.status.toUpperCase()}**`,
     `Duration: ${run.durationMs}ms`,
   ];
@@ -138,6 +146,7 @@ export function writeReports(availability, run, { outputDir = defaultReportDir, 
     lines.push('The fallback result must not be described as browser or Playwright proof.');
   }
   if (run.counts) lines.push('', `Passed: ${run.counts.passed} · Failed: ${run.counts.failed} · Skipped: ${run.counts.skipped} · Timed out: ${run.counts.timedOut}`);
+  if (run.status === 'warning') lines.push('', 'Skipped browser tests require investigation and do not satisfy complete browser proof.');
   if (run.parseError) lines.push('', `Reporter parse error: ${run.parseError}`);
   if (run.status === 'fail') {
     lines.push('', '## Failure output');
@@ -156,10 +165,11 @@ async function main() {
   console.log(`Mode: ${report.run.mode}`);
   console.log(`Evidence: ${report.run.evidenceLevel}`);
   console.log(`Browser proof: ${report.run.browserProof ? 'YES' : 'NO'}`);
+  console.log(`Complete browser proof: ${report.run.completeBrowserProof ? 'YES' : 'NO'}`);
   console.log(`Status: ${report.run.status.toUpperCase()}`);
   console.log(`Report: ${path.relative(root, jsonPath)}`);
   console.log(`Readable report: ${path.relative(root, mdPath)}`);
-  process.exit(report.run.status === 'pass' ? 0 : 1);
+  process.exit(report.run.status === 'fail' ? 1 : 0);
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
