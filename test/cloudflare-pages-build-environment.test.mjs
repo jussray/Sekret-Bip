@@ -17,7 +17,7 @@ test('Cloudflare Pages uses the repository-supported Node runtime', () => {
 test('frontend build exports Expo and writes the release marker', () => {
   assert.equal(
     packageJson.scripts['build:web'],
-    'expo export -p web && node scripts/write-release-metadata.mjs dist',
+    'expo export -p web && node scripts/write-release-metadata.mjs dist && node scripts/audit-built-artifact.mjs dist',
   );
   assert.match(releaseWriter, /path\.join\(absoluteOutput, 'release\.json'\)/);
   assert.match(releaseWriter, /CF_PAGES_COMMIT_SHA/);

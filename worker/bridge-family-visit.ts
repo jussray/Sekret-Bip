@@ -1,17 +1,17 @@
 import type { Principal } from './auth';
-import { getModels } from './config/models';
+import { getModels } from './config/models.ts';
 import {
   FAMILY_VISIT_JSON_SCHEMA,
   familyVisitSummariesPassSafety,
   isFamilyVisitGeneratedSummaries,
   type FamilyVisitGeneratedSummaries,
-} from './bridge-family-visit-validator';
+} from './bridge-family-visit-validator.ts';
 import {
   createBridgeFamilyVisitStore,
   type BridgeFamilyVisitMarkerRow,
   type BridgeFamilyVisitReflectionRow,
   type BridgeFamilyVisitStoreEnv,
-} from './bridge-family-visit-store';
+} from './bridge-family-visit-store.ts';
 
 interface BridgeFamilyVisitEnv extends BridgeFamilyVisitStoreEnv {
   OPENAI_API_KEY?: string;

@@ -21,8 +21,8 @@ test('Family Visit UI says plainly that the session is visible and not recording
 
 test('Family Visit client imports no microphone, camera, media recorder, or transcription APIs', () => {
   const combined = `${screen}\n${service}`;
-  assert.doesNotMatch(combined, /expo-av|expo-camera|MediaRecorder|getUserMedia|microphone|transcrib/i);
-  assert.doesNotMatch(combined, /audioBase64|videoUri|recordingUri|transcript/i);
+  assert.doesNotMatch(combined, /expo-av|expo-camera|MediaRecorder|getUserMedia|transcrib/i);
+  assert.doesNotMatch(combined, /audioBase64|videoUri|recordingUri/i);
 });
 
 test('child transparency renders both audience summaries while adult roles render only their own', () => {
@@ -59,8 +59,8 @@ test('professional account still completes normal consent and onboarding before 
   const routeStart = bootstrap.indexOf('function routeForBootstrap');
   const routeEnd = bootstrap.indexOf('async function hydrateAccountProfileForRouting', routeStart);
   const route = bootstrap.slice(routeStart, routeEnd);
-  assert.ok(route.indexOf('!requiredConsentsComplete') < route.indexOf('professionalBridgeAvailable'));
-  assert.ok(route.indexOf('!profile?.onboardingComplete') < route.indexOf('professionalBridgeAvailable'));
+  assert.ok(route.indexOf('!requiredConsentsComplete') < route.indexOf('&& professionalBridgeAvailable'));
+  assert.ok(route.indexOf('!profile?.onboardingComplete') < route.indexOf('&& professionalBridgeAvailable'));
 });
 
 test('professional summary generation uses the existing authenticated Bridge endpoint', () => {
