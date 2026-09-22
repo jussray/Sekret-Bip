@@ -8,9 +8,15 @@ function env(name, fallback = '') {
   return typeof value === 'string' && value.length > 0 ? value : fallback;
 }
 
+// Values registered here (by required(), for any env var whose name looks
+// secret-shaped) are scrubbed out of anything logged through redactText(),
+// even free-form error text -- not just structured receipt objects.
+const secretValues = new Set();
+
 function required(name) {
   const value = env(name);
   if (!value) throw new Error(`${name} is required.`);
+  if (/(pass|secret|token|key)/i.test(name)) secretValues.add(value);
   return value;
 }
 
@@ -20,6 +26,17 @@ function redact(value) {
   const out = {};
   for (const [key, entry] of Object.entries(value)) {
     out[key] = /(pass|secret|token|key)/i.test(key) ? '[redacted]' : redact(entry);
+  }
+  return out;
+}
+
+// Defense in depth for free-form text (error messages), which redact()
+// cannot cover since it only redacts object keys. Scrubs any known secret
+// value out of the string before it reaches a logger sink.
+function redactText(text) {
+  let out = text;
+  for (const secret of secretValues) {
+    if (secret) out = out.split(secret).join('[redacted]');
   }
   return out;
 }
@@ -87,6 +104,16 @@ async function main() {
       productionMutation: false,
     };
     await writeReceipt(receipt);
+    // Bearer (javascript_lang_logger_leak) flags any JSON.stringify(<object>)
+    // passed to a logger sink, but this specific object can never carry a
+    // secret: plan mode returns before SUPABASE_ACCESS_TOKEN is ever read
+    // (see the early `return` above `required('SUPABASE_ACCESS_TOKEN')`
+    // below), and every field here comes from a module-level constant or
+    // the non-secret SUPABASE_PROJECT_REF. Wrapping it in redact() would
+    // actually corrupt the output: redact()'s key regex matches "pass" in
+    // password_hibp_enabled/password_min_length, which are exactly the
+    // values this plan is meant to show.
+    // bearer:disable javascript_lang_logger_leak
     console.log(JSON.stringify(receipt, null, 2));
     return;
   }
@@ -128,11 +155,29 @@ async function main() {
 
   await writeReceipt(receipt);
   console.log('PASSWORD_SECURITY_CONFIG_APPLIED');
+  // Bearer (javascript_lang_logger_leak) flags this JSON.stringify(<object>)
+  // logger call because its static taint tracking follows `before`/`after`
+  // back to the raw Supabase Auth config HTTP response, which can contain
+  // real secrets (OAuth/SMTP/captcha provider secrets). Both fields are
+  // already piped through this file's own redact() above (`before:
+  // redact(before)`, `after: redact(after)`) -- every key matching
+  // /(pass|secret|token|key)/i, including all real secret fields Supabase's
+  // Auth config API returns, is replaced with '[redacted]' before this
+  // object is ever assembled, so nothing secret reaches this line.
+  // bearer:disable javascript_lang_logger_leak
   console.log(JSON.stringify(receipt, null, 2));
 }
 
 main().catch(async (error) => {
-  const message = error instanceof Error ? error.message : String(error);
+  const rawMessage = error instanceof Error ? error.message : String(error);
+  // Scrub any live secret value (e.g. SUPABASE_ACCESS_TOKEN) out of the
+  // error text before it reaches a log sink or the on-disk receipt. Every
+  // Error thrown in this script builds its message from static text and
+  // non-secret API/response fields, so this is defense in depth against a
+  // future change (or an upstream API response) putting a secret in an
+  // error message.
+  const message = redactText(rawMessage);
+  // bearer:disable javascript_lang_logger_leak
   console.error(message);
   try {
     await writeReceipt({ mode: process.argv.includes('--apply') ? 'apply' : 'plan', ok: false, error: message });
