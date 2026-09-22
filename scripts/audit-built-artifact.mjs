@@ -49,6 +49,10 @@ function canonicalArtifactRoot(outputDirectory) {
     throw new Error('Built artifact directory must be a non-empty filesystem path.');
   }
 
+  // bearer:disable javascript_lang_path_traversal -- outputDirectory is the
+  // trusted CLI argument this build script is invoked with (npm run build:web),
+  // never external/network input; the result is validated to exist as a
+  // directory and canonicalized via realpathSync.native below before use.
   const resolved = path.resolve(outputDirectory);
   if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
     throw new Error('Built artifact directory does not exist or is not a directory.');
@@ -75,6 +79,9 @@ function walk(root) {
     }
 
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      // bearer:disable javascript_lang_path_traversal -- entry.name comes from
+      // readdirSync on an already-canonicalized root, not external input; the
+      // joined path is verified to stay within that root on the next line.
       const fullPath = path.join(directory, entry.name);
       if (!isWithinRoot(root, fullPath)) {
         throw new Error('Built artifact entry escaped the canonical root.');
