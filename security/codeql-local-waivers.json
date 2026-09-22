@@ -92,16 +92,6 @@
       "rationale": "The assertion checks redacted test evidence for a repository-owned domain string and is not runtime URL validation."
     },
     {
-      "id": "controlled-account-test-url-anchor",
-      "language": "javascript-typescript",
-      "ruleId": "js/regex/missing-regexp-anchor",
-      "path": "test/controlled-account-cloud-comfort-gate.test.mjs",
-      "messageIncludes": "may match anywhere",
-      "maxMatches": 1,
-      "expiresAt": "2026-10-01T00:00:00Z",
-      "rationale": "The assertion verifies a fixed production URL is present in workflow source; it is not an allowlist check over untrusted input."
-    },
-    {
       "id": "password-recovery-doc-url-anchor",
       "language": "javascript-typescript",
       "ruleId": "js/regex/missing-regexp-anchor",
