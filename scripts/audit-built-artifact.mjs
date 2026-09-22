@@ -179,26 +179,35 @@ export function auditBuiltArtifact(outputDirectory, options = {}) {
 
     const relative = normalizeRelative(root, file);
     scannedFiles += 1;
-    const stat = fs.statSync(file);
-    scannedBytes += stat.size;
+    const descriptor = fs.openSync(file, 'r');
 
-    for (const pattern of FORBIDDEN_PATH_PATTERNS) {
-      if (pattern.test(relative)) {
-        violations.push(`${relative}: forbidden packaged path`);
-        break;
+    try {
+      const stat = fs.fstatSync(descriptor);
+      if (!stat.isFile()) {
+        throw new Error('Built artifact entry changed type before inspection.');
       }
-    }
+      scannedBytes += stat.size;
 
-    if (stat.size > maxTextBytes) continue;
-    const buffer = fs.readFileSync(file);
-    if (!looksLikeText(buffer)) continue;
-    const text = buffer.toString('utf8');
+      for (const pattern of FORBIDDEN_PATH_PATTERNS) {
+        if (pattern.test(relative)) {
+          violations.push(`${relative}: forbidden packaged path`);
+          break;
+        }
+      }
 
-    for (const { label, pattern } of FORBIDDEN_TEXT_PATTERNS) {
-      if (pattern.test(text)) violations.push(`${relative}: ${label}`);
-    }
-    for (const { name, value } of secrets) {
-      if (text.includes(value)) violations.push(`${relative}: configured ${name} value`);
+      if (stat.size > maxTextBytes) continue;
+      const buffer = fs.readFileSync(descriptor);
+      if (!looksLikeText(buffer)) continue;
+      const text = buffer.toString('utf8');
+
+      for (const { label, pattern } of FORBIDDEN_TEXT_PATTERNS) {
+        if (pattern.test(text)) violations.push(`${relative}: ${label}`);
+      }
+      for (const { name, value } of secrets) {
+        if (text.includes(value)) violations.push(`${relative}: configured ${name} value`);
+      }
+    } finally {
+      fs.closeSync(descriptor);
     }
   }
 
