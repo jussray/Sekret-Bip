@@ -55,6 +55,7 @@ test('guard_crew_member_write rejects anonymous sessions and owner/id mismatch',
 test('cleanup_crew_relationship_access is SECURITY DEFINER, effectively pinned, and not directly callable', async () => {
   const definitionSource = await read('supabase/migrations/20260714183500_harden_crew_membership_paths.sql');
   const lockSource = await read('supabase/migrations/20260714183600_lock_crew_function_search_paths.sql');
+  const corpus = await readMigrationCorpus();
   const fn = definitionSource.match(/create or replace function public\.cleanup_crew_relationship_access\(\)[\s\S]*?\$\$;/)?.[0];
   assert.ok(fn, 'expected cleanup_crew_relationship_access() definition');
 
@@ -69,10 +70,21 @@ test('cleanup_crew_relationship_access is SECURITY DEFINER, effectively pinned, 
     lockSource,
     /alter function public\.cleanup_crew_relationship_access\(\)\s+set search_path = pg_catalog, pg_temp/i,
   );
+
+  // The historical revoke only proves the deployed function *was* locked
+  // down once. Checking only that migration's text would stay green even if
+  // a later migration granted EXECUTE back to public/anon/authenticated —
+  // scan the full corpus so a re-grant regression actually fails this test.
+  assert.doesNotMatch(
+    corpus,
+    /grant\s+execute\s+on\s+function\s+public\.cleanup_crew_relationship_access\(\)\s+to\s+(?:public|anon|authenticated)\b/i,
+    'no migration may re-grant EXECUTE on cleanup_crew_relationship_access() to public/anon/authenticated',
+  );
 });
 
 test('apply_point_transaction is SECURITY DEFINER, pinned, and not directly callable', async () => {
   const source = await read('supabase/migrations/20260703_reconcile_point_ledger_schema.sql');
+  const corpus = await readMigrationCorpus();
   const fn = source.match(/create or replace function public\.apply_point_transaction\(\)[\s\S]*?\$\$;/)?.[0];
   assert.ok(fn, 'expected apply_point_transaction() definition');
 
@@ -81,6 +93,14 @@ test('apply_point_transaction is SECURITY DEFINER, pinned, and not directly call
   assert.match(source, /revoke all on function public\.apply_point_transaction\(\) from public, anon, authenticated/);
 
   assert.match(source, /after insert on public\.point_transactions/);
+
+  // Same effective-grant regression guard as cleanup_crew_relationship_access
+  // above: the historical revoke alone doesn't prove EXECUTE stays revoked.
+  assert.doesNotMatch(
+    corpus,
+    /grant\s+execute\s+on\s+function\s+public\.apply_point_transaction\(\)\s+to\s+(?:public|anon|authenticated)\b/i,
+    'no migration may re-grant EXECUTE on apply_point_transaction() to public/anon/authenticated',
+  );
 });
 
 test('record_bridge_signal_activity is SECURITY DEFINER, pinned, and never stores Bridge content', async () => {
