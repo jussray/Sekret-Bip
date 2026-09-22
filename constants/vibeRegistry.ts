@@ -76,7 +76,7 @@ export function resolveVibeKey(key?: string | null): VibeKey {
 // atmosphere type classification.
 
 export type VibeAtmosphereType =
-  | 'companion-day'    // Raylene's Room, Rylane After Dark — companion-anchored
+  | 'companion-day'    // Suhana's Room, Sy After Dark — companion-anchored
   | 'companion-night'  // same companions but night phase
   | 'atmosphere'       // Cloud Drift, Window Rain, Sunset Exhale — mood-first, no companion
   | 'night-comfort';   // Night Comfort — companion Night, deep surface
@@ -95,7 +95,7 @@ export type VibePresetIdentity = {
 export const PRESET_IDENTITY: Record<VibeKey, VibePresetIdentity> = {
   raylene: {
     key: 'raylene',
-    name: "Raylene's Room",
+    name: "Suhana's Room",
     emoji: '🌸',
     tagline: 'scrapbook soft · fairy lights · yours',
     character: 'raylene',
@@ -104,7 +104,7 @@ export const PRESET_IDENTITY: Record<VibeKey, VibePresetIdentity> = {
   },
   rylane: {
     key: 'rylane',
-    name: 'Rylane After Dark',
+    name: 'Sy After Dark',
     emoji: '🌃',
     tagline: 'city chill · cool-lit · keeps it real',
     character: 'rylane',
