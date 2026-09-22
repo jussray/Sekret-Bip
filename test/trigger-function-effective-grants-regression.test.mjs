@@ -30,26 +30,38 @@ function escapeRegex(value) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function stripSqlComments(source) {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/--[^\r\n]*/g, ' ');
+}
+
+function sqlStatements(source) {
+  return stripSqlComments(source)
+    .split(';')
+    .map((statement) => statement.trim())
+    .filter(Boolean);
+}
+
 function assertNoProtectedExecuteGrant(corpus, functionName) {
-  const statements = corpus.match(/grant\s+[\s\S]*?;/gi) ?? [];
   const escapedName = escapeRegex(functionName);
-  const directTarget = new RegExp(`\\bon\\s+(?:function|routine)\\s+[\\s\\S]*?\\bpublic\\.${escapedName}\\s*\\(`, 'i');
-  const schemaWideTarget = /\bon\s+all\s+(?:functions|routines)\s+in\s+schema\s+public\b/i;
+  const directTarget = new RegExp(`^(?:function|routine)\\s+public\\.${escapedName}\\s*\\(`, 'i');
+  const schemaWideTarget = /^all\s+(?:functions|routines)\s+in\s+schema\s+public$/i;
 
-  for (const statement of statements) {
-    if (!directTarget.test(statement) && !schemaWideTarget.test(statement)) continue;
+  for (const statement of sqlStatements(corpus)) {
+    const grant = statement.match(/^grant\s+(.+?)\s+on\s+(.+?)\s+to\s+(.+?)(?:\s+with\s+grant\s+option)?$/is);
+    if (!grant) continue;
 
-    const privilegeMatch = statement.match(/^grant\s+([\s\S]*?)\s+on\s+/i);
-    const granteeMatch = statement.match(/\bto\s+([\s\S]*?)(?:\s+with\s+grant\s+option)?\s*;$/i);
-    if (!privilegeMatch || !granteeMatch) continue;
+    const [, privilegeSource, target, granteeSource] = grant;
+    if (!directTarget.test(target.trim()) && !schemaWideTarget.test(target.trim())) continue;
 
-    const privileges = normalizeList(privilegeMatch[1]);
+    const privileges = normalizeList(privilegeSource);
     const grantsExecute = privileges.some(
       (privilege) => privilege === 'execute' || privilege === 'all' || privilege === 'all privileges',
     );
     if (!grantsExecute) continue;
 
-    const grantees = normalizeList(granteeMatch[1]);
+    const grantees = normalizeList(granteeSource);
     const exposedRoles = grantees.filter((role) => protectedRoles.has(role));
     assert.deepEqual(
       exposedRoles,
@@ -61,36 +73,33 @@ function assertNoProtectedExecuteGrant(corpus, functionName) {
 
 function aclEvents(source, functionName) {
   const escapedName = escapeRegex(functionName);
-  const patterns = [
-    {
-      type: 'drop',
-      regex: new RegExp(`\\bdrop\\s+(?:function|routine)\\s+(?:if\\s+exists\\s+)?public\\.${escapedName}\\s*\\(`, 'gi'),
-    },
-    {
-      type: 'create',
-      regex: new RegExp(`\\bcreate\\s+(?:or\\s+replace\\s+)?function\\s+public\\.${escapedName}\\s*\\(`, 'gi'),
-    },
-    {
-      type: 'revoke',
-      regex: new RegExp(
-        `\\brevoke\\s+([\\s\\S]*?)\\s+on\\s+(?:function|routine)\\s+public\\.${escapedName}\\s*\\([^)]*\\)\\s+from\\s+([\\s\\S]*?);`,
-        'gi',
-      ),
-    },
-  ];
+  const dropTarget = new RegExp(`^drop\\s+(?:function|routine)\\s+(?:if\\s+exists\\s+)?public\\.${escapedName}\\s*\\(`, 'i');
+  const createTarget = new RegExp(`^create\\s+(?:or\\s+replace\\s+)?function\\s+public\\.${escapedName}\\s*\\(`, 'i');
+  const revokeTarget = new RegExp(
+    `^revoke\\s+(.+?)\\s+on\\s+(?:function|routine)\\s+public\\.${escapedName}\\s*\\([^)]*\\)\\s+from\\s+(.+)$`,
+    'is',
+  );
 
   const events = [];
-  for (const { type, regex } of patterns) {
-    for (const match of source.matchAll(regex)) {
+  for (const statement of sqlStatements(source)) {
+    if (dropTarget.test(statement)) {
+      events.push({ type: 'drop', privileges: [], roles: [] });
+      continue;
+    }
+    if (createTarget.test(statement)) {
+      events.push({ type: 'create', privileges: [], roles: [] });
+      continue;
+    }
+    const revoke = statement.match(revokeTarget);
+    if (revoke) {
       events.push({
-        type,
-        index: match.index ?? 0,
-        privileges: type === 'revoke' ? normalizeList(match[1] ?? '') : [],
-        roles: type === 'revoke' ? normalizeList(match[2] ?? '') : [],
+        type: 'revoke',
+        privileges: normalizeList(revoke[1]),
+        roles: normalizeList(revoke[2]),
       });
     }
   }
-  return events.sort((left, right) => left.index - right.index);
+  return events;
 }
 
 function assertNewDefinitionsEndLocked(migrations, functionName) {
@@ -142,12 +151,14 @@ test('apply_point_transaction rejects explicit and implicit protected EXECUTE re
   assertNewDefinitionsEndLocked(migrations, 'apply_point_transaction');
 });
 
-test('grant parser catches multi-privilege and multi-role re-grants', () => {
+test('grant parser catches multi-privilege, multi-role, schema-wide, and comment-prefixed re-grants', () => {
   const unsafeCorpus = `
+    -- never grant this directly
     GRANT SELECT, EXECUTE ON FUNCTION public.cleanup_crew_relationship_access()
       TO service_role, authenticated;
     GRANT ALL PRIVILEGES ON FUNCTION public.apply_point_transaction()
       TO service_role, anon;
+    GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO service_role, public;
   `;
 
   assert.throws(
@@ -187,13 +198,14 @@ test('ACL model catches a drop/recreate that relies on default EXECUTE privilege
   );
 });
 
-test('ACL model accepts a recreated function only after protected EXECUTE is revoked again', () => {
+test('ACL model keeps unrelated REVOKEs statement-bounded and accepts a protected re-revoke', () => {
   const safeMigrations = [
     {
       name: '001_initial.sql',
       source: `
         create function public.apply_point_transaction()
         returns trigger language plpgsql as $$ begin return new; end $$;
+        revoke insert, update, delete on table public.point_ledger from authenticated;
         revoke all on function public.apply_point_transaction()
           from public, anon, authenticated;
       `,
@@ -204,6 +216,7 @@ test('ACL model accepts a recreated function only after protected EXECUTE is rev
         drop function public.apply_point_transaction();
         create function public.apply_point_transaction()
         returns trigger language plpgsql as $$ begin return new; end $$;
+        -- keep this function locked after recreation
         revoke execute on function public.apply_point_transaction()
           from public, anon, authenticated;
       `,
