@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 
-import { GLOBAL_VIBE_TOKENS, VIBE_DESIGN_TOKENS } from '@constants/vibeDesignTokens';
+import { GLOBAL_VIBE_TOKENS, VIBE_DESIGN_TOKENS } from '../../../constants/vibeDesignTokens';
 import {
   acknowledgeBridgeFamilyVisitSession,
   declineBridgeFamilyVisitSession,
