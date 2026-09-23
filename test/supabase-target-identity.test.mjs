@@ -7,6 +7,7 @@ import {
   resolveSupabaseTarget,
   verifySupabaseManagementIdentity,
 } from '../scripts/supabase-target-identity.mjs';
+import { classifySupabaseTargetIdentityFailure } from '../scripts/verify-supabase-production-schema.mjs';
 
 const registry = JSON.parse(fs.readFileSync('config/supabase-targets.json', 'utf8'));
 const canonical = registry.targets['sekret-bip-production'];
@@ -179,4 +180,11 @@ test('identity-only changes trigger and execute the production identity contract
     assert.match(productionGate, new RegExp(filePath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   assert.match(productionGate, /test\/supabase-target-identity\.test\.mjs/);
+});
+
+test('classifySupabaseTargetIdentityFailure maps the missing-token error to configuration-invalid before the generic fallback', () => {
+  const error = new Error('SUPABASE_ACCESS_TOKEN is required for live Supabase target verification.');
+  const result = classifySupabaseTargetIdentityFailure(error);
+  assert.equal(result.status, 'configuration-invalid');
+  assert.equal(result.errorCode, 'missing_supabase_access_token');
 });

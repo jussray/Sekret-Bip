@@ -82,6 +82,7 @@ test('secret detectors recognize modern and legacy privileged Supabase key names
     assert.match(source, /SUPABASE_SECRET_KEY/);
     assert.match(source, /SUPABASE_SERVICE_ROLE_KEY/);
   }
+  assert.match(controlRoomServer, /sb_secret_/);
 });
 
 test('public app remains publishable-key-first and never reads privileged Supabase keys', () => {
