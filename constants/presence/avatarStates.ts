@@ -20,14 +20,15 @@
 //   raylene-*.png ........... girl, long curly hair, gold pendant.
 //   rylane-{neutral,happy,writing,window,fullbody,neutral-v2}.png
 //                              boy, brown-highlighted dreadlocks, gold chain,
-//                              black Se'kret hoodie. Signed "Rylane" in the
+//                              black Se'kret hoodie. Signed "Rylane" (Sy's
+//                              pre-cutover name) in the
 //                              rylane-reference-sheet.png artwork itself.
 //   cloud-*.png ............. mascot.
 //   Night .................... Dedicated game-ready single-pose state art is
 //                              still pending. Design references are not loaded
 //                              by the runtime.
 //
-// Hard rule the user repeated multiple times: "Rylane and Night are not the
+// Hard rule the user repeated multiple times: "Sy and Night are not the
 // same person." Never alias them to each other's art.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -58,8 +59,8 @@ export type PresenceCharacter = 'raylene' | 'rylane' | 'cloud' | 'night';
 
 /** Display name for each character (for badges, accessibility labels). */
 export const CHARACTER_NAME: Record<PresenceCharacter, string> = {
-  raylene: 'Raylene',
-  rylane:  'Rylane',
+  raylene: 'Suhana',
+  rylane:  'Sy',
   cloud:   'Cloud',
   night:   'Night',
 };
@@ -128,13 +129,14 @@ const RAYLENE_CELLS: readonly AssetCell[] = [
   { time: 'rain',      state: 'comforting', asset: IMAGES.rayleneWindowRainy },
 ];
 
-// Rylane: dreadlocks, gold chain, black Se'kret hoodie. Verified via visual
-// scan of rylane-reference-sheet.png (signed "Rylane" in the artwork itself),
+// Sy: dreadlocks, gold chain, black Se'kret hoodie. Verified via visual
+// scan of rylane-reference-sheet.png (signed with the pre-cutover name
+// "Rylane" in the artwork itself),
 // rylane-fullbody.png, rylane-neutral.png, rylane-neutral-v2.png,
 // rylane-happy.png, rylane-writing.png, rylane-window.png.
 //
 // IMAGES.rylane* keys all resolve (via theme.ts aliasing) to one of the real
-// rylane-*.png files above — so each cell here renders actual Rylane art,
+// rylane-*.png files above — so each cell here renders actual Sy art,
 // never a stub byte and never another character's face.
 const RYLANE_CELLS: readonly AssetCell[] = [
   // Listening — calm, attentive. Window pose carries the "present" feel.
@@ -267,8 +269,8 @@ const ULTIMATE_FALLBACK = IMAGES.sekretSplash;
  *
  * IMPORTANT: fallbacks STAY WITHIN the same character's bank. We never
  * borrow another character's art — a missing Night pose falls back to
- * Night's other Night poses (or to sekret-splash), never to Rylane or
- * Raylene. The four avatars are distinct people, not lighting variants of
+ * Night's other Night poses (or to sekret-splash), never to Sy or
+ * Suhana. The four avatars are distinct people, not lighting variants of
  * each other.
  *
  * Fallback chain (all within the same character):
