@@ -3,6 +3,10 @@ name: EAS Build
 on:
   workflow_dispatch:
     inputs:
+      target_sha:
+        description: Exact verified commit SHA to build
+        required: true
+        type: string
       app:
         description: App target to build
         required: true
@@ -30,7 +34,7 @@ on:
           - production
 
 concurrency:
-  group: eas-build-${{ github.ref }}-${{ inputs.app }}-${{ inputs.platform }}
+  group: eas-build-${{ inputs.target_sha }}-${{ inputs.app }}-${{ inputs.platform }}
   cancel-in-progress: false
 
 permissions:
@@ -38,10 +42,11 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ inputs.target_sha }}
 
 jobs:
   build:
-    name: Build ${{ inputs.app }} ${{ inputs.platform }}
+    name: Build ${{ inputs.app }} ${{ inputs.platform }} @ ${{ inputs.target_sha }}
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -54,7 +59,24 @@ jobs:
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact verified candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'target_sha must be a lowercase 40-character commit SHA.' >&2
+            exit 1
+          }
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - uses: actions/setup-node@v4
         with:
@@ -119,5 +141,5 @@ jobs:
             --force \
             --non-interactive
 
-      - name: Queue EAS build
+      - name: Queue EAS build from exact verified candidate
         run: npx eas-cli@latest build --profile "${{ steps.profile.outputs.name }}" --platform "${{ inputs.platform }}" --non-interactive --no-wait

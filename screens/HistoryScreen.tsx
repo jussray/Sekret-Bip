@@ -8,8 +8,8 @@
 // and end with a char-aware sticky note.
 //
 // Voice:
-//   • Rylane (blue): "respect, look at the reps fr · lock in continues"
-//   • Raylene (pink/purple): "we see you 💜 · look how far you've come"
+//   • Sy (blue): "respect, look at the reps fr · lock in continues"
+//   • Suhana (pink/purple): "we see you 💜 · look how far you've come"
 //
 // Same polish patterns as the rest of the app: time-of-day backdrop, mood
 // glow, gradient hero overlay, stagger entrance, breath-loop on the streak
@@ -226,7 +226,7 @@ export function HistoryScreen({
             ]}
           >
             <Text style={[styles.pillText, { color: softAccent }]}>
-              {isRylane ? '\u{1F9CD} rylane is here' : '☁\uFE0F raylene is here'}
+              {isRylane ? '\u{1F9CD} sy is here' : '☁\uFE0F suhana is here'}
             </Text>
           </Animated.View>
 
@@ -323,7 +323,7 @@ export function HistoryScreen({
         <Animated.View style={[styles.sticky, enter(noteAnim)]}>
           <Text style={styles.stickyText}>{stickyAffirmation}</Text>
           <Text style={styles.stickySig}>
-            {isRylane ? '— rylane' : '— raylene'}
+            {isRylane ? '— sy' : '— suhana'}
           </Text>
         </Animated.View>
 
