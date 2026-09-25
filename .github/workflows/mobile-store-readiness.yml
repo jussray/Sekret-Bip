@@ -50,6 +50,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Report exact proof subject
+        run: echo "proof_subject=${GITHUB_SHA}"
+
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
