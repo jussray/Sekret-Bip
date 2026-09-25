@@ -217,3 +217,24 @@ test('authorization evidence and secrets stay out of the public surface', async 
     expect(visibleText).not.toContain(forbidden);
   }
 });
+
+test('public support page is reachable without authentication', async ({ page }) => {
+  await page.goto('/support/');
+  await expect(page.getByRole('heading', { name: 'Support' })).toBeVisible({ timeout: 30_000 });
+  const supportLink = page.getByRole('link', { name: 'support@sekretbip.net' });
+  await expect(supportLink).toBeVisible();
+  await expect(supportLink).toHaveAttribute('href', 'mailto:support@sekretbip.net');
+  await expect(page.getByText(/contact Se'kret Bip support without signing in/i)).toBeVisible();
+  await page.screenshot({ path: 'test-results/store-support-page.png', fullPage: true });
+});
+
+test('public account deletion page exposes an off-app deletion request path', async ({ page }) => {
+  await page.goto('/account-deletion/');
+  await expect(page.getByRole('heading', { name: 'Delete your account' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/request deletion of your Se'kret Bip account and associated account data/i)).toBeVisible();
+  const deletionLink = page.getByRole('link', { name: 'support@sekretbip.net' });
+  await expect(deletionLink).toBeVisible();
+  await expect(deletionLink).toHaveAttribute('href', /mailto:support@sekretbip\.net\?subject=/i);
+  await expect(page.getByText(/even if you no longer have the app installed/i)).toBeVisible();
+  await page.screenshot({ path: 'test-results/store-account-deletion-page.png', fullPage: true });
+});
