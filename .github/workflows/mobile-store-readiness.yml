@@ -16,6 +16,7 @@ on:
       - src/features/circle/**
       - supabase/migrations/**circle*.sql
       - public/support/**
+      - public/account-deletion/**
       - test/open-bip-*.test.mjs
       - e2e/smoke.spec.ts
       - scripts/verify-mobile-store-release.mjs
@@ -33,6 +34,7 @@ on:
       - src/features/circle/**
       - supabase/migrations/**circle*.sql
       - public/support/**
+      - public/account-deletion/**
       - test/open-bip-*.test.mjs
       - e2e/smoke.spec.ts
       - scripts/verify-mobile-store-release.mjs
