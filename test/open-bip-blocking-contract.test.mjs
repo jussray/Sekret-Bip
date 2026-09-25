@@ -8,6 +8,7 @@ const migration = read('supabase/migrations/20260925070000_block_open_bip_author
 const repository = read('src/features/circle/circleRepository.ts');
 const screen = read('app/(teen)/circle/feed-v2.tsx');
 const support = read('public/support/index.html');
+const deletion = read('public/account-deletion/index.html');
 const safetyScanMigration = read('supabase/migrations/20260619_safety_scan.sql');
 
 test('Open Bip blocking resolves private identity only inside Postgres', () => {
@@ -45,4 +46,15 @@ test('store-facing UGC safety contract keeps reporting, filtering, and public su
   assert.match(support, /href="mailto:support@sekretbip\.net"/i);
   assert.match(support, /contact Se'kret Bip support without signing in/i);
   assert.match(support, /privacy-and-safety/i);
+});
+
+test('Google Play deletion resource supports an off-app account deletion request', () => {
+  assert.match(deletion, /Delete your account/i);
+  assert.match(deletion, /request deletion of your Se'kret Bip account and associated account data/i);
+  assert.match(deletion, /even if you no longer have the app installed/i);
+  assert.match(deletion, /mailto:support@sekretbip\.net\?subject=/i);
+  assert.match(deletion, /Se'kret Bip account deletion request/i);
+  assert.match(deletion, /If you can still sign in, you can also start account deletion from account settings/i);
+  assert.match(deletion, /\/support\//i);
+  assert.match(deletion, /\/privacy-and-safety\//i);
 });
