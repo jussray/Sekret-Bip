@@ -150,46 +150,6 @@
       "maxMatches": 2,
       "expiresAt": "2026-10-01T00:00:00Z",
       "rationale": "These two expressions inspect repository-owned Playwright source text to verify the public apex URL and hostname assertions survived the Access fail-closed repair. They do not validate or authorize an untrusted runtime URL."
-    },
-    {
-      "id": "founder-auth-identity-test-domain-anchor",
-      "language": "javascript-typescript",
-      "ruleId": "js/regex/missing-regexp-anchor",
-      "path": "test/founder-owned-auth-identity.test.mjs",
-      "messageIncludes": "may match anywhere",
-      "maxMatches": 1,
-      "expiresAt": "2026-10-01T00:00:00Z",
-      "rationale": "The expression verifies that the founder email domain literal appears in repository-owned SQL source; it is not runtime email or domain validation."
-    },
-    {
-      "id": "control-room-os-test-domain-anchor",
-      "language": "javascript-typescript",
-      "ruleId": "js/regex/missing-regexp-anchor",
-      "path": "test/control-room-os.test.mjs",
-      "messageIncludes": "may match anywhere",
-      "maxMatches": 1,
-      "expiresAt": "2026-10-01T00:00:00Z",
-      "rationale": "The expression asserts a static configuration value in repository-owned source; it is not runtime email or domain validation."
-    },
-    {
-      "id": "worker-auth-test-cors-origins-anchor",
-      "language": "javascript-typescript",
-      "ruleId": "js/regex/missing-regexp-anchor",
-      "path": "test/worker-auth.test.mjs",
-      "messageIncludes": "may match anywhere",
-      "maxMatches": 3,
-      "expiresAt": "2026-10-01T00:00:00Z",
-      "rationale": "The expression verifies that canonical production CORS origins appear in repository-owned Worker source; it is a static source assertion, not runtime origin validation."
-    },
-    {
-      "id": "configure-codex-cloudflare-mcp-test-url-anchors",
-      "language": "javascript-typescript",
-      "ruleId": "js/regex/missing-regexp-anchor",
-      "path": "test/configure-codex-cloudflare-mcp.test.mjs",
-      "messageIncludes": "may match anywhere",
-      "maxMatches": 2,
-      "expiresAt": "2026-10-01T00:00:00Z",
-      "rationale": "These expressions verify that MCP server URLs appear in captured codex CLI invocations; they are static call-log assertions, not runtime URL authorization decisions."
     }
   ]
 }
