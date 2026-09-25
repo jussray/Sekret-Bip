@@ -11,6 +11,8 @@ on:
       - eas.json
       - package.json
       - package-lock.json
+      - app/(parent)/_layout.tsx
+      - e2e/smoke.spec.ts
       - scripts/verify-mobile-store-release.mjs
       - .github/workflows/eas-build.yml
       - .github/workflows/mobile-store-readiness.yml
@@ -21,6 +23,8 @@ on:
       - eas.json
       - package.json
       - package-lock.json
+      - app/(parent)/_layout.tsx
+      - e2e/smoke.spec.ts
       - scripts/verify-mobile-store-release.mjs
       - .github/workflows/eas-build.yml
       - .github/workflows/mobile-store-readiness.yml
