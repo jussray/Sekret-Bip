@@ -17,7 +17,7 @@ const terminal = new Set(['success', 'fail', 'skipped', 'cancelled', 'terminated
 const active = (rows) => (Array.isArray(rows) ? rows : []).filter((row) => !row?.deleted_on);
 
 const receipt = {
-  schemaVersion: 12,
+  schemaVersion: 13,
   generatedAt: new Date().toISOString(),
   trustedGitRef: process.env.GITHUB_REF || null,
   trustedGitSha: process.env.GITHUB_SHA || null,
@@ -33,9 +33,9 @@ const receipt = {
   },
   providerTopology: {
     workers: [
-      { name: separateWorker, previousName: previousSeparateWorker, role: 'separate-protected', mutationAuthorized: false },
-      { name: productionWorker, role: 'production' },
-      { name: alphaWorker, role: 'founder-gated-alpha', mutationAuthorized: false },
+      { name: separateWorker, previousName: previousSeparateWorker, role: 'separate-protected', requiredPresence: true, mutationAuthorized: false },
+      { name: productionWorker, role: 'production', requiredPresence: true },
+      { name: alphaWorker, role: 'founder-gated-alpha', requiredPresence: false, mutationAuthorized: false },
     ],
     pages: [{ name: pagesProject, role: 'frontend', mutationAuthorized: false }],
   },
@@ -68,6 +68,9 @@ const receipt = {
   alphaWorker: {
     name: alphaWorker,
     scriptTag: null,
+    observed: false,
+    expectedPresence: 'optional-until-founder-approved',
+    deploymentState: 'not-deployed-until-founder-approved',
     activeTriggerCount: null,
     founderGatedObservationOnly: true,
   },
@@ -297,17 +300,20 @@ const productionMatches = findWorker(productionWorker);
 const alphaMatches = findWorker(alphaWorker);
 if (separateMatches.length !== 1) fail('worker-identity-mismatch', `${separateWorker}: expected exactly one Worker, found ${separateMatches.length}.`, { worker: separateWorker, previousName: previousSeparateWorker, observedCount: separateMatches.length });
 if (productionMatches.length !== 1) fail('worker-identity-mismatch', `${productionWorker}: expected exactly one Worker, found ${productionMatches.length}.`, { worker: productionWorker, observedCount: productionMatches.length });
-if (alphaMatches.length !== 1) fail('worker-identity-mismatch', `${alphaWorker}: expected exactly one Worker, found ${alphaMatches.length}.`, { worker: alphaWorker, observedCount: alphaMatches.length });
+if (alphaMatches.length > 1) fail('worker-identity-mismatch', `${alphaWorker}: expected at most one founder-gated Worker, found ${alphaMatches.length}.`, { worker: alphaWorker, observedCount: alphaMatches.length, expectedPresence: 'optional-until-founder-approved' });
 
 const separateTag = clean(separateMatches[0]?.tag);
 const productionTag = clean(productionMatches[0]?.tag);
-const alphaTag = clean(alphaMatches[0]?.tag);
-if (!separateTag || !productionTag || !alphaTag) fail('worker-tag-missing', 'All protected Worker identities must expose immutable script tags.');
+const alphaTag = alphaMatches.length === 1 ? clean(alphaMatches[0]?.tag) : '';
+if (!separateTag || !productionTag) fail('worker-tag-missing', 'Required active Worker identities must expose immutable script tags.');
+if (alphaMatches.length === 1 && !alphaTag) fail('worker-tag-missing', `${alphaWorker}: observed founder-gated Worker must expose an immutable script tag.`, { worker: alphaWorker });
 
 receipt.separateWorker.scriptTag = separateTag;
 receipt.separateWorkerObserved = true;
 receipt.productionWorker.scriptTag = productionTag;
-receipt.alphaWorker.scriptTag = alphaTag;
+receipt.alphaWorker.observed = alphaMatches.length === 1;
+receipt.alphaWorker.scriptTag = alphaTag || null;
+receipt.alphaWorker.deploymentState = alphaTag ? 'deployed-founder-gated-observation-only' : 'not-deployed-until-founder-approved';
 writeReceipt();
 
 const separateTriggerRows = await get(`/accounts/${accountId}/builds/workers/${separateTag}/triggers`);
@@ -346,7 +352,7 @@ const verifiedMainOnly = activeTriggers.length === 1 &&
   deployCommand === 'npm run deploy:api:production' &&
   buildCommand === '' &&
   activeNonMainBuilds.length === 0;
-const alphaTriggers = await get(`/accounts/${accountId}/builds/workers/${alphaTag}/triggers`);
+const alphaTriggers = alphaTag ? await get(`/accounts/${accountId}/builds/workers/${alphaTag}/triggers`) : [];
 
 receipt.separateWorker.activeTriggerCount = separateActiveTriggers.length;
 receipt.separateWorker.branchIncludes = separateIncludes;
