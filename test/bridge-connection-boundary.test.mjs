@@ -23,6 +23,14 @@ test('S2Tell routes into Teen Bridge via S2TellBridgeScreen', async () => {
   assert.match(source, /S2TellBridgeScreen/);
 });
 
+test('S2Tell compatibility rejects anonymous Supabase sessions before bridge_shares access', async () => {
+  const source = await read('src/features/bridge/bridgeShareCompat.ts');
+  assert.match(source, /async function permanentUserId\(\)/);
+  assert.match(source, /if \(!user \|\| user\.is_anonymous\) return null/);
+  assert.doesNotMatch(source, /async function currentUserId\(\)/);
+  assert.match(source, /await permanentUserId\(\)/);
+});
+
 test('former Doorbell route aliases Parent Bridge signals', async () => {
   const source = await read('app/(parent)/dashboard.tsx');
   assert.match(source, /\(parent\)\/bridge\?tab=signals/);

@@ -7,20 +7,17 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migrationsDir = path.join(root, 'supabase', 'migrations');
 const summaryContractPath = path.join(migrationsDir, '20260705010000_bridge_summary_contract.sql');
-const legacyGuardPath = path.join(
-  root,
-  'supabase',
-  'reference',
-  'legacy_migrations',
-  '20260629032000_complete_parent_bridge_safety_storage_rls.sql',
+const permanentBoundaryPath = path.join(
+  migrationsDir,
+  '20260920203000_harden_bridge_permanent_account_boundary.sql',
 );
 
 const summaryContract = fs.readFileSync(summaryContractPath, 'utf8');
-const legacyGuard = fs.readFileSync(legacyGuardPath, 'utf8');
+const permanentBoundary = fs.readFileSync(permanentBoundaryPath, 'utf8');
 
-test('bridge authorization migration files exist at their expected authority paths', () => {
+test('bridge authorization migration files exist at their active authority paths', () => {
   assert.equal(fs.existsSync(summaryContractPath), true);
-  assert.equal(fs.existsSync(legacyGuardPath), true);
+  assert.equal(fs.existsSync(permanentBoundaryPath), true);
 });
 
 test('bridge summary contract removes legacy raw-content parent read paths', () => {
@@ -129,24 +126,70 @@ test('bridge_delivery_preferences has only a teen owner policy, no parent policy
   assert.doesNotMatch(summaryContract, /bridge_delivery_preferences_parent/i);
 });
 
-test('legacy guard applies is_non_anonymous_user to bridge_shares policies', () => {
-  assert.match(legacyGuard, /is_non_anonymous_user/i);
-  assert.match(legacyGuard, /bridge_shares_owner_update/i);
-  assert.match(legacyGuard, /bridge_shares_owner_delete/i);
-  assert.match(legacyGuard, /public\.is_non_anonymous_user\(\) and auth\.uid\(\) = user_id/i);
+test('active migration enforces permanent-account guards on legacy S2Tell bridge_shares', () => {
+  for (const policy of [
+    'bridge_shares_owner_select',
+    'bridge_shares_owner_insert',
+    'bridge_shares_owner_update',
+    'bridge_shares_owner_delete',
+  ]) {
+    assert.match(permanentBoundary, new RegExp(`alter policy ${policy}`, 'i'));
+  }
+  assert.match(permanentBoundary, /on public\.bridge_shares/i);
+  assert.match(permanentBoundary, /to authenticated/i);
+  assert.match(permanentBoundary, /public\.is_non_anonymous_user\(\)/i);
+  assert.match(permanentBoundary, /auth\.uid\(\) = user_id/i);
+  assert.doesNotMatch(permanentBoundary, /bridge_shares_linked_parent_select/i);
 });
 
-test('legacy guard applies is_non_anonymous_user to bridge_signals teen and parent policies', () => {
-  assert.match(legacyGuard, /bridge_signals.*teen read/i);
-  assert.match(legacyGuard, /bridge_signals.*teen insert/i);
-  assert.match(legacyGuard, /bridge_signals.*linked parent read/i);
-  assert.match(legacyGuard, /public\.is_non_anonymous_user\(\) and auth\.uid\(\) = teen_user_id/i);
+test('active migration enforces permanent-account guards on bridge_signals', () => {
+  for (const policy of [
+    'bridge_signals: teen read',
+    'bridge_signals: teen insert',
+    'bridge_signals: teen update',
+    'bridge_signals: linked parent read',
+  ]) {
+    assert.match(permanentBoundary, new RegExp(`alter policy "${policy}"`, 'i'));
+  }
+  assert.match(permanentBoundary, /to authenticated/i);
+  assert.match(permanentBoundary, /public\.is_non_anonymous_user\(\)/i);
+  assert.match(permanentBoundary, /revoked_at is null/i);
+  assert.match(permanentBoundary, /pl\.status = 'active'/i);
+  assert.match(permanentBoundary, /pl\.is_active = true/i);
 });
 
-test('legacy guard does not alter bridge_share_requests or bridge_summaries (those are Phase 1)', () => {
-  assert.doesNotMatch(legacyGuard, /bridge_share_requests/i);
-  assert.doesNotMatch(legacyGuard, /bridge_summaries/i);
-  assert.doesNotMatch(legacyGuard, /bridge_summary_views/i);
-  assert.doesNotMatch(legacyGuard, /bridge_share_sources/i);
-  assert.doesNotMatch(legacyGuard, /bridge_delivery_preferences/i);
+test('active migration enforces permanent-account guards on parent_notes', () => {
+  for (const policy of [
+    'parent_notes: parent insert',
+    'parent_notes: parent read',
+    'parent_notes: teen read',
+    'parent_notes: teen mark seen',
+  ]) {
+    assert.match(permanentBoundary, new RegExp(`alter policy "${policy}"`, 'i'));
+  }
+  assert.match(permanentBoundary, /public\.is_non_anonymous_user\(\)/i);
+  assert.match(permanentBoundary, /pl\.status = 'active'/i);
+  assert.match(permanentBoundary, /pl\.is_active = true/i);
+});
+
+test('parent note acknowledgement cannot grant teen clients authority to rewrite parent-authored content', () => {
+  assert.match(
+    permanentBoundary,
+    /revoke update on table public\.parent_notes from anon, authenticated/i,
+  );
+  assert.match(
+    permanentBoundary,
+    /grant update\s*\(seen_by_teen\) on table public\.parent_notes to authenticated/i,
+  );
+  assert.doesNotMatch(
+    permanentBoundary,
+    /grant update on table public\.parent_notes to authenticated/i,
+  );
+});
+
+test('permanent-account boundary migration does not reopen raw private parent read paths', () => {
+  assert.doesNotMatch(permanentBoundary, /journal_entries/);
+  assert.doesNotMatch(permanentBoundary, /mood_history/);
+  assert.doesNotMatch(permanentBoundary, /voice_notes/);
+  assert.doesNotMatch(permanentBoundary, /bridge_shares_linked_parent_select/);
 });

@@ -10,12 +10,14 @@ import {
   fetchLinkedTeenId as fetchLinkedTeenIdBase,
 } from './parentLink';
 
-async function uid(): Promise<string | null> {
+async function permanentUid(): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return null;
   try {
     const { data } = await sb.auth.getUser();
-    return data?.user?.id ?? null;
+    const user = data?.user;
+    if (!user || user.is_anonymous) return null;
+    return user.id;
   } catch {
     return null;
   }
@@ -70,7 +72,7 @@ export async function sendBridgeSignal(params: {
   charKey: 'raylene' | 'rylane';
 }): Promise<void> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) {
     throw new Error('A permanent signed-in Teen account is required to send through Bridge.');
   }
@@ -89,7 +91,7 @@ export async function sendBridgeSignal(params: {
 
 export async function fetchParentNotes(): Promise<ParentNote[]> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) return [];
   const { data } = await sb
     .from('parent_notes')
@@ -102,7 +104,7 @@ export async function fetchParentNotes(): Promise<ParentNote[]> {
 
 export async function fetchParentSentNotes(): Promise<ParentNote[]> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) return [];
   const { data } = await sb
     .from('parent_notes')
@@ -115,7 +117,8 @@ export async function fetchParentSentNotes(): Promise<ParentNote[]> {
 
 export async function markParentNoteSeen(id: string): Promise<void> {
   const sb = getSupabase();
-  if (!sb) return;
+  const userId = await permanentUid();
+  if (!sb || !userId) return;
   await sb.from('parent_notes').update({ seen_by_teen: true }).eq('id', id);
 }
 
@@ -123,7 +126,7 @@ export async function subscribeToParentNotes(
   onNew: (note: ParentNote) => void,
 ): Promise<() => void> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) return () => {};
   const channel = sb.channel(`parent-notes-${userId}`).on(
     'postgres_changes',
@@ -135,7 +138,8 @@ export async function subscribeToParentNotes(
 
 export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]> {
   const sb = getSupabase();
-  if (!sb || !teenId) return [];
+  const userId = await permanentUid();
+  if (!sb || !userId || !teenId) return [];
   const { data } = await sb
     .from('bridge_signals')
     .select('id, share_type, conv_mode, response_preference, char_key, sent_at, created_at')
@@ -147,7 +151,7 @@ export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]
 
 export async function sendParentNote(teenId: string, content: string): Promise<boolean> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId || !teenId || !content.trim()) return false;
   const { error } = await sb.from('parent_notes').insert({
     teen_user_id: teenId,
@@ -168,7 +172,7 @@ export async function sendParentNote(teenId: string, content: string): Promise<b
 
 export async function fetchParentEngagement(): Promise<ParentEngagement | null> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) return null;
   const [notesRes, engagementRes] = await Promise.all([
     sb.from('parent_notes').select('id', { count: 'exact', head: true }).eq('parent_user_id', userId),
@@ -187,7 +191,8 @@ export async function subscribeToBridgeSignals(
   onNew: (signal: BridgeSignal) => void,
 ): Promise<() => void> {
   const sb = getSupabase();
-  if (!sb || !teenId) return () => {};
+  const userId = await permanentUid();
+  if (!sb || !userId || !teenId) return () => {};
   const channel = sb.channel(`bridge-signals-${teenId}`).on(
     'postgres_changes',
     { event: 'INSERT', schema: 'public', table: 'bridge_signals', filter: `teen_user_id=eq.${teenId}` },
