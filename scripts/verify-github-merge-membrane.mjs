@@ -281,8 +281,18 @@ export function assessPullRequestTrust({ pullRequest, expectedSha, trustedBaseSh
       message: `PR_BEHIND_BASE head=${expectedSha} is behind base=${observedBaseSha}. The changed-files diff (and therefore the required-checks scope) cannot be trusted while a PR is behind its base branch. Merge the latest main into this branch and push before required-checks can be correctly evaluated. (Do not rebase a published branch: that requires a force-push, which needs separate, explicit founder approval.)`,
     };
   }
+  if (!mergeableState || mergeableState === 'unknown') {
+    // GitHub computes mergeable_state asynchronously and reports "unknown"
+    // (or omits it) until it finishes. Treating that as equivalent to a
+    // known-safe state would let a PR that is actually behind or dirty slip
+    // through during the window before GitHub reveals the real value --
+    // especially on a rerun where checks are already green and the loop
+    // would otherwise accept "ready" on its very first iteration, before
+    // mergeability ever resolves. Callers must keep waiting, not proceed.
+    return { ok: true, mergeabilityKnown: false };
+  }
 
-  return { ok: true };
+  return { ok: true, mergeabilityKnown: true };
 }
 
 async function writeReceipt(outputPath, receipt) {
@@ -328,6 +338,14 @@ export async function verifyGithubMergeMembrane({ env = process.env, now = () =>
     const currentPullRequest = await fetchPullRequest({ repository, prNumber, token });
     const currentTrust = assessPullRequestTrust({ pullRequest: currentPullRequest, expectedSha, trustedBaseSha });
     if (!currentTrust.ok) throw new Error(currentTrust.message);
+    if (!currentTrust.mergeabilityKnown) {
+      // GitHub has not finished computing mergeable_state yet. Do not
+      // evaluate or accept readiness this cycle -- an already-green set of
+      // checks from an earlier run must never be accepted before GitHub
+      // reveals whether this PR is actually behind or conflicted.
+      await sleep(pollMs);
+      continue;
+    }
 
     const checkRuns = await fetchCheckRuns({ repository, sha: expectedSha, token });
     evaluation = evaluateExpectedChecks({ expectedChecks, checkRuns, expectedSha });

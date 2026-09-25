@@ -45,17 +45,33 @@ test('trust assessment passes a clean, exact-head, correctly-based PR through un
     expectedSha: SHA,
     trustedBaseSha: BASE_SHA,
   });
-  assert.deepEqual(verdict, { ok: true });
+  assert.deepEqual(verdict, { ok: true, mergeabilityKnown: true });
 });
 
-for (const mergeableState of ['unstable', 'blocked', 'has_hooks', 'unknown', null, undefined]) {
-  test(`trust assessment does not fail-fast on mergeable_state=${mergeableState}`, () => {
+for (const mergeableState of ['unstable', 'blocked', 'has_hooks']) {
+  test(`trust assessment treats mergeable_state=${mergeableState} as known and safe`, () => {
     const verdict = assessPullRequestTrust({
       pullRequest: trustedPullRequest({ mergeable_state: mergeableState }),
       expectedSha: SHA,
       trustedBaseSha: BASE_SHA,
     });
-    assert.equal(verdict.ok, true);
+    assert.deepEqual(verdict, { ok: true, mergeabilityKnown: true });
+  });
+}
+
+for (const mergeableState of ['unknown', null, undefined, '']) {
+  test(`trust assessment treats mergeable_state=${mergeableState} as not yet known, not as safe`, () => {
+    // GitHub computes mergeable_state asynchronously. Accepting "unknown" as
+    // equivalent to a confirmed-safe state would let an actually-behind or
+    // actually-dirty PR slip through during the window before GitHub reveals
+    // the real value -- the exact race the P1 review finding on this PR
+    // described. Callers must keep polling, not proceed, while this is false.
+    const verdict = assessPullRequestTrust({
+      pullRequest: trustedPullRequest({ mergeable_state: mergeableState }),
+      expectedSha: SHA,
+      trustedBaseSha: BASE_SHA,
+    });
+    assert.deepEqual(verdict, { ok: true, mergeabilityKnown: false });
   });
 }
 
@@ -331,6 +347,20 @@ test('merge-membrane reassesses PR trust on every poll iteration, not only befor
   // trusted to still hold by the time the loop accepts a "ready" verdict.
   assert.match(loopBody, /fetchPullRequest\(/);
   assert.match(loopBody, /assessPullRequestTrust\(/);
+});
+
+test('merge-membrane never evaluates or accepts checks while mergeability is unknown', () => {
+  const gateStart = mergeMembraneSource.indexOf('if (!currentTrust.mergeabilityKnown)');
+  assert.notEqual(gateStart, -1, 'expected a mergeabilityKnown gate in the poll loop');
+  const gateEnd = mergeMembraneSource.indexOf('const checkRuns = await fetchCheckRuns', gateStart);
+  assert.notEqual(gateEnd, -1, 'expected the gate to precede the check-run fetch');
+  const gateBody = mergeMembraneSource.slice(gateStart, gateEnd);
+
+  // A rerun on an already-green head must not be accepted before GitHub
+  // resolves mergeable_state -- the gate must skip straight to the next
+  // poll (sleep + continue) rather than falling through to evaluate checks.
+  assert.match(gateBody, /await sleep\(pollMs\);/);
+  assert.match(gateBody, /continue;/);
 });
 
 test('PR continuity evaluates the live head with trusted base code', () => {
