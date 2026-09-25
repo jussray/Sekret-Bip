@@ -150,6 +150,36 @@
       "maxMatches": 2,
       "expiresAt": "2026-10-01T00:00:00Z",
       "rationale": "These two expressions inspect repository-owned Playwright source text to verify the public apex URL and hostname assertions survived the Access fail-closed repair. They do not validate or authorize an untrusted runtime URL."
+    },
+    {
+      "id": "store-icon-bundle-id-source-assertions",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/store-icon-contract.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 4,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "These expressions inspect the repository-owned app.config.ts source to verify that canonical bundle identifiers and store icon asset references are present. They are static source assertions, not runtime hostname or URL validation."
+    },
+    {
+      "id": "auth-password-security-github-url-source-assertion",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/auth-password-security-contract.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The expression inspects repository-owned workflow YAML to verify the dispatch contract fetches the current main HEAD from the GitHub API before a production apply. It is a static source assertion, not runtime URL authorization."
+    },
+    {
+      "id": "cloudflare-worker-builds-url-source-assertions",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/cloudflare-branch-authority-workflow-contract.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 2,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "These two expressions inspect repository-owned worker-verifier source to confirm that Cloudflare Builds trigger endpoints are fetched by script tag. They are static source assertions, not runtime URL trust decisions."
     }
   ]
 }
