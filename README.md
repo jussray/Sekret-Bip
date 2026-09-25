@@ -53,9 +53,9 @@ Prioritize interactive product states, companions embedded into real flows, resp
 - **Routes:** auth, onboarding, Teen, Parent, and founder/internal groups
 - **Local state:** React state, context, hooks, and AsyncStorage
 - **Cloud data:** Supabase Auth, Postgres, RLS, Storage, Edge Functions, ordered migrations
-- **Public API front door:** `https://api.sekretbip.net`, currently pinned by repository configuration to Cloudflare Worker `sekret-backend`
+- **Public API source contract:** production client configuration is single-homed to `https://api.sekretbip.net`; repository `wrangler.toml` identifies `sekret-backend` as the Worker source target. The live custom-domain attachment is Cloudflare provider truth and is not established by repository configuration alone.
 - **Companion runtime lineage:** Cloudflare Worker `sekret`; founder-confirmed active and historically the deployment identity for the Se’kret companion API. Exact live routes/custom domains remain Cloudflare provider-readback truth.
-- **Web:** canonical Cloudflare Pages project `sekret-bip`
+- **Web source contract:** repository deployment configuration designates Cloudflare Pages project `sekret-bip`; current live Pages project/domain state requires provider readback.
 - **Production proof:** exact release identity + Worker health + Supabase runtime + production Playwright + any required account/device witnesses
 - **Schema source:** `supabase/migrations/`
 

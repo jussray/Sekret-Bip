@@ -85,6 +85,17 @@ jobs:
 
       - run: npm ci
 
+      - name: Resolve pinned EAS CLI version
+        shell: bash
+        run: |
+          set -euo pipefail
+          eas_cli_version="$(node -p "require('./eas.json').cli.version")"
+          [[ "$eas_cli_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo 'eas.json cli.version must be an exact x.y.z version.' >&2
+            exit 1
+          }
+          echo "EAS_CLI_VERSION=$eas_cli_version" >> "$GITHUB_ENV"
+
       - name: Resolve EAS profile
         id: profile
         shell: bash
@@ -94,6 +105,9 @@ jobs:
           else
             echo "name=${{ inputs.channel }}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Verify mobile store release contract
+        run: node scripts/verify-mobile-store-release.mjs
 
       - name: Verify required build secrets
         shell: bash
@@ -123,7 +137,8 @@ jobs:
       - name: Sync Supabase variables to EAS environment
         shell: bash
         run: |
-          npx eas-cli@latest env:create \
+          set -euo pipefail
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
             --environment "${{ inputs.channel }}" \
             --name EXPO_PUBLIC_SUPABASE_URL \
             --value "$EXPO_PUBLIC_SUPABASE_URL" \
@@ -132,7 +147,7 @@ jobs:
             --force \
             --non-interactive
 
-          npx eas-cli@latest env:create \
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
             --environment "${{ inputs.channel }}" \
             --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
             --value "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
@@ -141,5 +156,24 @@ jobs:
             --force \
             --non-interactive
 
-      - name: Queue EAS build from exact verified candidate
-        run: npx eas-cli@latest build --profile "${{ steps.profile.outputs.name }}" --platform "${{ inputs.platform }}" --non-interactive --no-wait
+      - name: Build exact verified candidate and wait for provider result
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" build \
+            --profile "${{ steps.profile.outputs.name }}" \
+            --platform "${{ inputs.platform }}" \
+            --non-interactive \
+            --wait \
+            --json \
+            | tee eas-build-result.json
+          test -s eas-build-result.json
+
+      - name: Upload EAS build receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-build-${{ inputs.app }}-${{ inputs.platform }}-${{ inputs.target_sha }}
+          path: eas-build-result.json
+          if-no-files-found: ignore
+          retention-days: 30
