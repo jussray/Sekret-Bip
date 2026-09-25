@@ -54,3 +54,6 @@ assets/images/archive/
 
 # ── Logs ──────────────────────────────────────────────────────────────────
 *.log
+
+# ── Claude Code agent worktrees (isolated background-agent working dirs) ──
+.claude/worktrees/
