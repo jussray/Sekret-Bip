@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const optimization = fs.readFileSync(
-  path.join(root, 'supabase/migrations/20260917234000_optimize_bridge_family_visit_policies.sql'),
+  path.join(root, 'supabase/migrations/20260925200300_optimize_bridge_family_visit_policies.sql'),
   'utf8',
 );
 const screen = fs.readFileSync(

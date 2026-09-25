@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migration = fs.readFileSync(
-  path.join(root, 'supabase/migrations/20260918001000_atomic_bridge_family_visit_summary_finalize.sql'),
+  path.join(root, 'supabase/migrations/20260925200500_atomic_bridge_family_visit_summary_finalize.sql'),
   'utf8',
 );
 

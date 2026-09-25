@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migration = fs.readFileSync(
-  path.join(root, 'supabase/migrations/20260917235500_freeze_bridge_family_visit_authority.sql'),
+  path.join(root, 'supabase/migrations/20260925200400_freeze_bridge_family_visit_authority.sql'),
   'utf8',
 );
 
