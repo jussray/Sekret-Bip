@@ -43,17 +43,47 @@ function sqlStatements(source) {
     .filter(Boolean);
 }
 
+function splitTopLevel(value, separator) {
+  const parts = [];
+  let depth = 0;
+  let current = '';
+  for (const char of value) {
+    if (char === '(') depth += 1;
+    if (char === ')') depth -= 1;
+    if (char === separator && depth === 0) {
+      parts.push(current.trim());
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  if (current.trim()) parts.push(current.trim());
+  return parts;
+}
+
 function assertNoProtectedExecuteGrant(corpus, functionName) {
   const escapedName = escapeRegex(functionName);
-  const directTarget = new RegExp(`^(?:function|routine)\\s+public\\.${escapedName}\\s*\\(`, 'i');
+  // The argument-list signature is optional in Postgres GRANT syntax when the
+  // routine name is unambiguous (same as DROP FUNCTION below), and ON
+  // FUNCTION/ROUTINE may list several comma-separated targets. Match one
+  // isolated routine spec at a time rather than anchoring the whole target
+  // string, so a later target in the list is never skipped just because an
+  // earlier, unrelated routine appears first.
+  const directTarget = new RegExp(`^public\\.${escapedName}\\b(?:\\s*\\([^)]*\\))?$`, 'i');
   const schemaWideTarget = /^all\s+(?:functions|routines)\s+in\s+schema\s+public$/i;
 
   for (const statement of sqlStatements(corpus)) {
     const grant = statement.match(/^grant\s+(.+?)\s+on\s+(.+?)\s+to\s+(.+?)(?:\s+with\s+grant\s+option)?$/is);
     if (!grant) continue;
 
-    const [, privilegeSource, target, granteeSource] = grant;
-    if (!directTarget.test(target.trim()) && !schemaWideTarget.test(target.trim())) continue;
+    const [, privilegeSource, targetSource, granteeSource] = grant;
+    const trimmedTarget = targetSource.trim();
+    const routineListMatch = trimmedTarget.match(/^(?:function|routine)\s+(.+)$/is);
+    const matchesSchemaWide = schemaWideTarget.test(trimmedTarget);
+    const matchesDirect = routineListMatch
+      ? splitTopLevel(routineListMatch[1], ',').some((routine) => directTarget.test(routine))
+      : false;
+    if (!matchesDirect && !matchesSchemaWide) continue;
 
     const privileges = normalizeList(privilegeSource);
     const grantsExecute = privileges.some(
@@ -73,10 +103,22 @@ function assertNoProtectedExecuteGrant(corpus, functionName) {
 
 function aclEvents(source, functionName) {
   const escapedName = escapeRegex(functionName);
-  const dropTarget = new RegExp(`^drop\\s+(?:function|routine)\\s+(?:if\\s+exists\\s+)?public\\.${escapedName}\\s*\\(`, 'i');
+  // Postgres permits DROP/GRANT/REVOKE to omit the argument-list signature
+  // when the routine name is unambiguous (unlike CREATE FUNCTION, which
+  // always requires one) — `\b` preserves exact-name matching once the `(`
+  // anchor is no longer mandatory.
+  const dropTarget = new RegExp(`^drop\\s+(?:function|routine)\\s+(?:if\\s+exists\\s+)?public\\.${escapedName}\\b(?:\\s*\\([^)]*\\))?`, 'i');
   const createTarget = new RegExp(`^create\\s+(?:or\\s+replace\\s+)?function\\s+public\\.${escapedName}\\s*\\(`, 'i');
+  // KNOWN GAP, tracked not hidden: unlike assertNoProtectedExecuteGrant's
+  // GRANT-target parsing above, this REVOKE matcher still only recognizes a
+  // single routine target. A future migration revoking our function as part
+  // of a multi-target list (`REVOKE ... ON FUNCTION a(), public.X() FROM
+  // ...`) would go unrecognized here, which fails safe for this guard (it
+  // would report the function as still exposed, not silently as locked), but
+  // is worth widening to match the GRANT fix if that pattern ever appears in
+  // a real migration.
   const revokeTarget = new RegExp(
-    `^revoke\\s+(.+?)\\s+on\\s+(?:function|routine)\\s+public\\.${escapedName}\\s*\\([^)]*\\)\\s+from\\s+(.+)$`,
+    `^revoke\\s+(.+?)\\s+on\\s+(?:function|routine)\\s+public\\.${escapedName}\\b(?:\\s*\\([^)]*\\))?\\s+from\\s+(.+)$`,
     'is',
   );
 
@@ -225,5 +267,63 @@ test('ACL model keeps unrelated REVOKEs statement-bounded and accepts a protecte
 
   assert.doesNotThrow(
     () => assertNewDefinitionsEndLocked(safeMigrations, 'apply_point_transaction'),
+  );
+});
+
+test('grant parser catches EXECUTE granted through a multi-target routine list', () => {
+  const unsafeCorpus = `
+    GRANT EXECUTE ON FUNCTION public.some_other(), public.apply_point_transaction()
+      TO authenticated;
+  `;
+
+  assert.throws(
+    () => assertNoProtectedExecuteGrant(unsafeCorpus, 'apply_point_transaction'),
+    /authenticated/,
+  );
+
+  const safeCorpus = `
+    GRANT EXECUTE ON FUNCTION public.some_other(), public.another_unrelated()
+      TO authenticated;
+  `;
+  assert.doesNotThrow(
+    () => assertNoProtectedExecuteGrant(safeCorpus, 'apply_point_transaction'),
+  );
+});
+
+test('grant parser catches EXECUTE granted through an argument-less routine target', () => {
+  const unsafeCorpus = `
+    GRANT EXECUTE ON FUNCTION public.apply_point_transaction TO authenticated;
+  `;
+
+  assert.throws(
+    () => assertNoProtectedExecuteGrant(unsafeCorpus, 'apply_point_transaction'),
+    /authenticated/,
+  );
+});
+
+test('ACL model treats an argument-less DROP FUNCTION as a drop event', () => {
+  const unsafeMigrations = [
+    {
+      name: '001_initial.sql',
+      source: `
+        create or replace function public.apply_point_transaction()
+        returns trigger language plpgsql as $$ begin return new; end $$;
+        revoke all on function public.apply_point_transaction()
+          from public, anon, authenticated;
+      `,
+    },
+    {
+      name: '002_recreate.sql',
+      source: `
+        drop function public.apply_point_transaction;
+        create function public.apply_point_transaction()
+        returns trigger language plpgsql as $$ begin return new; end $$;
+      `,
+    },
+  ];
+
+  assert.throws(
+    () => assertNewDefinitionsEndLocked(unsafeMigrations, 'apply_point_transaction'),
+    /002_recreate\.sql leaves a new\/recreated apply_point_transaction\(\) definition exposed/,
   );
 });
