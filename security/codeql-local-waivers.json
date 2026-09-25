@@ -150,6 +150,6 @@
       "maxMatches": 2,
       "expiresAt": "2026-10-01T00:00:00Z",
       "rationale": "These two expressions inspect repository-owned Playwright source text to verify the public apex URL and hostname assertions survived the Access fail-closed repair. They do not validate or authorize an untrusted runtime URL."
-    },
+    }
   ]
 }
