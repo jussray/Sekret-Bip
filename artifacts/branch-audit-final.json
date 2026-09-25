@@ -5264,8 +5264,8 @@
     ],
     "error": null,
     "openPrNumber": null,
-    "disposition": "PRESERVE_DUPLICATE_CLUSTER_SURVIVOR",
-    "dispositionReason": "Designated survivor for a cluster of 1 branches sharing unmerged content not yet in main (8 commit(s) ahead). Duplicates: . Keep this one until the work is merged or explicitly discarded."
+    "disposition": "SAFE_DELETE_DUPLICATE_LIVE_ELSEWHERE",
+    "dispositionReason": "Tip SHA identical to a live, non-debt branch: feat/ai-crawler-contract (open PR #1096). Content is not lost by deleting this copy — it already exists on an actively maintained branch."
   },
   {
     "name": "feat/auth-screens",
