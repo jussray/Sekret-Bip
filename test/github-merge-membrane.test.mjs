@@ -67,7 +67,12 @@ test('trust assessment rejects a PR that is behind its base before spending the 
   });
   assert.equal(verdict.ok, false);
   assert.match(verdict.message, /^PR_BEHIND_BASE/);
-  assert.match(verdict.message, /Merge or rebase the latest main/);
+  assert.match(verdict.message, /Merge the latest main into this branch and push/);
+  // The message may still mention rebase, but only as a warning that it
+  // needs a force-push and separate founder approval -- never as a bare
+  // "rebase ... and push" instruction, which would omit that gate.
+  assert.doesNotMatch(verdict.message, /\brebase\b[^.]*\band push\b/i);
+  assert.match(verdict.message, /rebase[\s\S]*force-push[\s\S]*founder approval/i);
 });
 
 test('trust assessment rejects a PR with an unresolved merge conflict', () => {
@@ -312,6 +317,20 @@ test('merge-membrane receipt persists only trusted or bounded proof data', () =>
   assert.match(mergeMembraneSource, /MERGE_MEMBRANE_EVIDENCE_PATH must be/);
   assert.doesNotMatch(mergeMembraneSource, /\n\s+changedFiles,\n\s+expectedChecks,/);
   assert.match(mergeMembraneSource, /schemaVersion: 3/);
+});
+
+test('merge-membrane reassesses PR trust on every poll iteration, not only before the loop', () => {
+  const loopStart = mergeMembraneSource.indexOf('while (Date.now() - startedAt < timeoutMs)');
+  assert.notEqual(loopStart, -1, 'expected the merge-membrane poll loop');
+  const loopEnd = mergeMembraneSource.indexOf('await sleep(pollMs);', loopStart);
+  assert.notEqual(loopEnd, -1, 'expected the poll loop body to end with a sleep');
+  const loopBody = mergeMembraneSource.slice(loopStart, loopEnd);
+
+  // main (and therefore this PR's behind/dirty state) can change during the
+  // up-to-22-minute poll window; a stale pre-loop assessment must not be
+  // trusted to still hold by the time the loop accepts a "ready" verdict.
+  assert.match(loopBody, /fetchPullRequest\(/);
+  assert.match(loopBody, /assessPullRequestTrust\(/);
 });
 
 test('PR continuity evaluates the live head with trusted base code', () => {

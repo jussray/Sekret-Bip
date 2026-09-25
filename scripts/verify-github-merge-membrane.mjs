@@ -278,7 +278,7 @@ export function assessPullRequestTrust({ pullRequest, expectedSha, trustedBaseSh
   if (mergeableState === 'behind') {
     return {
       ok: false,
-      message: `PR_BEHIND_BASE head=${expectedSha} is behind base=${observedBaseSha}. The changed-files diff (and therefore the required-checks scope) cannot be trusted while a PR is behind its base branch. Merge or rebase the latest main into this branch and push before required-checks can be correctly evaluated.`,
+      message: `PR_BEHIND_BASE head=${expectedSha} is behind base=${observedBaseSha}. The changed-files diff (and therefore the required-checks scope) cannot be trusted while a PR is behind its base branch. Merge the latest main into this branch and push before required-checks can be correctly evaluated. (Do not rebase a published branch: that requires a force-push, which needs separate, explicit founder approval.)`,
     };
   }
 
@@ -308,9 +308,9 @@ export async function verifyGithubMergeMembrane({ env = process.env, now = () =>
     throw new Error(`MERGE_MEMBRANE_EVIDENCE_PATH must be ${DEFAULT_OUTPUT}.`);
   }
 
-  const pullRequest = await fetchPullRequest({ repository, prNumber, token });
-  const trust = assessPullRequestTrust({ pullRequest, expectedSha, trustedBaseSha });
-  if (!trust.ok) throw new Error(trust.message);
+  const initialPullRequest = await fetchPullRequest({ repository, prNumber, token });
+  const initialTrust = assessPullRequestTrust({ pullRequest: initialPullRequest, expectedSha, trustedBaseSha });
+  if (!initialTrust.ok) throw new Error(initialTrust.message);
 
   const changedFiles = await fetchChangedFiles({ repository, prNumber, token });
   const scopePatterns = await loadTrustedScopePatterns({ repository, baseSha: trustedBaseSha, token });
@@ -319,6 +319,16 @@ export async function verifyGithubMergeMembrane({ env = process.env, now = () =>
   let evaluation = null;
 
   while (Date.now() - startedAt < timeoutMs) {
+    // Re-fetch and reassess on every poll: main can advance (or this PR's
+    // mergeability can otherwise change) during the up-to-22-minute wait for
+    // check runs, and this workflow only re-triggers on this PR's own events
+    // (opened/synchronize/reopened/ready_for_review), never on a base-branch
+    // push. Trusting only the pre-loop assessment could accept a stale
+    // "ready" verdict computed against a diff that is no longer accurate.
+    const currentPullRequest = await fetchPullRequest({ repository, prNumber, token });
+    const currentTrust = assessPullRequestTrust({ pullRequest: currentPullRequest, expectedSha, trustedBaseSha });
+    if (!currentTrust.ok) throw new Error(currentTrust.message);
+
     const checkRuns = await fetchCheckRuns({ repository, sha: expectedSha, token });
     evaluation = evaluateExpectedChecks({ expectedChecks, checkRuns, expectedSha });
 
