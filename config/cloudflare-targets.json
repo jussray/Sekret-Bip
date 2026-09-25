@@ -1,10 +1,12 @@
 {
-  "version": 4,
-  "reviewedAt": "2026-08-28",
+  "version": 5,
+  "reviewedAt": "2026-09-25",
   "providerInventory": {
     "workers": [
       "bip",
-      "sekret-backend",
+      "sekret-backend"
+    ],
+    "founderGatedPlannedWorkers": [
       "sekret-backend-alpha"
     ],
     "pages": [
@@ -47,7 +49,8 @@
     "worker": {
       "name": "sekret-backend-alpha",
       "config": "wrangler.alpha.toml",
-      "status": "founder-gated"
+      "status": "founder-gated-not-deployed",
+      "provisioningAuthority": "explicit-founder-approval-required"
     }
   },
   "legacyDashboardServices": [
