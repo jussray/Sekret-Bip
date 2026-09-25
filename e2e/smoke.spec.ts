@@ -194,9 +194,11 @@ test('parent signup deep link exposes accessible account creation controls', asy
   await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
 });
 
-test('protected teen routes remain behind the public boundary', async ({ page }) => {
+test('protected teen routes remain behind the account and verification boundary', async ({ page }) => {
   await page.goto('/circle?bipDevSide=teen');
-  await expect(page.getByTestId('web-welcome-enter')).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveURL(/\/parent-link-verify(?:\?|$)/, { timeout: 30_000 });
+  await expect(page.getByText('TRUSTED CONNECTION')).toBeVisible();
+  await expect(page.getByText('Keep using Limited Mode')).toBeVisible();
   await expect(page.getByText('🌐 Circle')).not.toBeVisible();
 });
 
