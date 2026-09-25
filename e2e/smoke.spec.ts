@@ -195,7 +195,7 @@ test('parent signup deep link exposes accessible account creation controls', asy
 });
 
 test('protected teen routes remain behind the public boundary', async ({ page }) => {
-  await page.goto('/circle?bipDevAudience=teen');
+  await page.goto('/circle?bipDevSide=teen');
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('🌐 Circle')).not.toBeVisible();
 });
