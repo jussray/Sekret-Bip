@@ -7,6 +7,8 @@ const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), '
 const migration = read('supabase/migrations/20260925070000_block_open_bip_author.sql');
 const repository = read('src/features/circle/circleRepository.ts');
 const screen = read('app/(teen)/circle/feed-v2.tsx');
+const support = read('public/support/index.html');
+const safetyScanMigration = read('supabase/migrations/20260619_safety_scan.sql');
 
 test('Open Bip blocking resolves private identity only inside Postgres', () => {
   assert.match(migration, /create or replace function public\.block_public_circle_author_from_post/);
@@ -28,9 +30,19 @@ test('canonical Open Bip feed removes blocked relationships below the UI boundar
   assert.match(migration, /from public\.blocked_users b/i);
   assert.match(migration, /b\.user_id = v_user and b\.blocked_id = p\.user_id/i);
   assert.match(migration, /b\.user_id = p\.user_id and b\.blocked_id = v_user/i);
+  assert.match(migration, /p\.safety_flagged is false/i);
 
   assert.match(screen, /Block account/);
   assert.match(screen, /blockPublicCircleAuthor\(item\.id\)/);
   assert.match(screen, /accessibilityLabel="Circle safety options"/);
   assert.match(screen, /setItems\(current => current\.filter\(post => post\.id !== itemId\)\)/);
+});
+
+test('store-facing UGC safety contract keeps reporting, filtering, and public support discoverable', () => {
+  assert.match(screen, /reportPublicCirclePost\(item\.id\)/);
+  assert.match(safetyScanMigration, /CREATE TRIGGER safety_scan_public_circle/i);
+  assert.match(safetyScanMigration, /AFTER INSERT ON public\.public_circle_posts/i);
+  assert.match(support, /href="mailto:support@sekretbip\.net"/i);
+  assert.match(support, /contact Se'kret Bip support without signing in/i);
+  assert.match(support, /privacy-and-safety/i);
 });
