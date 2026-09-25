@@ -15,6 +15,7 @@ on:
       - app/(teen)/circle/**
       - src/features/circle/**
       - supabase/migrations/**circle*.sql
+      - public/support/**
       - test/open-bip-*.test.mjs
       - e2e/smoke.spec.ts
       - scripts/verify-mobile-store-release.mjs
@@ -31,6 +32,7 @@ on:
       - app/(teen)/circle/**
       - src/features/circle/**
       - supabase/migrations/**circle*.sql
+      - public/support/**
       - test/open-bip-*.test.mjs
       - e2e/smoke.spec.ts
       - scripts/verify-mobile-store-release.mjs
