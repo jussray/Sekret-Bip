@@ -245,6 +245,46 @@ async function loadTrustedScopePatterns({ repository, baseSha, token }) {
   return result;
 }
 
+// Determines whether the live PR state can be trusted enough to compute a
+// required-checks scope at all, before spending the poll timeout finding
+// out. GitHub's pulls/{n}/files diff (and therefore expectedChecksForChangedFiles)
+// is not reliable while a PR is behind or conflicted with its base: the
+// endpoint can report files from outstanding upstream main commits as if
+// they were part of the PR's own diff, inflating the required-checks scope
+// with checks that were never actually going to run for this PR's real
+// changes -- producing a GITHUB_MERGE_MEMBRANE_TIMEOUT after a full poll
+// window instead of an immediate, actionable error.
+export function assessPullRequestTrust({ pullRequest, expectedSha, trustedBaseSha }) {
+  const observedHeadSha = normalizeSha(pullRequest?.head?.sha);
+  const observedBaseSha = normalizeSha(pullRequest?.base?.sha);
+  const baseRef = clean(pullRequest?.base?.ref);
+  const mergeableState = clean(pullRequest?.mergeable_state);
+
+  if (observedHeadSha !== expectedSha) {
+    return { ok: false, message: `PR_HEAD_SHA_MISMATCH expected=${expectedSha} observed=${observedHeadSha || 'missing'}` };
+  }
+  if (baseRef !== 'main' || !observedBaseSha) {
+    return { ok: false, message: `TRUSTED_BASE_INVALID ref=${baseRef || 'missing'} sha=${observedBaseSha || 'missing'}` };
+  }
+  if (observedBaseSha !== trustedBaseSha) {
+    return { ok: false, message: `TRUSTED_BASE_SHA_MISMATCH expected=${trustedBaseSha} observed=${observedBaseSha}` };
+  }
+  if (mergeableState === 'dirty') {
+    return {
+      ok: false,
+      message: `PR_MERGE_CONFLICT head=${expectedSha} conflicts with base=${observedBaseSha}. Resolve the merge conflict before required-checks can be correctly evaluated.`,
+    };
+  }
+  if (mergeableState === 'behind') {
+    return {
+      ok: false,
+      message: `PR_BEHIND_BASE head=${expectedSha} is behind base=${observedBaseSha}. The changed-files diff (and therefore the required-checks scope) cannot be trusted while a PR is behind its base branch. Merge or rebase the latest main into this branch and push before required-checks can be correctly evaluated.`,
+    };
+  }
+
+  return { ok: true };
+}
+
 async function writeReceipt(outputPath, receipt) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
@@ -269,18 +309,8 @@ export async function verifyGithubMergeMembrane({ env = process.env, now = () =>
   }
 
   const pullRequest = await fetchPullRequest({ repository, prNumber, token });
-  const observedHeadSha = normalizeSha(pullRequest?.head?.sha);
-  const observedBaseSha = normalizeSha(pullRequest?.base?.sha);
-  const baseRef = clean(pullRequest?.base?.ref);
-  if (observedHeadSha !== expectedSha) {
-    throw new Error(`PR_HEAD_SHA_MISMATCH expected=${expectedSha} observed=${observedHeadSha || 'missing'}`);
-  }
-  if (baseRef !== 'main' || !observedBaseSha) {
-    throw new Error(`TRUSTED_BASE_INVALID ref=${baseRef || 'missing'} sha=${observedBaseSha || 'missing'}`);
-  }
-  if (observedBaseSha !== trustedBaseSha) {
-    throw new Error(`TRUSTED_BASE_SHA_MISMATCH expected=${trustedBaseSha} observed=${observedBaseSha}`);
-  }
+  const trust = assessPullRequestTrust({ pullRequest, expectedSha, trustedBaseSha });
+  if (!trust.ok) throw new Error(trust.message);
 
   const changedFiles = await fetchChangedFiles({ repository, prNumber, token });
   const scopePatterns = await loadTrustedScopePatterns({ repository, baseSha: trustedBaseSha, token });

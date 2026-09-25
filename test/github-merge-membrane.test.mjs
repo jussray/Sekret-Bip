@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   ALWAYS_REQUIRED_CHECKS,
+  assessPullRequestTrust,
   evaluateExpectedChecks,
   expectedChecksForChangedFiles,
   extractPullRequestPaths,
@@ -11,6 +12,16 @@ import {
 } from '../scripts/verify-github-merge-membrane.mjs';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const BASE_SHA = 'ccccccccccccccccccccccccccccccccccccccc';
+
+function trustedPullRequest(overrides = {}) {
+  return {
+    head: { sha: SHA },
+    base: { ref: 'main', sha: BASE_SHA },
+    mergeable_state: 'clean',
+    ...overrides,
+  };
+}
 const mergeMembraneSource = readFileSync('scripts/verify-github-merge-membrane.mjs', 'utf8');
 const releaseGateSource = readFileSync('.agents/skills/bip-release-gate/SKILL.md', 'utf8');
 
@@ -27,6 +38,74 @@ function run(name, conclusion = 'success', app = 'github-actions', overrides = {
     ...overrides,
   };
 }
+
+test('trust assessment passes a clean, exact-head, correctly-based PR through unchanged', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest(),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.deepEqual(verdict, { ok: true });
+});
+
+for (const mergeableState of ['unstable', 'blocked', 'has_hooks', 'unknown', null, undefined]) {
+  test(`trust assessment does not fail-fast on mergeable_state=${mergeableState}`, () => {
+    const verdict = assessPullRequestTrust({
+      pullRequest: trustedPullRequest({ mergeable_state: mergeableState }),
+      expectedSha: SHA,
+      trustedBaseSha: BASE_SHA,
+    });
+    assert.equal(verdict.ok, true);
+  });
+}
+
+test('trust assessment rejects a PR that is behind its base before spending the poll timeout', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ mergeable_state: 'behind' }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^PR_BEHIND_BASE/);
+  assert.match(verdict.message, /Merge or rebase the latest main/);
+});
+
+test('trust assessment rejects a PR with an unresolved merge conflict', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ mergeable_state: 'dirty' }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^PR_MERGE_CONFLICT/);
+  assert.match(verdict.message, /Resolve the merge conflict/);
+});
+
+test('trust assessment rejects a head SHA mismatch, a non-main base, and a stale trusted base', () => {
+  const headMismatch = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ head: { sha: 'deadbeef' } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(headMismatch.ok, false);
+  assert.match(headMismatch.message, /^PR_HEAD_SHA_MISMATCH/);
+
+  const wrongBaseRef = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ base: { ref: 'not-main', sha: BASE_SHA } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(wrongBaseRef.ok, false);
+  assert.match(wrongBaseRef.message, /^TRUSTED_BASE_INVALID/);
+
+  const staleTrustedBase = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ base: { ref: 'main', sha: 'ddddddddddddddddddddddddddddddddddddddd' } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(staleTrustedBase.ok, false);
+  assert.match(staleTrustedBase.message, /^TRUSTED_BASE_SHA_MISMATCH/);
+});
 
 test('glob matcher handles exact paths, stars, and recursive prefixes', () => {
   assert.equal(globMatches('src/a.ts', 'src/**'), true);
