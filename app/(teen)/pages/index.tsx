@@ -5,7 +5,7 @@
 //   ✓ sendCompanionMessage   — sole AI call for companion replies
 //                              (wraps fetchSekretBrainReply, emits companion_message event,
 //                               runs safety flag detection)
-//   ✓ Raylene / Rylane / Cloud / Night companion tabs
+//   ✓ Suhana / Sy / Cloud / Night companion tabs
 //   ✓ mood tags via AppContext.mood
 //   ✓ companion-specific prompts with rotation
 //   ✓ image / video attachment

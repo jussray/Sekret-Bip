@@ -1,7 +1,7 @@
 /**
  * Canonical theme and compatibility image map.
  *
- * Human companion assets are identity-locked to the approved Raylene, Rylane,
+ * Human companion assets are identity-locked to the approved Suhana, Sy,
  * and Night masters. State-specific keys remain stable so existing screens do
  * not need to change while matching emotional poses are regenerated.
  */
@@ -37,7 +37,7 @@ export const SEKRET_PROFILES: Record<string, SekretProfile> = {
     greeting: "Hey love. I'm here. Tell me what's on your mind.",
   },
   rylane: {
-    name: 'Rylane', emoji: '⚡', title: 'Loyal Bro',
+    name: 'Sy', emoji: '⚡', title: 'Loyal Bro',
     vibe: 'Quiet loyalty. Keeps it real. Never talks down.',
     greeting: "Aight, I'm here. What's been heavy?",
   },
