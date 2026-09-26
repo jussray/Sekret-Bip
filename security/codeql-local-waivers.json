@@ -150,6 +150,36 @@
       "maxMatches": 2,
       "expiresAt": "2026-10-01T00:00:00Z",
       "rationale": "These two expressions inspect repository-owned Playwright source text to verify the public apex URL and hostname assertions survived the Access fail-closed repair. They do not validate or authorize an untrusted runtime URL."
+    },
+    {
+      "id": "live-onboarding-email-gate-test-url-anchors",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/live-onboarding-email-gate.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 3,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "These three expressions assert that repository-owned workflow and mailbox source contain a specific Cloudflare Pages domain and specific mail provider API URL literals. They are static source assertions, not runtime URL validation or hostname allowlisting."
+    },
+    {
+      "id": "owned-bip-mail-proof-test-domain-anchor",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/owned-bip-mail-proof.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The expression verifies that a repository-owned workflow source does not reference Gmail or Google Mail domains. It is a static source exclusion assertion, not runtime URL validation or hostname allowlisting."
+    },
+    {
+      "id": "cloudflare-preflight-test-hostname-anchor",
+      "language": "javascript-typescript",
+      "ruleId": "js/regex/missing-regexp-anchor",
+      "path": "test/cloudflare-user-token-preflight-contract.test.mjs",
+      "messageIncludes": "may match anywhere",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The expression verifies that a repository-owned workflow source contains the exact Cloudflare API endpoint path including the app domain hostname. It is a static source assertion, not runtime hostname validation."
     }
   ]
 }
