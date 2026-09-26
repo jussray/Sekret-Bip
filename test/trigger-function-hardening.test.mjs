@@ -27,6 +27,11 @@ test('enforce_circle_anonymity blocks identity reveal on public/parent_community
 
   assert.match(fn, /security definer/);
   assert.match(fn, /set search_path = public/);
+  // Ties _kind to NEW.circle_id specifically — without this, a future edit
+  // that leaves _kind null or sourced from the wrong circle would still pass
+  // the predicate/exception assertions below while silently letting an
+  // identity-revealing post through.
+  assert.match(fn, /select kind into _kind from public\.circles where id = new\.circle_id/);
   assert.match(fn, /_kind in \('public', 'parent_community'\) and new\.is_identity_revealed is true/);
   assert.match(fn, /raise exception/);
 
