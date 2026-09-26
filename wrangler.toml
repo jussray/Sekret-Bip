@@ -1,5 +1,5 @@
 name = "sekret-backend"
-main = "worker/voice-entry.ts"
+main = "worker/github-app-entry.ts"
 compatibility_date = "2026-06-13"
 compatibility_flags = ["nodejs_compat"]
 logpush = true
@@ -32,8 +32,8 @@ binding = "AI"
 
 # Non-secret model vars — safe to commit.
 # To rotate a model: edit here and run `wrangler deploy --name sekret-backend`.
-# Secrets (OPENAI_API_KEY, ELEVENLABS_API_KEY, and SUPABASE_SERVICE_ROLE_KEY)
-# must use `wrangler secret put`, never this file.
+# Secrets (OPENAI_API_KEY, ELEVENLABS_API_KEY, SUPABASE_SERVICE_ROLE_KEY,
+# and GITHUB_WEBHOOK_SECRET) must use `wrangler secret put`, never this file.
 [vars]
 SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
 OPENAI_CHAT_MODEL = "gpt-4o"
@@ -80,6 +80,10 @@ BRIDGE_SUMMARIES_ROLLOUT = "disabled"
 # normal `wrangler deploy` updates the Worker script without requiring the
 # build token to mutate Custom Domain DNS/certificate records.
 # Production verification must still prove https://api.sekretbip.net/health.
+# The GitHub App webhook path is https://api.sekretbip.net/webhooks/github.
+# If Cloudflare Access protects api.sekretbip.net, that exact webhook path
+# needs a narrow bypass because GitHub cannot satisfy an interactive Access
+# login. HMAC verification remains mandatory at the Worker boundary.
 
 # ── Rate limiting binding ─────────────────────────────────────────────
 # 60 requests per 10-second window per user/IP key.
