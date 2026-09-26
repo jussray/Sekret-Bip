@@ -3,7 +3,7 @@ import { fetchSekretBrainReply, type SekretAvatarState } from './api';
 import {
   getSekretFallback,
   isArrivalMessage,
-  keepSekretReply,
+  guardSekretReply,
 } from '../../services/sekretVoice';
 import { normalizeSekretPersonality } from '../../services/sekretPresence';
 import { buildReplyRequest } from '../services/ai/buildReplyRequest';
@@ -189,8 +189,7 @@ export async function fetchPagesReplyDetails(input: {
 
     setAvatarState(avatarKey, nextState);
 
-    const guardedReply = keepSekretReply(response.reply, fallback);
-    const guardBlocked = guardedReply !== (response.reply ?? '').trim();
+    const { reply: guardedReply, blocked: guardBlocked } = guardSekretReply(response.reply, fallback);
 
     if (__DEV__ && guardBlocked) {
       console.warn('[fetchPagesReplyDetails] keepSekretReply blocked Worker reply.', {

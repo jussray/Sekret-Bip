@@ -26,8 +26,7 @@ test('parent coach dashes are preserved without bypassing the rest of the reply 
   assert.match(chat, /const isParentCoach = personalityId === 'parentCoach'/);
   assert.ok(chat.includes("rawReply.replace(/\\s*(?:—|–|--)\\s*/g, ' ').replace(/\\s+/g, ' ').trim()"));
   assert.doesNotMatch(chat, /rawReply\.replace\(\/\[—–\]\/g, '-'\)/);
-  assert.match(chat, /const guardedCandidate = keepSekretReply\(guardInput, sekretFallback\)/);
-  assert.match(chat, /const guardBlocked = guardedCandidate !== guardInput\.trim\(\)/);
+  assert.match(chat, /const \{ reply: guardedCandidate, blocked: guardBlocked \} = guardSekretReply\(guardInput, sekretFallback\)/);
   assert.match(chat, /isParentCoach && !guardBlocked\s*\? rawReply\.trim\(\)\s*:\s*guardedCandidate/);
   assert.match(chat, /keeps blocked word sequences contiguous/);
 });
