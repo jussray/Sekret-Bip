@@ -60,9 +60,13 @@ function buildFingerprint(finding) {
   return `${source}:${eventType}:${screen}`;
 }
 
+function privilegedSupabaseKey() {
+  return process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+}
+
 async function supabaseRequest(pathname, options = {}) {
   const url = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const key = privilegedSupabaseKey();
   if (!url || !key) throw new Error('Supabase ingestion credentials are not configured.');
 
   const response = await fetch(`${url.replace(/\/$/, '')}${pathname}`, {
@@ -135,7 +139,7 @@ async function ingestFinding(finding, context) {
 
 const runs = scanners.map(([name, script]) => runScanner(name, script));
 const findings = runs.flatMap((run) => run.result?.findings || []);
-const ingestionEnabled = Boolean((process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL) && process.env.SUPABASE_SERVICE_ROLE_KEY);
+const ingestionEnabled = Boolean((process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL) && privilegedSupabaseKey());
 const ingested = [];
 const ingestionErrors = [];
 

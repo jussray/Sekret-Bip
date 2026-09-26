@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import {
   ALWAYS_REQUIRED_CHECKS,
+  assessPullRequestTrust,
   evaluateExpectedChecks,
   expectedChecksForChangedFiles,
   extractPullRequestPaths,
@@ -11,6 +12,16 @@ import {
 } from '../scripts/verify-github-merge-membrane.mjs';
 
 const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const BASE_SHA = 'ccccccccccccccccccccccccccccccccccccccc';
+
+function trustedPullRequest(overrides = {}) {
+  return {
+    head: { sha: SHA },
+    base: { ref: 'main', sha: BASE_SHA },
+    mergeable_state: 'clean',
+    ...overrides,
+  };
+}
 const mergeMembraneSource = readFileSync('scripts/verify-github-merge-membrane.mjs', 'utf8');
 const releaseGateSource = readFileSync('.agents/skills/bip-release-gate/SKILL.md', 'utf8');
 
@@ -27,6 +38,95 @@ function run(name, conclusion = 'success', app = 'github-actions', overrides = {
     ...overrides,
   };
 }
+
+test('trust assessment passes a clean, exact-head, correctly-based PR through unchanged', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest(),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.deepEqual(verdict, { ok: true, mergeabilityKnown: true });
+});
+
+for (const mergeableState of ['unstable', 'blocked', 'has_hooks']) {
+  test(`trust assessment treats mergeable_state=${mergeableState} as known and safe`, () => {
+    const verdict = assessPullRequestTrust({
+      pullRequest: trustedPullRequest({ mergeable_state: mergeableState }),
+      expectedSha: SHA,
+      trustedBaseSha: BASE_SHA,
+    });
+    assert.deepEqual(verdict, { ok: true, mergeabilityKnown: true });
+  });
+}
+
+for (const mergeableState of ['unknown', null, undefined, '']) {
+  test(`trust assessment treats mergeable_state=${mergeableState} as not yet known, not as safe`, () => {
+    // GitHub computes mergeable_state asynchronously. Accepting "unknown" as
+    // equivalent to a confirmed-safe state would let an actually-behind or
+    // actually-dirty PR slip through during the window before GitHub reveals
+    // the real value -- the exact race the P1 review finding on this PR
+    // described. Callers must keep polling, not proceed, while this is false.
+    const verdict = assessPullRequestTrust({
+      pullRequest: trustedPullRequest({ mergeable_state: mergeableState }),
+      expectedSha: SHA,
+      trustedBaseSha: BASE_SHA,
+    });
+    assert.deepEqual(verdict, { ok: true, mergeabilityKnown: false });
+  });
+}
+
+test('trust assessment rejects a PR that is behind its base before spending the poll timeout', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ mergeable_state: 'behind' }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^PR_BEHIND_BASE/);
+  assert.match(verdict.message, /Merge the latest main into this branch and push/);
+  // The message may still mention rebase, but only as a warning that it
+  // needs a force-push and separate founder approval -- never as a bare
+  // "rebase ... and push" instruction, which would omit that gate.
+  assert.doesNotMatch(verdict.message, /\brebase\b[^.]*\band push\b/i);
+  assert.match(verdict.message, /rebase[\s\S]*force-push[\s\S]*founder approval/i);
+});
+
+test('trust assessment rejects a PR with an unresolved merge conflict', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ mergeable_state: 'dirty' }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^PR_MERGE_CONFLICT/);
+  assert.match(verdict.message, /Resolve the merge conflict/);
+});
+
+test('trust assessment rejects a head SHA mismatch, a non-main base, and a stale trusted base', () => {
+  const headMismatch = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ head: { sha: 'deadbeef' } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(headMismatch.ok, false);
+  assert.match(headMismatch.message, /^PR_HEAD_SHA_MISMATCH/);
+
+  const wrongBaseRef = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ base: { ref: 'not-main', sha: BASE_SHA } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(wrongBaseRef.ok, false);
+  assert.match(wrongBaseRef.message, /^TRUSTED_BASE_INVALID/);
+
+  const staleTrustedBase = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ base: { ref: 'main', sha: 'ddddddddddddddddddddddddddddddddddddddd' } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(staleTrustedBase.ok, false);
+  assert.match(staleTrustedBase.message, /^TRUSTED_BASE_SHA_MISMATCH/);
+});
 
 test('glob matcher handles exact paths, stars, and recursive prefixes', () => {
   assert.equal(globMatches('src/a.ts', 'src/**'), true);
@@ -233,6 +333,34 @@ test('merge-membrane receipt persists only trusted or bounded proof data', () =>
   assert.match(mergeMembraneSource, /MERGE_MEMBRANE_EVIDENCE_PATH must be/);
   assert.doesNotMatch(mergeMembraneSource, /\n\s+changedFiles,\n\s+expectedChecks,/);
   assert.match(mergeMembraneSource, /schemaVersion: 3/);
+});
+
+test('merge-membrane reassesses PR trust on every poll iteration, not only before the loop', () => {
+  const loopStart = mergeMembraneSource.indexOf('while (Date.now() - startedAt < timeoutMs)');
+  assert.notEqual(loopStart, -1, 'expected the merge-membrane poll loop');
+  const loopEnd = mergeMembraneSource.indexOf('await sleep(pollMs);', loopStart);
+  assert.notEqual(loopEnd, -1, 'expected the poll loop body to end with a sleep');
+  const loopBody = mergeMembraneSource.slice(loopStart, loopEnd);
+
+  // main (and therefore this PR's behind/dirty state) can change during the
+  // up-to-22-minute poll window; a stale pre-loop assessment must not be
+  // trusted to still hold by the time the loop accepts a "ready" verdict.
+  assert.match(loopBody, /fetchPullRequest\(/);
+  assert.match(loopBody, /assessPullRequestTrust\(/);
+});
+
+test('merge-membrane never evaluates or accepts checks while mergeability is unknown', () => {
+  const gateStart = mergeMembraneSource.indexOf('if (!currentTrust.mergeabilityKnown)');
+  assert.notEqual(gateStart, -1, 'expected a mergeabilityKnown gate in the poll loop');
+  const gateEnd = mergeMembraneSource.indexOf('const checkRuns = await fetchCheckRuns', gateStart);
+  assert.notEqual(gateEnd, -1, 'expected the gate to precede the check-run fetch');
+  const gateBody = mergeMembraneSource.slice(gateStart, gateEnd);
+
+  // A rerun on an already-green head must not be accepted before GitHub
+  // resolves mergeable_state -- the gate must skip straight to the next
+  // poll (sleep + continue) rather than falling through to evaluate checks.
+  assert.match(gateBody, /await sleep\(pollMs\);/);
+  assert.match(gateBody, /continue;/);
 });
 
 test('PR continuity evaluates the live head with trusted base code', () => {
