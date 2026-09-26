@@ -189,7 +189,12 @@ export async function fetchPagesReplyDetails(input: {
 
     setAvatarState(avatarKey, nextState);
 
-    const { reply: guardedReply, blocked: guardBlocked } = guardSekretReply(response.reply, fallback);
+    // A safety reply carries crisis resources (988, trusted adult). The voice
+    // guard is a style filter and must never swap it for a casual fallback.
+    const safetyText = response.safetyFlag === true ? (response.reply ?? '').trim() : '';
+    const { reply: guardedReply, blocked: guardBlocked } = safetyText
+      ? { reply: safetyText, blocked: false }
+      : guardSekretReply(response.reply, fallback);
 
     if (__DEV__ && guardBlocked) {
       console.warn('[fetchPagesReplyDetails] keepSekretReply blocked Worker reply.', {
@@ -203,9 +208,9 @@ export async function fetchPagesReplyDetails(input: {
       reply: guardedReply,
       tone: response.tone,
       avatarState: nextState,
-      replySource: 'worker',
-      fallbackUsed: false,
-      fallbackReason: null,
+      replySource: guardBlocked ? 'local-fallback' : 'worker',
+      fallbackUsed: guardBlocked,
+      fallbackReason: guardBlocked ? 'Reply guard replaced Worker reply with character fallback' : null,
     };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);

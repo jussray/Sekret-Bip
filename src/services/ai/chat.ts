@@ -278,11 +278,17 @@ export async function sendMessage(
     ? rawReply.replace(/\s*(?:—|–|--)\s*/g, ' ').replace(/\s+/g, ' ').trim()
     : rawReply;
   const { reply: guardedCandidate, blocked: guardBlocked } = guardSekretReply(guardInput, sekretFallback);
-  const guardedReply = isParentCoach && !guardBlocked
+  // A safety reply carries crisis resources (988, trusted adult). The voice
+  // guard is a style filter and must never swap it for a casual fallback.
+  const isSafetyReply = data.safetyFlag === true;
+  const guardedReply = isSafetyReply
     ? rawReply.trim()
-    : guardedCandidate;
+    : isParentCoach && !guardBlocked
+      ? rawReply.trim()
+      : guardedCandidate;
+  const guardSubstituted = guardBlocked && !isSafetyReply;
 
-  if (__DEV__ && guardBlocked) {
+  if (__DEV__ && guardSubstituted) {
     console.warn('[sendMessage] keepSekretReply blocked Worker reply — substituted character fallback.', {
       companion: personalityId,
       blocked: rawReply.slice(0, 80),
@@ -300,7 +306,8 @@ export async function sendMessage(
       surface: normalizedSurface,
       reply_source: data.replySource ?? 'worker',
       history_length: historyLength,
-      fallback_used: result.meta.fallbackUsed,
+      fallback_used: result.meta.fallbackUsed || guardSubstituted,
+      reply_guard_substituted: guardSubstituted,
       trace_id: data.traceId ?? result.meta.traceId ?? null,
       avatar_state: data.avatarState ?? null,
     },
@@ -308,9 +315,11 @@ export async function sendMessage(
 
   return {
     reply: guardedReply,
-    replySource: data.safetyFlag ? 'safety' : 'worker',
-    fallbackUsed: result.meta.fallbackUsed,
-    fallbackReason: result.meta.fallbackUsed ? 'Worker served fallback response' : null,
+    replySource: isSafetyReply ? 'safety' : guardSubstituted ? 'local-fallback' : 'worker',
+    fallbackUsed: result.meta.fallbackUsed || guardSubstituted,
+    fallbackReason: guardSubstituted
+      ? 'Reply guard replaced Worker reply with character fallback'
+      : result.meta.fallbackUsed ? 'Worker served fallback response' : null,
   };
 }
 
