@@ -40,7 +40,7 @@ async function githubJson(pathname) {
 }
 
 async function githubText(pathname) {
-  const response = await fetch(`https://api.github.com${pathname}`, { headers: githubHeaders('text/plain') });
+  const response = await fetch(`https://api.github.com${pathname}`, { headers: githubHeaders() });
   const body = await response.text();
   if (!response.ok) throw new Error(`GitHub ${response.status} ${response.statusText}: ${body.slice(0, 700)}`);
   return body;

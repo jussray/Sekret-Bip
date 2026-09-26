@@ -22,43 +22,26 @@ async function expectNoHorizontalOverflow(page: Page) {
 }
 
 async function expectRenderedImagesDecoded(targets: Locator, label: string) {
-  const unloaded = await targets.evaluateAll(nodes => {
-    const failures: Array<{
-      src: string | null;
-      complete: boolean | null;
-      naturalWidth: number | null;
-      naturalHeight: number | null;
-      reason: string | null;
-    }> = [];
+  const count = await targets.count();
 
-    for (const node of nodes) {
-      const image = node instanceof HTMLImageElement ? node : node.querySelector('img');
-      if (!image) {
-        failures.push({
-          src: null,
-          complete: null,
-          naturalWidth: null,
-          naturalHeight: null,
-          reason: 'no rendered img descendant',
-        });
-        continue;
-      }
+  for (let index = 0; index < count; index += 1) {
+    const target = targets.nth(index);
+    await target.scrollIntoViewIfNeeded();
 
-      if (!image.complete || image.naturalWidth <= 0 || image.naturalHeight <= 0) {
-        failures.push({
-          src: image.currentSrc || image.src || null,
-          complete: image.complete,
-          naturalWidth: image.naturalWidth,
-          naturalHeight: image.naturalHeight,
-          reason: 'rendered img did not decode',
-        });
-      }
-    }
-
-    return failures;
-  });
-
-  expect(unloaded, `Unloaded ${label}: ${JSON.stringify(unloaded)}`).toEqual([]);
+    const image = target.locator('img').first();
+    await expect(image, `${label} #${index + 1} must render an img`).toHaveCount(1);
+    await expect.poll(
+      () => image.evaluate(node => {
+        if (!(node instanceof HTMLImageElement)) return false;
+        return node.complete && node.naturalWidth > 0 && node.naturalHeight > 0;
+      }),
+      {
+        message: `${label} #${index + 1} must finish decoding after entering the loading window`,
+        timeout: 15_000,
+        intervals: [100, 250, 500, 1_000],
+      },
+    ).toBe(true);
+  }
 }
 
 async function expectDossierMediaTruth(page: Page) {
