@@ -16,7 +16,7 @@ import {
 import {
   getConversationPhase,
   isArrivalMessage,
-  keepSekretReply,
+  guardSekretReply,
   getSekretFallback,
   buildConversationPhaseInstruction,
   type ConversationPhase,
@@ -277,8 +277,7 @@ export async function sendMessage(
   const guardInput = isParentCoach
     ? rawReply.replace(/\s*(?:—|–|--)\s*/g, ' ').replace(/\s+/g, ' ').trim()
     : rawReply;
-  const guardedCandidate = keepSekretReply(guardInput, sekretFallback);
-  const guardBlocked = guardedCandidate !== guardInput.trim();
+  const { reply: guardedCandidate, blocked: guardBlocked } = guardSekretReply(guardInput, sekretFallback);
   const guardedReply = isParentCoach && !guardBlocked
     ? rawReply.trim()
     : guardedCandidate;
