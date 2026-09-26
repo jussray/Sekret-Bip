@@ -9,7 +9,9 @@ const read = (...parts) => fs.readFileSync(path.join(root, ...parts), 'utf8');
 const kit = read('content', 'beehiiv', 'publication-kit.md');
 const harvest = read('content', 'beehiiv', 'trial-harvest-pack.md');
 const receipt = read('content', 'beehiiv', 'provider-run-receipt.md');
-const pluginBoundary = read('content', 'beehiiv', 'plugin-boundary.md');
+// Markdown emphasis (**not**) is presentation, not contract wording.
+const stripEmphasis = (value) => value.replace(/\*\*|__/g, '');
+const pluginBoundary = stripEmphasis(read('content', 'beehiiv', 'plugin-boundary.md'));
 
 const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
