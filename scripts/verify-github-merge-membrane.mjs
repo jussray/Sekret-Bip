@@ -245,6 +245,56 @@ async function loadTrustedScopePatterns({ repository, baseSha, token }) {
   return result;
 }
 
+// Determines whether the live PR state can be trusted enough to compute a
+// required-checks scope at all, before spending the poll timeout finding
+// out. GitHub's pulls/{n}/files diff (and therefore expectedChecksForChangedFiles)
+// is not reliable while a PR is behind or conflicted with its base: the
+// endpoint can report files from outstanding upstream main commits as if
+// they were part of the PR's own diff, inflating the required-checks scope
+// with checks that were never actually going to run for this PR's real
+// changes -- producing a GITHUB_MERGE_MEMBRANE_TIMEOUT after a full poll
+// window instead of an immediate, actionable error.
+export function assessPullRequestTrust({ pullRequest, expectedSha, trustedBaseSha }) {
+  const observedHeadSha = normalizeSha(pullRequest?.head?.sha);
+  const observedBaseSha = normalizeSha(pullRequest?.base?.sha);
+  const baseRef = clean(pullRequest?.base?.ref);
+  const mergeableState = clean(pullRequest?.mergeable_state);
+
+  if (observedHeadSha !== expectedSha) {
+    return { ok: false, message: `PR_HEAD_SHA_MISMATCH expected=${expectedSha} observed=${observedHeadSha || 'missing'}` };
+  }
+  if (baseRef !== 'main' || !observedBaseSha) {
+    return { ok: false, message: `TRUSTED_BASE_INVALID ref=${baseRef || 'missing'} sha=${observedBaseSha || 'missing'}` };
+  }
+  if (observedBaseSha !== trustedBaseSha) {
+    return { ok: false, message: `TRUSTED_BASE_SHA_MISMATCH expected=${trustedBaseSha} observed=${observedBaseSha}` };
+  }
+  if (mergeableState === 'dirty') {
+    return {
+      ok: false,
+      message: `PR_MERGE_CONFLICT head=${expectedSha} conflicts with base=${observedBaseSha}. Resolve the merge conflict before required-checks can be correctly evaluated.`,
+    };
+  }
+  if (mergeableState === 'behind') {
+    return {
+      ok: false,
+      message: `PR_BEHIND_BASE head=${expectedSha} is behind base=${observedBaseSha}. The changed-files diff (and therefore the required-checks scope) cannot be trusted while a PR is behind its base branch. Merge the latest main into this branch and push before required-checks can be correctly evaluated. (Do not rebase a published branch: that requires a force-push, which needs separate, explicit founder approval.)`,
+    };
+  }
+  if (!mergeableState || mergeableState === 'unknown') {
+    // GitHub computes mergeable_state asynchronously and reports "unknown"
+    // (or omits it) until it finishes. Treating that as equivalent to a
+    // known-safe state would let a PR that is actually behind or dirty slip
+    // through during the window before GitHub reveals the real value --
+    // especially on a rerun where checks are already green and the loop
+    // would otherwise accept "ready" on its very first iteration, before
+    // mergeability ever resolves. Callers must keep waiting, not proceed.
+    return { ok: true, mergeabilityKnown: false };
+  }
+
+  return { ok: true, mergeabilityKnown: true };
+}
+
 async function writeReceipt(outputPath, receipt) {
   await mkdir(path.dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
@@ -268,19 +318,9 @@ export async function verifyGithubMergeMembrane({ env = process.env, now = () =>
     throw new Error(`MERGE_MEMBRANE_EVIDENCE_PATH must be ${DEFAULT_OUTPUT}.`);
   }
 
-  const pullRequest = await fetchPullRequest({ repository, prNumber, token });
-  const observedHeadSha = normalizeSha(pullRequest?.head?.sha);
-  const observedBaseSha = normalizeSha(pullRequest?.base?.sha);
-  const baseRef = clean(pullRequest?.base?.ref);
-  if (observedHeadSha !== expectedSha) {
-    throw new Error(`PR_HEAD_SHA_MISMATCH expected=${expectedSha} observed=${observedHeadSha || 'missing'}`);
-  }
-  if (baseRef !== 'main' || !observedBaseSha) {
-    throw new Error(`TRUSTED_BASE_INVALID ref=${baseRef || 'missing'} sha=${observedBaseSha || 'missing'}`);
-  }
-  if (observedBaseSha !== trustedBaseSha) {
-    throw new Error(`TRUSTED_BASE_SHA_MISMATCH expected=${trustedBaseSha} observed=${observedBaseSha}`);
-  }
+  const initialPullRequest = await fetchPullRequest({ repository, prNumber, token });
+  const initialTrust = assessPullRequestTrust({ pullRequest: initialPullRequest, expectedSha, trustedBaseSha });
+  if (!initialTrust.ok) throw new Error(initialTrust.message);
 
   const changedFiles = await fetchChangedFiles({ repository, prNumber, token });
   const scopePatterns = await loadTrustedScopePatterns({ repository, baseSha: trustedBaseSha, token });
@@ -289,6 +329,24 @@ export async function verifyGithubMergeMembrane({ env = process.env, now = () =>
   let evaluation = null;
 
   while (Date.now() - startedAt < timeoutMs) {
+    // Re-fetch and reassess on every poll: main can advance (or this PR's
+    // mergeability can otherwise change) during the up-to-22-minute wait for
+    // check runs, and this workflow only re-triggers on this PR's own events
+    // (opened/synchronize/reopened/ready_for_review), never on a base-branch
+    // push. Trusting only the pre-loop assessment could accept a stale
+    // "ready" verdict computed against a diff that is no longer accurate.
+    const currentPullRequest = await fetchPullRequest({ repository, prNumber, token });
+    const currentTrust = assessPullRequestTrust({ pullRequest: currentPullRequest, expectedSha, trustedBaseSha });
+    if (!currentTrust.ok) throw new Error(currentTrust.message);
+    if (!currentTrust.mergeabilityKnown) {
+      // GitHub has not finished computing mergeable_state yet. Do not
+      // evaluate or accept readiness this cycle -- an already-green set of
+      // checks from an earlier run must never be accepted before GitHub
+      // reveals whether this PR is actually behind or conflicted.
+      await sleep(pollMs);
+      continue;
+    }
+
     const checkRuns = await fetchCheckRuns({ repository, sha: expectedSha, token });
     evaluation = evaluateExpectedChecks({ expectedChecks, checkRuns, expectedSha });
 
