@@ -1,10 +1,12 @@
 export type CompanionId =
-  | 'raylene'
-  | 'rylane'
+  | 'suhana'
+  | 'sy'
   | 'cloud'
   | 'night'
   | 'sekret'
   | 'parentCoach';
+
+export type LegacyCompanionId = 'raylene' | 'rylane';
 
 export type CompanionSurface =
   | 'journal'
@@ -32,7 +34,7 @@ export interface CompanionHistoryTurn {
 }
 
 export interface CompanionReplyRequest {
-  characterId: CompanionId;
+  characterId: CompanionId | LegacyCompanionId;
   surface: CompanionSurface;
   userText: string;
   history?: CompanionHistoryTurn[];
@@ -45,11 +47,13 @@ export interface CompanionReplyRequest {
   conversationPhase?: string;
   phaseInstruction?: string;
   isArrival?: boolean;
+  /** True only for a user's first introduction to this companion. */
+  isFirstCompanionChat?: boolean;
 }
 
 export interface CompanionReplyData {
   reply: string;
-  characterId?: CompanionId;
+  characterId?: CompanionId | LegacyCompanionId;
   tone: string;
   avatarState?: CompanionAvatarState;
   safetyFlag: boolean;
@@ -59,17 +63,37 @@ export interface CompanionReplyData {
   traceId?: string;
 }
 
+export type VoiceProvider =
+  | 'cloudflare-aura-1'
+  | 'cloudflare-aura-2'
+  | 'elevenlabs-flash';
+
+export interface CharacterAlignment {
+  characters: string[];
+  characterStartTimesSeconds: number[];
+  characterEndTimesSeconds: number[];
+}
+
 export interface VoiceSynthesisRequest {
   reply: string;
-  characterId: CompanionId;
+  characterId: CompanionId | LegacyCompanionId;
   format?: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav';
+  requiresPreciseLipSync?: boolean;
+  includeTiming?: boolean;
+  lipSync?: 'standard' | 'precise';
 }
 
 export interface VoiceSynthesisData {
   audioBase64: string;
   contentType?: string;
-  characterId?: CompanionId;
+  characterId?: CompanionId | LegacyCompanionId;
   voiceSource?: string;
+  voiceProvider?: VoiceProvider;
+  primaryVoiceProvider?: VoiceProvider;
+  model?: string;
+  voiceId?: string;
+  usedFallback?: boolean;
+  timing?: CharacterAlignment;
   traceId?: string;
 }
 
@@ -91,6 +115,7 @@ export type WorkerErrorCode =
   | 'RATE_LIMITED'
   | 'BACKEND_UNAVAILABLE'
   | 'VOICE_UNAVAILABLE'
+  | 'FOUNDER_PAUSED'
   | 'TIMEOUT'
   | 'NETWORK_ERROR'
   | 'UNKNOWN';

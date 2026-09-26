@@ -1,0 +1,158 @@
+name: Documentation Truth Exact-Head Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - README.md
+      - AGENTS.md
+      - SPRINT.md
+      - DEPLOYMENT.md
+      - docs/**
+      - .control-room/README_SYNC_POLICY.md
+      - .agents/skills/bip-architecture/SKILL.md
+      - scripts/audit-documentation-truth.mjs
+      - test/launch-documentation-contract.test.mjs
+      - test/control-room-readme-sync.test.mjs
+      - test/documentation-truth-drift.test.mjs
+      - test/supabase-trigger-structure.test.mjs
+      - implementation-ledger.json
+      - implementation-ledger.extensions/**
+      - .github/workflows/documentation-truth-gate.yml
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - SPRINT.md
+      - DEPLOYMENT.md
+      - docs/**
+      - .control-room/README_SYNC_POLICY.md
+      - scripts/audit-documentation-truth.mjs
+      - test/launch-documentation-contract.test.mjs
+      - test/control-room-readme-sync.test.mjs
+      - test/documentation-truth-drift.test.mjs
+      - .github/workflows/documentation-truth-gate.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-truth-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify-documentation-truth:
+    name: Exact head, documentation contracts, truth expiry, and ledger
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out exact candidate head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p documentation-evidence
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          printf 'expected_head_sha=%s\nactual_head_sha=%s\nworkflow_run_id=%s\n' \
+            "$EXPECTED_HEAD_SHA" "$ACTUAL_HEAD_SHA" "$GITHUB_RUN_ID" \
+            | tee documentation-evidence/exact-head.txt
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Parse-check truth auditor
+        run: node --check scripts/audit-documentation-truth.mjs
+
+      - name: Run documentation authority contracts
+        id: documentation_contracts
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test \
+            test/launch-documentation-contract.test.mjs \
+            test/control-room-readme-sync.test.mjs \
+            test/documentation-truth-drift.test.mjs \
+            test/supabase-trigger-structure.test.mjs \
+            2>&1 | tee documentation-evidence/documentation-contracts.log
+
+      - name: Audit documentation truth expiry
+        id: truth_expiry
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          node scripts/audit-documentation-truth.mjs \
+            --report=documentation-evidence/documentation-truth-report.json \
+            2>&1 | tee documentation-evidence/documentation-truth-audit.log
+
+      - name: Verify implementation ledger claims
+        id: implementation_ledger
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run verify:implementation-ledger \
+            2>&1 | tee documentation-evidence/implementation-ledger.log
+
+      - name: Record aggregate documentation truth conclusion
+        if: always()
+        shell: bash
+        env:
+          DOCUMENTATION_CONTRACTS_OUTCOME: ${{ steps.documentation_contracts.outcome }}
+          TRUTH_EXPIRY_OUTCOME: ${{ steps.truth_expiry.outcome }}
+          IMPLEMENTATION_LEDGER_OUTCOME: ${{ steps.implementation_ledger.outcome }}
+        run: |
+          set -euo pipefail
+          printf '{\n  "schemaVersion": 1,\n  "exactHead": "%s",\n  "documentationContracts": "%s",\n  "truthExpiry": "%s",\n  "implementationLedger": "%s"\n}\n' \
+            "$EXPECTED_HEAD_SHA" \
+            "$DOCUMENTATION_CONTRACTS_OUTCOME" \
+            "$TRUTH_EXPIRY_OUTCOME" \
+            "$IMPLEMENTATION_LEDGER_OUTCOME" \
+            | tee documentation-evidence/conclusion.json
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: documentation-truth-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: documentation-evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Enforce documentation truth conclusion
+        if: always()
+        shell: bash
+        env:
+          DOCUMENTATION_CONTRACTS_OUTCOME: ${{ steps.documentation_contracts.outcome }}
+          TRUTH_EXPIRY_OUTCOME: ${{ steps.truth_expiry.outcome }}
+          IMPLEMENTATION_LEDGER_OUTCOME: ${{ steps.implementation_ledger.outcome }}
+        run: |
+          set -euo pipefail
+          test "$DOCUMENTATION_CONTRACTS_OUTCOME" = success
+          test "$TRUTH_EXPIRY_OUTCOME" = success
+          test "$IMPLEMENTATION_LEDGER_OUTCOME" = success

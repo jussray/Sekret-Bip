@@ -25,6 +25,35 @@ export interface RedeemedParentLink {
   activatedAt: string | null;
 }
 
+export type ParentInviteEmailStatus = 'not_requested' | 'sent' | 'failed';
+
+export interface ParentInviteEmailDelivery {
+  status: ParentInviteEmailStatus;
+  errorCode?: string | null;
+}
+
+export interface GeneratedParentInvite {
+  code: string;
+  email: ParentInviteEmailDelivery;
+}
+
+export interface CreateParentInviteOptions {
+  parentEmail?: string | null;
+}
+
+interface ParentLinkCreateResponse {
+  ok?: unknown;
+  invite?: {
+    invite_code?: unknown;
+    expires_at?: unknown;
+  } | null;
+  email?: {
+    status?: unknown;
+    error_code?: unknown;
+  } | null;
+  error?: unknown;
+}
+
 interface RedeemParentLinkRow {
   link_id?: unknown;
   teen_user_id?: unknown;
@@ -50,6 +79,28 @@ async function auditParentLinkFailure(
 
 function rpcFailure(error: { message?: string | null; code?: string | null; hint?: string | null }): ParentLinkFailure {
   return mapParentLinkRpcError(error.message);
+}
+
+function normalizeOptionalEmail(value?: string | null): string | null {
+  const trimmed = value?.trim().toLowerCase() ?? '';
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function parseEmailDelivery(
+  value: ParentLinkCreateResponse['email'],
+  requested: boolean,
+): ParentInviteEmailDelivery {
+  if (!requested) return { status: 'not_requested' };
+
+  if (value?.status === 'sent') return { status: 'sent' };
+  if (value?.status === 'failed') {
+    return {
+      status: 'failed',
+      errorCode: typeof value.error_code === 'string' ? value.error_code : null,
+    };
+  }
+
+  return { status: 'failed', errorCode: 'invalid_email_delivery_response' };
 }
 
 export function normalizeParentInviteCode(value: string): string {
@@ -100,7 +151,9 @@ async function currentUserId(): Promise<string | null> {
   }
 }
 
-export async function generateInviteCodeResult(): Promise<ParentLinkResult<string>> {
+export async function generateInviteCodeWithDeliveryResult(
+  options: CreateParentInviteOptions = {},
+): Promise<ParentLinkResult<GeneratedParentInvite>> {
   const sb = getSupabase();
   if (!sb) {
     return { ok: false, code: 'not_configured', message: 'The secure connection service is not configured.' };
@@ -111,7 +164,42 @@ export async function generateInviteCodeResult(): Promise<ParentLinkResult<strin
     return { ok: false, code: 'not_authenticated', message: 'Sign in to create a parent invite code.' };
   }
 
+  const parentEmail = normalizeOptionalEmail(options.parentEmail);
+
   try {
+    if (parentEmail) {
+      const { data, error } = await sb.functions.invoke('parent-link-create', {
+        body: { parentEmail },
+      });
+
+      if (error) {
+        await auditParentLinkFailure('invite_generation_edge_failed', new Error(error.message), {
+          error_name: error.name,
+        });
+        return { ok: false, code: 'server_error', message: 'Could not create or email the invite code. Try again.' };
+      }
+
+      const payload = data as ParentLinkCreateResponse | null;
+      const rawCode = payload?.invite?.invite_code;
+      const code = typeof rawCode === 'string' ? normalizeParentInviteCode(rawCode) : '';
+      if (code.length !== PARENT_INVITE_CODE_LENGTH) {
+        await auditParentLinkFailure(
+          'invite_generation_edge_response_invalid',
+          new Error('Invalid parent-link-create response shape'),
+          { response_type: Array.isArray(data) ? 'array' : typeof data },
+        );
+        return { ok: false, code: 'invalid_response', message: 'The server returned an invalid invite code.' };
+      }
+
+      return {
+        ok: true,
+        value: {
+          code,
+          email: parseEmailDelivery(payload?.email, true),
+        },
+      };
+    }
+
     const { data, error } = await sb.rpc('create_parent_link_invite');
     if (error) {
       await auditParentLinkFailure('invite_generation_rpc_failed', new Error(error.message), {
@@ -132,11 +220,24 @@ export async function generateInviteCodeResult(): Promise<ParentLinkResult<strin
       return { ok: false, code: 'invalid_response', message: 'The server returned an invalid invite code.' };
     }
 
-    return { ok: true, value: code };
+    return {
+      ok: true,
+      value: {
+        code,
+        email: { status: 'not_requested' },
+      },
+    };
   } catch (error) {
     await auditParentLinkFailure('invite_generation_threw', error);
     return { ok: false, code: 'server_error', message: 'Could not create an invite code. Check your connection and try again.' };
   }
+}
+
+export async function generateInviteCodeResult(
+  options: CreateParentInviteOptions = {},
+): Promise<ParentLinkResult<string>> {
+  const result = await generateInviteCodeWithDeliveryResult(options);
+  return result.ok ? { ok: true, value: result.value.code } : result;
 }
 
 export async function generateInviteCode(): Promise<string | null> {

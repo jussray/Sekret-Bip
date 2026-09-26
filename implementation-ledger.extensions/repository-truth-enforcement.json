@@ -1,0 +1,27 @@
+{
+  "id": "repository-truth-enforcement",
+  "name": "Failure-truth and branch-hygiene repository gates",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/702",
+  "acceptanceCriteria": [
+    "Executable catch paths are inventoried and classified, and known false-success signatures fail exact-head CI.",
+    "Truthful Result-pattern failures, explicit fallback behavior, verified recovery, and telemetry-only cleanup remain distinguishable from user-visible success.",
+    "Remote branches are inventoried with canonical, current, merged-awaiting-cleanup, stale, and prohibited-name classifications without automatic deletion.",
+    "Repository-truth reports are uploaded as commit-scoped workflow artifacts and historical cleanup remains separately approved."
+  ],
+  "contractPaths": [
+    "REPO_HEALTH_DUPLICATES.md",
+    "config/failure-truth-allowlist.json",
+    "scripts/audit-failure-truth.mjs",
+    "scripts/audit-branch-hygiene.mjs",
+    ".github/workflows/repository-truth-gate.yml"
+  ],
+  "testPaths": [
+    "test/repository-truth-gates.test.mjs"
+  ],
+  "verification": {
+    "state": "not-run",
+    "evidence": "https://github.com/jussray/Sekret-Bip/issues/702",
+    "blocker": "Run the exact-head Repository Truth Gate, classify any existing needs-review catch paths, and review the historical branch inventory before raising verification state."
+  }
+}

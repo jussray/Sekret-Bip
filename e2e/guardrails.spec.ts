@@ -6,7 +6,10 @@ test('installs the public-safe Se’kret Bip guardrail snapshot', async ({ page 
   await expect(page.locator('html')).toHaveAttribute('data-product-stage', 'phased-production-readiness');
 
   const snapshot = await page.evaluate(() => window.__SEKRET_BIP_GUARDRAILS__);
+  expect(snapshot?.version).toBe('1.1.0');
   expect(snapshot?.vision.id).toBe('private-teen-emotional-growth');
+  expect(snapshot?.vision.culturalMission).toMatch(/love.*repair.*communication.*belonging.*family responsibility.*courage.*community/i);
+  expect(snapshot?.vision.proofStrategy).toMatch(/creation over censorship.*measurable evidence/i);
   expect(snapshot?.privacyDefault).toBe('private');
   expect(snapshot?.parentAccessMode).toBe('verified-consent-scoped');
   expect(snapshot?.publicIdentityMode).toBe('anonymous-contextual');
@@ -35,7 +38,7 @@ test('public entry and auth surfaces do not render private product data or secre
 
 test('public auth surfaces expose no parent surveillance or privileged controls', async ({ page }) => {
   await page.goto('/login');
-  await expect(page.getByText('welcome back')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: /view teen journal|open voice transcript|bypass consent|admin dashboard/i })).toHaveCount(0);
   await expect(page.getByRole('link', { name: /view teen journal|open voice transcript|bypass consent/i })).toHaveCount(0);
 });

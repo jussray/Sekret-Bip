@@ -37,7 +37,7 @@ The client cannot type another account’s identity during acceptance. `redeem_c
 
 Migrations:
 
-- `20260705010000_crew_accountability.sql`
+- `20260707020922_crew_accountability.sql`
 - `20260714183100_remove_crew_caps_and_guard_relationships.sql`
 - `20260714183200_guard_crew_invite_acceptance.sql`
 - `20260714183300_accepted_crew_identity_rpc.sql`

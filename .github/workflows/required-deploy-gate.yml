@@ -1,0 +1,117 @@
+name: Required Deployability Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: required-deploy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  EXPO_NO_TELEMETRY: 1
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  deploy:
+    name: deploy
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24 for repository and Worker proof
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install repository dependencies for Worker proof
+        run: npm ci
+
+      - name: Verify deployment and merge-authority contracts
+        run: node --test test/production-authority-workflow-contracts.test.mjs test/github-merge-membrane.test.mjs test/pr-continuity.attack20.test.mjs test/cloudflare-pages-build-environment.test.mjs test/cloudflare-worker-identity.test.mjs
+
+      - name: Prove exact-head Worker deployability without mutation
+        run: npx wrangler deploy --dry-run --config wrangler.toml
+
+      - name: Set up repository-pinned Node for Pages proof
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Verify Pages runtime matches repository contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="$(tr -d '[:space:]' < .node-version)"
+          actual="$(node --version | sed 's/^v//')"
+          printf 'pages_node_expected=%s\npages_node_actual=%s\n' "$expected" "$actual"
+          test "$actual" = "$expected"
+
+      - name: Install repository dependencies for Pages proof
+        run: |
+          rm -rf node_modules
+          npm ci
+
+      - name: Prove exact-head Pages build without deployment
+        env:
+          CF_PAGES: '1'
+          CF_PAGES_COMMIT_SHA: ${{ env.EXPECTED_HEAD_SHA }}
+          CF_PAGES_BRANCH: ${{ github.event.pull_request.head.ref }}
+          CF_PAGES_URL: https://exact-head.pages.dev
+          CF_PAGES_DEPLOYMENT_ID: github-required-deploy-${{ github.run_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          set -a
+          source .env.production
+          set +a
+          npm run build:web
+
+      - name: Record deployability receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/required-deploy
+          cat > artifacts/required-deploy/receipt.json <<JSON
+          {
+            "contract": "sekret-bip/required-deployability@v1",
+            "repository": "${GITHUB_REPOSITORY}",
+            "headSha": "${EXPECTED_HEAD_SHA}",
+            "event": "pull_request",
+            "productionMutation": false,
+            "workerDryRun": true,
+            "pagesBuild": true,
+            "pagesCloudflareMode": true,
+            "pagesNodeVersion": "$(tr -d '[:space:]' < .node-version)",
+            "authority": "deployability-only"
+          }
+          JSON
+
+      - name: Upload deployability receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: required-deployability-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/required-deploy/receipt.json
+          if-no-files-found: error
+          retention-days: 30

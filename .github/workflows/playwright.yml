@@ -1,72 +1,48 @@
 name: Playwright Smoke and Guardrails
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'app/**'
-      - 'components/**'
-      - 'screens/**'
-      - 'src/**'
-      - 'worker/**'
-      - 'e2e/**'
-      - 'scripts/verify-cloudflare-native-deploy.mjs'
-      - 'scripts/write-release-metadata.mjs'
-      - 'test/cloudflare-native-deploy.test.mjs'
-      - 'test/release-metadata.test.mjs'
-      - 'docs/VISION.md'
-      - 'docs/GUARDRAILS.md'
-      - 'DEPLOYMENT.md'
-      - 'wrangler.toml'
-      - 'playwright.config.ts'
-      - 'playwright.production.config.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/ci.yml'
-      - '.github/workflows/deploy-cloudflare.yml'
-      - '.github/workflows/playwright.yml'
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'components/**'
-      - 'screens/**'
-      - 'src/**'
-      - 'worker/**'
-      - 'e2e/**'
-      - 'scripts/verify-cloudflare-native-deploy.mjs'
-      - 'scripts/write-release-metadata.mjs'
-      - 'test/cloudflare-native-deploy.test.mjs'
-      - 'test/release-metadata.test.mjs'
-      - 'docs/VISION.md'
-      - 'docs/GUARDRAILS.md'
-      - 'DEPLOYMENT.md'
-      - 'wrangler.toml'
-      - 'playwright.config.ts'
-      - 'playwright.production.config.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/ci.yml'
-      - '.github/workflows/deploy-cloudflare.yml'
-      - '.github/workflows/playwright.yml'
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: Exact candidate commit SHA to verify
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ inputs.target_sha }}
+  PLAYWRIGHT_ARTIFACT_DIR: artifacts/playwright-smoke
 
 jobs:
   smoke:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
 
     steps:
-      - name: Check out current workflow head
-        uses: actions/checkout@v4
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'target_sha must be a lowercase 40-character commit SHA.' >&2
+            exit 1
+          }
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
@@ -74,8 +50,67 @@ jobs:
       - name: Install repository dependencies
         run: npm ci
 
+      - name: Record browser-evidence provenance
+        shell: bash
+        env:
+          EVIDENCE_REPOSITORY: ${{ github.repository }}
+          EVIDENCE_WORKFLOW: ${{ github.workflow }}
+          EVIDENCE_RUN_ID: ${{ github.run_id }}
+          EVIDENCE_RUN_ATTEMPT: ${{ github.run_attempt }}
+          EVIDENCE_EVENT: ${{ github.event_name }}
+          EVIDENCE_ACTOR: ${{ github.actor }}
+          EVIDENCE_RUNNER_OS: ${{ runner.os }}
+          EVIDENCE_RUNNER_ARCH: ${{ runner.arch }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          export EVIDENCE_NODE_VERSION="$(node --version)"
+          export EVIDENCE_PLAYWRIGHT_VERSION="$(npx playwright --version)"
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const clean = (value) => typeof value === 'string' ? value.trim() : '';
+          const sha = clean(process.env.EXPECTED_HEAD_SHA).toLowerCase();
+          if (!/^[0-9a-f]{40}$/.test(sha)) throw new Error('invalid EXPECTED_HEAD_SHA');
+
+          const receipt = {
+            schemaVersion: 1,
+            repository: clean(process.env.EVIDENCE_REPOSITORY),
+            commitSha: sha,
+            generatedAt: new Date().toISOString(),
+            workflow: clean(process.env.EVIDENCE_WORKFLOW),
+            trigger: clean(process.env.EVIDENCE_EVENT),
+            actor: clean(process.env.EVIDENCE_ACTOR),
+            run: {
+              id: clean(process.env.EVIDENCE_RUN_ID),
+              attempt: clean(process.env.EVIDENCE_RUN_ATTEMPT),
+            },
+            runner: {
+              os: clean(process.env.EVIDENCE_RUNNER_OS),
+              arch: clean(process.env.EVIDENCE_RUNNER_ARCH),
+              node: clean(process.env.EVIDENCE_NODE_VERSION),
+              playwright: clean(process.env.EVIDENCE_PLAYWRIGHT_VERSION),
+            },
+            evidence: {
+              provenanceArtifact: `playwright-provenance-${sha}-${clean(process.env.EVIDENCE_RUN_ID)}`,
+              failureArtifact: `playwright-report-${sha}-${clean(process.env.EVIDENCE_RUN_ID)}`,
+              defaultArtifactDir: clean(process.env.PLAYWRIGHT_ARTIFACT_DIR),
+              tracePolicy: 'retain-on-failure',
+              screenshotPolicy: 'only-on-failure',
+              videoPolicy: 'retain-on-failure',
+            },
+            authority: {
+              merge: false,
+              deploy: false,
+              providerMutation: false,
+            },
+          };
+
+          fs.writeFileSync('artifacts/playwright-provenance.json', `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+          NODE
+
       - name: Run exact-release unit tests
-        run: node --test test/cloudflare-native-deploy.test.mjs test/release-metadata.test.mjs
+        run: node --test test/cloudflare-native-deploy.test.mjs test/release-metadata.test.mjs test/playwright-evidence-provenance-workflow.test.mjs
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
@@ -83,11 +118,26 @@ jobs:
       - name: Run Playwright smoke and guardrail tests
         run: npx playwright test
 
-      - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
+      - name: Verify founder-preview Comfort and Cloud routes
+        run: npx playwright test --config=playwright.founder-preview.config.ts
+
+      - name: Upload browser-evidence provenance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: playwright-report
-          path: playwright-report/
-          if-no-files-found: ignore
-          retention-days: 7
+          name: playwright-provenance-${{ env.EXPECTED_HEAD_SHA }}-${{ github.run_id }}
+          path: artifacts/playwright-provenance.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload failure-scoped Playwright evidence
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: playwright-report-${{ env.EXPECTED_HEAD_SHA }}-${{ github.run_id }}
+          path: |
+            artifacts/playwright-smoke/
+            playwright-report-founder-preview/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14

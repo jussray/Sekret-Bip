@@ -13,6 +13,7 @@ import { backendAuthHeaders } from '@/utils/backendAuth';
 import { getSupabase } from '@/utils/supabase';
 
 const BASE_URL = ((process.env as Record<string, string | undefined>).EXPO_PUBLIC_BACKEND_URL ?? '').replace(/\/$/, '');
+const CONTROLLED_ALPHA_SOURCE_KINDS = new Set<BridgeShareSourceRef['kind']>(['journal', 'mood']);
 
 export interface BridgeSharePreviewItem {
   kind: BridgeShareSourceRef['kind'];
@@ -63,6 +64,13 @@ export function buildBridgeSharePreview(
   if (sources.length > 20) {
     return { ok: false, code: 'invalid_input', message: 'Choose no more than 20 items at once.' };
   }
+  if (sources.some((source) => !CONTROLLED_ALPHA_SOURCE_KINDS.has(source.kind))) {
+    return {
+      ok: false,
+      code: 'not_configured',
+      message: 'Controlled alpha currently supports Journal entries and Mood check-ins only.',
+    };
+  }
 
   return {
     ok: true,
@@ -71,13 +79,7 @@ export function buildBridgeSharePreview(
       items: sources.map((source) => ({
         kind: source.kind,
         sourceId: source.sourceId,
-        label: source.kind === 'journal'
-          ? 'Journal entry'
-          : source.kind === 'mood'
-            ? 'Mood check-in'
-            : source.kind === 'goal'
-              ? 'Goal'
-              : 'Scrapbook memory',
+        label: source.kind === 'journal' ? 'Journal entry' : 'Mood check-in',
       })),
       notice: 'Your parent will receive a generated summary, not your full private content. You can revoke access later.',
     },

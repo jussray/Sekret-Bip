@@ -1,6 +1,6 @@
 {
   "cli": {
-    "version": ">= 16.0.0",
+    "version": "24.7.0",
     "appVersionSource": "remote"
   },
   "build": {
@@ -10,7 +10,7 @@
       "env": {
         "APP_VARIANT": "teen",
         "EXPO_PUBLIC_APP_VARIANT": "teen",
-        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       },
       "ios": {
         "simulator": true,
@@ -23,7 +23,7 @@
       "env": {
         "APP_VARIANT": "parent",
         "EXPO_PUBLIC_APP_VARIANT": "parent",
-        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       },
       "ios": {
         "simulator": true,
@@ -38,7 +38,8 @@
       "env": {
         "APP_VARIANT": "teen",
         "EXPO_PUBLIC_APP_VARIANT": "teen",
-        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "beta",
+        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend-alpha.mcgill-raylene.workers.dev"
       }
     },
     "parent-preview": {
@@ -49,29 +50,40 @@
       "env": {
         "APP_VARIANT": "parent",
         "EXPO_PUBLIC_APP_VARIANT": "parent",
-        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "beta",
+        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend-alpha.mcgill-raylene.workers.dev"
       }
     },
     "production": {
       "autoIncrement": true,
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "ios": {
         "image": "latest"
       },
       "env": {
         "APP_VARIANT": "teen",
         "EXPO_PUBLIC_APP_VARIANT": "teen",
-        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "public",
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       }
     },
     "parent-production": {
       "autoIncrement": true,
+      "distribution": "store",
+      "android": {
+        "buildType": "app-bundle"
+      },
       "ios": {
         "image": "latest"
       },
       "env": {
         "APP_VARIANT": "parent",
         "EXPO_PUBLIC_APP_VARIANT": "parent",
-        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend.mcgill-raylene.workers.dev"
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "public",
+        "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       }
     }
   }

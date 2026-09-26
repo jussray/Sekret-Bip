@@ -19,5 +19,8 @@
       "@types/*": ["./src/types/*"]
     }
   },
-  "exclude": ["supabase/functions/**"]
+  "exclude": [
+    "supabase/functions/**",
+    "tools/zapier/**"
+  ]
 }

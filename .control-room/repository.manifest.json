@@ -1,0 +1,246 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "sekret-bip",
+  "repository": {
+    "provider": "github",
+    "identifier": "jussray/Sekret-Bip",
+    "defaultBranch": "main"
+  },
+  "verification": {
+    "requiredSignals": [
+      { "id": "typecheck", "name": "Typecheck", "required": true },
+      { "id": "lint", "name": "Lint", "required": true },
+      { "id": "unit-tests", "name": "Unit Tests", "required": true },
+      { "id": "rls-audit", "name": "RLS Audit", "required": true },
+      { "id": "runtime-truth", "name": "Runtime Truth Contracts", "required": true }
+    ]
+  },
+  "capabilities": [
+    {
+      "id": "private-account-and-identity-boundary",
+      "description": "Keeps private identity separate from anonymous Circle identity and gates cloud sync behind account completion.",
+      "status": "active",
+      "evidencePaths": [
+        "src/features/identity/accountProfile.ts",
+        "src/utils/sync.ts",
+        "scripts/test-device-sync.mjs"
+      ],
+      "requiredSignals": ["typecheck", "unit-tests", "rls-audit"],
+      "usageAssertions": [
+        {
+          "id": "teen-onboarding-saves-private-profile",
+          "path": "app/(onboarding)/reflection.tsx",
+          "marker": "saveAccountProfile",
+          "description": "Teen onboarding writes the canonical private account profile."
+        },
+        {
+          "id": "profile-flow-keeps-anonymous-circle-name",
+          "path": "app/(onboarding)/reflection.tsx",
+          "marker": "circleNickname: 'anonymous bip'",
+          "description": "The public Circle identity is explicitly separated from the private display name."
+        },
+        {
+          "id": "device-sync-contract-executes-account-gates",
+          "path": "scripts/test-device-sync.mjs",
+          "marker": "account",
+          "description": "The cross-device contract covers account-gated sync and second-user safety."
+        }
+      ]
+    },
+    {
+      "id": "teen-controlled-parent-bridge",
+      "description": "Shares only explicit teen-approved Bridge data through active parent links with revocation support.",
+      "status": "active",
+      "evidencePaths": [
+        "screens/BridgeScreen.tsx",
+        "src/utils/parentLink.ts",
+        "src/utils/parentBridgeCompat.ts",
+        "supabase/functions/bridge-share-create/index.ts",
+        "supabase/functions/bridge-share-revoke/index.ts"
+      ],
+      "requiredSignals": ["typecheck", "unit-tests", "rls-audit"],
+      "usageAssertions": [
+        {
+          "id": "bridge-screen-sends-metadata-signal",
+          "path": "screens/BridgeScreen.tsx",
+          "marker": "sendBridgeSignal({ shareType, convMode, charKey })",
+          "description": "The teen Bridge screen sends only the selected signal metadata."
+        },
+        {
+          "id": "bridge-screen-loads-share-history",
+          "path": "screens/BridgeScreen.tsx",
+          "marker": "fetchTeenBridgeShareHistory()",
+          "description": "The teen can inspect previously created Bridge summaries."
+        },
+        {
+          "id": "bridge-screen-invokes-revocation",
+          "path": "screens/BridgeScreen.tsx",
+          "marker": "revokeBridgeShareRequest(requestId)",
+          "description": "The teen-facing flow calls the revocation contract."
+        }
+      ]
+    },
+    {
+      "id": "consent-audit-runtime-truth",
+      "description": "Records consent state and immutable audit evidence atomically through an authenticated database RPC.",
+      "status": "active",
+      "evidencePaths": [
+        "services/consentService.ts",
+        "app/(onboarding)/consent.tsx",
+        "supabase/migrations/20260715060000_harden_consent_and_deletion_runtime_truth.sql",
+        "test/runtime-truth-contract.test.mjs"
+      ],
+      "requiredSignals": ["typecheck", "runtime-truth"],
+      "usageAssertions": [
+        {
+          "id": "consent-service-calls-atomic-rpc",
+          "path": "services/consentService.ts",
+          "marker": "record_user_consent",
+          "description": "Consent persistence uses the authenticated atomic RPC."
+        },
+        {
+          "id": "onboarding-requires-explicit-consent-action",
+          "path": "app/(onboarding)/consent.tsx",
+          "marker": "consentService.grant",
+          "description": "The onboarding UI records required consent only after explicit checkbox choices and a separate Continue action."
+        }
+      ]
+    },
+    {
+      "id": "verifiable-account-deletion",
+      "description": "Discovers live private Storage buckets, clears deletion blockers, deletes the account, and leaves a service-role receipt.",
+      "status": "active",
+      "evidencePaths": [
+        "src/components/settings/AccountDeletionControls.tsx",
+        "supabase/functions/account-delete/index.ts",
+        "supabase/migrations/20260715060000_harden_consent_and_deletion_runtime_truth.sql",
+        "test/runtime-truth-contract.test.mjs"
+      ],
+      "requiredSignals": ["runtime-truth", "rls-audit"],
+      "usageAssertions": [
+        {
+          "id": "settings-request-deletion",
+          "path": "src/components/settings/AccountDeletionControls.tsx",
+          "marker": "requestAccountDeletion()",
+          "description": "The settings UI invokes the delayed deletion request."
+        },
+        {
+          "id": "settings-cancel-deletion",
+          "path": "src/components/settings/AccountDeletionControls.tsx",
+          "marker": "cancelAccountDeletion()",
+          "description": "The settings UI exposes cancellation during the grace period."
+        },
+        {
+          "id": "worker-discovers-live-buckets",
+          "path": "supabase/functions/account-delete/index.ts",
+          "marker": "listBuckets()",
+          "description": "The deletion worker discovers the live Storage inventory."
+        },
+        {
+          "id": "worker-writes-deletion-receipt",
+          "path": "supabase/functions/account-delete/index.ts",
+          "marker": "account_deletion_receipts",
+          "description": "The worker leaves a durable, non-identifying completion receipt."
+        }
+      ]
+    },
+    {
+      "id": "companion-reply-contract",
+      "description": "Runs named Se’kret companion personalities through the worker contract with memory and safety boundaries.",
+      "status": "active",
+      "evidencePaths": [
+        "src/utils/api.ts",
+        "src/services/backend/sekretClient.ts",
+        "worker/config/policy.ts",
+        "app/(teen)/pages/[id].tsx",
+        "test/supabase-worker-ai-reply-contract.test.mjs"
+      ],
+      "requiredSignals": ["typecheck", "unit-tests"],
+      "usageAssertions": [
+        {
+          "id": "pages-screen-calls-companion-api",
+          "path": "app/(teen)/pages/[id].tsx",
+          "marker": "fetchSekretBrainReply",
+          "description": "The teen Pages conversation flow calls the companion API contract."
+        },
+        {
+          "id": "api-uses-typed-sekret-client",
+          "path": "src/utils/api.ts",
+          "marker": "sekretClient.sendReply(request)",
+          "description": "The API layer routes companion requests through the current typed Worker client and Result contract."
+        }
+      ]
+    },
+    {
+      "id": "repository-truth-enforcement",
+      "description": "Inventories failure handling and branch state so false success and duplicate work cannot hide behind green-looking output.",
+      "status": "active",
+      "evidencePaths": [
+        "scripts/audit-failure-truth.mjs",
+        "scripts/audit-branch-hygiene.mjs",
+        "config/failure-truth-allowlist.json",
+        ".github/workflows/repository-truth-gate.yml",
+        "test/repository-truth-gates.test.mjs",
+        "implementation-ledger.extensions/repository-truth-enforcement.json"
+      ],
+      "requiredSignals": ["unit-tests", "runtime-truth"],
+      "usageAssertions": [
+        {
+          "id": "failure-truth-blocks-success-in-catch",
+          "path": "scripts/audit-failure-truth.mjs",
+          "marker": "suspicious-success",
+          "description": "The gate distinguishes suspicious success from truthful failure, fallback, recovery, and telemetry-only handling."
+        },
+        {
+          "id": "branch-gate-never-auto-deletes",
+          "path": "scripts/audit-branch-hygiene.mjs",
+          "marker": "deletionAuthorized: false",
+          "description": "The branch inventory records cleanup debt without silently deleting founder history."
+        }
+      ]
+    }
+  ],
+  "buildAssist": {
+    "enabled": true,
+    "preferredBuilder": "codex",
+    "riskLevel": "high"
+  },
+  "privacy": {
+    "allowlistedPacketFields": [
+      "projectId",
+      "repository.provider",
+      "repository.identifier",
+      "commitSha",
+      "branch",
+      "manifestHash",
+      "generatedAt",
+      "runner.provider",
+      "runner.runId",
+      "runner.detailsUrl",
+      "checks.id",
+      "checks.name",
+      "checks.required",
+      "checks.status",
+      "checks.detailsUrl",
+      "capabilities.id",
+      "capabilities.claimedStatus",
+      "capabilities.observedStatus",
+      "capabilities.evidencePaths",
+      "capabilities.usageAssertionIds",
+      "capabilities.failedUsageAssertionIds",
+      "capabilities.reason"
+    ],
+    "forbiddenData": [
+      "journal text",
+      "voice transcripts or recordings",
+      "teen or parent names",
+      "email addresses",
+      "Circle post content",
+      "private messages",
+      "usage assertion marker text in runner packets",
+      "Supabase service-role keys",
+      "OpenAI keys",
+      "raw product database rows"
+    ]
+  }
+}

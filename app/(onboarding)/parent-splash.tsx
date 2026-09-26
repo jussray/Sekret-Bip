@@ -1,26 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { SplashScreen } from '@screens/SplashScreen';
 
-const ENTRY_LOCK_MS = 900;
-
+/**
+ * Deprecated compatibility route.
+ *
+ * Se’kret Bip no longer has a canonical splash step. Preserve this route for
+ * stale links/history, but immediately continue to the parent destination.
+ */
 export default function ParentOnboardingSplash() {
   const { next } = useLocalSearchParams<{ next?: string }>();
-  const [entryEnabled, setEntryEnabled] = useState(false);
   const destination = next === 'room' ? '/(parent)/room' : '/(onboarding)/parent-welcome';
 
   useEffect(() => {
-    const timer = setTimeout(() => setEntryEnabled(true), ENTRY_LOCK_MS);
-    return () => clearTimeout(timer);
-  }, []);
+    router.replace(destination);
+  }, [destination]);
 
-  return (
-    <SplashScreen
-      userSide="parent"
-      setScreen={() => {
-        if (!entryEnabled) return;
-        router.replace(destination);
-      }}
-    />
-  );
+  return null;
 }

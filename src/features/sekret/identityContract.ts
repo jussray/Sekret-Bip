@@ -6,10 +6,17 @@
  * visible identities.
  */
 
+import {
+  COMPANION_DISPLAY_NAMES,
+  type NamedCompanionId,
+} from '@/features/identity/companionIds';
+import { migratePersistedCompanionId } from '@/features/identity/legacyCompanionIdMigration';
+
+export type { NamedCompanionId } from '@/features/identity/companionIds';
+
 export const VISIBLE_AI_NAME = "Se'kret" as const;
 export const INTERNAL_REASONING_NAME = 'Oracle' as const;
 
-export type NamedCompanionId = 'raylene' | 'rylane' | 'cloud' | 'night';
 export type InternalAiIdentity = NamedCompanionId | 'sekret' | 'oracle';
 
 export type SekretVisibleSurface =
@@ -24,13 +31,6 @@ export type SekretVisibleSurface =
 export type SekretSuppressedSurface =
   | 'companion-picker'
   | 'companion-avatar-grid';
-
-const COMPANION_DISPLAY_NAMES: Record<NamedCompanionId, string> = {
-  raylene: 'Raylene',
-  rylane: 'Rylane',
-  cloud: 'Cloud',
-  night: 'Night',
-};
 
 const SEKRET_VISIBLE_SURFACES = new Set<string>([
   'sekret-chat',
@@ -54,13 +54,14 @@ export function getVisibleIdentity(): typeof VISIBLE_AI_NAME {
 
 /**
  * Resolve an identity for display without collapsing named companions into
- * Se'kret. Unknown values fail closed to Se'kret rather than Raylene.
+ * Se'kret. Persisted pre-cutover IDs are migrated only at this read boundary.
+ * Unknown values fail closed to Se'kret rather than a named companion.
  */
 export function resolveVisibleIdentity(identity: string): string {
-  const normalized = identity.trim().toLowerCase();
+  const canonical = migratePersistedCompanionId(identity);
 
-  if (normalized in COMPANION_DISPLAY_NAMES) {
-    return COMPANION_DISPLAY_NAMES[normalized as NamedCompanionId];
+  if (canonical) {
+    return COMPANION_DISPLAY_NAMES[canonical];
   }
 
   return VISIBLE_AI_NAME;

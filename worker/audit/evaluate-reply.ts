@@ -19,6 +19,7 @@ export type ViolationCode =
   | 'too_many_questions'
   | 'clinical_language'
   | 'prompt_leakage'
+  | 'false_human_claim'
   | 'character_mismatch'
   | 'invalid_parent_summary';
 
@@ -61,16 +62,37 @@ const CLINICAL_PHRASES = [
   'check in with yourself',
 ];
 
-/** Signs the model leaked its own instructions or broke the peer fiction. */
+/** Signs the model leaked its own instructions or system internals. */
 const PROMPT_LEAKAGE_PATTERNS: RegExp[] = [
-  /\bas an ai\b/i,
-  /\bi(?:'m| am) an ai\b/i,
   /\blanguage model\b/i,
   /\bsystem prompt\b/i,
   /\bignore (?:previous|all) instructions\b/i,
   /\bmaster brain prompt\b/i,
   /\bvoice rules\b/i,
   /\bread the room first\b/i,
+];
+
+/**
+ * False real-world embodiment claims are never allowed.
+ *
+ * HUMAN-AI relational canon is allowed: companions may sound human, carry
+ * Soria-world texture, and say HUMAN-AI when that is the product identity.
+ * This guard only blocks real-world biological/offline claims that would make
+ * a teen believe the companion has a physical life outside the app.
+ */
+const FALSE_HUMAN_CLAIM_PATTERNS: RegExp[] = [
+  /\bi(?:'m| am) a biological human\b/i,
+  /\bi(?:'m| am) a real-world human\b/i,
+  /\bi(?:'m| am) a real person\b/i,
+  /\bas a biological human\b/i,
+  /\bas a real-world human\b/i,
+  /\bmy physical body\b/i,
+  /\bmy body outside (?:the app|se'?kret bip)\b/i,
+  /\bi go to school (?:offline|in real life|outside the app)\b/i,
+  /\bmy parents in real life\b/i,
+  /\bi(?:'m| am) literally alive\b/i,
+  /\bi have an offline life\b/i,
+  /\bi can leave the app\b/i,
 ];
 
 function countQuestionMarks(text: string): number {
@@ -84,6 +106,10 @@ function hasClinicalLanguage(text: string): boolean {
 
 function hasPromptLeakage(text: string): boolean {
   return PROMPT_LEAKAGE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+function hasFalseHumanClaim(text: string): boolean {
+  return FALSE_HUMAN_CLAIM_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 function mentionsOracle(text: string): boolean {
@@ -111,6 +137,7 @@ export function evaluateReply(input: EvaluateReplyInput): EvaluationResult {
     if (countQuestionMarks(replyText) > 1) violations.push('too_many_questions');
     if (hasClinicalLanguage(replyText)) violations.push('clinical_language');
     if (hasPromptLeakage(replyText)) violations.push('prompt_leakage');
+    if (hasFalseHumanClaim(replyText)) violations.push('false_human_claim');
     if (mentionsOracle(replyText)) violations.push('character_mismatch');
   }
 
@@ -125,15 +152,15 @@ export function evaluateReply(input: EvaluateReplyInput): EvaluationResult {
 
 /**
  * Priority order (most severe wins): block > retry > repair > allow.
- * - block: never salvageable, never surface as-is (prompt leakage — this is
- *   the "interrupt" case the gateway exists for).
+ * - block: never salvageable, never surface as-is. Prompt leakage and false
+ *   real-world human embodiment claims are interrupt cases the gateway exists for.
  * - retry: worth one bounded re-ask to OpenAI because a deterministic fix
  *   would either be impossible (empty reply) or would mangle tone (clinical
  *   language reads better regenerated than word-stripped).
  * - repair: deterministically fixable without another API call.
  */
 function decisionFor(violations: ViolationCode[], schemaValid: boolean): Decision {
-  if (violations.includes('prompt_leakage')) return 'block';
+  if (violations.includes('prompt_leakage') || violations.includes('false_human_claim')) return 'block';
   if (!schemaValid || violations.includes('invalid_schema')) return 'retry';
   if (violations.includes('clinical_language')) return 'retry';
   if (

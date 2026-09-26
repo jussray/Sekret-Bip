@@ -7,18 +7,18 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {
-  applyBipEnergyFade,
-  loadUnseenBipEnergyAdjustment,
-  markBipEnergyAdjustmentSeen,
-  type BipEnergyAdjustment,
-} from '@/features/activity/bipEnergy';
+import { router } from 'expo-router';
 import {
   loadMeaningfulReturnSnapshot,
   markMeaningfulReturnSeen,
   type MeaningfulReturnSnapshot,
   type ReturnStage,
 } from '@/features/retention/meaningfulReturn';
+import {
+  archiveSavedContinuation,
+  loadSavedContinuation,
+  type SavedContinuation,
+} from '@/features/retention/savedContinuation';
 
 interface BipReturnOverlayProps {
   onNavigate: (screen: string) => void;
@@ -31,7 +31,7 @@ const STAGE_COPY: Record<ReturnStage, { title: string; body: string }> = {
   },
   understanding: {
     title: "You're starting to see what helps.",
-    body: 'A few honest days can teach you more than a perfect streak ever could.',
+    body: 'A few honest check-ins can teach you what helps without asking you to show up every day.',
   },
   ownership: {
     title: 'This is becoming your Bip story.',
@@ -47,24 +47,20 @@ const NEEDS = [
 
 export function BipReturnOverlay({ onNavigate }: BipReturnOverlayProps) {
   const [snapshot, setSnapshot] = useState<MeaningfulReturnSnapshot | null>(null);
-  const [energyAdjustment, setEnergyAdjustment] = useState<BipEnergyAdjustment | null>(null);
+  const [continuation, setContinuation] = useState<SavedContinuation | null>(null);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
     void (async () => {
-      // The point RPC is once-per-day and idempotent. Waiting here ensures the
-      // same Room visit can show the result instead of making the teen return
-      // again just to learn that Bip Energy faded.
-      await applyBipEnergyFade();
-      const [nextSnapshot, nextAdjustment] = await Promise.all([
+      const [nextSnapshot, nextContinuation] = await Promise.all([
         loadMeaningfulReturnSnapshot(),
-        loadUnseenBipEnergyAdjustment(),
+        loadSavedContinuation(),
       ]);
       if (!active) return;
       setSnapshot(nextSnapshot);
-      setEnergyAdjustment(nextAdjustment);
-      setOpen(nextSnapshot.isNew || Boolean(nextAdjustment));
+      setContinuation(nextContinuation);
+      setOpen(nextSnapshot.isNew);
     })();
     return () => { active = false; };
   }, []);
@@ -75,10 +71,7 @@ export function BipReturnOverlay({ onNavigate }: BipReturnOverlayProps) {
   );
 
   async function close() {
-    await Promise.all([
-      snapshot?.latest ? markMeaningfulReturnSeen(snapshot.latest.id) : Promise.resolve(),
-      energyAdjustment ? markBipEnergyAdjustmentSeen(energyAdjustment.checkedAt) : Promise.resolve(),
-    ]);
+    if (snapshot?.latest) await markMeaningfulReturnSeen(snapshot.latest.id);
     setOpen(false);
   }
 
@@ -87,18 +80,38 @@ export function BipReturnOverlay({ onNavigate }: BipReturnOverlayProps) {
     onNavigate(screen);
   }
 
+  async function continueSaved() {
+    if (!continuation) return;
+    const entryId = continuation.entryId;
+    await archiveSavedContinuation();
+    setContinuation(null);
+    setOpen(false);
+    router.push(`/(teen)/pages/${entryId}` as any);
+  }
+
+  async function removeSavedFromRoom() {
+    await archiveSavedContinuation();
+    setContinuation(null);
+  }
+
   return (
     <>
       <TouchableOpacity
         style={styles.floatingButton}
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel="Open your Bip return receipt and choose what you need"
+        accessibilityLabel="Open your Bip return choices"
         activeOpacity={0.86}
       >
-        <Text style={styles.floatingIcon}>{energyAdjustment ? '✨' : snapshot?.latest?.icon ?? '💜'}</Text>
+        <Text style={styles.floatingIcon}>
+          {continuation ? '↩' : snapshot?.latest?.icon ?? '💜'}
+        </Text>
         <Text style={styles.floatingText}>
-          {energyAdjustment ? 'welcome back' : snapshot?.latest ? 'your Bip story' : 'what do you need?'}
+          {continuation
+            ? 'continue your thought'
+            : snapshot?.latest
+              ? 'your Bip story'
+              : 'what do you need?'}
         </Text>
       </TouchableOpacity>
 
@@ -108,17 +121,30 @@ export function BipReturnOverlay({ onNavigate }: BipReturnOverlayProps) {
             <View style={styles.handle} />
             <Text style={styles.kicker}>YOUR BIP STORY</Text>
 
-            {energyAdjustment ? (
-              <View style={styles.energyCard}>
-                <Text style={styles.energyIcon}>✨</Text>
-                <View style={styles.receiptTextWrap}>
-                  <Text style={styles.energyTitle}>Your Bip Energy faded a little.</Text>
-                  <Text style={styles.energyBody}>
-                    {energyAdjustment.adjusted} point{energyAdjustment.adjusted === 1 ? '' : 's'} eased back after {energyAdjustment.daysAway} days away. Welcome back. Small steps still count.
-                  </Text>
-                  <Text style={styles.energyPromise}>
-                    Bip Tickets, redeemed rewards, and unlocked room items stay yours.
-                  </Text>
+            {continuation ? (
+              <View style={styles.continueCard}>
+                <Text style={styles.continueKicker}>SAVED FOR LATER</Text>
+                <Text style={styles.continueTitle}>Continue where you left off.</Text>
+                <Text style={styles.continueBody}>
+                  Room remembers which page to reopen. Your words stay on that page.
+                </Text>
+                <View style={styles.continueActions}>
+                  <TouchableOpacity
+                    style={styles.continueButton}
+                    onPress={() => void continueSaved()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Continue the saved page"
+                  >
+                    <Text style={styles.continueButtonText}>continue</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.archiveButton}
+                    onPress={() => void removeSavedFromRoom()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Remove saved page from Room"
+                  >
+                    <Text style={styles.archiveButtonText}>remove from Room</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ) : null}
@@ -141,7 +167,7 @@ export function BipReturnOverlay({ onNavigate }: BipReturnOverlayProps) {
               <Text style={styles.rhythmNumber}>{snapshot?.activeDays30 ?? 0}</Text>
               <View style={{ flex: 1 }}>
                 <Text style={styles.rhythmLabel}>days you checked in this month</Text>
-                <Text style={styles.rhythmSub}>Your active-day story stays even when a streak resets.</Text>
+                <Text style={styles.rhythmSub}>Your check-ins stay part of your story, even after time away.</Text>
               </View>
             </View>
 
@@ -181,6 +207,7 @@ const styles = StyleSheet.create({
     bottom: 26,
     zIndex: 50,
     elevation: 20,
+    minHeight: 44,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 7,
@@ -228,20 +255,38 @@ const styles = StyleSheet.create({
     letterSpacing: 1.8,
     marginBottom: 10,
   },
-  energyCard: {
-    flexDirection: 'row',
-    gap: 12,
+  continueCard: {
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: 'rgba(251,191,36,0.38)',
-    backgroundColor: 'rgba(120,53,15,0.18)',
+    borderColor: 'rgba(167,139,250,0.42)',
+    backgroundColor: 'rgba(76,29,149,0.22)',
     padding: 15,
     marginBottom: 12,
   },
-  energyIcon: { fontSize: 28 },
-  energyTitle: { color: '#fef3c7', fontSize: 15, fontWeight: '900', lineHeight: 21 },
-  energyBody: { color: '#e7d6ae', fontSize: 12, lineHeight: 18, marginTop: 4 },
-  energyPromise: { color: '#f5cf73', fontSize: 10, lineHeight: 15, fontWeight: '800', marginTop: 7 },
+  continueKicker: { color: '#a78bfa', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
+  continueTitle: { color: '#fff', fontSize: 16, fontWeight: '900', lineHeight: 22, marginTop: 5 },
+  continueBody: { color: '#cfc6df', fontSize: 11, lineHeight: 17, marginTop: 4 },
+  continueActions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  continueButton: {
+    flex: 1,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    backgroundColor: '#7c3aed',
+    paddingHorizontal: 14,
+  },
+  continueButtonText: { color: '#fff', fontSize: 11, fontWeight: '900' },
+  archiveButton: {
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(196,181,253,0.26)',
+    paddingHorizontal: 16,
+  },
+  archiveButtonText: { color: '#b8aec8', fontSize: 11, fontWeight: '800' },
   receiptCard: {
     flexDirection: 'row',
     gap: 12,

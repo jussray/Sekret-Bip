@@ -42,10 +42,80 @@ function client() {
   return getSupabase();
 }
 
+function normalizePersistedRecord(
+  value: unknown,
+  fallbackCategory: ConsentCategory,
+  fallbackGranted: boolean,
+): ConsentRecord {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (!row || typeof row !== 'object') {
+    throw new Error('consent_persistence_returned_no_record');
+  }
+
+  const candidate = row as Partial<ConsentRecord>;
+  return {
+    category: (candidate.category ?? fallbackCategory) as ConsentCategory,
+    granted: typeof candidate.granted === 'boolean' ? candidate.granted : fallbackGranted,
+    timestamp: String(candidate.timestamp ?? ''),
+    version: String(candidate.version ?? CONSENT_VERSION),
+  };
+}
+
+async function persistConsent(
+  userId: string,
+  category: ConsentCategory,
+  granted: boolean,
+): Promise<ConsentRecord> {
+  const supabase = client();
+  if (!supabase) {
+    throw new Error('consent_persistence_unavailable');
+  }
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !user) {
+    throw new Error('consent_authentication_required');
+  }
+
+  if (user.id !== userId) {
+    throw new Error('consent_user_mismatch');
+  }
+
+  const { data, error } = await supabase.rpc('record_user_consent', {
+    p_category: category,
+    p_granted: granted,
+    p_version: CONSENT_VERSION,
+  });
+
+  if (error) {
+    throw new Error(`consent_persistence_failed:${error.message}`);
+  }
+
+  const record = normalizePersistedRecord(data, category, granted);
+  if (!record.timestamp) {
+    throw new Error('consent_persistence_missing_timestamp');
+  }
+
+  return record;
+}
+
 export const consentService = {
   async load(userId: string): Promise<void> {
     const supabase = client();
     if (!supabase) {
+      cache.clear();
+      return;
+    }
+
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user || user.id !== userId) {
       cache.clear();
       return;
     }
@@ -76,24 +146,12 @@ export const consentService = {
   },
 
   async grant(userId: string, category: ConsentCategory): Promise<void> {
-    const record: ConsentRecord = {
-      category,
-      granted: true,
-      timestamp: new Date().toISOString(),
-      version: CONSENT_VERSION,
-    };
-    await upsertConsent(userId, record, 'grant');
+    const record = await persistConsent(userId, category, true);
     cache.set(category, record);
   },
 
   async revoke(userId: string, category: ConsentCategory): Promise<void> {
-    const record: ConsentRecord = {
-      category,
-      granted: false,
-      timestamp: new Date().toISOString(),
-      version: CONSENT_VERSION,
-    };
-    await upsertConsent(userId, record, 'revoke');
+    const record = await persistConsent(userId, category, false);
     cache.set(category, record);
   },
 
@@ -109,44 +167,3 @@ export const consentService = {
     cache.clear();
   },
 };
-
-async function upsertConsent(
-  userId: string,
-  record: ConsentRecord,
-  action: 'grant' | 'revoke',
-): Promise<void> {
-  const supabase = client();
-  if (!supabase) {
-    console.warn('[consentService] Supabase is not configured; consent was not persisted.');
-    return;
-  }
-
-  const { error: upsertError } = await supabase
-    .from('user_consents')
-    .upsert({
-      user_id: userId,
-      category: record.category,
-      granted: record.granted,
-      timestamp: record.timestamp,
-      version: record.version,
-    }, { onConflict: 'user_id,category' });
-
-  if (upsertError) {
-    console.warn('[consentService] Upsert failed:', upsertError.message);
-    return;
-  }
-
-  void supabase
-    .from('consent_audit_log')
-    .insert({
-      user_id: userId,
-      category: record.category,
-      action,
-      granted: record.granted,
-      timestamp: record.timestamp,
-      version: record.version,
-    })
-    .then(({ error }) => {
-      if (error) console.warn('[consentService] Audit log failed:', error.message);
-    });
-}

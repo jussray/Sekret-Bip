@@ -1,0 +1,93 @@
+name: Mobile Store Readiness
+
+on:
+  push:
+    branches:
+      - main
+      - chore/eas-build-config
+    paths:
+      - app.json
+      - app.config.ts
+      - eas.json
+      - package.json
+      - package-lock.json
+      - app/(parent)/_layout.tsx
+      - e2e/smoke.spec.ts
+      - scripts/verify-mobile-store-release.mjs
+      - .github/workflows/eas-build.yml
+      - .github/workflows/mobile-store-readiness.yml
+  pull_request:
+    paths:
+      - app.json
+      - app.config.ts
+      - eas.json
+      - package.json
+      - package-lock.json
+      - app/(parent)/_layout.tsx
+      - e2e/smoke.spec.ts
+      - scripts/verify-mobile-store-release.mjs
+      - .github/workflows/eas-build.yml
+      - .github/workflows/mobile-store-readiness.yml
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-store-readiness-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  CI: true
+
+jobs:
+  contract:
+    name: Store contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Report exact proof subject
+        run: echo "proof_subject=${GITHUB_SHA}"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: node --check scripts/verify-mobile-store-release.mjs
+      - run: node scripts/verify-mobile-store-release.mjs
+      - run: npm run type-check
+
+  playwright-regression:
+    name: Playwright front-door regression
+    needs: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- e2e/smoke.spec.ts
+
+      - name: Upload Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-store-playwright-${{ github.sha }}
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 30

@@ -1,0 +1,60 @@
+name: Verify Cloudflare Branch Authority Apply Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/cloudflare-branch-authority.yml'
+      - '.github/workflows/cloudflare-branch-authority-apply.yml'
+      - '.github/workflows/cloudflare-branch-authority-apply-contract.yml'
+      - 'config/cloudflare-targets.json'
+      - 'scripts/verify-cloudflare-pages-branch-authority.mjs'
+      - 'test/cloudflare-branch-authority-apply-workflow-contract.test.mjs'
+      - 'test/cloudflare-pages-branch-authority.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-branch-authority-apply-contract-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  contract:
+    name: Verify current provider-topology safety contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out exact workflow head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Verify exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          test "$actual" = "$GITHUB_SHA"
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            current_main="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+            test -n "$current_main"
+            test "$actual" = "$current_main"
+          fi
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify Cloudflare topology, Pages authority, and founder-apply contracts
+        run: >-
+          node --test
+          test/cloudflare-branch-authority-apply-workflow-contract.test.mjs
+          test/cloudflare-pages-branch-authority.test.mjs

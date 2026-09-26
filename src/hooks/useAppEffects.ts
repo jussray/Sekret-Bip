@@ -10,6 +10,7 @@
  *   6. Rotating home message
  */
 import { useEffect } from 'react';
+import { AppState as NativeAppState } from 'react-native';
 import type { Dispatch, SetStateAction } from 'react';
 import type { AppState } from '../store/useAppStore';
 import { loadState, saveState } from '@/utils/storage';
@@ -99,71 +100,90 @@ export function useAppEffects(state: AppState, setState: SetState) {
 
   // 3. Supabase: pull and merge only for an authenticated account.
   // Signed-out users stay at the auth boundary; no anonymous account is created.
+  // Re-run the same merge when the app becomes active so cloud-backed UI does not
+  // remain stale after backgrounding, tab switches, or edits from another device.
   useEffect(() => {
     if (!isSupabaseConfigured || isLoading) return;
     let cancelled = false;
-    (async () => {
-      const uid = await getCurrentSessionUserId();
-      if (!uid || cancelled) return;
+    let refreshInFlight = false;
 
-      // Bulk pull (mood, journal, circle, voice, comfort, crew, room)
-      const cloud = await pullAll();
-      if (!cloud || cancelled) return;
-      if (__DEV__)
-        console.log('[sync] cloud counts', {
-          mood:         cloud.moodHistory.length,
-          journal:      cloud.journalEntries.length,
-          circle:       cloud.circlePosts.length,
-          parentCircle: cloud.parentCirclePosts.length,
-          voice:        cloud.voiceNotes.length,
-          comfort:      cloud.comfortSessions.length,
-          crew:         cloud.crewMembers.length,
-          checkIns:     cloud.crewCheckIns.length,
-          roomMemory:   cloud.roomMemory ? 'present' : 'null',
-        });
-      setState(prev => ({
-        ...prev,
-        moodHistory:       mergeById(prev.moodHistory,       cloud.moodHistory),
-        journalEntries:    mergeById(prev.journalEntries,    cloud.journalEntries),
-        circlePosts:       mergeById(prev.circlePosts,       cloud.circlePosts),
-        parentCirclePosts: mergeById(prev.parentCirclePosts, cloud.parentCirclePosts),
-        voiceNotes:        mergeById(prev.voiceNotes,        cloud.voiceNotes),
-        comfortSessions:   mergeById(prev.comfortSessions,   cloud.comfortSessions),
-        crewMembers:       mergeById(prev.crewMembers,       cloud.crewMembers),
-        crewCheckIns:      mergeById(prev.crewCheckIns,      cloud.crewCheckIns),
-        roomMemory: cloud.roomMemory
-          ? { ...prev.roomMemory, ...cloud.roomMemory }
-          : prev.roomMemory,
-      }));
+    const refreshCloudState = async () => {
+      if (cancelled || refreshInFlight) return;
+      refreshInFlight = true;
+      try {
+        const uid = await getCurrentSessionUserId();
+        if (!uid || cancelled) return;
 
-      // Period days — additive merge (union of local + cloud sets)
-      if (!cancelled) {
-        const cloudDays = await loadPeriodDays();
-        if (cloudDays.length > 0) {
-          setState(prev => ({
-            ...prev,
-            periodDays: Array.from(new Set([...prev.periodDays, ...cloudDays])).sort(),
-          }));
+        // Bulk pull (mood, journal, circle, voice, comfort, crew, room)
+        const cloud = await pullAll();
+        if (!cloud || cancelled) return;
+        if (__DEV__)
+          console.log('[sync] cloud counts', {
+            mood:         cloud.moodHistory.length,
+            journal:      cloud.journalEntries.length,
+            circle:       cloud.circlePosts.length,
+            parentCircle: cloud.parentCirclePosts.length,
+            voice:        cloud.voiceNotes.length,
+            comfort:      cloud.comfortSessions.length,
+            crew:         cloud.crewMembers.length,
+            checkIns:     cloud.crewCheckIns.length,
+            roomMemory:   cloud.roomMemory ? 'present' : 'null',
+          });
+        setState(prev => ({
+          ...prev,
+          moodHistory:       mergeById(prev.moodHistory,       cloud.moodHistory),
+          journalEntries:    mergeById(prev.journalEntries,    cloud.journalEntries),
+          circlePosts:       mergeById(prev.circlePosts,       cloud.circlePosts),
+          parentCirclePosts: mergeById(prev.parentCirclePosts, cloud.parentCirclePosts),
+          voiceNotes:        mergeById(prev.voiceNotes,        cloud.voiceNotes),
+          comfortSessions:   mergeById(prev.comfortSessions,   cloud.comfortSessions),
+          crewMembers:       mergeById(prev.crewMembers,       cloud.crewMembers),
+          crewCheckIns:      mergeById(prev.crewCheckIns,      cloud.crewCheckIns),
+          roomMemory: cloud.roomMemory
+            ? { ...prev.roomMemory, ...cloud.roomMemory }
+            : prev.roomMemory,
+        }));
+
+        // Period days — additive merge (union of local + cloud sets)
+        if (!cancelled) {
+          const cloudDays = await loadPeriodDays();
+          if (cloudDays.length > 0) {
+            setState(prev => ({
+              ...prev,
+              periodDays: Array.from(new Set([...prev.periodDays, ...cloudDays])).sort(),
+            }));
+          }
         }
-      }
 
-      // Oracle discovery profiles — restore full structured profiles from oracle_records
-      if (!cancelled) {
-        const [teenProfile, parentProfile] = await Promise.all([
-          restoreOracleDiscovery('teen'),
-          restoreOracleDiscovery('parent'),
-        ]);
-        if (teenProfile || parentProfile) {
-          setState(prev => ({
-            ...prev,
-            ...(teenProfile   ? { oracleProfile:       teenProfile   } : {}),
-            ...(parentProfile ? { parentOracleProfile: parentProfile } : {}),
-          }));
+        // Oracle discovery profiles — restore full structured profiles from oracle_records
+        if (!cancelled) {
+          const [teenProfile, parentProfile] = await Promise.all([
+            restoreOracleDiscovery('teen'),
+            restoreOracleDiscovery('parent'),
+          ]);
+          if (teenProfile || parentProfile) {
+            setState(prev => ({
+              ...prev,
+              ...(teenProfile   ? { oracleProfile:       teenProfile   } : {}),
+              ...(parentProfile ? { parentOracleProfile: parentProfile } : {}),
+            }));
+          }
         }
+      } finally {
+        refreshInFlight = false;
       }
-    })();
-    return () => { cancelled = true; };
-  }, [isLoading]); // intentional: only re-run when loading state changes
+    };
+
+    void refreshCloudState();
+    const appStateSubscription = NativeAppState.addEventListener('change', nextState => {
+      if (nextState === 'active') void refreshCloudState();
+    });
+
+    return () => {
+      cancelled = true;
+      appStateSubscription.remove();
+    };
+  }, [isLoading]); // intentional: initial hydration + active-state refreshes only
 
   // 3b. Teen activity summary: keep parent-facing snapshot fresh.
   // Runs only for teen-side users and writes only aggregated streak/session/tier data.

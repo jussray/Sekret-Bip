@@ -1,126 +1,121 @@
 # Demo Readiness Enforcement
 
-Last reviewed: 2026-07-13
+Last reviewed: 2026-08-20
 
-This document converts the current readiness review into enforced implementation policy. Documentation may describe only behavior backed by code, migrations, configuration, tests, live evidence, or a named release gate. Planned behavior is not demo-ready behavior.
+This document converts readiness review into enforced implementation policy. Documentation may describe only behavior backed by code, migrations, configuration, tests, live evidence, or a named release gate. Planned behavior is not demo-ready behavior.
 
 ## Release posture
 
-Se'kret Bip is suitable for a controlled, scripted internal demo only when the demo uses synthetic or non-sensitive data, clearly labels unfinished areas, and avoids real crisis disclosures, unsupported legal/compliance claims, and unverified parent lifecycle flows.
+Se'kret Bip is suitable for a controlled internal demo only when the demo uses synthetic/non-sensitive data, clearly labels unfinished areas, and avoids unsupported production, privacy, legal, parent-lifecycle, or provider-binding claims.
 
-Public launch, public demo involving real teen data, app-store release, or production teen-data collection is blocked until all applicable gates in this document and `docs/legal/LAUNCH_COMPLIANCE_CHECKLIST.md` are satisfied with evidence.
+Public launch or production teen-data collection remains evidence-gated by the then-current launch plan, legal/safeguarding requirements, and exact production proof.
 
 ## Evidence states
-
-The repository uses the following machine-checked order:
 
 ```text
 planned -> contract -> integrated -> verified -> released
 ```
 
-`implementation-ledger.json` records each feature's paths, tests, rollout, verification, rollback, and blockers. Architecture, roadmap, current-status, and agent-skill changes fail CI when they do not update the ledger.
+`implementation-ledger.json` records feature paths, tests, rollout, verification, rollback, and blockers. Architecture/status/agent-skill changes must reconcile machine and documentation truth.
 
 ## Enforced completion rule
 
 A feature or deployment path may be called complete only when all applicable layers agree:
 
-1. route and screen behavior;
+1. route/screen behavior;
 2. service/API behavior;
-3. Supabase migration, RLS, RPC, Storage, or Edge Function behavior;
+3. database/RLS/RPC/Storage/Edge Function behavior;
 4. executable tests or documented live proof;
-5. telemetry and failure visibility;
-6. rollout controls and rollback;
-7. production verification when the claim depends on live Cloudflare or Supabase configuration.
+5. telemetry/failure visibility;
+6. rollout and rollback;
+7. production/provider verification when the claim depends on live Cloudflare or Supabase configuration.
 
-UI hiding is never authorization. Parent/teen boundaries, founder/admin boundaries, account deletion, storage access, and Circle/Crew/Bridge visibility must be enforced by server checks, RLS/RPCs, and Storage policies.
+UI hiding is never authorization.
+
+## Worker purpose enforcement
+
+Current checked-in public routing is:
+
+```text
+client -> https://api.sekretbip.net -> sekret-backend
+```
+
+The durable purpose boundary is:
+
+- `sekret`: founder-confirmed companion API lineage and target owner for reply, voice, transcription, companion identity/style, and reply-coupled safety enforcement;
+- `sekret-backend`: stable public ingress plus Bridge/privileged Supabase/email/platform operations;
+- preferred connection: Cloudflare Service Binding from `sekret-backend` to `sekret` for `/api/sekret/*`, without adding a second public client URL.
+
+The Service Binding is not demo-ready or production-ready merely because docs describe it. Before claiming the split is active, require provider readback, exact Worker versions, companion path proof, non-regression, and rollback.
+
+`SUPABASE_SERVICE_ROLE_KEY` must not be copied into `sekret` merely to preserve current assurance metadata persistence. Privileged telemetry persistence must move behind a narrow backend/internal boundary first.
 
 ## Parent and Bridge enforcement
 
-Parent routes, linked-account tables, Bridge contracts, summary paths, and revocation paths exist. The parent product remains in progress until evidence covers:
+Bridge is privileged platform behavior and remains on `sekret-backend` in the purpose split.
 
-- parent splash and onboarding;
-- pending, active, expired, revoked, blocked, and deleted relationships;
-- controlled two-account production journeys;
-- Parent Circle privacy validation;
-- Parent Coach boundaries;
-- period-sharing permissions;
-- minimal-content notifications;
-- complete relationship and privacy tests.
+Parent/Bridge claims require evidence for applicable relationship states, controlled two-account journeys, privacy validation, revocation/unlink/deletion, and minimized notifications.
 
-Bridge may show only content intentionally shared into the linked relationship. It must not expose raw journals, private voice transcripts, private companion chats, private character memory, private notes, unshared messages, or general activity history.
-
-Bridge summaries remain under controlled rollout. Existing code is not permission to enable the feature without the documented production proof.
+Bridge may expose only intentionally shared/minimized content. It must not expose raw private journals, private voice transcripts, private companion chats, private memory, or unrelated activity.
 
 ## Deployment enforcement
 
-Production authority is Cloudflare native Git integration. A deployed environment is release-ready only when the exact commit is proven through independent evidence:
+Production authority is Cloudflare native integration. Before the companion split, exact-production evidence includes the then-current requirements from `DEPLOYMENT.md` and issue #696: exact repository target, Pages release marker, canonical public backend health/release identity, Supabase runtime, production Playwright, and applicable account/device witnesses.
 
-1. `Workers Builds: sekret-backend` succeeds for the expected commit;
-2. the deployed Pages `release.json` reports the same `main` SHA;
-3. the canonical Worker health endpoint succeeds;
-4. read-only production Playwright verifies the release marker and protected teen and parent routes;
-5. the resulting evidence artifact is retained.
+After an approved `sekret-backend -> sekret` Service Binding cutover, add:
 
-The retired Supabase `release-health` function is not valid release evidence. It is a JWT-protected HTTP 410 retirement. GitHub Actions verifies production but does not upload code to Cloudflare.
+1. exact `sekret-backend` public release identity;
+2. exact `sekret` companion release/version;
+3. live provider binding readback;
+4. reply/voice/transcription execution on the intended companion release;
+5. Bridge/email/platform non-regression;
+6. rollback proof to the prior backend-local companion implementation.
+
+The retired Supabase `release-health` function is not valid release evidence. GitHub Actions verifies; it does not silently become a second normal upload authority.
 
 Additional deployment requirements:
 
-- server secrets remain in Cloudflare or Supabase secret stores;
-- Worker CORS is restricted to approved origins;
-- authenticated Worker routes verify identity and do not trust body-only user identifiers;
-- Supabase migrations replay cleanly from an empty database;
-- RLS and Storage policies match the live project;
-- required Edge Functions are deployed with reviewed authentication settings;
-- repository validation passes or has a documented environment-only limitation.
+- server secrets remain in server-side secret stores;
+- Worker CORS/auth/rate-limit behavior matches the actual invocation path;
+- authenticated routes do not trust body-only identity;
+- Supabase migrations replay and match live state;
+- RLS/Storage/Edge Function auth is reviewed;
+- provider route/binding/build-trigger unknowns remain UNKNOWN until read back.
 
 ## Authorization enforcement
 
-Verified live slices include:
+A verified slice does not certify the whole database. Elevated database/function access requires least privilege and executable denial tests.
 
-- sampled owner access plus cross-user and anonymous denial;
-- zero synthetic probe residue;
-- service-role-only configuration tables with zero client grants;
-- `notification_deliveries` verified as an intentional service-role-only table;
-- three obsolete Edge Functions retired behind platform JWT verification.
-
-These slices do not certify the entire database. Before L4 or broader launch claims:
-
-- behavior-test high-blast-radius authenticated database functions;
-- add negative tests for `account-delete` and `safety-scan`;
-- plan and test password-breach protection across signup, login, reset, and existing accounts.
+Companion runtime code should not receive broad platform credentials simply because it needs model access or telemetry.
 
 ## Legal and age-gate enforcement
 
-The service is documented as 13+ unless a separately reviewed under-13 product is implemented. Public launch is blocked until the app and API enforce the minimum-age boundary and direct API/replay tests prove the UI cannot be bypassed.
+The service is documented as 13+ unless a separately reviewed under-13 product is implemented. Public launch requires the then-current age/consent/legal controls and bypass-resistant proof.
 
-A demo must warn participants not to enter real personal, journal, voice, or crisis information unless the environment is approved for production data handling.
+Demos must not ask participants to enter real private journal, voice, account, or sensitive safety information unless the environment is explicitly approved for that data.
 
 ## Companion enforcement
 
-The implemented companion system supports short-term history, approved context, canonical identity/style enforcement, TTS styling, and metadata-only telemetry.
+The implemented companion system supports short-term history, approved context, canonical identity/style enforcement, voice behavior, and metadata-safe telemetry contracts.
 
-Do not market or demo durable semantic memory, persistent goals, scheduled reflection, relationship phases from persisted evidence, or inter-companion coordination as implemented. Those remain planned until schema, provenance, correction, expiry, deletion, RLS, runtime use, denial tests, rollout, and rollback exist together.
+Do not market durable semantic memory, persistent goals, scheduled reflection, persisted relationship phases, or inter-companion coordination as implemented without their complete privacy/runtime proof.
 
 ## Required validation
 
-Before any release candidate or externally shared demo, run:
+For applicable changes:
 
 ```bash
 npm run type-check
 npm test
 npm run lint
+node scripts/audit-documentation-truth.mjs
 npm run verify:bundle
 npm run audit:control-room
 npm run validate:companions
 npm run test:e2e
-```
-
-For the full repository gate:
-
-```bash
 npm run verify:prepush
 ```
 
-For production claims, follow `DEPLOYMENT.md` and preserve the exact-release artifact.
+For production claims, follow `DEPLOYMENT.md` and preserve the exact release/binding evidence packet.
 
-Any warning involving privacy, authorization, deployment identity, age gates, deletion, safety, or parent/teen boundaries must be resolved or explicitly documented as a non-production limitation.
+Any warning involving privacy, authorization, deployment identity, Worker binding, age gates, deletion, safety, or parent/teen boundaries must be resolved or explicitly classified as a non-production limitation.

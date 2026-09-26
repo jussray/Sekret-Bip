@@ -26,6 +26,8 @@ import {
   resolveParentEntryState,
   routeForParentEntryState,
 } from '@/services/parentEntryState';
+import { advanceStage } from '@/services/onboarding';
+import { getSupabase } from '@/utils/supabase';
 
 export default function ParentLinkOnboarding() {
   const { setUserSide } = useAppContext();
@@ -38,10 +40,12 @@ export default function ParentLinkOnboarding() {
   const normalized = normalizeParentInviteCode(code);
   const ready = normalized.length === PARENT_INVITE_CODE_LENGTH && !loading;
 
-  async function completeVerifiedParentLink(linkedTeenId: string) {
+  async function completeParentLink(linkedTeenId: string) {
     setUserSide('parent');
     await AsyncStorage.setItem('linked_teen_id', linkedTeenId);
-
+    getSupabase()?.auth.getUser().then(({ data }) => {
+      if (data.user) advanceStage(data.user.id, 'parent_linked').catch(() => null);
+    });
     const parentEntry = await resolveParentEntryState();
     router.replace(routeForParentEntryState(parentEntry) as never);
   }
@@ -63,7 +67,7 @@ export default function ParentLinkOnboarding() {
         return;
       }
 
-      await completeVerifiedParentLink(result.value.teenUserId);
+      await completeParentLink(result.value.teenUserId);
     } catch {
       await AsyncStorage.removeItem('linked_teen_id');
       setError('Could not connect right now. Check your connection and try again.');
@@ -79,6 +83,9 @@ export default function ParentLinkOnboarding() {
     try {
       setUserSide('parent');
       await AsyncStorage.removeItem('linked_teen_id');
+      getSupabase()?.auth.getUser().then(({ data }) => {
+        if (data.user) advanceStage(data.user.id, 'parent_link_skipped').catch(() => null);
+      });
       router.replace('/(auth)/guardian-verification');
     } finally {
       setLoading(false);
@@ -138,14 +145,14 @@ export default function ParentLinkOnboarding() {
         </View>
 
         <Text style={styles.privacy}>
-          This code only establishes the trusted teen-parent connection. You will only see what your teen intentionally sends through Bridge.
+          This code only establishes the trusted teen-parent connection. You will only see what your teen intentionally sends through Bridge. Teen age assurance is a separate explicit action.
         </Text>
 
         {needsCodeHelp ? (
           <View style={styles.helpCard}>
             <Text style={styles.helpTitle}>Need a code?</Text>
             <Text style={styles.helpBody}>
-              Ask your teen to open their account-verification screen and create a fresh eight-character code. Stay here and enter it when they share it with you.
+              Ask your teen to open Parent Link and create a fresh eight-character code. Stay here and enter it when they share it with you.
             </Text>
           </View>
         ) : null}
@@ -161,7 +168,7 @@ export default function ParentLinkOnboarding() {
           {loading && ready ? (
             <ActivityIndicator color="#062015" />
           ) : (
-            <Text style={styles.primaryText}>Approve and connect</Text>
+            <Text style={styles.primaryText}>Connect accounts</Text>
           )}
         </TouchableOpacity>
 

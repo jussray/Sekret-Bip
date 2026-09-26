@@ -18,6 +18,28 @@ The emotional goal is simple:
 
 Help teens understand themselves, build emotional skills, create a meaningful record of their growth, and ask for support without surrendering privacy or identity control.
 
+## Cultural mission
+
+Se’kret Bip exists to help expand the emotional culture available to young people and families, not merely to react after hurt has already happened.
+
+The product should create compelling, age-appropriate examples of:
+
+- love that does not require control;
+- repair after conflict;
+- communication instead of humiliation;
+- belonging without performance;
+- family responsibility without surveillance;
+- courage that includes vulnerability and asking for help;
+- community, care, and mutual responsibility;
+- self-respect and healthy boundaries;
+- handling hurt without making retaliation the only imaginable response.
+
+This is a creation mission, not a censorship mission. Se’kret Bip should not shame artists, media, parents, communities, or young people for the culture they already live in. It should make healthier emotional scripts vivid, current, useful, and worth choosing.
+
+The current teen and parent product is the proving ground. Younger-age experiences, broader cultural programs, creator partnerships, school/community partnerships, or claimed social outcomes remain future work until their real product, safety, privacy, age-appropriateness, evidence, and release gates exist.
+
+Cultural influence must be earned through evidence. Public claims about impact should come from measured product behavior, user outcomes, validated research, and real-world use rather than founder belief alone.
+
 ## Product promises
 
 ### 1. Private by default
@@ -196,6 +218,6 @@ A feature is production-ready only when:
 
 ## Ultimate mission
 
-> Help teens build emotional intelligence, confidence, healthy habits, self-expression, and stronger relationships while feeling understood instead of judged.
+> Help young people and families build a richer emotional culture: understand themselves, communicate, repair, belong, take responsibility, ask for help, and handle hurt without surrendering dignity, privacy, or identity.
 
-Se’kret Bip should feel like a private place worth returning to, not another system demanding performance from a kid who already has enough of those.
+Se’kret Bip begins with a private teen-and-parent product. The larger ambition is to prove that a healthier emotional environment can be deliberately designed, genuinely used, and responsibly measured, so the work can eventually influence creators, families, and communities beyond the app.

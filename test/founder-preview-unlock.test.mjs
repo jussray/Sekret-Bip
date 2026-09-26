@@ -54,7 +54,7 @@ test('preview points unlock UI without touching the real economy', () => {
   assert.doesNotMatch(ledger, /preview[\s\S]{0,200}\.insert\(/);
 });
 
-test('only implemented relationship features receive the development override', () => {
+test('implemented and founder-only prototype features receive development override without L4', () => {
   const flags = read('src/constants/relationshipFeatureFlags.ts');
 
   assert.match(flags, /FOUNDER_PREVIEWABLE_FEATURES/);
@@ -64,15 +64,19 @@ test('only implemented relationship features receive the development override', 
     flags.indexOf('const FOUNDER_PREVIEWABLE_FEATURES'),
     flags.indexOf('export function isRelationshipFeatureAvailable'),
   );
-  assert.doesNotMatch(previewSet, /emotionalScrapbook/);
+  assert.match(previewSet, /emotionalScrapbook/);
   assert.doesNotMatch(previewSet, /companionMemory/);
 });
 
-test('route visibility opens in development while screen safety boundaries remain', () => {
+test('route visibility opens in development while side and Quiet Bip safety boundaries remain', () => {
   const teenLayout = read('app/(teen)/_layout.tsx');
   const parentLayout = read('app/(parent)/_layout.tsx');
 
-  assert.match(teenLayout, /if \(founderPreview\) return <TeenTabs/);
+  assert.match(teenLayout, /if \(founderPreview && devSideOverride === 'parent'\)/);
+  assert.match(teenLayout, /if \(founderPreview\) \{/);
+  assert.match(teenLayout, /if \(!sleepLoaded\) return <TeenLoadingSurface \/>/);
+  assert.match(teenLayout, /if \(sleepActive && !quietRouteAllowed\) return <Redirect href="\/\(teen\)\/quiet" \/>/);
+  assert.match(teenLayout, /return <TeenTabs selectedSekret=\{selectedSekret \?\? 'raylene'\} quietActive=\{sleepActive\} \/>/);
   assert.match(teenLayout, /SafetyExperienceSheet/);
   assert.match(teenLayout, /useSafetyCheck/);
   assert.match(parentLayout, /if \(founderPreview\) return <ParentTabs/);

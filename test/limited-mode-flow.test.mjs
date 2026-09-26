@@ -21,7 +21,7 @@ test('limited mode keeps private tools open and social tools locked', async () =
 
 test('parent invite creation uses a protected server transition', async () => {
   const client = await read('src/utils/parentLink.ts');
-  const migration = await read('supabase/migrations/20260630002000_limited_mode_parent_invite.sql');
+  const migration = await read('supabase/migrations/20260630022018_limited_mode_parent_invite_transition.sql');
   assert.match(client, /rpc\('create_parent_link_invite'\)/);
   assert.match(migration, /'PENDING_PARENT'/);
   assert.match(migration, /grant execute on function public\.create_parent_link_invite\(\) to authenticated/);

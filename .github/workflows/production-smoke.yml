@@ -1,57 +1,176 @@
 name: Production Smoke
 
 on:
-  workflow_dispatch: {}
   workflow_run:
-    workflows: ["Deploy to Cloudflare"]
+    workflows: ["Verify Cloudflare Native Deployment"]
     types: [completed]
 
 permissions:
+  actions: read
   contents: read
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+  EXPECTED_RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
 
 concurrency:
-  group: production-smoke
-  cancel-in-progress: false
+  group: production-smoke-main
+  cancel-in-progress: true
 
 jobs:
   smoke:
-    name: Verify sekretbip.net
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    name: Verify public production front doors
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
     if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event.workflow_run.conclusion == 'success'
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main'
 
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
+      - name: Classify upstream production verification and current target
+        id: upstream
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          UPSTREAM_RUN_ID: ${{ github.event.workflow_run.id }}
+          UPSTREAM_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          WORKFLOW_HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
 
-      - name: Set up Node
-        uses: actions/setup-node@v4
+          jobs_json="$({
+            curl --fail-with-body --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$REPOSITORY/actions/runs/$UPSTREAM_RUN_ID/jobs?per_page=100"
+          })"
+
+          current_main="$({
+            curl --fail-with-body --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$REPOSITORY/commits/main"
+          } | node -e "let body='';process.stdin.on('data',c=>body+=c);process.stdin.on('end',()=>{const parsed=JSON.parse(body);if(!parsed.sha)process.exit(2);process.stdout.write(parsed.sha);});")"
+
+          printf 'upstream_head=%s\nworkflow_head=%s\ncurrent_main=%s\n' "$UPSTREAM_HEAD_SHA" "$WORKFLOW_HEAD_SHA" "$current_main"
+
+          UPSTREAM_HEAD_SHA="$UPSTREAM_HEAD_SHA" WORKFLOW_HEAD_SHA="$WORKFLOW_HEAD_SHA" CURRENT_MAIN="$current_main" GITHUB_OUTPUT="$GITHUB_OUTPUT" node -e '
+            const fs = require("node:fs");
+            const payload = JSON.parse(process.argv[1]);
+            const target = payload.jobs?.find(
+              (job) => job.name === "Verify exact frontend Worker, backend Worker, and release"
+            );
+            const out = (value) => fs.appendFileSync(process.env.GITHUB_OUTPUT, `should_run=${value}\n`);
+
+            if (!target) {
+              console.error("Required upstream production verification job is absent.");
+              process.exit(4);
+            }
+            if (target.conclusion === "skipped") {
+              console.log("Production verification was intentionally inapplicable; skipping smoke.");
+              out("false");
+              process.exit(0);
+            }
+            if (target.status !== "completed") {
+              console.error(`Required upstream production verification job is ${target.status}, not completed.`);
+              process.exit(3);
+            }
+            if (target.conclusion !== "success") {
+              console.error(`Required upstream production verification job concluded ${target.conclusion}.`);
+              process.exit(3);
+            }
+            if (target.head_sha !== process.env.UPSTREAM_HEAD_SHA) {
+              console.error("Required upstream production verification job does not belong to the release SHA.");
+              process.exit(3);
+            }
+            if (process.env.UPSTREAM_HEAD_SHA !== process.env.WORKFLOW_HEAD_SHA) {
+              console.log("Verified release SHA differs from the workflow_run default-branch SHA; superseding stale smoke.");
+              out("false");
+              process.exit(0);
+            }
+            if (process.env.WORKFLOW_HEAD_SHA !== process.env.CURRENT_MAIN) {
+              console.log("Workflow-run default-branch SHA is no longer current main; superseding stale smoke.");
+              out("false");
+              process.exit(0);
+            }
+
+            console.log(`verified_upstream_job=${target.name}`);
+            console.log(`verified_release_sha=${process.env.UPSTREAM_HEAD_SHA}`);
+            console.log(`trusted_checkout_sha=${process.env.WORKFLOW_HEAD_SHA}`);
+            out("true");
+          ' "$jobs_json"
+
+      - name: Check out exact verified source head
+        if: steps.upstream.outputs.should_run == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact source head
+        if: steps.upstream.outputs.should_run == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nrelease=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$EXPECTED_RELEASE_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+          test "$EXPECTED_HEAD_SHA" = "$EXPECTED_RELEASE_SHA"
+
+      - name: Set up Node 24
+        if: steps.upstream.outputs.should_run == 'true'
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
           node-version: '24'
           cache: npm
 
       - name: Install repository dependencies
+        if: steps.upstream.outputs.should_run == 'true'
         run: npm ci
 
-      - name: Install pinned Playwright test runner
-        run: npm install --no-save --no-package-lock @playwright/test@1.61.1
-
       - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+        if: steps.upstream.outputs.should_run == 'true'
+        run: ./node_modules/.bin/playwright install --with-deps chromium
 
-      - name: Run read-only smoke checks against the live domain
-        run: npx playwright test --config=playwright.production.config.ts
+      - name: Run read-only smoke checks against live public domains
+        if: steps.upstream.outputs.should_run == 'true'
+        run: ./node_modules/.bin/playwright test --config=playwright.production.config.ts
+
+      - name: Reverify exact live release identities after smoke
+        if: steps.upstream.outputs.should_run == 'true'
+        run: >-
+          ./node_modules/.bin/playwright test
+          --config=playwright.production.config.ts
+          --grep "production exposes the exact expected Pages and Worker release commit"
+
+      - name: Verify smoke target remained current main
+        if: steps.upstream.outputs.should_run == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          current_main="$({
+            curl --fail-with-body --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$REPOSITORY/commits/main"
+          } | node -e "let body='';process.stdin.on('data',c=>body+=c);process.stdin.on('end',()=>{const parsed=JSON.parse(body);if(!parsed.sha)process.exit(2);process.stdout.write(parsed.sha);});")"
+          printf 'expected=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
+          test "$current_main" = "$EXPECTED_HEAD_SHA"
 
       - name: Upload Playwright report
-        if: failure()
-        uses: actions/upload-artifact@v4
+        if: ${{ failure() && steps.upstream.outputs.should_run == 'true' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: production-smoke-report
+          name: production-smoke-report-${{ env.EXPECTED_HEAD_SHA }}
           path: playwright-report-production/
           if-no-files-found: ignore
           retention-days: 7

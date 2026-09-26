@@ -4,9 +4,9 @@ import fs from 'node:fs';
 
 const source = fs.readFileSync(new URL('../app/(teen)/pages/index.tsx', import.meta.url), 'utf8');
 
-test('Me and Oracle never fall back to Raylene portraits', () => {
-  assert.equal(source.includes("companionAvatarId: AiCompanionId | null"), true);
-  assert.equal(source.includes("aiCompanion ? activeTab : null"), true);
+test('Me and Oracle never fall back to Suhana portraits', () => {
+  assert.equal(source.includes("companionAvatarId: SekretCharacterId | null"), true);
+  assert.equal(source.includes("aiCompanion ? normalizeSekretCharacter(activeTab) : null"), true);
   assert.equal(source.includes("activeTab === 'me' ? '🪞' : '🔮'"), true);
 });
 

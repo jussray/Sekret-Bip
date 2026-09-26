@@ -7,6 +7,7 @@ const candidates = [
   path.join(root, 'reports', 'control-room', 'latest.json'),
 ];
 const reportPath = candidates.find((candidate) => fs.existsSync(candidate));
+const skipReportPath = path.join(root, 'reports', 'control-room', 'test-skips-latest.json');
 
 if (!reportPath) {
   throw new Error('No local Control Room report found. Run `npm run verify:local` first.');
@@ -27,6 +28,10 @@ const report = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
 const failedChecks = Array.isArray(report.checks)
   ? report.checks.filter((check) => check.status === 'fail')
   : [];
+const skipReport = fs.existsSync(skipReportPath)
+  ? JSON.parse(fs.readFileSync(skipReportPath, 'utf8'))
+  : { observations: [] };
+const skippedTests = Array.isArray(skipReport.observations) ? skipReport.observations : [];
 
 async function supabaseRequest(pathname, options = {}) {
   const response = await fetch(`${supabaseUrl.replace(/\/$/, '')}${pathname}`, {
@@ -115,17 +120,71 @@ async function ingestFailure(check) {
   return check.id;
 }
 
-const ingested = [];
-for (const check of failedChecks) {
-  ingested.push(await ingestFailure(check));
+async function ingestSkip(item) {
+  if (!item?.fingerprint || !item?.proof_cookie || item.authority !== false) {
+    throw new Error('Local test-skip receipt is missing its non-authorizing continuity fields.');
+  }
+  const metadata = {
+    source: 'local_test_skip',
+    repository: item.repository || null,
+    head_sha: item.head_sha || null,
+    runner: item.runner || null,
+    command: item.command || null,
+    test_id: item.test_id || null,
+    test_file: item.test_file || null,
+    reason: item.reason || null,
+    classification: item.classification || null,
+    proof_cookie: item.proof_cookie,
+    authority: false,
+  };
+  const inserted = await supabaseRequest('/rest/v1/audit_events', {
+    method: 'POST',
+    body: JSON.stringify({
+      user_id: null,
+      event_type: 'local_test_skipped',
+      screen: 'local-control-room',
+      severity: 'warning',
+      message: `${item.test_id || 'A test'} was skipped and cannot satisfy complete proof.`,
+      metadata,
+      resolved: false,
+    }),
+  });
+  const eventId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
+  if (!eventId) throw new Error(`audit_events insert did not return an id for ${item.fingerprint}.`);
+  await supabaseRequest('/rest/v1/rpc/upsert_control_room_issue', {
+    method: 'POST',
+    body: JSON.stringify({
+      p_fingerprint: item.fingerprint,
+      p_source: 'local_control_room',
+      p_category: 'test-skip',
+      p_severity: 'warning',
+      p_status: 'open',
+      p_title: `Skipped proof witness: ${item.test_id || 'unknown test'}`,
+      p_summary: `${item.reason || 'No skip reason supplied.'} A skip is not a pass.`,
+      p_suggested_fix: 'Resolve the missing prerequisite or explicitly confirm the witness is inapplicable, then execute the required proof path.',
+      p_affected_surface: 'local-tests',
+      p_affected_user_id: null,
+      p_event_id: eventId,
+      p_metadata: metadata,
+    }),
+  });
+  return item.fingerprint;
 }
+
+const ingestedFailures = [];
+for (const check of failedChecks) ingestedFailures.push(await ingestFailure(check));
+const ingestedSkips = [];
+for (const item of skippedTests) ingestedSkips.push(await ingestSkip(item));
 
 const result = {
   report_path: path.relative(root, reportPath),
+  skip_report_path: fs.existsSync(skipReportPath) ? path.relative(root, skipReportPath) : null,
   report_status: report.summary?.status || null,
   failed_count: failedChecks.length,
-  ingested_count: ingested.length,
-  ingested,
+  skipped_count: skippedTests.length,
+  ingested_failure_count: ingestedFailures.length,
+  ingested_skip_count: ingestedSkips.length,
+  ingested: [...ingestedFailures, ...ingestedSkips],
 };
 
 console.log(JSON.stringify(result, null, 2));

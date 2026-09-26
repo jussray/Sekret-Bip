@@ -1,0 +1,65 @@
+name: GitHub Merge Membrane
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+
+concurrency:
+  group: github-merge-membrane-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  TRUSTED_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  PR_NUMBER: ${{ github.event.pull_request.number }}
+  MERGE_MEMBRANE_EVIDENCE_PATH: artifacts/github-merge-membrane.json
+
+jobs:
+  merge-membrane:
+    name: merge-membrane
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out trusted base evaluator
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.TRUSTED_BASE_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify trusted base evaluator
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'trusted_base=%s\nactual=%s\nproof_subject=%s\n' "$TRUSTED_BASE_SHA" "$actual" "$EXPECTED_HEAD_SHA"
+          test "$actual" = "$TRUSTED_BASE_SHA"
+          test -n "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify trusted merge-membrane contracts
+        run: node --test test/github-merge-membrane.test.mjs
+
+      - name: Require exact-head machine proof
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/verify-github-merge-membrane.mjs
+
+      - name: Retain merge-membrane receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: github-merge-membrane-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/github-merge-membrane.json
+          if-no-files-found: ignore
+          retention-days: 30

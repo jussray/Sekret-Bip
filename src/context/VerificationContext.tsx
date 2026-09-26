@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import type { ParentLinkState, VerificationSnapshot, VerificationState } from '@/types/verification';
 import { INITIAL_VERIFICATION_SNAPSHOT } from '@/services/verificationState';
 import { getSupabase, isSupabaseConfigured } from '@/utils/supabase';
@@ -17,6 +18,7 @@ type Value = {
   verificationError: string | null;
   isAuthResolved: boolean;
   isAuthenticated: boolean;
+  session: Session | null;
   refreshVerification: () => Promise<void>;
 };
 
@@ -57,10 +59,49 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
   const [verificationError, setError] = useState<string | null>(null);
   const [isAuthResolved, setAuthResolved] = useState(!isSupabaseConfigured);
   const [isAuthenticated, setAuthenticated] = useState(false);
+  const [authSession, setSession] = useState<Session | null>(null);
+
+  const loadVerificationForSession = useCallback(async (session: Session | null) => {
+    const permanentSession = Boolean(session && !session.user.is_anonymous);
+    const userId = permanentSession ? session?.user.id : undefined;
+
+    setSession(session);
+    setAuthenticated(permanentSession);
+    setAuthResolved(true);
+
+    if (!userId) {
+      setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
+      setError(null);
+      return;
+    }
+
+    const supabase = getSupabase();
+    if (!supabase) {
+      setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from('account_verification')
+      .select('verification_state,parent_link_state,verification_reason,verification_updated_at')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+
+    // Missing or malformed server data must fail closed. The local default is
+    // only a locked fallback and is never treated as proof of verification.
+    if (!data) {
+      setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
+      setError('Verification record unavailable.');
+      return;
+    }
+    setSnapshot(mapRow(data as Row));
+  }, []);
 
   const refreshVerification = useCallback(async () => {
     const supabase = getSupabase();
     if (!supabase) {
+      setSession(null);
       setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
       setAuthenticated(false);
       setAuthResolved(true);
@@ -71,68 +112,129 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     setError(null);
     try {
+      // Session restoration lives here so entry screens can consume one
+      // resolved auth truth instead of each mounting their own getSession().
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
+      if (sessionError) {
+        setSession(null);
+        setAuthenticated(false);
+        setAuthResolved(true);
+        setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
+        setError(sessionError.message);
+        return;
+      }
 
       const session = sessionData.session;
-      const permanentSession = Boolean(session && !session.user.is_anonymous);
-      const userId = permanentSession ? session?.user.id : undefined;
-      setAuthenticated(permanentSession);
-      setAuthResolved(true);
-
-      if (!userId) {
+      try {
+        await loadVerificationForSession(session);
+      } catch (error) {
+        // Verification truth may fail closed, but it must never rewrite a
+        // successfully restored permanent Supabase session into signed-out.
+        const permanentSession = Boolean(session && !session.user.is_anonymous);
+        setSession(session);
+        setAuthenticated(permanentSession);
+        setAuthResolved(true);
         setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
-        return;
+        setError(error instanceof Error ? error.message : 'Unable to load verification.');
       }
-
-      const { data, error } = await supabase
-        .from('account_verification')
-        .select('verification_state,parent_link_state,verification_reason,verification_updated_at')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (error) throw error;
-
-      // Missing or malformed server data must fail closed. The local default is
-      // only a locked fallback and is never treated as proof of verification.
-      if (!data) {
-        setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
-        setError('Verification record unavailable.');
-        return;
-      }
-      setSnapshot(mapRow(data as Row));
     } catch (error) {
+      // A genuine session-read failure is auth uncertainty, so clear auth
+      // truth rather than preserving a potentially stale local session.
+      setSession(null);
       setAuthenticated(false);
       setAuthResolved(true);
       setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
-      setError(error instanceof Error ? error.message : 'Unable to load verification.');
+      setError(error instanceof Error ? error.message : 'Unable to restore account session.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadVerificationForSession]);
 
   useEffect(() => {
     const supabase = getSupabase();
     if (!supabase) {
+      setSession(null);
       setAuthResolved(true);
       setLoading(false);
       return;
     }
 
+    let active = true;
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+
+    const removeVerificationChannel = () => {
+      if (channel) void supabase.removeChannel(channel);
+      channel = null;
+    };
+
+    const subscribeToVerificationSignal = (userId: string) => {
+      removeVerificationChannel();
+      channel = supabase
+        .channel(`account-verification-context-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'account_verification',
+            filter: `user_id=eq.${userId}`,
+          },
+          () => {
+            void refreshVerification();
+          },
+        )
+        .subscribe();
+    };
+
+    // One explicit initial session read hydrates both auth truth and
+    // verification state. The INITIAL_SESSION event below only attaches the
+    // realtime witness and never performs a second startup getSession().
     void refreshVerification();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+
+      const user = session?.user;
       const permanentSession = Boolean(session && !session.user.is_anonymous);
+      setSession(session);
       setAuthResolved(true);
       setAuthenticated(permanentSession);
+      removeVerificationChannel();
+
       if (!permanentSession) {
         setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
         setError(null);
         setLoading(false);
-      } else {
-        void refreshVerification();
+        return;
       }
+
+      if (user) subscribeToVerificationSignal(user.id);
+      if (event === 'INITIAL_SESSION') return;
+
+      setLoading(true);
+      setError(null);
+      void loadVerificationForSession(session)
+        .catch((error) => {
+          if (!active) return;
+          // The auth event already established a permanent session. Keep that
+          // auth truth while verification falls back to its locked state.
+          setSession(session);
+          setAuthenticated(permanentSession);
+          setAuthResolved(true);
+          setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
+          setError(error instanceof Error ? error.message : 'Unable to load verification.');
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
     });
-    return () => subscription.unsubscribe();
-  }, [refreshVerification]);
+
+    return () => {
+      active = false;
+      removeVerificationChannel();
+      subscription.unsubscribe();
+    };
+  }, [loadVerificationForSession, refreshVerification]);
 
   const value = useMemo<Value>(() => ({
     verificationSnapshot,
@@ -141,6 +243,7 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
     verificationError,
     isAuthResolved,
     isAuthenticated,
+    session: authSession,
     refreshVerification,
   }), [
     verificationSnapshot,
@@ -148,6 +251,7 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
     verificationError,
     isAuthResolved,
     isAuthenticated,
+    authSession,
     refreshVerification,
   ]);
 

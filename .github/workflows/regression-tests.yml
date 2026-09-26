@@ -1,13 +1,6 @@
 name: Regression Tests
 
 on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
-      - ci/regression-test-action
   workflow_dispatch:
 
 permissions:

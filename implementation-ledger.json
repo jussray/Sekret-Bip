@@ -299,6 +299,24 @@
       }
     },
     {
+      "id": "bridge-learning-oracle-grounding",
+      "name": "Bridge Learning Oracle source grounding (search-backed teaching packet)",
+      "status": "planned",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/357",
+      "acceptanceCriteria": [
+        "Grounding queries are issued server-side only, from a Worker route, using a Worker-only secret never present in client bundles, logs, or telemetry.",
+        "Grounding queries carry only the shared Bridge Learning session's subject, topic, and current step; never private Study Buddy history, journal content, or content outside the session.",
+        "GroundedSource.sourceType only ever assigns 'reference' to a search-grounded citation, never 'approved_curriculum' or 'user_source'.",
+        "When no citable, on-topic source is found, the packet sets needsOutsideHelp true with a correspondingly low confidence instead of fabricating a citation.",
+        "A scoped usage boundary distinct from the root PERPLEXITY.md creative-IP research contract exists and is followed before any real grounding query is issued."
+      ],
+      "verification": {
+        "state": "not-run",
+        "evidence": "docs/BRIDGE_LEARNING_SEKRET_TEACHER.md",
+        "blocker": "This is Bridge Learning implementation slice 4. Slices 2 (schema/RPCs/RLS) and 3 (teen/parent UI) have not started, and slice 4 depends on them. Only slice 1 (contracts, feature flag, pure state machine) exists today. No Worker route, secret, schema, or grounding call exists. Not implemented yet."
+      }
+    },
+    {
       "id": "l5-cross-companion-synthesis",
       "name": "L5 cross-companion synthesis, consented goal proposal",
       "status": "planned",

@@ -1,0 +1,27 @@
+{
+  "id": "founder-operator-orchestration",
+  "name": "Founder Operator mission-to-artifact orchestration",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/605",
+  "acceptanceCriteria": [
+    "A founder-only Control Room surface converts one mission into a durable plan with ULTRATHINK orientation, explicit artifact ownership, evidence paths, and a founder decision gate.",
+    "Fixed-path persistence rejects private or credential-shaped content and accepts local-evidence only when the server itself can attest a passed allowlisted verification mission.",
+    "Founder approval remains distinct from executed verification, and approval-gated external actions stay human-required until separately completed."
+  ],
+  "contractPaths": [
+    "batches/481/02-founder-operator.md",
+    "docs/CONTROL_ROOM_FOUNDER_OPERATOR.md",
+    "src/services/controlRoomFounderOperator.ts",
+    "src/types/controlRoomFounderOperator.ts",
+    ".agents/skills/bip-control-room/SKILL.md"
+  ],
+  "testPaths": [
+    "test/control-room-founder-operator-contract.test.mjs",
+    "test/control-room-founder-operator-server.test.mjs",
+    "test/control-room-founder-operator.test.mjs"
+  ],
+  "verification": {
+    "state": "partial",
+    "evidence": "Local focused evidence on July 24, 2026: 10/10 core and Founder Operator persistence tests passed; exact-head repository and browser access-control checks remain required before merge."
+  }
+}

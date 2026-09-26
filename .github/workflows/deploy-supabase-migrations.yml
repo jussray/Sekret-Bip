@@ -1,0 +1,199 @@
+name: Deploy Supabase Production Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Exact current-main commit SHA whose migrations should be evaluated'
+        required: true
+        type: string
+      mode:
+        description: 'Dry-run previews the production migration plan; apply executes pending migration SQL'
+        required: true
+        default: dry-run
+        type: choice
+        options:
+          - dry-run
+          - apply
+      confirm_project:
+        description: 'Type the production Supabase project ref to confirm the target'
+        required: true
+        type: string
+      apply_confirmation:
+        description: 'For apply only, type APPLY PRODUCTION MIGRATIONS'
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  SUPABASE_PROJECT_REF: tbsevonvegdnlyjgplmm
+  SUPABASE_SCHEMA_EVIDENCE_PATH: artifacts/supabase-production-schema.json
+
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate-production:
+    name: ${{ inputs.mode == 'apply' && 'Apply production migrations' || 'Dry-run production migrations' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Validate dispatch intent
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          MODE: ${{ inputs.mode }}
+          CONFIRM_PROJECT: ${{ inputs.confirm_project }}
+          APPLY_CONFIRMATION: ${{ inputs.apply_confirmation }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo 'target_sha must be a full 40-character commit SHA.' >&2
+            exit 1
+          }
+          test "$CONFIRM_PROJECT" = "$SUPABASE_PROJECT_REF" || {
+            echo 'Production project confirmation does not match the repository-owned project ref.' >&2
+            exit 1
+          }
+          case "$MODE" in
+            dry-run) ;;
+            apply)
+              test "$APPLY_CONFIRMATION" = 'APPLY PRODUCTION MIGRATIONS' || {
+                echo 'Apply confirmation is missing or incorrect.' >&2
+                exit 1
+              }
+              ;;
+            *)
+              echo "Unsupported migration mode: $MODE" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Check out exact target
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact target is current main
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'requested=%s\nactual=%s\n' "$TARGET_SHA" "$actual"
+          test "$actual" = "$TARGET_SHA"
+
+          git fetch --no-tags --depth=1 origin main
+          current_main="$(git rev-parse FETCH_HEAD)"
+          printf 'current_main=%s\n' "$current_main"
+          test "$TARGET_SHA" = "$current_main" || {
+            echo 'Refusing to evaluate production migrations from a SHA that is no longer current main.' >&2
+            exit 1
+          }
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1
+        with:
+          version: 2.113.0
+
+      - name: Verify production credentials
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || {
+            echo 'SUPABASE_ACCESS_TOKEN is not configured for this workflow.' >&2
+            exit 1
+          }
+          test -n "$SUPABASE_DB_PASSWORD" || {
+            echo 'SUPABASE_DB_PASSWORD is not configured for this workflow.' >&2
+            exit 1
+          }
+
+      - name: Link exact production project
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Preview production migration plan
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          supabase db push --linked --dry-run 2>&1 | tee artifacts/supabase-db-push-dry-run.txt
+
+      - name: Verify production schema before mutation
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node scripts/verify-supabase-production-schema.mjs
+
+      - name: Re-verify current main immediately before mutation
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          current_main="$(git rev-parse FETCH_HEAD)"
+          printf 'mutation_target=%s\ncurrent_main=%s\n' "$TARGET_SHA" "$current_main"
+          test "$TARGET_SHA" = "$current_main" || {
+            echo 'Main advanced after pre-mutation proof; refusing production migration mutation.' >&2
+            exit 1
+          }
+
+      - name: Apply production migrations
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          supabase db push --linked 2>&1 | tee artifacts/supabase-db-push-apply.txt
+
+      - name: Verify exact production schema after mutation
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          node scripts/verify-supabase-production-schema.mjs
+
+      - name: Retain migration evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: supabase-production-migration-${{ inputs.mode }}-${{ inputs.target_sha }}
+          path: |
+            artifacts/supabase-db-push-dry-run.txt
+            artifacts/supabase-db-push-apply.txt
+            artifacts/supabase-production-schema.json
+          if-no-files-found: warn
+          retention-days: 30

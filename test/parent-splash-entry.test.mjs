@@ -7,9 +7,10 @@ const source = fs.readFileSync(
   'utf8',
 );
 
-test('parent splash stays locked briefly before accepting entry', () => {
-  assert.equal(source.includes('ENTRY_LOCK_MS = 900'), true);
-  assert.equal(source.includes('useState(false)'), true);
-  assert.equal(source.includes('setTimeout(() => setEntryEnabled(true)'), true);
-  assert.equal(source.includes('if (!entryEnabled) return'), true);
+test('deprecated parent splash route redirects immediately without rendering a splash', () => {
+  assert.equal(source.includes("from '@screens/SplashScreen'"), false);
+  assert.equal(source.includes('ENTRY_LOCK_MS'), false);
+  assert.equal(source.includes("router.replace(destination)"), true);
+  assert.equal(source.includes("'/(onboarding)/parent-welcome'"), true);
+  assert.equal(source.includes('return null'), true);
 });

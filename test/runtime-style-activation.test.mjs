@@ -49,7 +49,7 @@ const runtimeSource = fs.readFileSync(path.join(root, 'worker/runtime-style.ts')
 const indexSource = fs.readFileSync(path.join(root, 'worker/index.ts'), 'utf8');
 const observedSource = fs.readFileSync(path.join(root, 'worker/observed-index.ts'), 'utf8');
 
-const raylene = runtime.resolveRuntimeStyle('raylene');
+const suhana = runtime.resolveRuntimeStyle('suhana');
 const sekret = runtime.resolveRuntimeStyle('sekret');
 const parentCoach = runtime.resolveRuntimeStyle('parentCoach');
 
@@ -58,26 +58,29 @@ after(() => {
 });
 
 test('runtime actor normalization preserves aliases without substring guessing', () => {
-  assert.equal(runtime.normalizeReplyActor('soft'), 'raylene');
+  assert.equal(runtime.normalizeReplyActor('soft'), 'suhana');
+  assert.equal(runtime.normalizeReplyActor('raylene'), 'suhana');
+  assert.equal(runtime.normalizeReplyActor('Raylene'), 'suhana');
+  assert.equal(runtime.normalizeReplyActor('Rylane'), 'sy');
   assert.equal(runtime.normalizeReplyActor('Night Se’kret'), 'night');
   assert.equal(runtime.normalizeReplyActor('oracle'), 'sekret');
   assert.equal(runtime.normalizeReplyActor('Se’kret Coach'), 'parentCoach');
-  assert.equal(runtime.normalizeReplyActor('definitely-not-raylene'), null);
+  assert.equal(runtime.normalizeReplyActor('definitely-not-suhana'), null);
   assert.equal(runtime.normalizeReplyActor(''), null);
 });
 
 test('parent coaching cannot cross the teen-facing actor/surface boundary', () => {
   assert.equal(runtime.validateActorSurface('parentCoach', 'journal'), 'parentCoach actor requires the parentCoach surface');
-  assert.equal(runtime.validateActorSurface('raylene', 'parentCoach'), 'parentCoach surface requires the parentCoach actor');
+  assert.equal(runtime.validateActorSurface('suhana', 'parentCoach'), 'parentCoach surface requires the parentCoach actor');
   assert.equal(runtime.validateActorSurface('parentCoach', 'parentCoach'), null);
   assert.equal(runtime.validateActorSurface('sekret', 'selfDiscovery'), null);
 });
 
 test('named companions and Se’kret resolve the merged versioned style contracts', () => {
-  assert.equal(raylene.role, 'named-companion');
-  assert.equal(raylene.textStyleVersion, 'raylene-text-v1');
-  assert.equal(raylene.speechStyleVersion, 'raylene-speech-v1');
-  assert.equal(raylene.maxQuestions, 1);
+  assert.equal(suhana.role, 'named-companion');
+  assert.equal(suhana.textStyleVersion, 'suhana-text-v1');
+  assert.equal(suhana.speechStyleVersion, 'suhana-speech-v1');
+  assert.equal(suhana.maxQuestions, 1);
 
   assert.equal(sekret.role, 'continuity-presence');
   assert.equal(sekret.textStyleVersion, 'sekret-presence-text-v1');
@@ -99,6 +102,42 @@ test('authoritative prompt instruction carries role, versions, and question budg
   assert.match(instruction, /not a selectable companion/i);
 });
 
+test('companion empathy understands perspective without validating harmful conduct', () => {
+  const instruction = runtime.buildRuntimeStyleInstruction(suhana);
+
+  assert.match(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
+  assert.match(instruction, /without treating that perspective as verified truth/i);
+  assert.match(instruction, /without automatically endorsing an action, belief, accusation, explanation, or choice/i);
+  assert.match(instruction, /Understanding is not agreement/i);
+  assert.match(instruction, /Explanation is context, not excuse/i);
+  assert.match(instruction, /does not erase impact/i);
+  assert.match(instruction, /preserve the boundary plainly and without shaming/i);
+  assert.match(instruction, /support proportionate accountability/i);
+  assert.match(instruction, /keep the judgment uncertain/i);
+  assert.match(instruction, /do not invent blame or certainty/i);
+  assert.match(instruction, /affected by the behavior, not only the speaker/i);
+  assert.match(instruction, /Never use empathy to pressure reconciliation, forgiveness, disclosure, parent sharing, or surrender of privacy/i);
+  assert.match(instruction, /Safety, consent, privacy, existing escalation rules, and factual truth outrank conversational warmth/i);
+});
+
+test('empathy invariants stay explicit and do not silently weaken truth or accountability', () => {
+  assert.deepEqual(runtime.EMPATHY_ACCOUNTABILITY_INVARIANTS, {
+    perspectiveIsNotTruth: true,
+    understandingIsNotAgreement: true,
+    explanationIsNotExcuse: true,
+    compassionDoesNotEraseImpact: true,
+    intentDoesNotOverrideOutcome: true,
+    accountabilityCanCoexistWithEmpathy: true,
+    dignitySurvivesCorrection: true,
+    uncertaintyMustStayUncertain: true,
+  });
+});
+
+test('parent coach remains outside the teen companion empathy contract', () => {
+  const instruction = runtime.buildRuntimeStyleInstruction(parentCoach);
+  assert.doesNotMatch(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
+});
+
 test('Se’kret output is deterministically repaired to hide Oracle and ask zero questions', () => {
   const result = runtime.enforceRuntimeStyleResponse({
     reply: 'Oracle noticed a pattern. What feels true? Is there more?',
@@ -113,10 +152,21 @@ test('Se’kret output is deterministically repaired to hide Oracle and ask zero
   assert.deepEqual(result.styleViolationCodes, ['style_oracle_leak', 'style_question_budget']);
 });
 
+test('legacy display names are repaired to Suhana and Sy before a reply reaches the user', () => {
+  const result = runtime.enforceRuntimeStyleResponse({
+    reply: 'Raylene said Rylane has your back.',
+  }, suhana);
+
+  assert.equal(result.reply, 'Suhana said Sy has your back.');
+  assert.equal(result.actorId, 'suhana');
+  assert.equal(result.styleRepaired, true);
+  assert.deepEqual(result.styleViolationCodes, ['style_forbidden_phrase']);
+});
+
 test('named companion output keeps one question and repairs extras', () => {
   const result = runtime.enforceRuntimeStyleResponse({
     reply: 'What happened? What do you want next?',
-  }, raylene);
+  }, suhana);
   assert.equal(result.reply, 'What happened? What do you want next.');
   assert.equal(result.questionBudget, 1);
   assert.deepEqual(result.styleViolationCodes, ['style_question_budget']);
@@ -129,6 +179,7 @@ test('production Worker wrapper injects, enforces, voices, and returns style evi
   assert.match(indexSource, /instructions: style\.speechInstructions/);
   assert.match(indexSource, /styleDecision/);
   assert.match(runtimeSource, /parentCoach actor requires the parentCoach surface/);
+  assert.match(runtimeSource, /EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION/);
 });
 
 test('observed Worker forwards style versions and repair evidence to telemetry', () => {

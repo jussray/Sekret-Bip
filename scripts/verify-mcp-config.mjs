@@ -2,19 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const expectedProjectServerNames = [
-  'cloudflare-builds',
-  'cloudflare-docs',
-  'cloudflare-observability',
-  'context7',
-  'figma',
-  'github',
-  'microsoft-learn',
-  'playwright',
-  'supabase',
-];
-const expectedCredentialedServerNames = [
-  'bright-data',
+
+const projectServerNames = [
   'cloudflare-builds',
   'cloudflare-docs',
   'cloudflare-observability',
@@ -26,7 +15,27 @@ const expectedCredentialedServerNames = [
   'supabase',
 ];
 
-const expectedRemoteUrls = {
+const exampleServerNames = [
+  'bright-data',
+  ...projectServerNames,
+].sort();
+
+const ideCloudflareServerNames = [
+  'cloudflare',
+  'cloudflare-bindings',
+  'cloudflare-builds',
+  'cloudflare-docs',
+  'cloudflare-observability',
+].sort();
+
+const routingServerNames = [
+  ...exampleServerNames,
+  'cloudflare',
+  'cloudflare-bindings',
+  'product-design',
+].sort();
+
+const remoteUrls = {
   github: 'https://api.githubcopilot.com/mcp/',
   'microsoft-learn': 'https://learn.microsoft.com/api/mcp',
   context7: 'https://mcp.context7.com/mcp',
@@ -36,7 +45,15 @@ const expectedRemoteUrls = {
   'cloudflare-observability': 'https://observability.mcp.cloudflare.com/mcp',
 };
 
-const expectedGithubToolsets =
+const ideCloudflareUrls = {
+  cloudflare: 'https://mcp.cloudflare.com/mcp',
+  'cloudflare-docs': 'https://docs.mcp.cloudflare.com/mcp',
+  'cloudflare-bindings': 'https://bindings.mcp.cloudflare.com/mcp',
+  'cloudflare-builds': 'https://builds.mcp.cloudflare.com/mcp',
+  'cloudflare-observability': 'https://observability.mcp.cloudflare.com/mcp',
+};
+
+const githubToolsets =
   'repos,issues,pull_requests,actions,code_security,secret_protection';
 const pinnedPlaywrightPackage = '@playwright/mcp@0.0.78';
 const brightDataPackage = '@brightdata/mcp';
@@ -45,53 +62,40 @@ function fail(message) {
   throw new Error(`[verify:mcp] ${message}`);
 }
 
+function assert(condition, message) {
+  if (!condition) fail(message);
+}
+
 function readJson(relativePath) {
-  const absolutePath = path.join(root, relativePath);
   try {
-    return JSON.parse(fs.readFileSync(absolutePath, 'utf8'));
+    return JSON.parse(fs.readFileSync(path.join(root, relativePath), 'utf8'));
   } catch (error) {
     fail(`${relativePath} is missing or invalid JSON: ${error.message}`);
   }
-}
-
-function assert(condition, message) {
-  if (!condition) fail(message);
 }
 
 function sortedKeys(value) {
   return Object.keys(value ?? {}).sort();
 }
 
-function validateServerSet(relativePath, servers, expectedServerNames) {
+function validateExactSet(relativePath, servers, expectedNames) {
   assert(
-    JSON.stringify(sortedKeys(servers)) === JSON.stringify(expectedServerNames),
-    `${relativePath} must contain exactly: ${expectedServerNames.join(', ')}`,
+    JSON.stringify(sortedKeys(servers)) === JSON.stringify([...expectedNames].sort()),
+    `${relativePath} must contain exactly: ${[...expectedNames].sort().join(', ')}`,
   );
 }
 
 function validateRemoteServers(relativePath, servers) {
-  for (const [name, url] of Object.entries(expectedRemoteUrls)) {
+  for (const [name, url] of Object.entries(remoteUrls)) {
     assert(servers[name]?.type === 'http', `${relativePath}:${name} must use HTTP`);
     assert(servers[name]?.url === url, `${relativePath}:${name} URL drifted`);
   }
 
-  const githubHeaders = servers.github?.headers ?? {};
-  assert(
-    githubHeaders['X-MCP-Toolsets'] === expectedGithubToolsets,
-    `${relativePath}:github toolsets drifted`,
-  );
-  assert(
-    githubHeaders['X-MCP-Lockdown'] === 'true',
-    `${relativePath}:github lockdown mode must remain enabled`,
-  );
-  assert(
-    githubHeaders['X-MCP-Insiders'] === undefined,
-    `${relativePath}:github insiders mode must remain a private opt-in`,
-  );
-  assert(
-    githubHeaders.Authorization === undefined,
-    `${relativePath}:github authentication must not be committed`,
-  );
+  const headers = servers.github?.headers ?? {};
+  assert(headers['X-MCP-Toolsets'] === githubToolsets, `${relativePath}:github toolsets drifted`);
+  assert(headers['X-MCP-Lockdown'] === 'true', `${relativePath}:github lockdown must remain enabled`);
+  assert(headers['X-MCP-Insiders'] === undefined, `${relativePath}:github insiders must remain private opt-in`);
+  assert(headers.Authorization === undefined, `${relativePath}:github auth must not be committed`);
 }
 
 function validateSupabase(relativePath, server, expectedProjectRef) {
@@ -99,85 +103,97 @@ function validateSupabase(relativePath, server, expectedProjectRef) {
   assert(server?.type === 'http', `${relativePath}:supabase must use HTTP`);
   assert(url.origin === 'https://mcp.supabase.com', `${relativePath}:supabase host drifted`);
   assert(url.pathname === '/mcp', `${relativePath}:supabase path drifted`);
-  assert(
-    url.searchParams.get('project_ref') === expectedProjectRef,
-    `${relativePath}:supabase project scope drifted`,
-  );
-  assert(
-    url.searchParams.get('read_only') === 'true',
-    `${relativePath}:supabase must remain read-only`,
-  );
-  assert(
-    url.searchParams.get('features') === 'database,docs',
-    `${relativePath}:supabase features must remain database,docs`,
-  );
+  assert(url.searchParams.get('project_ref') === expectedProjectRef, `${relativePath}:supabase project scope drifted`);
+  assert(url.searchParams.get('read_only') === 'true', `${relativePath}:supabase must remain read-only`);
+  assert(url.searchParams.get('features') === 'database,docs', `${relativePath}:supabase features must remain database,docs`);
 }
 
-function validatePlaywright(relativePath, server, requireStdioType = false) {
-  if (requireStdioType) {
-    assert(server?.type === 'stdio', `${relativePath}:playwright must use stdio`);
-  }
+function validatePlaywright(relativePath, server) {
+  assert(server?.type === 'local', `${relativePath}:playwright must use Copilot local type`);
   assert(server?.command === 'npx', `${relativePath}:playwright command must be npx`);
   assert(Array.isArray(server?.args), `${relativePath}:playwright args are missing`);
-  assert(
-    server.args.includes(pinnedPlaywrightPackage),
-    `${relativePath}:playwright must stay pinned to ${pinnedPlaywrightPackage}`,
-  );
+  assert(server.args.includes('-y'), `${relativePath}:playwright must use non-interactive npx`);
+  assert(server.args.includes(pinnedPlaywrightPackage), `${relativePath}:playwright must stay pinned to ${pinnedPlaywrightPackage}`);
   assert(!server.args.some((arg) => String(arg).includes('@latest')), `${relativePath}:playwright cannot use @latest`);
   assert(server.args.includes('--isolated'), `${relativePath}:playwright must use an isolated profile`);
   const browserIndex = server.args.indexOf('--browser');
-  assert(
-    browserIndex >= 0 && server.args[browserIndex + 1] === 'chromium',
-    `${relativePath}:playwright browser must be chromium`,
-  );
+  assert(browserIndex >= 0 && server.args[browserIndex + 1] === 'chromium', `${relativePath}:playwright browser must be chromium`);
+  assert(Array.isArray(server.tools) && server.tools.includes('*'), `${relativePath}:playwright tools must be exposed to Copilot`);
+  assert(!server.env, `${relativePath}:playwright must not commit environment credentials`);
 }
 
-function validateBrightData(relativePath, server, expectedApiToken, requireStdioType = false) {
-  if (requireStdioType) {
-    assert(server?.type === 'stdio', `${relativePath}:bright-data must use stdio`);
-  }
+function validateBrightData(relativePath, server) {
   assert(server?.command === 'npx', `${relativePath}:bright-data command must be npx`);
   assert(Array.isArray(server?.args), `${relativePath}:bright-data args are missing`);
   assert(server.args.includes('-y'), `${relativePath}:bright-data must use non-interactive npx`);
-  assert(
-    server.args.includes(brightDataPackage),
-    `${relativePath}:bright-data must use ${brightDataPackage}`,
-  );
-  assert(
-    server?.env?.API_TOKEN === expectedApiToken,
-    `${relativePath}:bright-data API token reference drifted`,
-  );
-  assert(
-    server?.env?.GROUPS === 'code',
-    `${relativePath}:bright-data must remain restricted to GROUPS=code`,
-  );
+  assert(server.args.includes(brightDataPackage), `${relativePath}:bright-data must use ${brightDataPackage}`);
+  assert(server?.env?.API_TOKEN === '<YOUR_BRIGHT_DATA_API_TOKEN>', `${relativePath}:bright-data token placeholder drifted`);
+  assert(server?.env?.GROUPS === 'code', `${relativePath}:bright-data must remain restricted to GROUPS=code`);
   assert(!('PRO_MODE' in (server?.env ?? {})), `${relativePath}:bright-data Pro Mode is forbidden`);
   assert(!('TOOLS' in (server?.env ?? {})), `${relativePath}:bright-data explicit tools are forbidden`);
 }
 
-function validateVscodeInput(config) {
-  const input = (config.inputs ?? []).find((entry) => entry.id === 'brightdata_api_token');
-  assert(input?.type === 'promptString', '.vscode/mcp.json Bright Data input must be promptString');
-  assert(input?.password === true, '.vscode/mcp.json Bright Data input must be masked');
-  assert(
-    input?.description === 'Bright Data API Token',
-    '.vscode/mcp.json Bright Data input description drifted',
-  );
+function validateIdeCloudflare(relativePath, servers) {
+  validateExactSet(relativePath, servers, ideCloudflareServerNames);
+  for (const [name, url] of Object.entries(ideCloudflareUrls)) {
+    assert(servers[name]?.url === url, `${relativePath}:${name} URL drifted`);
+    assert(!servers[name]?.headers, `${relativePath}:${name} must authenticate through the supported client`);
+    assert(!servers[name]?.env, `${relativePath}:${name} must not commit credentials`);
+  }
+}
+
+function validateRouting(config) {
+  assert(config?.schemaVersion === 1, 'config/mcp-skill-routing.json schemaVersion must be 1');
+  assert(Array.isArray(config.alwaysLoad), 'MCP routing alwaysLoad must be an array');
+  assert(config.alwaysLoad.includes('bip-repo-truth'), 'MCP routing must always load bip-repo-truth');
+  validateExactSet('config/mcp-skill-routing.json', config.servers, routingServerNames);
+
+  const referencedSkills = new Set(config.alwaysLoad);
+  for (const serverName of routingServerNames) {
+    const route = config.servers?.[serverName];
+    assert(route && typeof route === 'object', `${serverName} is missing its MCP skill route`);
+    assert(Array.isArray(route.skills) && route.skills.length > 0, `${serverName} must map to at least one Bip skill`);
+    assert(typeof route.boundary === 'string' && route.boundary.trim().length >= 24, `${serverName} must document a real authority boundary`);
+    for (const skill of route.skills) referencedSkills.add(skill);
+  }
+
+  for (const skill of referencedSkills) {
+    assert(/^[a-z0-9-]+$/.test(skill), `invalid Bip skill name: ${skill}`);
+    assert(fs.existsSync(path.join(root, '.agents', 'skills', skill, 'SKILL.md')), `mapped Bip skill does not exist: ${skill}`);
+  }
+
+  const requiredMappings = {
+    github: ['bip-repo-truth', 'bip-release-gate'],
+    supabase: ['bip-supabase-guardian', 'bip-privacy-redteam', 'bip-auth-onboarding'],
+    playwright: ['bip-auth-onboarding', 'bip-release-gate'],
+    cloudflare: ['bip-worker-guardian', 'bip-privacy-redteam', 'bip-release-gate'],
+    'cloudflare-bindings': ['bip-worker-guardian', 'bip-privacy-redteam', 'bip-release-gate'],
+    'cloudflare-builds': ['bip-worker-guardian', 'bip-release-gate'],
+    'cloudflare-observability': ['bip-worker-guardian', 'bip-privacy-redteam'],
+    figma: ['bip-companion-style-engine', 'bip-sekret-identity'],
+    'product-design': ['bip-product-design-gate', 'bip-privacy-redteam', 'bip-release-gate'],
+  };
+
+  for (const [server, skills] of Object.entries(requiredMappings)) {
+    for (const skill of skills) {
+      assert(config.servers[server].skills.includes(skill), `${server} must activate ${skill}`);
+    }
+  }
 }
 
 function assertNoCommittedSecrets(relativePath, parsed) {
   const serialized = JSON.stringify(parsed);
-  const secretPatterns = [
+  const patterns = [
     /github_pat_/i,
     /ghp_[A-Za-z0-9]{20,}/,
     /sk-(?:proj-)?[A-Za-z0-9_-]{20,}/,
     /Bearer\s+[A-Za-z0-9._-]{12,}/i,
     /SUPABASE_ACCESS_TOKEN/,
+    /SUPABASE_SERVICE_ROLE_KEY/,
     /CLOUDFLARE_API_TOKEN/,
     /NETDATA_CLOUD_API_TOKEN/,
   ];
-
-  for (const pattern of secretPatterns) {
+  for (const pattern of patterns) {
     assert(!pattern.test(serialized), `${relativePath} appears to contain a committed credential`);
   }
 }
@@ -185,50 +201,38 @@ function assertNoCommittedSecrets(relativePath, parsed) {
 const projectConfig = readJson('.mcp.json');
 const exampleConfig = readJson('.mcp.example.json');
 const vscodeConfig = readJson('.vscode/mcp.json');
+const cursorConfig = readJson('.cursor/mcp.json');
+const routingConfig = readJson('config/mcp-skill-routing.json');
 
 const projectServers = projectConfig.mcpServers;
 const exampleServers = exampleConfig.mcpServers;
-const vscodeServers = vscodeConfig.servers;
 
-validateServerSet('.mcp.json', projectServers, expectedProjectServerNames);
-validateServerSet('.mcp.example.json', exampleServers, expectedCredentialedServerNames);
-validateServerSet('.vscode/mcp.json', vscodeServers, expectedCredentialedServerNames);
-
+validateExactSet('.mcp.json', projectServers, projectServerNames);
+validateExactSet('.mcp.example.json', exampleServers, exampleServerNames);
 validateRemoteServers('.mcp.json', projectServers);
 validateRemoteServers('.mcp.example.json', exampleServers);
-validateRemoteServers('.vscode/mcp.json', vscodeServers);
-
 validateSupabase('.mcp.json', projectServers.supabase, 'tbsevonvegdnlyjgplmm');
 validateSupabase('.mcp.example.json', exampleServers.supabase, 'YOUR_PROJECT_REF');
-validateSupabase('.vscode/mcp.json', vscodeServers.supabase, 'tbsevonvegdnlyjgplmm');
-
 validatePlaywright('.mcp.json', projectServers.playwright);
 validatePlaywright('.mcp.example.json', exampleServers.playwright);
-validatePlaywright('.vscode/mcp.json', vscodeServers.playwright, true);
+validateBrightData('.mcp.example.json', exampleServers['bright-data']);
+validateIdeCloudflare('.vscode/mcp.json', vscodeConfig.servers);
+validateIdeCloudflare('.cursor/mcp.json', cursorConfig.mcpServers);
+validateRouting(routingConfig);
 
 assert(!projectServers['bright-data'], '.mcp.json must remain credential-free and omit bright-data');
-validateBrightData(
-  '.mcp.example.json',
-  exampleServers['bright-data'],
-  '<YOUR_BRIGHT_DATA_API_TOKEN>',
-);
-validateBrightData(
-  '.vscode/mcp.json',
-  vscodeServers['bright-data'],
-  '${input:brightdata_api_token}',
-  true,
-);
-validateVscodeInput(vscodeConfig);
+assert(!projectServers['cloudflare-api'], '.mcp.json must not enable broad Cloudflare API access');
+assert(!projectServers['netdata-cloud'], '.mcp.json must not enable Netdata without Bip-owned hosts');
+assert(!projectServers.dbhub, '.mcp.json must use scoped Supabase instead of generic DBHub access');
 
-assert(!projectServers['cloudflare-api'], '.mcp.json must not enable the broad Cloudflare API server');
-assert(!vscodeServers['cloudflare-api'], '.vscode/mcp.json must not enable the broad Cloudflare API server');
-assert(!projectServers['netdata-cloud'], '.mcp.json must not enable Netdata without persistent Bip-owned hosts');
-assert(!vscodeServers['netdata-cloud'], '.vscode/mcp.json must not enable Netdata without persistent Bip-owned hosts');
-assert(!projectServers.dbhub, '.mcp.json must use the scoped Supabase server instead of generic DBHub access');
-assert(!vscodeServers.dbhub, '.vscode/mcp.json must use the scoped Supabase server instead of generic DBHub access');
+for (const [relativePath, parsed] of [
+  ['.mcp.json', projectConfig],
+  ['.mcp.example.json', exampleConfig],
+  ['.vscode/mcp.json', vscodeConfig],
+  ['.cursor/mcp.json', cursorConfig],
+  ['config/mcp-skill-routing.json', routingConfig],
+]) {
+  assertNoCommittedSecrets(relativePath, parsed);
+}
 
-assertNoCommittedSecrets('.mcp.json', projectConfig);
-assertNoCommittedSecrets('.mcp.example.json', exampleConfig);
-assertNoCommittedSecrets('.vscode/mcp.json', vscodeConfig);
-
-console.log('[verify:mcp] MCP configuration is valid, scoped, pinned, and credential-free.');
+console.log('[verify:mcp] Bip MCP client schemas, skill routing, authority boundaries, and credential guards are valid.');

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const linkSrc = fs.readFileSync(new URL('../src/utils/parentLink.ts', import.meta.url), 'utf8');
-const reconcileSql = fs.readFileSync(new URL('../supabase/migrations/20260630003000_reconcile_parent_link_contract.sql', import.meta.url), 'utf8');
+const reconcileSql = fs.readFileSync(new URL('../supabase/migrations/20260630022018_limited_mode_parent_invite_transition.sql', import.meta.url), 'utf8');
 const lockSql = fs.readFileSync(new URL('../supabase/migrations/20260711070000_lock_parent_links_to_rpc_only.sql', import.meta.url), 'utf8');
 const revokeEdgeSrc = fs.readFileSync(new URL('../supabase/functions/parent-link-revoke/index.ts', import.meta.url), 'utf8');
 

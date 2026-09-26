@@ -19,7 +19,7 @@
 -- this file brings the repo migration history in line with that.
 
 alter table public.safety_alerts
-  drop constraint safety_alerts_alert_type_check;
+  drop constraint if exists safety_alerts_alert_type_check;
 alter table public.safety_alerts
   add constraint safety_alerts_alert_type_check
   check (alert_type in (
@@ -28,7 +28,7 @@ alter table public.safety_alerts
   ));
 
 alter table public.safety_alerts
-  drop constraint safety_alerts_severity_check;
+  drop constraint if exists safety_alerts_severity_check;
 alter table public.safety_alerts
   add constraint safety_alerts_severity_check
   check (severity in ('low','medium','high','critical'));

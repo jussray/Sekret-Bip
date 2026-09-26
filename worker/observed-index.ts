@@ -76,18 +76,20 @@ async function readSafeResponseMetadata(response: Response, operation: string): 
   try {
     const data = await response.clone().json() as Record<string, unknown>;
     const usage = data.usage as Record<string, unknown> | undefined;
+    const fallbackUsed = data.replySource === 'fallback' || data.usedFallback === true;
     const styleDecision = data.styleDecision === 'repair' ? 'repair' : undefined;
+    const decision = fallbackUsed ? 'fallback' : styleDecision || (typeof data.decision === 'string' ? data.decision : undefined);
     return {
       characterId: typeof data.characterId === 'string' ? data.characterId : undefined,
       actorRole: typeof data.actorRole === 'string' ? data.actorRole : undefined,
-      fallbackUsed: data.replySource === 'fallback' || data.usedFallback === true,
+      fallbackUsed,
       voiceSource: typeof data.voiceSource === 'string' ? data.voiceSource : undefined,
       model: typeof data.model === 'string' ? data.model : undefined,
       inputTokens: typeof usage?.inputTokens === 'number' ? usage.inputTokens : undefined,
       outputTokens: typeof usage?.outputTokens === 'number' ? usage.outputTokens : undefined,
       totalTokens: typeof usage?.totalTokens === 'number' ? usage.totalTokens : undefined,
       estimatedCostUsd: typeof data.estimatedCostUsd === 'number' ? data.estimatedCostUsd : undefined,
-      decision: styleDecision || (typeof data.decision === 'string' ? data.decision : undefined),
+      decision,
       violationCodes: Array.isArray(data.violationCodes) ? data.violationCodes.filter((v): v is string => typeof v === 'string') : undefined,
       schemaValid: typeof data.schemaValid === 'boolean' ? data.schemaValid : undefined,
       promptVersion: typeof data.promptVersion === 'string' ? data.promptVersion : undefined,

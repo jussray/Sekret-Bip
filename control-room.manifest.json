@@ -4,7 +4,7 @@
   "portfolioHub": "jussray/founder-control-room",
   "role": "product-control-room",
   "authority": {
-    "sourceOfTruth": "Repository implementation ledger plus Supabase project tbsevonvegdnlyjgplmm and canonical Cloudflare deployment evidence",
+    "sourceOfTruth": "Current main, repository implementation ledger, repo-native test inventory, exact-head GitHub workflow results, Supabase authorization evidence, and canonical Cloudflare production observations",
     "portfolioMode": "sanitized-read-only-observer",
     "productionMutation": "separate-founder-gate"
   },
@@ -14,27 +14,181 @@
       "app/(dev)/control-room.tsx",
       "src/screens/DevControlRoomWorkspace.tsx",
       "src/services/controlRoomAnalytics.ts",
-      "implementation-ledger.json"
+      "implementation-ledger.json",
+      "control-room.manifest.json",
+      ".control-room/repository.manifest.json",
+      ".control-room/test-ledger.manifest.json",
+      "scripts/control-room-test-ledger.mjs",
+      "scripts/control-room-juss-proof.mjs",
+      "scripts/verify-control-room-tests.mjs",
+      ".github/workflows/control-room-test-ledger.yml",
+      ".github/workflows/control-room-tests.yml"
     ],
     "privateContentAllowed": false
   },
+  "tests": {
+    "authority": "repo-native-dynamic-inventory",
+    "executionAuthority": "exact-head-workflow-results",
+    "catalogIsPassEvidence": false,
+    "aggregation": "sanitized-provider-summary-to-founder-control-room",
+    "rawLogsAllowed": false,
+    "discovery": {
+      "source": "package.json#scripts and .github/workflows",
+      "includedPrefixes": [
+        "test",
+        "verify",
+        "audit",
+        "proof",
+        "lint",
+        "typecheck",
+        "type-check",
+        "build"
+      ],
+      "excludedPrefixes": [
+        "deploy",
+        "start",
+        "dev",
+        "control-room:mission",
+        "control-room:serve",
+        "control-room:dev"
+      ],
+      "receipt": "artifacts/control-room-tests.json"
+    },
+    "criticalScripts": [
+      "test",
+      "type-check",
+      "lint",
+      "verify:bundle",
+      "verify:mcp",
+      "verify:cookies",
+      "verify:implementation-ledger",
+      "audit:control-room",
+      "test:founder-operator",
+      "test:github-failure-routing",
+      "verify:production-deploy-branch",
+      "verify:production-release",
+      "verify:cloudflare-native",
+      "test:e2e:production"
+    ],
+    "workflowCatalog": [
+      {
+        "id": "production-deploy-branch-guard",
+        "name": "Production Deploy Branch Guard",
+        "kind": "security",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "main-contract-drift",
+        "name": "Main Contract Drift Exact-Head Gate",
+        "kind": "contract",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "repository-truth",
+        "name": "Repository Truth Gate",
+        "kind": "contract",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "product-design-playwright",
+        "name": "Product Design Playwright Proof",
+        "kind": "e2e",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "founder-operator",
+        "name": "Founder Operator Exact-Head Gate",
+        "kind": "integration",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "front-door",
+        "name": "Front Door Exact-Head Gate",
+        "kind": "e2e",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "onboarding-and-type",
+        "name": "Onboarding and Type Exact-Head Gate",
+        "kind": "integration",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "github-failure-routing",
+        "name": "GitHub Failure Routing Exact-Head Gate",
+        "kind": "integration",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "production-gate-contract",
+        "name": "Production Gate Contract",
+        "kind": "deployment",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "cloudflare-native-production",
+        "name": "Verify Cloudflare Native Deployment",
+        "kind": "deployment",
+        "required": true,
+        "status": "main-only"
+      },
+      {
+        "id": "control-room-test-ledger",
+        "name": "Control Room Test Ledger",
+        "kind": "integration",
+        "required": true,
+        "status": "active"
+      },
+      {
+        "id": "control-room-manifest",
+        "name": "Control Room Manifest",
+        "kind": "contract",
+        "required": true,
+        "status": "founder-gated"
+      },
+      {
+        "id": "control-room-test-catalog",
+        "name": "Verify Se'kret control room test catalog",
+        "kind": "contract",
+        "required": true,
+        "status": "active"
+      }
+    ]
+  },
   "evidence": {
     "status": "integrated",
-    "commit": "7f1ab6e8561ef9b88f039db33e207036ffecd810",
-    "observedAt": "2026-07-12",
+    "commit": "cd31a76f5390e6721b224ab1b9afcc9c01934e51",
+    "commitMeaning": "verified base inspected before the current-main catalog reconstruction",
+    "observedAt": "2026-08-05",
     "proofRefs": [
       "implementation-ledger.json",
-      "security/supabase-authorization-baseline.json",
-      "supabase/probes/authorization_founder_guardian_phase1.sql"
+      ".control-room/repository.manifest.json",
+      ".control-room/test-ledger.manifest.json",
+      "package.json",
+      "scripts/control-room-juss-proof.mjs",
+      ".github/workflows/repository-truth-gate.yml",
+      ".github/workflows/control-room-test-ledger.yml",
+      ".github/workflows/deploy-cloudflare.yml"
     ]
   },
   "risk": {
     "level": "high",
     "blockers": [
-      "Production Worker and Pages exact-release proof remains required for current main",
+      "Production release proof must remain bound to the exact current main SHA",
       "Bridge two-account production proof remains incomplete",
-      "L4 persistence remains blocked by unfinished authorization and Auth configuration gates"
+      "L4 persistence remains blocked by unfinished authorization and Auth configuration gates",
+      "A discovered script or workflow name is inventory only and is never a test pass",
+      "Teen, parent, journal, voice, Circle, private-message, credential, and raw-log content must never enter portfolio packets"
     ]
   },
-  "nextGate": "Complete exact-release production verification and remaining authorization denial suites before expanding memory or portfolio observer scope."
+  "nextGate": "Pass current-main catalog contracts, preserve the exact-head ledger as separate runtime evidence, emit only the sanitized juss-proof/v1 summary to Founder Control Room, and keep provider/runtime proof as a separate authority step."
 }

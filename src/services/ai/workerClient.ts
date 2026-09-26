@@ -11,6 +11,7 @@ import type {
   CompanionReplyRequest,
   CompanionSurface,
   TranscriptionRequest,
+  VoiceSynthesisData,
   VoiceSynthesisRequest,
   WorkerErrorCode,
   WorkerResult,
@@ -59,9 +60,8 @@ const workerClient = {
     return unwrap(await sekretClient.sendReply(params));
   },
 
-  async synthesizeVoice(params: SendVoiceParams): Promise<{ audioBase64: string }> {
-    const data = unwrap(await sekretClient.synthesizeVoice(params));
-    return { audioBase64: data.audioBase64 };
+  async synthesizeVoice(params: SendVoiceParams): Promise<VoiceSynthesisData> {
+    return unwrap(await sekretClient.synthesizeVoice(params));
   },
 
   async transcribeAudio(params: TranscribeParams): Promise<{ text: string }> {

@@ -1,4 +1,11 @@
-import React, { useState } from 'react';
+// app/(auth)/login.tsx
+//
+// Instagram-model login screen.
+// ─ Wordmark-only logo (no icon box, no glow blobs)
+// ─ Clean thin-border inputs, solid CTA, OR divider, Sign up switch
+// ─ All Supabase auth logic, shake animation, and error handling preserved.
+
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,31 +15,165 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Animated,
+  Pressable,
 } from 'react-native';
+import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useVerificationContext } from '@/context/VerificationContext';
+import type { AccountSide } from '@/features/identity/accountProfile';
+import {
+  clearEmailConfirmationUrl,
+  parseEmailConfirmationUrl,
+} from '@/features/auth/emailConfirmation';
+import { fetchPostAuthBootstrap } from '@/services/auth/postAuthBootstrap';
 import { getSupabase } from '@/utils/supabase';
 
+function authErrorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    return typeof message === 'string' ? message : '';
+  }
+  return '';
+}
+
+function isAuthTransportError(error: unknown): boolean {
+  const message = authErrorMessage(error).toLowerCase();
+  return (
+    message.includes('failed to fetch')
+    || message.includes('network request failed')
+    || message.includes('load failed')
+    || message.includes('request timeout')
+    || message.includes('request timed out')
+    || message.includes('context deadline exceeded')
+    || message.includes('gateway timeout')
+  );
+}
+
 function readableAuthError(error: unknown): string {
-  if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
+  if (isAuthTransportError(error)) {
     return 'Could not reach the account server. Check your connection and try again.';
   }
-  if (error instanceof Error && error.message) return error.message;
+  const message = authErrorMessage(error);
+  if (message) return message;
   return 'Something went wrong while signing in. Please try again.';
 }
 
+function normalizeSide(value: string | undefined): AccountSide | undefined {
+  return value === 'parent' || value === 'teen' ? value : undefined;
+}
+
+function authRoute(
+  path: '/(auth)/signup' | '/(auth)/login' | '/(auth)/forgot-password',
+  side?: AccountSide,
+): string {
+  return side ? `${path}?side=${side}` : path;
+}
+
 export default function LoginScreen() {
-  const params = useLocalSearchParams<{ passwordReset?: string }>();
+  const params = useLocalSearchParams<{ passwordReset?: string; emailConfirmed?: string; side?: string }>();
   const passwordReset = params.passwordReset === '1';
-  const [email, setEmail]       = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError]       = useState('');
-  const [loading, setLoading]   = useState(false);
+  const emailConfirmed = params.emailConfirmed === '1';
+  const preferredSide = normalizeSide(params.side);
+  const { refreshVerification } = useVerificationContext();
+
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [error, setError]         = useState('');
+  const [loading, setLoading]     = useState(false);
+  const [pwVisible, setPwVisible] = useState(false);
+
+  const shakeAnim = useRef(new Animated.Value(0)).current;
+  const confirmationHandled = useRef(false);
+
+  function shakeCard() {
+    Animated.sequence([
+      Animated.timing(shakeAnim, { toValue:  10, duration: 50,  useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue: -10, duration: 50,  useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:   6, duration: 40,  useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:  -6, duration: 40,  useNativeDriver: true }),
+      Animated.timing(shakeAnim, { toValue:   0, duration: 30,  useNativeDriver: true }),
+    ]).start();
+  }
+
+  useEffect(() => {
+    if (!emailConfirmed || confirmationHandled.current) return;
+    confirmationHandled.current = true;
+
+    const sb = getSupabase();
+    if (!sb) return;
+    const supabase = sb;
+
+    let active = true;
+    let routed = false;
+
+    async function restoreConfirmedSession(url: string | null) {
+      if (!active || routed) return;
+
+      try {
+        if (Platform.OS !== 'web') {
+          const parsed = parseEmailConfirmationUrl(url);
+          if (parsed.kind === 'error') {
+            setError(parsed.message);
+            return;
+          }
+
+          if (parsed.kind === 'tokens') {
+            const { error: sessionError } = await supabase.auth.setSession({
+              access_token: parsed.accessToken,
+              refresh_token: parsed.refreshToken,
+            });
+            if (sessionError) return;
+          }
+        }
+
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!active || !session?.user || session.user.is_anonymous) return;
+
+        const bootstrap = await fetchPostAuthBootstrap(preferredSide);
+        await refreshVerification();
+        if (!active || routed) return;
+
+        routed = true;
+        clearEmailConfirmationUrl();
+        router.replace(bootstrap.nextRoute as never);
+      } catch {
+        if (active) {
+          setError('We could not finish confirming your email. You can sign in manually or request a new confirmation link.');
+        }
+      }
+    }
+
+    const linkSubscription = Linking.addEventListener('url', ({ url }) => {
+      void restoreConfirmedSession(url);
+    });
+
+    void (async () => {
+      const initialUrl = Platform.OS === 'web' && typeof window !== 'undefined'
+        ? window.location.href
+        : await Linking.getInitialURL();
+      await restoreConfirmedSession(initialUrl);
+    })();
+
+    return () => {
+      active = false;
+      linkSubscription.remove();
+    };
+  }, [emailConfirmed, preferredSide, refreshVerification]);
 
   async function handleSignIn() {
     setError('');
     const e = email.trim();
     const p = password;
-    if (!e || !p) { setError('Email and password are required.'); return; }
+    if (!e || !p) {
+      setError('Email and password are required.');
+      shakeCard();
+      return;
+    }
 
     setLoading(true);
     const sb = getSupabase();
@@ -44,10 +185,17 @@ export default function LoginScreen() {
 
     try {
       const { error: authErr } = await sb.auth.signInWithPassword({ email: e, password: p });
-      if (authErr) { setError(authErr.message); return; }
-      router.replace('/');
+      if (authErr) {
+        setError(readableAuthError(authErr));
+        shakeCard();
+        return;
+      }
+      const bootstrap = await fetchPostAuthBootstrap(preferredSide);
+      await refreshVerification();
+      router.replace(bootstrap.nextRoute as never);
     } catch (caught) {
       setError(readableAuthError(caught));
+      shakeCard();
     } finally {
       setLoading(false);
     }
@@ -55,110 +203,230 @@ export default function LoginScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={s.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.inner}>
-        <Text style={styles.logo}>Se&#39;kret Bip 💜</Text>
-        <Text style={styles.tagline}>welcome back</Text>
+      <Animated.View style={[s.card, { transform: [{ translateX: shakeAnim }] }]}>
+
+        <View style={s.logoArea}>
+          <Text style={s.wordmark}>Se'kret Bip</Text>
+          <Text style={s.heart}>♡</Text>
+        </View>
+
+        <Text style={s.tagline}>sign in to continue</Text>
 
         {passwordReset ? (
-          <Text style={styles.success} accessibilityRole="alert">
-            Password updated. Sign in with your new password.
-          </Text>
+          <View style={s.successBanner}>
+            <Text style={s.successBannerText}>
+              Password updated — sign in with your new password.
+            </Text>
+          </View>
         ) : null}
 
-        <TextInput
-          style={styles.input}
-          placeholder="email"
-          placeholderTextColor="#555"
-          autoCapitalize="none"
-          autoComplete="email"
-          autoCorrect={false}
-          keyboardType="email-address"
-          textContentType="emailAddress"
-          value={email}
-          editable={!loading}
-          onChangeText={t => { setEmail(t); setError(''); }}
-          accessibilityLabel="Email"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="password"
-          placeholderTextColor="#555"
-          secureTextEntry
-          autoComplete="current-password"
-          textContentType="password"
-          value={password}
-          editable={!loading}
-          onChangeText={t => { setPassword(t); setError(''); }}
-          onSubmitEditing={handleSignIn}
-          returnKeyType="go"
-          accessibilityLabel="Password"
-        />
+        <View style={[s.inputWrap, error && !email ? s.inputError : null]}>
+          <TextInput
+            style={s.input}
+            placeholder="Phone number, username or email"
+            placeholderTextColor={MUTED}
+            autoCapitalize="none"
+            autoComplete="email"
+            autoCorrect={false}
+            keyboardType="email-address"
+            textContentType="emailAddress"
+            value={email}
+            editable={!loading}
+            onChangeText={t => { setEmail(t); setError(''); }}
+            accessibilityLabel="Email"
+          />
+        </View>
+
+        <View style={[s.inputWrap, { marginBottom: 6 }]}>
+          <TextInput
+            style={[s.input, { paddingRight: 52 }]}
+            placeholder="Password"
+            placeholderTextColor={MUTED}
+            secureTextEntry={!pwVisible}
+            autoComplete="current-password"
+            textContentType="password"
+            value={password}
+            editable={!loading}
+            onChangeText={t => { setPassword(t); setError(''); }}
+            onSubmitEditing={handleSignIn}
+            returnKeyType="go"
+            accessibilityLabel="Password"
+          />
+          <Pressable
+            style={s.eyeBtn}
+            onPress={() => setPwVisible(v => !v)}
+            accessibilityLabel={pwVisible ? 'Hide password' : 'Show password'}
+          >
+            <Text style={s.eyeText}>{pwVisible ? '🙈' : '👁'}</Text>
+          </Pressable>
+        </View>
+
+        {error ? (
+          <Text style={s.errorText} accessibilityRole="alert">{error}</Text>
+        ) : null}
 
         <TouchableOpacity
-          onPress={() => router.push('/(auth)/forgot-password')}
-          style={styles.forgot}
+          onPress={() => router.push(authRoute('/(auth)/forgot-password', preferredSide) as never)}
+          style={s.forgotRow}
           accessibilityRole="link"
           accessibilityLabel="Forgot password"
         >
-          <Text style={styles.forgotText}>Forgot password?</Text>
+          <Text style={s.forgotText}>Forgot password?</Text>
         </TouchableOpacity>
 
-        {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
-
         <TouchableOpacity
-          style={[styles.btn, loading && styles.btnDisabled]}
+          style={[s.btn, (loading || !email || !password) && s.btnDim]}
           onPress={handleSignIn}
           disabled={loading}
+          activeOpacity={0.82}
           accessibilityRole="button"
-          accessibilityLabel="Sign In"
+          accessibilityLabel="Log in"
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.btnText}>Sign In</Text>
-          )}
+          {loading
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={s.btnText}>Log in</Text>
+          }
         </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => router.push('/(auth)/signup')}
-          style={styles.link}
-          accessibilityRole="link"
-          accessibilityLabel="New here? Create an account"
-        >
-          <Text style={styles.linkText}>New here? Create an account</Text>
-        </TouchableOpacity>
-      </View>
+        <View style={s.dividerRow}>
+          <View style={s.dividerLine} />
+          <Text style={s.dividerText}>OR</Text>
+          <View style={s.dividerLine} />
+        </View>
+
+        <View style={s.switchRow}>
+          <Text style={s.switchLabel}>Don't have an account?</Text>
+          <TouchableOpacity
+            onPress={() => router.push(authRoute('/(auth)/signup', preferredSide) as never)}
+            accessibilityRole="link"
+            accessibilityLabel="Sign up"
+          >
+            <Text style={s.switchCta}>{' '}Sign up.</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  root:     { flex: 1, backgroundColor: '#0d0d0d' },
-  inner:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  logo:     { color: '#fff', fontSize: 28, fontWeight: '800', marginBottom: 6 },
-  tagline:  { color: '#6d28d9', fontSize: 15, marginBottom: 24 },
-  success: {
-    width: '100%', color: '#c4b5fd', backgroundColor: '#1f1630', borderWidth: 1,
-    borderColor: '#6d28d9', borderRadius: 12, paddingVertical: 12, paddingHorizontal: 14,
-    textAlign: 'center', fontSize: 14, marginBottom: 16,
+const PURPLE     = '#7c3aed';
+const PURPLE_DIM = '#4c1d95';
+const BG         = '#0a0a0a';
+const BORDER     = '#2a2a35';
+const TEXT       = '#f3f3f5';
+const MUTED      = '#666';
+
+const s = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: BG,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  card: {
+    width: '100%',
+    maxWidth: 380,
+    paddingHorizontal: 32,
+    paddingTop: 52,
+    paddingBottom: 32,
+    alignItems: 'center',
+  },
+  logoArea: {
+    alignItems: 'center',
+    marginBottom: 28,
+  },
+  wordmark: {
+    color: TEXT,
+    fontSize: 32,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    lineHeight: 36,
+  },
+  heart: {
+    color: PURPLE,
+    fontSize: 18,
+    marginTop: 2,
+  },
+  tagline: {
+    color: MUTED,
+    fontSize: 13,
+    marginBottom: 28,
+    letterSpacing: 0.2,
+  },
+  successBanner: {
+    width: '100%',
+    backgroundColor: '#12101a',
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginBottom: 16,
+  },
+  successBannerText: {
+    color: '#c4b5fd',
+    fontSize: 13,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  inputWrap: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: BORDER,
+    borderRadius: 10,
+    backgroundColor: '#111118',
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
+  inputError: { borderColor: '#ef4444' },
   input: {
-    width: '100%', borderWidth: 1, borderColor: '#2a2a2a', borderRadius: 14,
-    paddingVertical: 14, paddingHorizontal: 18, color: '#fff', fontSize: 15,
-    backgroundColor: '#111', marginBottom: 12,
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    color: TEXT,
+    fontSize: 14,
   },
-  forgot:     { alignSelf: 'flex-end', marginTop: 2, marginBottom: 18 },
-  forgotText: { color: '#c4b5fd', fontSize: 14 },
-  error:      { color: '#f87171', fontSize: 13, marginBottom: 10, textAlign: 'center' },
+  eyeBtn: { paddingHorizontal: 14, paddingVertical: 14 },
+  eyeText: { fontSize: 16 },
+  errorText: {
+    color: '#f87171',
+    fontSize: 12,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+    marginLeft: 2,
+  },
+  forgotRow: { alignSelf: 'flex-end', marginBottom: 20 },
+  forgotText: { color: '#a78bfa', fontSize: 13, fontWeight: '600' },
   btn: {
-    width: '100%', backgroundColor: '#6d28d9', borderRadius: 16,
-    paddingVertical: 17, alignItems: 'center', marginTop: 4, marginBottom: 18,
+    width: '100%',
+    backgroundColor: PURPLE,
+    borderRadius: 10,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  btnDisabled: { opacity: 0.55 },
-  btnText:  { color: '#fff', fontWeight: '700', fontSize: 16 },
-  link:     { marginBottom: 28 },
-  linkText: { color: '#c4b5fd', fontSize: 14 },
+  btnDim: { backgroundColor: PURPLE_DIM },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: 15, letterSpacing: 0.2 },
+  dividerRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  dividerLine: { flex: 1, height: 1, backgroundColor: BORDER },
+  dividerText: {
+    color: MUTED,
+    fontSize: 11,
+    fontWeight: '600',
+    marginHorizontal: 12,
+    letterSpacing: 1.2,
+  },
+  switchRow: { flexDirection: 'row', alignItems: 'center' },
+  switchLabel: { color: MUTED, fontSize: 14 },
+  switchCta: { color: '#a78bfa', fontSize: 14, fontWeight: '700' },
 });

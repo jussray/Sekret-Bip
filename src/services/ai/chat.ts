@@ -86,6 +86,12 @@ function localFallback(
   const reset = /\b(failed|fell off|gave up|stopped|missed|behind|procrastinat)\w*\b/.test(lower);
   const mirror = mayMirrorProfanity(relationship);
 
+  if (personalityId === 'parentCoach') {
+    if (angry) return "Let's slow this down before anyone reacts. What happened right before things escalated?";
+    if (sad) return "That sounds hard for both of you. What happened, and what have you already tried?";
+    return 'Start with what happened at home and what you want to handle differently.';
+  }
+
   if (isShortContinuation) {
     if (personalityId === 'rylane') return "Aight, I'm here. Talk.";
     if (personalityId === 'cloud') return "Hey. No pressure — whatever you want to say, or nothing at all.";
@@ -180,9 +186,7 @@ export async function sendMessage(
                   : 'journal');
 
   if (!WORKER_BASE_URL) {
-    const fallbackText = personalityId === 'parentCoach'
-      ? "Hey. Glad you're here. What's going on at home?"
-      : localFallback(personalityId, text, learnedRelationship);
+    const fallbackText = localFallback(personalityId, text, learnedRelationship);
     if (__DEV__) {
       console.warn(
         '[sendMessage] No EXPO_PUBLIC_BACKEND_URL set — using local fallback.',
@@ -260,9 +264,24 @@ export async function sendMessage(
     };
   }
 
-  const sekretFallback = getSekretFallback(personalityId, text);
-  const guardedReply = keepSekretReply(rawReply, sekretFallback);
-  const guardBlocked = guardedReply !== rawReply.trim();
+  const isParentCoach = personalityId === 'parentCoach';
+  const sekretFallback = isParentCoach
+    ? localFallback(personalityId, text, learnedRelationship)
+    : getSekretFallback(personalityId, text);
+
+  // Teen-companion voices reject em/en dashes as an AI tell. Parent Coach may
+  // use those marks naturally, so remove dash separators only for evaluation.
+  // Collapsing them to whitespace keeps blocked word sequences contiguous;
+  // inserting a hyphen here could let a phrase such as “I'm here to support
+  // you” evade the shared guard.
+  const guardInput = isParentCoach
+    ? rawReply.replace(/\s*(?:—|–|--)\s*/g, ' ').replace(/\s+/g, ' ').trim()
+    : rawReply;
+  const guardedCandidate = keepSekretReply(guardInput, sekretFallback);
+  const guardBlocked = guardedCandidate !== guardInput.trim();
+  const guardedReply = isParentCoach && !guardBlocked
+    ? rawReply.trim()
+    : guardedCandidate;
 
   if (__DEV__ && guardBlocked) {
     console.warn('[sendMessage] keepSekretReply blocked Worker reply — substituted character fallback.', {

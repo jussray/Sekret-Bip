@@ -2,6 +2,8 @@ export const SEKRET_BIP_VISION = Object.freeze({
   id: 'private-teen-emotional-growth',
   stage: 'phased-production-readiness',
   northStar: 'Help teens understand themselves, build emotional skills, and ask for support without surrendering privacy or identity control.',
+  culturalMission: 'Expand the emotional culture available to young people and families by making love, repair, communication, belonging, family responsibility, courage, community, and healthier responses to hurt feel compelling and usable.',
+  proofStrategy: 'Creation over censorship; earn cultural influence through safe product experiences and measurable evidence before public outcome claims.',
   source: 'docs/VISION.md',
 });
 
@@ -20,7 +22,7 @@ export const SEKRET_BIP_GUARDRAILS = Object.freeze([
 
 export function publicSekretBipGuardrailSnapshot() {
   return Object.freeze({
-    version: '1.0.0',
+    version: '1.1.0',
     vision: SEKRET_BIP_VISION,
     guardrails: SEKRET_BIP_GUARDRAILS,
     privacyDefault: 'private',

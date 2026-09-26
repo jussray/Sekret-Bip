@@ -21,6 +21,9 @@ import {
   type ParentFocus,
   type ParentRoomStyle,
 } from '@/features/identity/accountProfile';
+import { fetchPostAuthBootstrap } from '@/services/auth/postAuthBootstrap';
+import { advanceStage, markActivated } from '@/services/onboarding';
+import { getSupabase } from '@/utils/supabase';
 
 const FOCUS_OPTIONS: { id: ParentFocus; label: string; emoji: string }[] = [
   { id: 'support', label: 'Support', emoji: '🤝' },
@@ -66,6 +69,12 @@ export default function ParentSetup() {
     setError(null);
     Keyboard.dismiss();
     try {
+      const bootstrap = await fetchPostAuthBootstrap('parent');
+      if (!bootstrap.requiredConsentsComplete) {
+        router.replace(bootstrap.nextRoute as never);
+        return;
+      }
+
       await saveAccountProfile({
         accountSide: 'parent',
         privateDisplayName,
@@ -75,15 +84,18 @@ export default function ParentSetup() {
         circleNickname: 'Guardian Bip',
         circleAvatarEmoji: selectedRoomStyle === 'dad' ? '👑' : '💜',
       });
-      const state = await submitGuardianVerification();
+      await submitGuardianVerification();
+
+      getSupabase()?.auth.getUser().then(({ data }) => {
+        if (!data.user) return;
+        advanceStage(data.user.id, 'parent_setup_complete').catch(() => null);
+        markActivated(data.user.id, 'onboarding_complete').catch(() => null);
+      });
+
       setUserSide('parent');
       setParentRoomStyle(selectedRoomStyle);
       await refreshVerification();
-      router.replace(
-        state === 'VERIFIED_GUARDIAN'
-          ? '/(parent)/room'
-          : '/(auth)/guardian-verification',
-      );
+      router.replace('/(onboarding)/parent-link');
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to save your Parent profile.');
     } finally {
@@ -99,20 +111,15 @@ export default function ParentSetup() {
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <LinearGradient colors={['#071410', '#0d1f18', '#08140f']} style={StyleSheet.absoluteFill} />
-
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <TouchableOpacity onPress={() => router.back()} style={styles.back}>
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
 
         <Text style={styles.step}>PARENT SETUP</Text>
-        <Text style={styles.title}>Quick intro,{`\n`}then your room.</Text>
+        <Text style={styles.title}>Quick intro,{`\n`}then connect.</Text>
         <Text style={styles.intro}>
-          You can finish setting up now and connect a teen later. No invite code required.
+          Finish your Parent profile, then enter your teen’s private code or continue to guardian review and link later.
         </Text>
 
         <Text style={styles.label}>What should your teen call you?</Text>
@@ -145,9 +152,7 @@ export default function ParentSetup() {
               accessibilityState={{ selected: roomStyle === opt.id }}
             >
               <Text style={styles.cardEmoji}>{opt.emoji}</Text>
-              <Text style={[styles.cardText, roomStyle === opt.id && styles.cardTextActive]}>
-                {opt.label}
-              </Text>
+              <Text style={[styles.cardText, roomStyle === opt.id && styles.cardTextActive]}>{opt.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -163,24 +168,17 @@ export default function ParentSetup() {
               style={[styles.card, focus === opt.id && styles.cardActive]}
             >
               <Text style={styles.cardEmoji}>{opt.emoji}</Text>
-              <Text style={[styles.cardText, focus === opt.id && styles.cardTextActive]}>
-                {opt.label}
-              </Text>
+              <Text style={[styles.cardText, focus === opt.id && styles.cardTextActive]}>{opt.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
       </ScrollView>
 
       <View style={styles.footer}>
-        <TouchableOpacity
-          disabled={!ready}
-          onPress={handleFinish}
-          style={[styles.btn, !ready && styles.btnDisabled]}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.btnText}>{saving ? 'saving…' : 'Finish setup →'}</Text>
+        <TouchableOpacity disabled={!ready} onPress={handleFinish} style={[styles.btn, !ready && styles.btnDisabled]} activeOpacity={0.85}>
+          <Text style={styles.btnText}>{saving ? 'saving…' : 'Continue to private code →'}</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

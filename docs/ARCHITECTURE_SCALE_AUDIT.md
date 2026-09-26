@@ -1,112 +1,114 @@
 # Se'kret Bip — Architecture Audit for 1K to 100K Users
 
-> **Historical audit snapshot.** Originally produced for issue #141 before the July 13 implementation-evidence, exact-release, companion-style, and Supabase authorization work. The findings below are preserved as an audit trail. Current feature state is governed by `implementation-ledger.json`, `docs/CURRENT_STATUS.md`, and live evidence.
+> **Historical audit snapshot.** Originally produced for issue #141. Historical findings remain preserved as an audit trail. Current feature/runtime state is governed by `implementation-ledger.json`, `docs/CURRENT_STATUS.md`, current source, and live evidence.
 
-Last reconciled with current documentation: 2026-07-13
+Last reconciled with current documentation: 2026-08-20
 
 ## Changes since the original audit
 
-The following material changes now exist:
+Material durable changes now include:
 
-- architecture and status claims are checked by the Implementation Evidence gate;
-- the canonical Worker is `sekret-backend` and the Pages project is `sekret-bip`;
-- production verification uses an exact Worker check, deployed `release.json`, health verification, and production Playwright;
-- the Supabase `release-health` function is retired behind JWT protection and is not release evidence;
-- server-owned configuration tables have zero client grants with preserved rows and service-role access;
-- `notification_deliveries` is verified as intentionally service-role-only;
-- three obsolete Edge Functions are JWT-protected HTTP 410 retirements;
-- the companion identity/style contract is integrated into Worker and TTS runtime paths;
-- L4 continuity memory remains planned and blocked by remaining authorization work.
+- architecture and status claims are checked by evidence/truth gates;
+- `api.sekretbip.net` is the stable public API origin currently configured to `sekret-backend`;
+- `sekret` is a founder-confirmed active companion API Worker lineage whose provider binding must be read back before mutation;
+- the code now exposes a clean reply/voice/transcription companion contract separate from privileged Bridge/email/data operations;
+- the preferred future Worker split keeps one public API and uses a Cloudflare Service Binding from `sekret-backend` to `sekret` for `/api/sekret/*`;
+- production verification requires exact release identity, backend health, Supabase runtime, and production Playwright, with exact companion Worker/binding proof added after a split;
+- server-owned configuration/data operations remain protected by database/runtime boundaries;
+- companion identity/style enforcement is integrated into Worker and voice paths;
+- L4 continuity memory remains separately governed.
 
 ## Matters before meaningful scale
 
 ### Point-ledger schema correctness
 
-The original audit found incompatible `point_transactions` assumptions and missing `point_balances` support. The schema reconciliation migration addressed the immediate correctness defect.
-
-The lasting lesson remains: migrations, RPC bodies, and client expectations need executable contract checks. The implementation-evidence gate prevents unsupported feature claims, but it does not replace schema-behavior tests.
+Migrations, RPC bodies, and client expectations need executable contract checks. Machine evidence prevents unsupported feature claims but does not replace schema-behavior testing.
 
 ### Point transaction authorization
 
-Before points can purchase real inventory, verify that clients cannot fabricate positive transactions. Prefer server-owned writes through reviewed RPCs or APIs, narrow direct grants, and test negative paths.
-
-This remains a product-integrity and fraud boundary, not merely a scale optimization.
+Before points purchase real inventory, verify clients cannot fabricate positive transactions. Prefer server-owned writes through reviewed RPCs/APIs, narrow grants, and negative tests.
 
 ### Point-earning limits
 
-Point-earning events require server-side caps, idempotency, and reconciliation before rewards become financially material. Monitor first, but do not connect unbounded client events to redeemable merchandise.
+Point-earning events require server-side caps, idempotency, and reconciliation before rewards become financially material.
 
 ### Route ownership regressions
 
-`(teen)` and `(parent)` are canonical route groups. Historical `(main)` references must not re-enter current code. CI or repository checks are preferable to reviewer memory.
-
-Route grouping remains a presentation boundary, not authorization.
+`(teen)` and `(parent)` are canonical route groups. Historical route references must not silently re-enter current code. Route grouping is presentation, not authorization.
 
 ### Multi-device conflict behavior
 
-Local/cloud synchronization still needs an explicit conflict strategy before the product can claim lossless multi-device editing. Last-write-wins may be acceptable for an early release when disclosed, but silent conflict loss should become visible before usage broadens.
+Local/cloud synchronization needs an explicit conflict strategy before claiming lossless multi-device editing.
 
 ## Matters at growth scale
 
 ### AI request and cost controls
 
-At early scale, measure per-user AI and voice cost. At larger scale, introduce budgets, abuse limits, queueing, graceful degradation, and model-routing controls based on observed traffic rather than speculative complexity.
+Measure per-user AI and voice cost first. Introduce budgets, abuse limits, queueing, graceful degradation, and model routing from observed traffic rather than speculative complexity.
 
-Safety and crisis handling must never be throttled merely to meet a cost ceiling.
+### Companion Worker boundary
 
-### Voice and Worker boundaries
+Earlier versions of this audit said service splitting should wait for scale evidence. The code/provider history now supplies a stronger reason to split: **authority and least privilege**, not fashionable microservices.
 
-The canonical Worker currently owns reply and voice orchestration. Splitting voice into a separate service should be justified by latency, reliability, or concurrency evidence, not architecture fashion.
+The code already groups `/api/sekret/reply`, `/api/sekret/voice`, and `/api/sekret/transcribe` as one typed companion contract. Bridge summary and email are separate privileged responsibilities. Founder/provider history also preserves an active `sekret` companion Worker lineage.
+
+The best-fit target is therefore:
+
+- `sekret`: companion inference, style/safety response enforcement, voice/transcription, AI/voice provider capability;
+- `sekret-backend`: stable public API ingress plus privileged Bridge/data/email/platform operations;
+- Service Binding between them so the client keeps one public API URL.
+
+This split should happen only after provider readback, exact compatibility proof, telemetry least-privilege repair, rollback design, and release-gate coverage.
+
+### Secret blast radius
+
+The current companion telemetry persistence uses `SUPABASE_SERVICE_ROLE_KEY`. Do not copy that key into the companion Worker simply to enable a split. Move privileged persistence behind a narrow internal/backend-owned boundary first.
+
+Reducing the companion Worker to AI/voice capability plus user-authenticated context is a meaningful security/scaling improvement because high-churn companion code no longer needs the same privileged data plane as Bridge/email operations.
+
+### Voice boundary
+
+Voice belongs with the companion execution plane because reply, TTS, and transcription share character identity/style contracts and one client transport. Splitting voice away from companion inference again would need separate latency/reliability evidence.
 
 ### Media retention
 
-Voice notes and images need approved retention and deletion rules before a large corpus accumulates. Retention design is a privacy requirement as well as a storage-cost requirement.
+Voice notes and images need approved retention/deletion rules before a large corpus accumulates.
 
 ### L4 continuity memory
 
-The current runtime supports short-term history and approved context. Durable continuity memory, persistent goals, scheduled reflection, and inter-companion coordination remain planned.
-
-L4 is not a scale blocker, but it is a privacy-sensitive product capability. It must include ownership, provenance, correction, expiry, deletion, RLS, denial tests, runtime use, rollout, telemetry, and rollback before activation.
+Durable continuity memory, persistent goals, scheduled reflection, and inter-companion coordination remain planned privacy-sensitive capabilities. They require provenance, correction, expiry, deletion, RLS, denial tests, runtime proof, rollout, telemetry, and rollback before activation.
 
 ### Observability and retries
 
-Current metadata-only telemetry and Founder Control Room sources provide operational visibility. Exact-release verification now proves which Worker and Pages commit is serving production.
+Metadata-only telemetry and Founder Control Room provide operational visibility. After the Worker split, observability must preserve trace continuity across the public backend and companion Worker without exposing conversation content.
 
-Remaining scale work includes:
+Recommended additions when evidence requires them:
 
-- durable retry/backoff for failed client synchronization;
-- queue visibility;
-- per-provider cost and latency budgets;
-- alerting that does not expose private teen content;
-- production observation of companion style-version metadata.
-
-The retired Supabase `release-health` function must not be cited as current observability or deployment proof.
+- shared correlation/trace IDs across the service binding;
+- per-Worker release/version identity in the same release packet;
+- provider latency/cost budgets;
+- queue/retry visibility where real traffic demonstrates need;
+- companion style-version metadata on the companion Worker;
+- no broad service-role secret solely for telemetry.
 
 ### Moderation and safety
 
-Moderation and safety capacity must scale with usage and must not be capped for cost reasons. The two remaining custom-auth Edge Functions require negative-auth evidence, and broader safety operations still require human and legal review.
+Moderation and safety capacity must scale with usage and remain independently reviewed. Companion reply safety belongs with the companion execution contract; privileged account/data/notification operations remain separate runtime concerns.
 
 ## Cross-cutting event and ledger consistency
 
-Activity events and point transactions can drift when written in separate operations. A periodic reconciliation process is a better-sized response than distributed transactions unless real traffic proves stronger guarantees are necessary.
-
-Before rewards become financially material, define:
-
-- authoritative event source;
-- idempotency key;
-- reconciliation frequency;
-- fraud review path;
-- rollback and correction behavior.
+Activity events and point transactions can drift when written separately. Prefer idempotency and reconciliation over distributed-transaction complexity until traffic proves stronger guarantees are needed.
 
 ## Recommended order from current state
 
-1. Finish high-blast-radius database-function behavior tests.
-2. Add negative-auth tests for `account-delete` and `safety-scan`.
-3. Complete account deletion and Storage cleanup proof.
-4. Complete controlled Bridge and parent relationship production journeys.
-5. Add server-side point caps and fraud boundaries before real merchandise redemption.
-6. Define media retention before significant user growth.
-7. Build one privacy-reviewed L4 continuity path only after its trust boundary is approved.
-8. Revisit service splitting, queues, and advanced scaling from observed production data.
+1. Complete Cloudflare provider readback for `sekret` and `sekret-backend`.
+2. Prove the target `sekret` companion contract is compatible with current reply/voice/transcription clients.
+3. Remove the telemetry dependency on `SUPABASE_SERVICE_ROLE_KEY` from the future companion boundary.
+4. Add a reviewed `sekret-backend -> sekret` Service Binding with rollback to the existing local companion implementation.
+5. Extend exact-release proof to bind both Worker versions and the binding.
+6. Continue high-blast-radius database authorization/behavior tests.
+7. Complete controlled Bridge/parent and deletion journeys.
+8. Add reward/fraud and media-retention controls before financial/storage scale makes them urgent.
+9. Revisit queues and further service splitting only from observed production data.
 
-Do not turn a scale audit into a shopping list of infrastructure. The next architecture should be purchased with evidence, not anxiety.
+Do not turn a scale audit into an infrastructure shopping list. Split where authority, privilege, rollback, and observed bottlenecks justify it.

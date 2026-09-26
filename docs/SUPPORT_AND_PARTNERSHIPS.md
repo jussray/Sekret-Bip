@@ -46,6 +46,20 @@ Support must not:
 - introduce advertising models based on private emotional data
 - require claims that exceed the product's verified implementation state
 
+## Commitment truth
+
+Paid partner, vendor, contractor, or pilot work must not be treated as active unless the required funding is confirmed and founder-authorized.
+
+If funding becomes unavailable:
+
+- pause future paid work and new spending rather than allowing an unfunded commitment to keep expanding;
+- communicate the change promptly and do not invent or promise a payment date that is not supportable;
+- distinguish work already completed or accepted from future or unperformed work;
+- record any completed-work obligation and restart condition in a private operations record, not in the public product repository;
+- resume paid work only after the founder explicitly reauthorizes both the budget and the scope.
+
+This repository may record the durable control, but it must not contain private contractor financial details, personal financial circumstances, or unnecessary identifying information.
+
 ## Current stage
 
 The product is under active development. The teen experience, parent experience, backend, safety boundaries, and release systems are not all production-complete.

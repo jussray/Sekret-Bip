@@ -1,104 +1,132 @@
-# Se'kret Bip — Current Status
+<!-- truth-mode: durable -->
+# Se’kret Bip — Current Status Protocol
 
-Last reviewed: 2026-07-13
+This file explains how to determine Se’kret Bip’s **current** status without freezing volatile provider/runtime facts into repository prose.
 
-This page is the human-readable status summary. `implementation-ledger.json` is the machine-checked source for feature state, evidence, rollout controls, and blockers.
+## Live truth boundary
 
-## Integrated
+Do not use this document to determine the live `main` SHA, the open/closed state of an issue, a Cloudflare result, a Supabase runtime result, or whether production Playwright passed.
 
-- Expo Router route groups for teen and parent experiences
-- Supabase-backed authentication, synchronization, ordered migrations, RLS, Storage, and Edge Functions
-- Canonical Cloudflare Worker `sekret-backend`
-- Cloudflare Pages project `sekret-bip`
-- One typed frontend-to-Worker client and shared request/response contract for companion replies, transcription, speech, health, stable errors, trace IDs, fallback state, and avatar state
-- Companion reply, transcription, speech, and metadata-only telemetry flows
-- Versioned Se'kret identity and companion-style runtime wrapper in Worker and TTS paths
-- Mind + Body Reset guided regulation tools and timer-driven bodyweight workouts
-- Bridge account-link, consent, summary, revocation, and controlled-rollout contracts
-- Founder Control Room operational data sources
-- Exact-release production verification using the Worker check, deployed `release.json`, health verification, and read-only Playwright
-- Implementation Evidence CI gate for architecture, roadmap, status, and agent-skill claims
+Resolve those facts from live authority at decision time:
 
-## Verified authorization and operations slices
+1. GitHub branch / PR / issue / check / review / job state;
+2. the newest marked release receipt on issue #696;
+3. Cloudflare provider evidence for the same target;
+4. the intended Supabase project and live migration/runtime evidence;
+5. production browser, controlled-account, and physical-device evidence where applicable.
 
-- Rollback-contained live proof for sampled owner access, cross-user denial, anonymous denial, and zero synthetic residue
-- `app_config` and `app_private_config` hardened as service-role-only with RLS enabled, zero client grants, zero policies, and unchanged rows
-- `notification_deliveries` verified as an intentional service-role-only table rather than an unresolved user-policy gap
-- `release-health`, `bridge-e2e-probe`, and `github-workflow-status` retired as JWT-protected, side-effect-free HTTP 410 functions with replacement evidence
-- Repository migration history aligned with the live Supabase migration version for config-grant hardening
-- The existing `bip_events` event-to-points trigger restored and inspected live without adding a parallel workout or reward table
-- `comfort_sessions` and `room_memory` now require both permanent-account status and matching ownership; anonymous table grants were removed and authenticated access was reduced to CRUD only
-- Migration `20260713230600_harden_private_self_data_permanent_accounts` is applied live and matches the repository migration ledger
-- A rollback-contained live proof passed 7 of 7 checks: anonymous-auth writes were denied, permanent-owner writes remained functional, least-privilege grants were confirmed, and no synthetic application rows were retained
-- Supabase still emits static anonymous-role warnings for these guarded policies because the advisor does not evaluate `is_non_anonymous_user()`; the executable JWT-claim proof is the authorization evidence
+`docs/TRUTH_AUTHORITY.md` defines how earlier verification becomes historical or superseded when new evidence contradicts it.
 
-## Integrated but not yet fully verified or released
+## Durable repository posture
 
-### Frontend-to-Worker contract spine
+Se’kret Bip has an integrated application and infrastructure foundation and uses evidence-gated launch progression. Integrated code is not automatically production verified.
 
-- `src/contracts/sekretApi.ts` defines the shared reply, voice, transcription, avatar-state, and stable-error contracts.
-- `src/services/backend/sekretClient.ts` owns migrated Worker transport, authentication headers, timeout mapping, trace IDs, and Worker-versus-local fallback state.
-- Main chat, legacy API helpers, and the founder Worker adapter route through the shared client rather than owning separate direct fetch logic.
-- Exact-head CI, Type Check, Quality Gate, Regression, Pre-Push, Companion Lab, and Playwright passed before merge.
-- Exact-production-release observation and complete user-facing proof for 401, 403, 429, timeout, offline, safety, malformed-response, and voice-unavailable states remain before verified or released status.
+Durable foundations include:
 
-### Mind + Body Reset
+- Expo Router auth, onboarding, Teen, Parent, and founder/internal route groups;
+- Supabase Auth, Postgres, RLS, Storage, Edge Functions, and ordered migrations;
+- `https://api.sekretbip.net` as the stable public API origin currently configured to `sekret-backend`;
+- founder-confirmed active Cloudflare Worker `sekret` as the companion API lineage, with exact provider routing/bindings requiring live readback;
+- canonical Cloudflare Pages project `sekret-bip`;
+- shared typed companion request/reply/voice/transcription contracts and stable error mapping;
+- privacy-safe companion, Circle, Calm/Comfort, relationship, deletion, and operational contracts at varying evidence levels;
+- exact-release verification machinery and retained evidence boundaries;
+- production audience journeys for Teen, Bip Jr, and Parent that still require an exact deployed-release execution before they become production proof.
 
-- Guided mind tools, guided body regulation, and four real bodyweight routines are wired through teen-only hidden routes.
-- Work/rest timers, low-impact alternatives, pause, skip, stop, progress, safety guidance, and meaningful-completion thresholds are implemented.
-- Minimal routine metadata uses the existing `bip_events` pipeline; raw emotional text is not written by the reset flow.
-- Exact-head CI, Expo web export, and Playwright passed; physical iOS/Android plus manual timer, accessibility, and movement-safety QA remain before verified or released status.
+## Worker purpose rule
 
-### Parent and Bridge
+Current routing and target architecture are intentionally separate claims.
 
-- Parent routes and linked-account data exist.
-- Bridge contracts and runtime paths exist.
-- Bridge summaries remain under controlled rollout.
-- Production two-account journey proof, full relationship lifecycle coverage, Parent Circle privacy, Parent Coach boundaries, minimal-content notifications, and parent-facing completion remain open.
+**Current repository routing:** clients call `api.sekretbip.net`, which `wrangler.toml` maps to `sekret-backend`.
 
-### Companion identity and style
+**Durable purpose boundary:** companion reply/voice/transcription execution belongs with `sekret`; privileged Bridge/data/email/platform work belongs with `sekret-backend`.
 
-- Canonical identity and style contracts are consumed by Worker and TTS runtime paths.
-- Exact-head CI, Companion Lab, and Playwright passed.
-- Production style-version telemetry still needs to be observed before the feature is promoted from integrated to verified or released.
+**Preferred migration:** preserve the public API URL and delegate `/api/sekret/*` from `sekret-backend` to `sekret` through a Cloudflare Service Binding after provider readback, compatibility proof, least-privilege secret review, and founder approval.
 
-### Control Room
+Until that cutover is proven, do not describe the service binding as live. Do not put `SUPABASE_SERVICE_ROLE_KEY` into `sekret` merely to preserve telemetry.
 
-- Founder-gated operational sources and screens exist.
-- Freshness, unavailable states, and metadata-only boundaries are required.
-- Identity, style, voice, and L4 observer adapters must not be presented as complete before their runtime or data sources are evidenced.
+## Evidence layers
 
-## Enforced release blockers
+Keep these independent:
 
-- Controlled production proof for Bridge and parent relationship journeys
-- Account deletion and privacy lifecycle completion
-- Focused positive and negative behavior tests for remaining high-blast-radius authenticated database functions
-- Continued anonymous-auth policy hardening for Bridge, activity, points/rewards, tasks, relationships, and other private surfaces tracked in issue #399
-- Negative-auth tests for the two remaining custom-auth Edge Functions: `account-delete` and `safety-scan`
-- Password-breach protection planning and Auth regression evidence
-- Legal, accessibility, safeguarding, moderation, and store-review readiness
-- Production evidence for any feature still marked integrated rather than verified or released
+- code present in a branch;
+- exact-head PR checks;
+- checks on the merge/current-main commit;
+- Cloudflare build/deployment/configuration evidence for each Worker and any binding between them;
+- live Supabase schema/authorization/runtime evidence;
+- production browser evidence;
+- controlled-account evidence;
+- physical-device evidence.
 
-## Planned only — not implemented
+A green signal in one layer does not silently prove another.
 
-- Durable L4 continuity memory
-- Persistent companion goals
-- Scheduled reflection jobs
-- Inter-companion coordination
-- Relationship phase derived from persisted evidence
+## Current-status query contract
 
-L4 remains blocked until ownership, provenance, correction, expiration, deletion, RLS, denial tests, runtime use, rollout, and rollback are approved together.
+When an agent or founder asks “where are we now?”, return a small status packet rather than quoting old prose:
 
-## Release posture
+```text
+STATE
+OBSERVED_AT
+TARGET_SHA
+AUTHORITY
+EVIDENCE_REF
+CURRENT | HISTORICAL | SUPERSEDED | UNKNOWN
+```
 
-A controlled internal demo may use synthetic or non-sensitive data while unfinished areas are clearly labeled. Public launch, public demo involving real teen data, app-store release, and production teen-data collection remain blocked until the applicable engineering, privacy, security, legal, and operational gates have evidence.
+Then apply:
 
-See:
+```text
+State → Evidence → Claim
+```
 
-- `implementation-ledger.json`
-- `docs/WIRING_STATUS.md`
-- `docs/DEMO_READINESS_ENFORCEMENT.md`
-- `docs/security/SUPABASE_AUTHORIZATION_PHASE0.md`
-- `security/private-self-data-hardening.json`
-- `docs/legal/LAUNCH_COMPLIANCE_CHECKLIST.md`
+If `main` moved after exact-head evidence, re-pin. If a provider/runtime observation is newer and contradictory, supersede the older current-state claim while retaining it as historical evidence.
+
+For Worker topology questions, separately report:
+
+```text
+PUBLIC_FRONT_DOOR
+COMPANION_WORKER
+PLATFORM_WORKER
+SERVICE_BINDING_STATE
+PROVIDER_ROUTE_READBACK
+EXACT_RELEASE_IDENTITY_PER_WORKER
+```
+
+Unknown provider bindings remain UNKNOWN rather than being inferred from repository filenames.
+
+## Launch evidence classes
+
+Before public-launch readiness is claimed, applicable gates include:
+
+- exact production routing and release identity;
+- canonical public backend health;
+- exact companion Worker identity and service-binding proof once the split is activated;
+- live Supabase migration and runtime/authorization evidence;
+- auth, session restore, recovery, and onboarding journeys;
+- Teen, Bip Jr, Parent/Bridge, Cloud/Comfort, privacy-denial, unlink, and deletion journeys;
+- physical-device, accessibility, offline, notification, moderation, and failure-state QA;
+- legal, safeguarding, store, support, incident-response, backup, restore, and rollback readiness.
+
+The exact set must come from the then-current launch plan and issue authority, not from a historical snapshot.
+
+## Product and UX direction
+
+Se’kret Bip is a premium, living app experience. Cosmic and character art is atmosphere and visual DNA; it is not the product architecture. Prioritize interactive states, embedded companions, emotional responsiveness, personalized home behavior, clear Teen / Parent / Bip Jr journeys, accessible motion, and a coherent mobile design system.
+
+## Planned lanes
+
+L4 continuity memory and L5 synthesis remain separately governed future lanes unless a newer approved plan and exact implementation prove otherwise. They do not enter launch scope merely because they appear in historical strategy material.
+
+## Canonical references
+
+- `docs/TRUTH_AUTHORITY.md`
+- `docs/DOCUMENTATION_MAP.md`
+- `docs/CLOUDFLARE_OWNERSHIP.md`
+- `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md`
+- `docs/LAUNCH_ROADMAP.md`
 - `DEPLOYMENT.md`
+- `implementation-ledger.json`
+- `implementation-ledger.extensions/`
+- issue #696 for exact-production release receipts
+
+Historical dated documents remain useful evidence for their observation window. They do not override fresh live authority.

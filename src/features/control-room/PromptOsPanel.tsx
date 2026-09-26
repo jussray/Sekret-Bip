@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { PERSONALITY_CONFIG } from '@/services/ai/personalities';
 import { AVATAR_PERSONAS, lintAvatarResponse, type AvatarPersona } from '@/services/ai/aiPatternLinter';
 import { PERSONA_OPERATIONS } from '@/config/controlRoomPersonaOperations';
 import { PROMPT_OS_ENTRIES, PROMPT_OS_SCOPE, type PromptOsCategory } from '@/config/controlRoomPromptOs';
+import { getCurrentFounderProfile, isFounderProfile } from '@/services/founderAudit';
 
 type Panel = 'library' | 'personas' | 'quality' | 'deployments';
 const categories: Array<'all' | PromptOsCategory> = ['all', 'personas', 'system', 'redteam', 'engineering', 'release'];
@@ -18,8 +19,26 @@ export default function PromptOsPanel() {
   const [query, setQuery] = useState('');
   const [lintPersona, setLintPersona] = useState<AvatarPersona>('redteam');
   const [lintDraft, setLintDraft] = useState('');
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
   const lintResult = useMemo(() => lintAvatarResponse(lintDraft, lintPersona), [lintDraft, lintPersona]);
   const entries = useMemo(() => PROMPT_OS_ENTRIES.filter((item) => category === 'all' || item.category === category).filter((item) => `${item.title} ${item.description} ${item.tags.join(' ')}`.toLowerCase().includes(query.toLowerCase())), [category, query]);
+
+  useEffect(() => {
+    void getCurrentFounderProfile().then((profile) => {
+      setAuthorized(isFounderProfile(profile));
+    });
+  }, []);
+
+  if (authorized === null) {
+    return <View style={[s.root, s.centerContent]}><ActivityIndicator color="#a78bfa" /></View>;
+  }
+
+  if (!authorized) {
+    return <View style={[s.root, s.centerContent]}>
+      <Text style={s.lockedTitle}>Prompt OS is locked.</Text>
+      <Text style={s.lockedBody}>Founder or admin access is required to view prompt, persona, and quality operations.</Text>
+    </View>;
+  }
 
   return <View style={s.root}>
     <View style={s.header}>
@@ -60,22 +79,29 @@ export default function PromptOsPanel() {
       </> : null}
 
       {panel === 'quality' ? <>
-        <View style={s.panel}><Text style={s.panelTitle}>AI Voice Authenticity</Text><Text style={s.bodyText}>Founder-only advisory linting. Live response retry or blocking stays off until false positives are measured.</Text><Text style={s.detail}>Source: ai_pattern_scan</Text><Text style={s.detail}>Category: ai_quality</Text></View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>{AVATAR_PERSONAS.map((item) => <Chip key={item} label={item} active={lintPersona === item} onPress={() => setLintPersona(item)} />)}</ScrollView>
-        <TextInput value={lintDraft} onChangeText={setLintDraft} placeholder="Paste an avatar draft to lint" placeholderTextColor="#6b7280" multiline style={[s.input, { minHeight: 140, textAlignVertical: 'top' }]} />
-        <View style={s.card}>
-          <View style={s.row}><Text style={s.cardTitle}>Lint result</Text><Text style={[s.status, { color: lintResult.severity === 'block' ? '#fb7185' : lintResult.severity === 'warn' ? '#facc15' : '#4ade80' }]}>{lintResult.severity}</Text></View>
-          <Text style={s.detail}>Score: {lintResult.score}</Text>
-          <Text style={s.bodyText}>{lintResult.summary}</Text>
-          {lintResult.hits.map((hit) => <Text key={hit.patternId} style={s.tags}>{hit.severity.toUpperCase()} · P{hit.patternId} {hit.patternName}: {hit.matches.join(', ')}</Text>)}
+        <View style={s.panel}>
+          <Text style={s.panelTitle}>Voice Integrity Audit</Text>
+          <Text style={s.bodyText}>Founder-only density-based voice review. It does not infer authorship and never blocks on one isolated style marker.</Text>
+          <Text style={s.detail}>Source: voice_density_scan</Text>
+          <Text style={s.detail}>Category: voice_quality</Text>
         </View>
-        <View style={s.card}><Text style={s.cardTitle}>Quality pipeline</Text><Text style={s.bodyText}>Prompt → persona rules → model response → pattern lint → safety checks → telemetry → Control Room issue.</Text></View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>{AVATAR_PERSONAS.map((item) => <Chip key={item} label={item} active={lintPersona === item} onPress={() => setLintPersona(item)} />)}</ScrollView>
+        <TextInput value={lintDraft} onChangeText={setLintDraft} placeholder="Paste an avatar draft to audit" placeholderTextColor="#6b7280" multiline style={[s.input, { minHeight: 140, textAlignVertical: 'top' }]} />
+        <View style={s.card}>
+          <View style={s.row}><Text style={s.cardTitle}>Voice audit</Text><Text style={[s.status, { color: lintResult.severity === 'warn' ? '#facc15' : '#4ade80' }]}>{lintResult.severity}</Text></View>
+          <Text style={s.detail}>Density score: {lintResult.score}</Text>
+          <Text style={s.detail}>Clustered: {lintResult.clustered ? 'yes' : 'no'}</Text>
+          <Text style={s.detail}>Authorship inference: {lintResult.authorshipInference}</Text>
+          <Text style={s.bodyText}>{lintResult.summary}</Text>
+          {lintResult.hits.map((hit) => <Text key={hit.patternId} style={s.tags}>{hit.severity.toUpperCase()} · P{hit.patternId} {hit.patternName} ×{hit.occurrences}: {hit.matches.join(', ')}</Text>)}
+        </View>
+        <View style={s.card}><Text style={s.cardTitle}>Quality pipeline</Text><Text style={s.bodyText}>Prompt → persona rules → model response → voice-density audit → safety checks → telemetry → Control Room issue.</Text></View>
       </> : null}
 
       {panel === 'deployments' ? <>
         <View style={s.panel}><Text style={s.panelTitle}>Prompt lifecycle</Text><Text style={s.bodyText}>Create → test → lint → red-team → deploy → monitor → rollback.</Text></View>
         <View style={s.card}><Text style={s.cardTitle}>Deployment guard</Text><Text style={s.bodyText}>No prompt deployment is active from this screen yet. The first production deployment path must version the prompt, record the actor, preserve the prior version, and provide rollback.</Text></View>
-        <View style={s.card}><Text style={s.cardTitle}>Provider boundary</Text><Text style={s.bodyText}>Prompt OS owns behavior. Provider adapters own ChatGPT, Claude, Codex, Perplexity, or future model formatting.</Text></View>
+        <View style={s.card}><Text style={s.cardTitle}>Provider boundary</Text><Text style={s.bodyText}>Prompt OS owns behavior. Provider adapters own ChatGPT, Claude, Codex, DeepSeek, Perplexity, or future model formatting. DeepSeek remains advisory-only until an authenticated server adapter, output validation, telemetry, cost limits, and rollback are verified.</Text></View>
       </> : null}
     </ScrollView>
   </View>;
@@ -83,6 +109,9 @@ export default function PromptOsPanel() {
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#080611' },
+  centerContent: { alignItems: 'center', justifyContent: 'center', padding: 28 },
+  lockedTitle: { color: '#fff', fontSize: 17, fontWeight: '900', textAlign: 'center' },
+  lockedBody: { color: '#8f899e', fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 8, maxWidth: 300 },
   header: { paddingTop: 58, paddingHorizontal: 20, paddingBottom: 14 },
   kicker: { color: '#a78bfa', fontWeight: '800', fontSize: 11, letterSpacing: 2 },
   title: { color: '#fff', fontWeight: '900', fontSize: 30, marginTop: 4 },

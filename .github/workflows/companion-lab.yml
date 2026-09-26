@@ -1,31 +1,6 @@
 name: Companion Lab Audit
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/companion-lab-audit.js'
-      - 'test/fixtures/companion-lab-scenarios.json'
-      - 'test/fixtures/replies/**'
-      - 'docs/COMPANION_LAB.md'
-      - '.github/workflows/companion-lab.yml'
-      - 'package.json'
-      - 'worker/sekret-reply.ts'
-      - 'src/services/ai/**'
-      - 'src/utils/sekretReply.ts'
-      - 'src/services/sekretVoice.ts'
-  pull_request:
-    paths:
-      - 'scripts/companion-lab-audit.js'
-      - 'test/fixtures/companion-lab-scenarios.json'
-      - 'test/fixtures/replies/**'
-      - 'docs/COMPANION_LAB.md'
-      - '.github/workflows/companion-lab.yml'
-      - 'package.json'
-      - 'worker/sekret-reply.ts'
-      - 'src/services/ai/**'
-      - 'src/utils/sekretReply.ts'
-      - 'src/services/sekretVoice.ts'
   workflow_dispatch:
 
 permissions:
