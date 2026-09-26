@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFile } from 'node:fs/promises';
-
-import { handleGitHubWebhook } from '../worker/github-webhook.ts';
+import ts from 'typescript';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+
+async function loadWebhookRuntime() {
+  const source = await read('worker/github-webhook.ts');
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ES2022,
+      target: ts.ScriptTarget.ES2022,
+    },
+    fileName: 'worker/github-webhook.ts',
+  }).outputText;
+  const encoded = Buffer.from(output, 'utf8').toString('base64');
+  return import(`data:text/javascript;base64,${encoded}`);
+}
 
 async function signature(secret, body) {
   const key = await crypto.subtle.importKey(
@@ -19,6 +31,7 @@ async function signature(secret, body) {
 }
 
 test('GitHub webhook rejects missing secret and invalid signatures', async () => {
+  const { handleGitHubWebhook } = await loadWebhookRuntime();
   const body = new TextEncoder().encode('{"zen":"keep it logically awesome"}');
   const missingSecret = await handleGitHubWebhook(
     new Request('https://api.sekretbip.net/webhooks/github', {
@@ -50,6 +63,7 @@ test('GitHub webhook rejects missing secret and invalid signatures', async () =>
 });
 
 test('GitHub ping is accepted only after HMAC verification', async () => {
+  const { handleGitHubWebhook } = await loadWebhookRuntime();
   const secret = 'test-secret';
   const body = new TextEncoder().encode('{"zen":"keep it logically awesome"}');
   const response = await handleGitHubWebhook(
