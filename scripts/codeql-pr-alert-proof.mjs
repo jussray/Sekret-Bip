@@ -226,6 +226,12 @@ export function runLocalCodeqlProof(env = process.env) {
     throw new Error(`Local CodeQL waiver contract failed for ${language}: ${classified.waiverErrors.join(' ')}`);
   }
   if (classified.blockingFindings.length > 0) {
+    // Temporary diagnostic: surface finding paths so waivers can be added correctly.
+    // Remove after findings are identified and waived.
+    process.stderr.write('BLOCKING_FINDINGS_DETAIL: ' + JSON.stringify(
+      classified.blockingFindings.map((f) => ({rule: f.ruleId, path: f.path, msg: f.message})),
+      null, 2,
+    ) + '\n');
     throw new Error(
       `Local CodeQL security gate failed for ${language}: ${classified.blockingFindings.length} unwaived finding(s)`,
     );
