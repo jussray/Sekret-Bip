@@ -189,6 +189,7 @@ function assertNoCommittedSecrets(relativePath, parsed) {
     /sk-(?:proj-)?[A-Za-z0-9_-]{20,}/,
     /Bearer\s+[A-Za-z0-9._-]{12,}/i,
     /SUPABASE_ACCESS_TOKEN/,
+    /SUPABASE_SECRET_KEY/,
     /SUPABASE_SERVICE_ROLE_KEY/,
     /CLOUDFLARE_API_TOKEN/,
     /NETDATA_CLOUD_API_TOKEN/,

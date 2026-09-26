@@ -1,7 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const SUPABASE_SECRET_KEY = getSupabaseSecretKey() ?? '';
 
 const REQUIRED_CONTRACTS = [
   { contractKey: 'consent_deletion_runtime_truth', version: '20260715060000' },
@@ -19,11 +20,11 @@ function json(body: unknown, status: number): Response {
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405);
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
     return json({ healthy: false, error: 'server_config' }, 500);
   }
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
