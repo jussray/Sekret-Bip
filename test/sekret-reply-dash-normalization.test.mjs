@@ -12,15 +12,18 @@ const tsc = existsSync(localTsc) ? localTsc : 'tsc';
 
 function loadVoice() {
   const out = mkdtempSync(path.join(tmpdir(), 'sekret-dash-'));
+  // Compile from the temp dir with absolute inputs: no tsconfig.json in cwd,
+  // so this works on the repo's pinned TypeScript and on newer majors without
+  // version-specific flags. --rootDir keeps the emitted layout predictable.
   execFileSync(tsc, [
-    '--ignoreConfig',
-    'services/sekretPresence.ts',
-    'services/sekretVoice.ts',
+    path.resolve('services/sekretPresence.ts'),
+    path.resolve('services/sekretVoice.ts'),
+    '--rootDir', path.resolve('.'),
     '--outDir', out,
     '--target', 'ES2020',
     '--module', 'commonjs',
     '--skipLibCheck',
-  ], { stdio: 'inherit' });
+  ], { stdio: 'inherit', cwd: out });
   return { voice: require(path.join(out, 'services', 'sekretVoice.js')), out };
 }
 
