@@ -208,9 +208,9 @@ export async function fetchPagesReplyDetails(input: {
       reply: guardedReply,
       tone: response.tone,
       avatarState: nextState,
-      replySource: 'worker',
-      fallbackUsed: false,
-      fallbackReason: null,
+      replySource: guardBlocked ? 'local-fallback' : 'worker',
+      fallbackUsed: guardBlocked,
+      fallbackReason: guardBlocked ? 'Reply guard replaced Worker reply with character fallback' : null,
     };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);

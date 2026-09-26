@@ -306,7 +306,8 @@ export async function sendMessage(
       surface: normalizedSurface,
       reply_source: data.replySource ?? 'worker',
       history_length: historyLength,
-      fallback_used: result.meta.fallbackUsed,
+      fallback_used: result.meta.fallbackUsed || guardSubstituted,
+      reply_guard_substituted: guardSubstituted,
       trace_id: data.traceId ?? result.meta.traceId ?? null,
       avatar_state: data.avatarState ?? null,
     },
@@ -314,9 +315,11 @@ export async function sendMessage(
 
   return {
     reply: guardedReply,
-    replySource: data.safetyFlag ? 'safety' : 'worker',
-    fallbackUsed: result.meta.fallbackUsed,
-    fallbackReason: result.meta.fallbackUsed ? 'Worker served fallback response' : null,
+    replySource: isSafetyReply ? 'safety' : guardSubstituted ? 'local-fallback' : 'worker',
+    fallbackUsed: result.meta.fallbackUsed || guardSubstituted,
+    fallbackReason: guardSubstituted
+      ? 'Reply guard replaced Worker reply with character fallback'
+      : result.meta.fallbackUsed ? 'Worker served fallback response' : null,
   };
 }
 
