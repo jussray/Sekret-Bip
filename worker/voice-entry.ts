@@ -10,6 +10,7 @@ import {
 } from './firebase-app-check';
 import { emitWorkerTelemetry, type WorkerTelemetryEvent } from './telemetry';
 import { persistAuditEvent, type AuditPersistEnv } from './audit/persist-event';
+import { enforceActiveDefense, type ActiveDefenseEnv } from './active-defense';
 import { normalizeReplyActor, resolveRuntimeStyle } from './runtime-style';
 import { selectVoiceRoute, type CharacterId } from './voice-routing';
 import { synthesizeRoutedVoice, type VoiceProviderEnv } from './voice-providers';
@@ -32,7 +33,7 @@ interface WorkerVersionMetadata {
   timestamp: string;
 }
 
-interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv {
+interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv, ActiveDefenseEnv {
   ALLOWED_ORIGINS?: string;
   VOICE_PROVIDER_MODE?: 'legacy' | 'cloudflare-only' | 'hybrid';
   SEKRET_RATE_LIMITER?: RateLimit;
@@ -201,8 +202,6 @@ function observeAppCheck(
     decision: mode === 'observe' || result.status === 'valid' ? 'allow' : 'block',
     violation_codes: result.reason ? [`app_check_${result.reason}`] : undefined,
   };
-  // Never log the bearer App Check token or decoded token body. Cloudflare
-  // receives only the privacy-safe verification classification and reason.
   emitWorkerTelemetry(event);
 }
 
@@ -379,9 +378,13 @@ export default {
   async fetch(request: Request, env: Env, ctx: MinimalExecutionContext): Promise<Response> {
     const started = Date.now();
     const cors = corsHeaders(request, env);
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+    const activeDefense = enforceActiveDefense(request, env, ctx, started);
+    if (activeDefense.response) return withSecurityHeaders(activeDefense.response, cors);
+
     const blocked = originRejected(request, env, cors);
     if (blocked) return blocked;
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
     const path = new URL(request.url).pathname;
     if (request.method === 'GET' && path === '/health') {
