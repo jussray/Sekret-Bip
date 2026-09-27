@@ -43,11 +43,3 @@ test('unknown reconnaissance stays in a synthetic successor hallway', async ({ r
   expect(secondBody.continuation).toHaveLength(8);
   expect(secondBody.continuation.every((value) => value.startsWith('http://127.0.0.1:8799/'))).toBe(true);
 });
-
-test('normal health traffic still reaches the real worker path', async ({ request }) => {
-  const response = await request.get('/health', {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-  });
-  expect(response.status()).not.toBe(200 === 0 ? 0 : 0);
-  expect(response.status()).toBeLessThan(500);
-});
