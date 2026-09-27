@@ -212,12 +212,34 @@ jobs:
       # Attack 2000 evidence rule: after exact-current-main trust is established,
       # independent proof planes keep observing even when a sibling plane fails or stalls.
       # A failed plane still fails the job; it no longer suppresses unrelated evidence.
+      - name: Ensure PostgreSQL client for project database witness
+        if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          psql --version
+
       - name: Verify exact Supabase production schema contract
         id: supabase_schema
         if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
         timeout-minutes: 5
         env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: node scripts/verify-supabase-production-db-witness.mjs
+
+      - name: Audit Supabase Management API identity without gating release
+        id: supabase_management_identity
+        if: ${{ !cancelled() && steps.trusted_current_main.outcome == 'success' }}
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_SCHEMA_EVIDENCE_PATH: artifacts/supabase-management-api-schema.json
         run: node scripts/verify-supabase-production-schema.mjs
 
       - name: Record safe frontend and backend transport evidence
@@ -295,6 +317,7 @@ jobs:
             artifacts/cloudflare-native-deploy.json
             artifacts/production-release-endpoint-probe.json
             artifacts/supabase-production-schema.json
+            artifacts/supabase-management-api-schema.json
             playwright-report-production/
             test-results-production/
           if-no-files-found: warn
@@ -312,5 +335,5 @@ jobs:
           RELEASE_OBSERVATION_MODE: blocked
           VERIFICATION_JOB_STATUS: failure
           RELEASE_STEP_OUTCOMES: >-
-            {"trusted_target":"${{ steps.trusted_target.outcome }}","checkout":"${{ steps.checkout.outcome }}","exact_head":"${{ steps.exact_head.outcome }}","setup_node":"${{ steps.setup_node.outcome }}","install":"${{ steps.install.outcome }}","trusted_current_main":"${{ steps.trusted_current_main.outcome }}","cloudflare_release":"${{ steps.cloudflare_release.outcome }}","supabase_schema":"${{ steps.supabase_schema.outcome }}","release_transport":"${{ steps.release_transport.outcome }}","backend_health":"${{ steps.backend_health.outcome }}","supabase_health":"${{ steps.supabase_health.outcome }}","chromium":"${{ steps.chromium.outcome }}","production_browser_observation":"${{ steps.production_browser_observation.outcome }}","production_playwright":"${{ steps.production_playwright.outcome }}","upload_evidence":"${{ steps.upload_evidence.outcome }}"}
+            {"trusted_target":"${{ steps.trusted_target.outcome }}","checkout":"${{ steps.checkout.outcome }}","exact_head":"${{ steps.exact_head.outcome }}","setup_node":"${{ steps.setup_node.outcome }}","install":"${{ steps.install.outcome }}","trusted_current_main":"${{ steps.trusted_current_main.outcome }}","cloudflare_release":"${{ steps.cloudflare_release.outcome }}","supabase_schema":"${{ steps.supabase_schema.outcome }}","supabase_management_identity":"${{ steps.supabase_management_identity.outcome }}","release_transport":"${{ steps.release_transport.outcome }}","backend_health":"${{ steps.backend_health.outcome }}","supabase_health":"${{ steps.supabase_health.outcome }}","chromium":"${{ steps.chromium.outcome }}","production_browser_observation":"${{ steps.production_browser_observation.outcome }}","production_playwright":"${{ steps.production_playwright.outcome }}","upload_evidence":"${{ steps.upload_evidence.outcome }}"}
         run: node "$RUNNER_TEMP/sekret-publish-production-release-observation.mjs"
