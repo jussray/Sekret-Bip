@@ -9,6 +9,7 @@ on:
       - security/*-edge-entry.*
       - test/reciprocal-defense.test.mjs
       - test/reciprocal-ingress.test.mjs
+      - wrangler.toml
       - .github/workflows/reciprocal-defense.yml
   workflow_dispatch:
 permissions:
@@ -24,3 +25,7 @@ jobs:
           node-version: "22"
       - name: Verify reciprocal defense and ingress invariants
         run: node --test test/reciprocal-defense.test.mjs test/reciprocal-ingress.test.mjs
+      - name: Verify Se'kret Bip edge wiring
+        run: |
+          grep -q '^main = "security/sekret-edge-entry.ts"' wrangler.toml
+          grep -q "export \* from '../worker/voice-entry'" security/sekret-edge-entry.ts
