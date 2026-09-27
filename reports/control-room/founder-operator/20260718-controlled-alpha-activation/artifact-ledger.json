@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "planId": "20260718-controlled-alpha-activation",
+  "sourceOfTruth": "Founder Control Room",
+  "repository": "jussray/Sekret-Bip",
+  "pullRequest": 495,
+  "branch": "launch/controlled-alpha-activation",
+  "order": [
+    "observe",
+    "orient",
+    "artifact-plan",
+    "execute",
+    "verify",
+    "decide"
+  ],
+  "currentPhase": "execute",
+  "items": [
+    {
+      "id": "mission-brief",
+      "phase": "observe",
+      "owner": "chatgpt",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/mission-brief.md",
+      "status": "complete",
+      "acceptance": "Mission, 5W1H, scope, exclusions, exact-state baseline, sequence, and non-claims are explicit.",
+      "nextAction": "Maintain when scope or evidence changes."
+    },
+    {
+      "id": "artifact-ledger",
+      "phase": "artifact-plan",
+      "owner": "chatgpt",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/artifact-ledger.json",
+      "status": "active",
+      "acceptance": "Every required launch artifact appears in dependency order with one owner, acceptance gate, status, and next action.",
+      "nextAction": "Append newly discovered requirements in dependency order without deleting earlier entries."
+    },
+    {
+      "id": "system-map",
+      "phase": "orient",
+      "owner": "codex",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/system-map.md",
+      "status": "complete",
+      "acceptance": "App variants, feature flags, Worker routing, Supabase authorization, relationship lifecycle, deletion, preview builds, and device evidence are mapped with dependencies.",
+      "nextAction": "Apply current-state corrections through the repository boundary evidence and future map revisions."
+    },
+    {
+      "id": "red-team-register",
+      "phase": "orient",
+      "owner": "chatgpt",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/red-team-register.md",
+      "status": "complete-with-open-risks",
+      "acceptance": "Privacy, cross-user, deletion, false-green, rollout, credential, and rollback risks have observable triggers and controls.",
+      "nextAction": "Keep live RLS, deletion, authentication, deployment identity, device, and journey risks open until executed proof exists."
+    },
+    {
+      "id": "bottleneck-map",
+      "phase": "orient",
+      "owner": "chatgpt",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/bottleneck-map.md",
+      "status": "complete",
+      "acceptance": "The highest-leverage constraint and smallest reversible executable slice are explicit.",
+      "nextAction": "Repository boundary and authorization contracts are implemented; advance through complete-checkout verification before external runtime actions."
+    },
+    {
+      "id": "repository-boundary-evidence",
+      "phase": "execute",
+      "owner": "codex",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/repository-boundary-evidence.md",
+      "status": "complete",
+      "acceptance": "Beta audience, Worker fail-closed, Bridge source/consent intent, Crew RPC-only mutation, private non-recursive RLS helpers, rollback, and exact non-claims are retained.",
+      "nextAction": "Preserve these boundaries through exact-head compilation, unit, migration, bundle, export, and browser verification."
+    },
+    {
+      "id": "supabase-live-baseline",
+      "phase": "execute",
+      "owner": "supabase",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/supabase-live-baseline.md",
+      "status": "complete-pre-migration-baseline",
+      "acceptance": "The live project, migration history, catalog probe results, schema compatibility, indexes, aggregate drift, advisor findings, branch-capability result, non-claims, and founder gates are retained without private identifiers or persistent mutation.",
+      "nextAction": "Use this as the before-state. After an approved isolated or local migration validation and separate live-application approval, rerun catalog probe v2 expecting 12 of 12 and rerun security advisors."
+    },
+    {
+      "id": "relationship-authorization-contract",
+      "phase": "execute",
+      "owner": "supabase",
+      "path": "supabase/probes/controlled_alpha_relationship_contract_v2.sql",
+      "status": "isolated-branch-blocked-by-plan",
+      "acceptance": "The three ordered forward migrations parse, apply cleanly in an approved isolated or dry-run environment, preserve RLS, expose only intended RPCs, keep private helpers outside the public API, and pass catalog probe v2 without reading user rows.",
+      "nextAction": "The founder-approved development-branch attempt was rejected because branching requires Supabase Pro. No branch or charge exists. Continue through a local Supabase reset when repository access recovers, or obtain separate approval for a plan upgrade or separately priced validation project. Hold live migration application."
+    },
+    {
+      "id": "authentication-security-gate",
+      "phase": "execute",
+      "owner": "founder",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/founder-decision-pack.md",
+      "status": "human-required",
+      "acceptance": "Compromised-password protection is enabled before controlled-alpha password invitations, or an explicit accepted-risk decision and alternative authentication control are recorded.",
+      "nextAction": "Founder decides whether to enable the protection before controlled-account creation. Do not represent password authentication as launch-ready while this remains unresolved."
+    },
+    {
+      "id": "alpha-runtime-record",
+      "phase": "execute",
+      "owner": "cloudflare",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/alpha-runtime-record.md",
+      "status": "prepared-human-gated",
+      "acceptance": "Dedicated alpha runtime identity, non-secret configuration, deployment evidence, preview build identities, production isolation, and rollback are retained.",
+      "nextAction": "After complete-checkout tests, migration verification, implementation-ledger validation, and the Wrangler dry run, stop for founder approval before credential use, migration application, deployment, paid build capacity, or distribution."
+    },
+    {
+      "id": "verification-report",
+      "phase": "verify",
+      "owner": "playwright",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/verification-report.json",
+      "status": "partial",
+      "acceptance": "Executed proof, exact state, infrastructure classifications, failures, and remaining blockers are summarized without false-green claims.",
+      "nextAction": "Append complete-checkout, migration, runtime, build, journey, deletion, and device results as each executes."
+    },
+    {
+      "id": "trust-journey-evidence",
+      "phase": "verify",
+      "owner": "playwright",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/trust-journey-evidence.json",
+      "status": "planned-human-gated",
+      "acceptance": "Bridge, Crew, revocation, re-share, unlink, deletion, cleanup, and second-user isolation are observed with controlled accounts.",
+      "nextAction": "The synthetic fixture and evidence checklist exists. Keep execution blocked until approved runtime, database parity, accounts, and founder authorization are available."
+    },
+    {
+      "id": "device-evidence",
+      "phase": "verify",
+      "owner": "playwright",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/device-evidence.json",
+      "status": "planned-blocked-by-preview-builds",
+      "acceptance": "Teen and parent iOS/Android installs, critical routes, accessibility, offline behavior, and failure states are retained.",
+      "nextAction": "The device matrix exists. Keep execution blocked until exact-head teen and parent preview builds are approved, created, and distributed to the controlled devices."
+    },
+    {
+      "id": "founder-decision-pack",
+      "phase": "decide",
+      "owner": "founder",
+      "path": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/founder-decision-pack.md",
+      "status": "prepared-human-gated",
+      "acceptance": "The decision pack records current evidence, the approved but plan-blocked branch attempt, safe alternatives, authentication protection choice, public RPC posture, and non-claims.",
+      "nextAction": "Founder may separately approve a Supabase plan upgrade, a separately priced validation project, or wait for local/hosted repository execution. The recommended live migration and distribution state remains hold."
+    }
+  ],
+  "standingRules": [
+    "Use Founder Control Room as the operational source of truth.",
+    "Treat GitHub as repository memory and evidence, not a substitute for executed proof.",
+    "Add newly discovered requirements in dependency order without deleting prior work.",
+    "Do not count zero-step workflow failures as code or test results.",
+    "Do not expose raw teen content to parents.",
+    "Do not enable unfinished L4 or L5 concepts.",
+    "Do not merge, deploy, use credentials, spend, mutate data, widen distribution, or delete material without the founder gate."
+  ]
+}

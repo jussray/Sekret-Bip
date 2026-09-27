@@ -22,6 +22,7 @@ Maturity scale used below, specific to this doc:
 | L2 | Stateless call + injected short-term history (**current state**) |
 | L3 | Durable memory across sessions, per companion, per user |
 | L4 | L3 + persistent goals, self-reflection, and coordination across companions where warranted |
+| L5 | L4 + cross-companion synthesis under explicit consent, autonomous goal proposal (not just tracking), and self-directed reflection scheduling — **not started; blocked on L4 reaching `verified`, see below** |
 
 ## Current state (as implemented today)
 
@@ -155,3 +156,33 @@ bundle:
 3. Wire into `src/services/ai/buildReplyRequest.ts` where `oracleContext` is
    already assembled
 4. Tests under `test/`, following `test/companion-reply-continuity.test.mjs`
+
+## L5 — cross-companion synthesis (blocked, not started)
+
+L5 is a real target, not a hypothetical: once companions have durable,
+individually retrievable memory (L4), the next honest step up is letting
+Se'kret/Oracle *synthesize* across what Raylene, Rylane, Cloud, and Night
+have each separately learned — under explicit consent — and let the system
+propose goals rather than only track ones the teen stated. That's a
+meaningfully different capability from L4, not a relabeling of it.
+
+It is **not started**, and per `.agents/skills/bip-l4-memory/SKILL.md`'s own
+rule — *"absence of one of these paths is a delivery gap, not permission to
+invent a parallel implementation"* — no L5 schema, service, or runtime should
+be built before L4 exists. Concretely, L5 contract work cannot begin until:
+
+- `l4-continuity-memory` in `implementation-ledger.json` reaches `verified`
+  (not just `integrated` — L5 depends on L4's memory actually being proven
+  correct and denial-tested in production, not merely wired up);
+- the `SPRINT.md` "Next execution order" items that gate L4 schema activation
+  (anonymous-auth policy hardening, authenticated-RPC behavior tests,
+  negative-auth tests for the two custom-auth Edge Functions, password-breach
+  protection planning) are complete;
+- cross-companion consent has its own reviewed contract — L5's "synthesis
+  across companions" is exactly the kind of cross-companion sharing
+  `bip-l4-memory` lists as an **"Automatic blocker"** ("silently
+  cross-companion sharing") unless it's explicit and consented.
+
+This section exists so "L5" has one honest definition instead of being
+reinvented differently by a future session. See `implementation-ledger.json`'s
+`l5-cross-companion-synthesis` entry for its tracked status.

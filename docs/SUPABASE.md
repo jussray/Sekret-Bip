@@ -1,147 +1,180 @@
-# Se'kret Bip — Supabase setup
+# Se'kret Bip — Supabase Setup and Trust Boundaries
 
-Phase 2 backend. Wires real cloud sync for mood, journal, voice, circle,
-comfort sessions, bip crew, and crew check-ins.
+Last reviewed: 2026-07-13
 
-The app **already works without Supabase** — every cloud call is a safe
-no-op when env vars are missing, and all state stays in AsyncStorage. Add
-Supabase to get cross-device sync, durable history, and (eventually) real
-crew invites.
+Supabase provides authentication, Postgres, Row Level Security, Storage, Realtime-capable data paths, database functions, and Edge Functions for Se'kret Bip.
 
-## 1. Create the project
+The active production project is tracked in the repository security baseline. Never place service-role credentials or server-only secrets in the Expo bundle.
 
-1. Go to [supabase.com](https://supabase.com) and create a new project.
-2. Project Settings → API → copy:
-   - `Project URL` → goes in `EXPO_PUBLIC_SUPABASE_URL`
-   - `anon public` key → goes in `EXPO_PUBLIC_SUPABASE_ANON_KEY`
-3. **NEVER** copy or commit the `service_role` key. It bypasses RLS and
-   stays server-side only.
+## 1. Client configuration
 
-## 2. Apply the schema
-
-`supabase/migrations/` is the single source of truth for the schema — apply
-it with the Supabase CLI:
-
-```bash
-npx supabase login
-npx supabase link --project-ref <your-project-ref>
-npx supabase db push
-```
-
-This runs every file in `supabase/migrations/` in order, creating each
-table, enabling Row Level Security, and adding owner-only policies — each
-row is scoped to `auth.uid()`. Every migration is written to be safely
-rerunnable (`create table if not exists`, `drop policy if exists` before
-`create policy`), so `db push` is safe to run again after pulling new
-migrations.
-
-No dashboard SQL Editor paste-in required, and none of the tables it
-creates are hand-maintained anywhere else in the repo.
-
-## 3. Enable anonymous auth
-
-1. Authentication → Providers → enable **Anonymous Sign-Ins**.
-2. The app calls `supabase.auth.signInAnonymously()` on boot
-   (`utils/sync.ts → ensureAnonymousSession`) so each user gets a stable
-   `auth.uid()` without giving up an email. They can upgrade later.
-
-## 4. Add env vars
-
-Copy `.env.example` → `.env.local` and fill in the two values.
+Copy `.env.example` to `.env.local` and add only client-safe public values:
 
 ```bash
 cp .env.example .env.local
-# edit .env.local with your real URL + anon key
 ```
 
-Then restart Expo with cache cleared:
+```text
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
+EXPO_PUBLIC_BACKEND_URL=
+```
+
+The public Supabase key is not an authorization bypass. RLS, RPC authorization, Storage policies, and server checks remain mandatory.
+
+Never add service-role credentials, database passwords, Edge Function shared secrets, or AI provider keys to public variables.
+
+## 2. Authentication model
+
+The canonical product flow is:
+
+```text
+Splash -> Age Gate -> Sign Up / Sign In -> Private Profile Setup -> Teen or Parent App
+```
+
+Current account identity is based on Supabase Auth users and private profile/account records. Do not restore anonymous sign-in as a default boot behavior without a reviewed product, migration, privacy, merge, and deletion plan.
+
+Account and cloud synchronization must remain blocked until age and account/profile gates are resolved.
+
+Real names and private account fields must not be reused as public Circle identity. Public identity, trusted relationships, guardian access, and private-self contexts are distinct authorization surfaces.
+
+## 3. Schema source of truth
+
+`supabase/migrations/` is the only schema source of truth.
 
 ```bash
-npx expo start --clear
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npx supabase db push
 ```
 
-`.env.local` is gitignored — never commit it.
+Rules:
 
-## 5. Verify
+- do not paste a second full bootstrap schema into the SQL editor;
+- do not edit live tables without a repository migration and reconciliation plan;
+- migration filenames and live migration versions must agree;
+- migrations must replay in order against a fresh project;
+- data migrations require explicit rollback or correction strategy.
 
-Open the app. On first boot you should see a row appear in `auth.users`
-in your Supabase dashboard. After tapping a mood, you should see a row in
-`mood_history`. After writing a journal, a row in `journal_entries`.
+## 4. Authorization evidence
 
-If nothing appears, check the **Logs** tab in Supabase — RLS denials show
-there. The most common issue is forgetting to enable anonymous sign-ins.
+Current verified live slices are recorded in:
 
-## What gets synced
+- `security/supabase-authorization-baseline.json`
+- `docs/security/SUPABASE_AUTHORIZATION_PHASE0.md`
+- `supabase/probes/authorization_phase0.sql`
 
-| Local state         | Cloud table         | Helper                  |
-|---------------------|---------------------|-------------------------|
-| `moodHistory`       | `mood_history`      | `syncMood`              |
-| `journalEntries`    | `journal_entries`   | `syncJournal`           |
-| `circlePosts`       | `circle_posts`      | `syncCirclePost`        |
-| `voiceNotes`        | `voice_notes`       | `syncVoiceNote`         |
-| `comfortSessions`   | `comfort_sessions`  | `syncComfortSession`    |
-| `crewMembers`       | `crew_members`      | `syncCrewMember`        |
-| `crewCheckIns`      | `crew_check_ins`    | `syncCrewCheckIn`       |
+Verified slices currently include:
 
-Each helper is a fire-and-forget call from the existing local-write paths
-in `app/index.tsx` and `screens/BipCrewScreen.tsx`. Local writes happen
-first and never wait on the network — if the cloud call fails, the local
-copy is still saved to AsyncStorage and the user sees no error.
+- owner access for sampled private tables;
+- cross-user read and update denial;
+- anonymous denial;
+- zero synthetic probe residue;
+- server-only configuration tables with zero client grants and preserved rows;
+- `notification_deliveries` as an intentional service-role-only table;
+- JWT-protected retirement of obsolete release/probe Edge Functions.
 
-## Boot-time cloud restore
+These proofs are scoped. They do not certify every table, function, Storage path, or relationship state.
 
-On every app boot, after the local AsyncStorage restore finishes, the app:
+## 5. RLS and database functions
 
-1. Calls `ensureAnonymousSession()` to get a stable `auth.uid()`.
-2. Calls `pullAll()` to fetch every owned row from the cloud.
-3. **Merges** cloud + local: cloud rows win on `id` collision, any
-   local-only rows survive and sync up on the next write.
-4. Merged state is persisted back to AsyncStorage via the existing save
-   effect — so the next launch is instant and offline-safe.
+UI hiding never counts as authorization.
 
-This means a fresh install on a second device hydrates with the user's
-full history once they sign in (anon today, email later).
+For user-owned tables:
 
-## What's NOT synced yet
+- derive ownership from `auth.uid()` or an equivalent reviewed relationship boundary;
+- test positive owner access;
+- test anonymous denial;
+- test cross-user read and write denial;
+- test parent, guardian, founder, or moderator roles separately when applicable.
 
-- `roomMemory` — the table exists (`room_memory`) but the helper isn't
-  wired into `updateRoomMemory` yet. Will land in the next pass.
-- Realtime subscriptions — Crew check-ins are local-only right now. The
-  next pass adds `supabase.channel('crew').on('postgres_changes', ...)`
-  so check-ins from another device appear in real time.
-- Period tracker — `period_days` table exists, wiring is pending.
+For `SECURITY DEFINER` functions:
 
-## Notes on safety
+- set an explicit `search_path`;
+- minimize `EXECUTE` grants;
+- perform authorization inside the function;
+- test unauthorized roles and cross-user inputs;
+- do not accept a user identifier as authority merely because it appears in an argument.
 
-- Every table has RLS enabled with owner-only policies. A user cannot read
-  or write another user's rows, even with the anon key.
-- Composite primary key `(user_id, id)` lets device-generated ids
-  round-trip cleanly through AsyncStorage and the cloud.
-- All sync helpers swallow errors so a broken cloud never breaks the local
-  experience. Errors only surface in dev logs.
+High-blast-radius authenticated functions still require focused behavior suites before L4 activation.
 
-## Running in GitHub Codespaces
+## 6. Server-only tables
 
-For the full step-by-step (open Codespace, install, env vars, start, smoke
-tests), see [`docs/CODESPACES.md`](./CODESPACES.md). The short version:
+A table can intentionally have RLS enabled, zero policies, and no client grants when it is owned exclusively by server operations.
 
-1. Open the repo on GitHub → **Code** → **Codespaces** → **Create codespace on main**.
-2. In the Codespace terminal:
-   ```bash
-   npm install --legacy-peer-deps
-   cp .env.example .env.local
-   ```
-3. Fill `.env.local` with your `EXPO_PUBLIC_SUPABASE_URL` and
-   `EXPO_PUBLIC_SUPABASE_ANON_KEY` from Supabase → Settings → API.
-4. Run `npx supabase link --project-ref <your-project-ref> && npx supabase db push` once (see [§2](#2-apply-the-schema)).
-5. Start the app:
-   ```bash
-   npx expo start --web
-   ```
-6. Click the forwarded-port toast to open the app in a new tab. Watch
-   the DevTools console for `[sync] pullAll hydrated { ... }` to confirm
-   cloud restore fired on boot.
+Current examples include:
 
-Without `.env.local` the app still runs — it just stays offline-only and
-`pullAll` short-circuits silently. That's intentional so contributors can
-demo the UI without a Supabase project.
+- `app_config`;
+- `app_private_config`;
+- `guardian_verification_reviews`;
+- `notification_deliveries`.
+
+Do not add a client policy merely to silence an advisor. A new client use case must add a reviewed API or policy, tests, minimization, rollout, and rollback together.
+
+## 7. Storage
+
+Private buckets and object paths must use owner-scoped policies. Folder naming is not authorization unless policies enforce it.
+
+Before release, test:
+
+- owner upload/read/delete;
+- cross-user denial;
+- parent denial unless explicitly shared;
+- sign-out and second-user isolation;
+- account deletion cleanup;
+- failed cleanup retry and idempotency.
+
+## 8. Edge Functions
+
+Deploy Edge Functions from `supabase/functions/` with explicit authentication settings.
+
+Current boundary classes:
+
+- platform-JWT user functions;
+- dedicated server-to-server custom-auth functions;
+- retired functions that return HTTP 410 behind platform JWT verification.
+
+`release-health`, `bridge-e2e-probe`, and `github-workflow-status` are retired. They are not active product or release systems.
+
+`account-delete` and `safety-scan` remain dedicated custom-auth functions and require focused negative-auth evidence.
+
+## 9. Cloud synchronization
+
+Local-first behavior must not silently create identity or merge data before account gates resolve.
+
+For every synchronized data type, document:
+
+- local owner;
+- cloud table;
+- stable identifier;
+- conflict behavior;
+- deletion behavior;
+- second-device restore behavior;
+- sign-out cleanup;
+- retry/error visibility.
+
+Do not claim lossless multi-device editing until conflict behavior is user-visible and tested.
+
+## 10. Validation
+
+Repository checks:
+
+```bash
+npm run type-check
+npm test
+npm run lint
+npm run audit:control-room
+npm run verify:prepush
+```
+
+Authorization changes also require focused live or rollback-contained probes. A regex scanner can detect missing declarations, but it cannot prove policy behavior.
+
+## 11. Codespaces
+
+See `docs/CODESPACES.md` for environment setup. Hydrate Git LFS before visual validation:
+
+```bash
+git lfs pull
+```
+
+Codespaces and local Supabase configuration are development tools. Production schema and function claims must be reconciled against the active project and committed evidence.

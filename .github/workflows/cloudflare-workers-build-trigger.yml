@@ -1,0 +1,347 @@
+name: Reconcile Cloudflare Workers Build Trigger
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'wrangler.toml'
+      - 'scripts/reconcile-cloudflare-workers-build-trigger.mjs'
+      - 'scripts/run-with-normalized-cloudflare-token.mjs'
+      - 'test/cloudflare-workers-build-trigger-control-plane.test.mjs'
+      - 'test/cloudflare-workers-build-trigger-approval.test.mjs'
+      - 'test/cloudflare-workers-token-fallback.test.mjs'
+      - 'test/cloudflare-workers-release-identity-trigger.test.mjs'
+      - 'test/cloudflare-workers-build-trigger-workflow-contract.test.mjs'
+      - 'test/cloudflare-workers-build-watch-path-observation.test.mjs'
+      - '.github/workflows/cloudflare-workers-build-trigger.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'wrangler.toml'
+      - 'scripts/reconcile-cloudflare-workers-build-trigger.mjs'
+      - 'scripts/run-with-normalized-cloudflare-token.mjs'
+      - 'test/cloudflare-workers-build-trigger-control-plane.test.mjs'
+      - 'test/cloudflare-workers-build-trigger-approval.test.mjs'
+      - 'test/cloudflare-workers-token-fallback.test.mjs'
+      - 'test/cloudflare-workers-release-identity-trigger.test.mjs'
+      - 'test/cloudflare-workers-build-trigger-workflow-contract.test.mjs'
+      - 'test/cloudflare-workers-build-watch-path-observation.test.mjs'
+      - '.github/workflows/cloudflare-workers-build-trigger.yml'
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: Apply trigger repair and request the exact native Worker build
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-workers-build-trigger-production
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  BIP_WORKER_NAME: sekret-backend
+  # Keep the provider build phase non-mutating. The reviewed deploy wrapper
+  # stamps WORKER_RELEASE_SHA itself immediately before wrangler deploy.
+  BIP_WORKER_BUILD_COMMAND: ''
+  BIP_WORKER_DEPLOY_COMMAND: npm run deploy:api:production
+  BIP_WORKER_BUILD_COMMIT: ${{ github.sha }}
+  CLOUDFLARE_BUILD_EVIDENCE_PATH: artifacts/cloudflare-workers-build-trigger.json
+
+jobs:
+  contract:
+    name: Verify Workers Builds trigger contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Run focused trigger reconciliation tests
+        run: >-
+          node --test
+          test/cloudflare-workers-build-trigger-control-plane.test.mjs
+          test/cloudflare-workers-build-trigger-approval.test.mjs
+          test/cloudflare-workers-token-fallback.test.mjs
+          test/cloudflare-workers-release-identity-trigger.test.mjs
+          test/cloudflare-workers-build-trigger-workflow-contract.test.mjs
+          test/cloudflare-workers-build-watch-path-observation.test.mjs
+
+  reconcile:
+    name: Reconcile native Workers Builds trigger
+    needs: contract
+    # Trusted main pushes may inspect provider state and fail closed when it is
+    # unsafe. Provider mutation remains an explicit workflow_dispatch apply=true action.
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.sha }}
+      CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check out exact trusted head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact trusted head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Require Cloudflare control-plane credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_WORKERS_BUILDS_API_TOKEN:-}" ] && [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo 'At least one Cloudflare API token is required for Workers Builds control-plane access.' >&2
+            exit 1
+          fi
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || {
+            echo 'CLOUDFLARE_ACCOUNT_ID is not configured.' >&2
+            exit 1
+          }
+
+      - name: Preflight dedicated Builds token
+        id: dedicated_preflight
+        continue-on-error: true
+        env:
+          TOKEN_VALUE: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+          TOKEN_SOURCE: dedicated-builds-token
+        run: |
+          node - <<'NODE'
+          const source = process.env.TOKEN_SOURCE || 'unknown';
+          const token = process.env.TOKEN_VALUE || '';
+          if (!token) throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=not-configured`);
+          if (token !== token.trim()) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=leading-or-trailing-whitespace`);
+          }
+          if (/[^\x21-\x7e]/.test(token) || /\s/.test(token)) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=non-ascii-or-whitespace`);
+          }
+          if (/^Bearer\s+/i.test(token)) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=bearer-prefix-stored-in-secret`);
+          }
+          if (/^["']|["']$/.test(token)) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=quoted-secret`);
+          }
+          if (/^[A-Z_][A-Z0-9_]*=/.test(token)) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=variable-assignment-stored-in-secret`);
+          }
+          if (token.startsWith('cfat_')) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=account-scoped-token-not-supported-by-workers-builds-api`);
+          }
+          const shape = token.startsWith('cfut_') ? 'user-prefixed' : 'legacy-opaque';
+          console.log(`TOKEN_PREFLIGHT source=${source} shape=${shape} result=accepted`);
+          NODE
+
+      - name: Read trigger with dedicated Builds token
+        id: dedicated_read
+        if: steps.dedicated_preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ''
+          CLOUDFLARE_BUILD_EVIDENCE_PATH: artifacts/cloudflare-workers-build-trigger-dedicated.json
+        run: node scripts/reconcile-cloudflare-workers-build-trigger.mjs
+
+      - name: Preflight general Cloudflare token fallback
+        id: general_preflight
+        if: steps.dedicated_read.outcome != 'success'
+        continue-on-error: true
+        env:
+          TOKEN_VALUE: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TOKEN_SOURCE: general-cloudflare-token
+        run: |
+          node --input-type=module - <<'NODE'
+          import { normalizeCloudflareTokenTransport } from './scripts/run-with-normalized-cloudflare-token.mjs';
+          const source = process.env.TOKEN_SOURCE || 'unknown';
+          const raw = process.env.TOKEN_VALUE || '';
+          const { token, changed } = normalizeCloudflareTokenTransport(raw);
+          if (!token) throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=not-configured`);
+          if (/[^\x21-\x7e]/.test(token) || /\s/.test(token)) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=non-ascii-or-whitespace-after-normalization`);
+          }
+          if (/^Bearer\s+/i.test(token)) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=bearer-prefix-stored-in-secret`);
+          }
+          if (/^["']|["']$/.test(token)) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=quoted-secret`);
+          }
+          if (/^[A-Z_][A-Z0-9_]*=/.test(token)) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=variable-assignment-stored-in-secret`);
+          }
+          if (token.startsWith('cfat_')) {
+            throw new Error(`TOKEN_PREFLIGHT_FAILED source=${source} reason=account-scoped-token-not-supported-by-workers-builds-api`);
+          }
+          const shape = token.startsWith('cfut_') ? 'user-prefixed' : 'legacy-opaque';
+          console.log(`TOKEN_PREFLIGHT source=${source} shape=${shape} normalized=${changed} result=accepted`);
+          NODE
+
+      - name: Read trigger with general Cloudflare token fallback
+        id: general_read
+        if: steps.dedicated_read.outcome != 'success' && steps.general_preflight.outcome == 'success'
+        continue-on-error: true
+        env:
+          CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ''
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_BUILD_EVIDENCE_PATH: artifacts/cloudflare-workers-build-trigger-general.json
+        run: node scripts/run-with-normalized-cloudflare-token.mjs scripts/reconcile-cloudflare-workers-build-trigger.mjs
+
+      - name: Select non-destructive trigger receipt
+        id: select_readback
+        if: always()
+        shell: bash
+        env:
+          DEDICATED_PREFLIGHT_OUTCOME: ${{ steps.dedicated_preflight.outcome }}
+          DEDICATED_OUTCOME: ${{ steps.dedicated_read.outcome }}
+          GENERAL_PREFLIGHT_OUTCOME: ${{ steps.general_preflight.outcome }}
+          GENERAL_OUTCOME: ${{ steps.general_read.outcome }}
+          DEDICATED_EVIDENCE_PATH: artifacts/cloudflare-workers-build-trigger-dedicated.json
+          GENERAL_EVIDENCE_PATH: artifacts/cloudflare-workers-build-trigger-general.json
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+
+          const attempts = [
+            {
+              source: 'dedicated-builds-token',
+              preflight: process.env.DEDICATED_PREFLIGHT_OUTCOME || 'unknown',
+              outcome: process.env.DEDICATED_OUTCOME || 'skipped',
+              path: process.env.DEDICATED_EVIDENCE_PATH,
+            },
+            {
+              source: 'general-cloudflare-token',
+              preflight: process.env.GENERAL_PREFLIGHT_OUTCOME || 'skipped',
+              outcome: process.env.GENERAL_OUTCOME || 'skipped',
+              path: process.env.GENERAL_EVIDENCE_PATH,
+            },
+          ];
+
+          function readReceipt(filePath) {
+            if (!filePath || !fs.existsSync(filePath)) return null;
+            return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          }
+
+          function classify(receipt) {
+            const message = String(receipt?.error || '');
+            if (/Cloudflare GET \/user\/tokens\/verify failed:/i.test(message)) {
+              return 'token-verify-failed';
+            }
+            if (/Cloudflare GET \/accounts\/[^/]+\/workers\/scripts/i.test(message)) {
+              return 'workers-scripts-read-failed';
+            }
+            if (/Cloudflare GET \/accounts\/[^/]+\/builds\/workers\/[^/]+\/triggers/i.test(message)) {
+              return 'workers-ci-read-failed';
+            }
+            if (/PRODUCTION_TRIGGER_SELECTION_FAILED/i.test(message)) return 'production-trigger-selection-failed';
+            if (/NON_PRODUCTION_TRIGGER_SELECTION_FAILED/i.test(message)) return 'non-production-trigger-selection-failed';
+            if (/TOKEN_SELECTION_FAILED|NOT_ACTIVE_OR_NOT_USER_SCOPED/i.test(message)) {
+              return 'token-selection-failed';
+            }
+            return receipt?.status || 'unknown';
+          }
+
+          function providerCode(receipt) {
+            const match = String(receipt?.error || '').match(/\bcode=(\d+)\b/);
+            return match?.[1] || 'none';
+          }
+
+          for (const attempt of attempts) {
+            const receipt = readReceipt(attempt.path);
+            console.log(
+              `WORKERS_TRIGGER_READBACK_ATTEMPT source=${attempt.source} preflight=${attempt.preflight} outcome=${attempt.outcome} status=${receipt?.status || 'missing'} class=${classify(receipt)} provider_code=${providerCode(receipt)}`,
+            );
+          }
+
+          const selected = attempts.find((attempt) => attempt.outcome === 'success');
+          const canonical = process.env.CLOUDFLARE_BUILD_EVIDENCE_PATH;
+
+          if (!selected) {
+            const retainedFailure = [...attempts].reverse().find((attempt) => fs.existsSync(attempt.path));
+            if (retainedFailure) fs.copyFileSync(retainedFailure.path, canonical);
+            console.error('WORKERS_TRIGGER_PROVIDER_READBACK_FAILED: no configured token completed provider discovery.');
+            process.exit(1);
+          }
+
+          fs.copyFileSync(selected.path, canonical);
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `selected=${selected.source}\n`);
+          console.log(`WORKERS_TRIGGER_READBACK_SELECTED=${selected.source}`);
+          NODE
+
+      - name: Require provider trigger to already be safe on main push
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const evidencePath = process.env.CLOUDFLARE_BUILD_EVIDENCE_PATH;
+          const receipt = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
+          if (receipt.verified !== true || receipt.status !== 'already-correct') {
+            console.error(
+              `WORKERS_TRIGGER_MAIN_READBACK_UNSAFE: status=${receipt.status || 'unknown'} verified=${String(receipt.verified)}`,
+            );
+            process.exit(1);
+          }
+          console.log('WORKERS_TRIGGER_MAIN_READBACK_SAFE');
+          NODE
+
+      - name: Apply, verify, and request exact native build with dedicated token
+        if: github.event_name == 'workflow_dispatch' && inputs.apply == true && steps.select_readback.outputs.selected == 'dedicated-builds-token'
+        env:
+          CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ''
+          CLOUDFLARE_BUILD_EVIDENCE_PATH: artifacts/cloudflare-workers-build-trigger.json
+        run: node scripts/reconcile-cloudflare-workers-build-trigger.mjs --apply
+
+      - name: Apply, verify, and request exact native build with general token
+        if: github.event_name == 'workflow_dispatch' && inputs.apply == true && steps.select_readback.outputs.selected == 'general-cloudflare-token'
+        env:
+          CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ''
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_BUILD_EVIDENCE_PATH: artifacts/cloudflare-workers-build-trigger.json
+        run: node scripts/run-with-normalized-cloudflare-token.mjs scripts/reconcile-cloudflare-workers-build-trigger.mjs --apply
+
+      - name: Upload trigger evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-workers-build-trigger-${{ github.run_id }}
+          path: artifacts/cloudflare-workers-build-trigger*.json
+          if-no-files-found: warn
+          retention-days: 30

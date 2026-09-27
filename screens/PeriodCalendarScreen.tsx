@@ -1,6 +1,6 @@
 // screens/PeriodCalendarScreen.tsx
-// Se'kret Bip — Cycle Calendar (cycle layer of Womanhood, Raylene-led)
-// Private. On-device only. No data leaves the phone.
+// Se'kret Bip — Cycle Calendar (cycle layer of Womanhood, Suhana-led)
+// Account-synced cycle data; not shown in Parent Pages.
 //
 // Phase 1 polish: time-of-day backdrop (raylene window), mood glow,
 // staggered entrance, breath loop, today highlight, sticky note, body-positive copy.
@@ -69,7 +69,7 @@ export function PeriodCalendarScreen({
   const [lastPeriodStart, setLastPeriodStart] = useState<string | null>(null);
 
   const time = useMemo(() => getTimeOfDay(), []);
-  // Raylene-led screen, but backdrop respects the chosen companion's room
+  // Suhana-led screen, but backdrop respects the chosen companion's room
   const charKey: 'raylene' | 'rylane' = selectedSekret === 'rylane' ? 'rylane' : 'raylene';
   const bg   = useMemo(() => getRoomBg(charKey, time), [charKey, time]);
   const glow = useMemo(() => moodGlow(mood), [mood]);
@@ -221,7 +221,7 @@ export function PeriodCalendarScreen({
           </TouchableOpacity>
 
           <Text style={styles.logo}>cycle calendar 🩸</Text>
-          <Text style={styles.subtitle}>track your cycle, quietly. only you see this.</Text>
+          <Text style={styles.subtitle}>track your cycle, quietly. not shown in Parent Pages.</Text>
 
           <Animated.View
             style={[
@@ -230,7 +230,7 @@ export function PeriodCalendarScreen({
               { transform: [{ scale: breathScale }], opacity: breathOpacity },
             ]}
           >
-            <Text style={[styles.energyText, { color: glow }]}>💜 private · on-device</Text>
+            <Text style={[styles.energyText, { color: glow }]}>💜 private · account synced</Text>
           </Animated.View>
 
           <View style={styles.cloudWrap}>
@@ -347,13 +347,13 @@ export function PeriodCalendarScreen({
         <Animated.View style={cardStyle(card4)}>
           <View style={styles.stickyNote}>
             <Text style={styles.stickyText}>
-              "your body isn't a problem to solve. it's yours. you know it best." — raylene
+              "your body isn't a problem to solve. it's yours. you know it best." — suhana
             </Text>
           </View>
 
           <View style={[styles.card, { backgroundColor: 'rgba(30,18,55,0.7)', borderColor: glow + '66' }]}>
             <Text style={styles.privacyNote}>
-              tap any day to mark it 🩸 · your data stays on this device. nothing leaves. 🔒
+              tap any day to mark it 🩸 · cycle days sync to your account so they can follow you between devices. they aren't shown in Parent Pages. 🔒
             </Text>
           </View>
 

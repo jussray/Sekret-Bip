@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-07-13",
+  "functions": [
+    {
+      "slug": "release-health",
+      "sourcePath": "supabase/functions/release-health/index.ts",
+      "verifyJwt": true,
+      "expectedStatus": 410,
+      "replacement": "scripts/verify-cloudflare-native-deploy.mjs"
+    },
+    {
+      "slug": "bridge-e2e-probe",
+      "sourcePath": "supabase/functions/bridge-e2e-probe/index.ts",
+      "verifyJwt": true,
+      "expectedStatus": 410,
+      "replacement": "issue #270 controlled two-account proof"
+    },
+    {
+      "slug": "github-workflow-status",
+      "sourcePath": "supabase/functions/github-workflow-status/index.ts",
+      "verifyJwt": true,
+      "expectedStatus": 410,
+      "replacement": "GitHub Actions check runs and Cloudflare-native evidence"
+    }
+  ]
+}

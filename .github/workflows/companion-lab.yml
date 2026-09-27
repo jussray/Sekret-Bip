@@ -1,0 +1,46 @@
+name: Companion Lab Audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  audit:
+    name: Score companion reply fixtures
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Syntax check audit script
+        run: node --check scripts/companion-lab-audit.js
+
+      - name: Run Companion Lab audit
+        run: |
+          set -o pipefail
+          npm run audit:companion-lab:verbose 2>&1 | tee companion-lab-report.txt
+        # Exit 0 = all scored scenarios pass (or no reply files yet — gap report).
+        # Exit 1 = one or more hard-fail or below-threshold results.
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: companion-lab-report
+          path: companion-lab-report.txt
+          retention-days: 30

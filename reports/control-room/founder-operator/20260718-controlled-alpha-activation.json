@@ -1,0 +1,389 @@
+{
+  "schemaVersion": 1,
+  "id": "20260718-controlled-alpha-activation",
+  "createdAt": "2026-07-18T03:15:00.000Z",
+  "mission": "Fully activate every already-built launch-relevant Se’kret Bip feature for a controlled teen and parent alpha, using Founder Control Room as the ordered source of truth.",
+  "constraints": "Preserve privacy, consent, authorization, deletion, rollback, production isolation, exact-state evidence, and all existing work. Continue despite the hosted-runner startup blockage, but never count zero-step failures as executed proof. Keep unfinished L4 and L5 concepts blocked. Do not expose raw teen content to parents, commit credentials, merge, deploy, migrate, spend, publish, create accounts, or delete material without the required founder gate.",
+  "modes": [
+    "ultrathink",
+    "billgates-artifacts",
+    "elonmusk-execution"
+  ],
+  "lanes": [
+    {
+      "id": "founder",
+      "label": "Founder",
+      "purpose": "Own mission priority, external approvals, launch decision, and final truth.",
+      "authority": "decision"
+    },
+    {
+      "id": "chatgpt",
+      "label": "ChatGPT",
+      "purpose": "Maintain the ordered Founder Room plan, synthesize evidence, and advance the next safe slice.",
+      "authority": "execution"
+    },
+    {
+      "id": "codex",
+      "label": "Codex",
+      "purpose": "Own narrow repository changes, tests, and pull-request evidence.",
+      "authority": "execution"
+    },
+    {
+      "id": "github",
+      "label": "GitHub",
+      "purpose": "Retain repository history, review state, branch identity, and exact-state evidence.",
+      "authority": "evidence"
+    },
+    {
+      "id": "cloudflare",
+      "label": "Cloudflare",
+      "purpose": "Own approved isolated Worker preview and deployment operations.",
+      "authority": "execution"
+    },
+    {
+      "id": "supabase",
+      "label": "Supabase",
+      "purpose": "Own approved authentication, authorization, database, and controlled account operations.",
+      "authority": "execution"
+    },
+    {
+      "id": "playwright",
+      "label": "Playwright",
+      "purpose": "Retain browser journey evidence, screenshots, traces, and failure artifacts.",
+      "authority": "evidence"
+    },
+    {
+      "id": "local-agent",
+      "label": "Local Agent",
+      "purpose": "Run only allowlisted local verification and recovery missions.",
+      "authority": "execution"
+    }
+  ],
+  "phases": [
+    {
+      "id": "observe",
+      "title": "Observe and lock launch truth",
+      "objective": "Record the exact activation branch, feature boundaries, retained evidence, and explicit non-claims.",
+      "operatingQuestion": "What is true now, what is only configured, and what must remain untouched?",
+      "ownerLane": "chatgpt",
+      "supportLanes": [
+        "founder",
+        "github"
+      ],
+      "artifactIds": [
+        "mission-brief",
+        "artifact-ledger"
+      ],
+      "safeMissionId": "continue-yesterday",
+      "exitGate": "The scope, owner, branch, evidence baseline, exclusions, and blockers are explicit.",
+      "status": "active"
+    },
+    {
+      "id": "orient",
+      "title": "ULTRATHINK dependency and risk orientation",
+      "objective": "Map app, Worker, Supabase, relationship, deletion, device, and release dependencies.",
+      "operatingQuestion": "Which hidden dependency could create a false-green alpha or weaken a privacy boundary?",
+      "ownerLane": "chatgpt",
+      "supportLanes": [
+        "codex",
+        "github",
+        "supabase",
+        "cloudflare"
+      ],
+      "artifactIds": [
+        "system-map",
+        "red-team-register",
+        "bottleneck-map"
+      ],
+      "exitGate": "Dependency order, failure modes, rollback triggers, and the smallest reversible slice are recorded.",
+      "status": "planned"
+    },
+    {
+      "id": "artifact-plan",
+      "title": "Bill Gates launch artifact ledger",
+      "objective": "Give every runtime, journey, device, and decision artifact one owner and one evidence gate.",
+      "operatingQuestion": "Which durable records must exist so the launch can be reconstructed without chat memory?",
+      "ownerLane": "chatgpt",
+      "supportLanes": [
+        "founder",
+        "codex",
+        "github"
+      ],
+      "artifactIds": [
+        "artifact-ledger"
+      ],
+      "exitGate": "Every artifact has an owner, evidence requirement, path, status, rollback, and approval boundary.",
+      "status": "planned"
+    },
+    {
+      "id": "execute",
+      "title": "Elon Musk smallest reversible activation slice",
+      "objective": "Provision and verify the isolated alpha runtime and preview-build path without changing production rollout.",
+      "operatingQuestion": "What is the narrowest live slice that proves the alpha path without borrowing production authority?",
+      "ownerLane": "codex",
+      "supportLanes": [
+        "cloudflare",
+        "supabase",
+        "github"
+      ],
+      "artifactIds": [
+        "alpha-runtime-record"
+      ],
+      "exitGate": "The dedicated alpha runtime and both preview profiles are identifiable while production remains fail-closed.",
+      "status": "planned"
+    },
+    {
+      "id": "verify",
+      "title": "Truth-mode trust and device journeys",
+      "objective": "Execute two-account, revocation, deletion, isolation, accessibility, failure-state, and device proofs.",
+      "operatingQuestion": "What actually ran across the teen, parent, Worker, database, and device path?",
+      "ownerLane": "playwright",
+      "supportLanes": [
+        "local-agent",
+        "codex",
+        "supabase",
+        "github"
+      ],
+      "artifactIds": [
+        "trust-journey-evidence",
+        "device-evidence",
+        "verification-report"
+      ],
+      "safeMissionId": "verify-frontend",
+      "exitGate": "Every hard gate has executed evidence or an explicit blocked classification with the next action.",
+      "status": "blocked"
+    },
+    {
+      "id": "decide",
+      "title": "Founder controlled-alpha decision",
+      "objective": "Present evidence, remaining risks, rollback, audience boundary, and exact external actions for approval.",
+      "operatingQuestion": "Does retained proof justify opening the controlled alpha, and what remains prohibited?",
+      "ownerLane": "founder",
+      "supportLanes": [
+        "chatgpt",
+        "github",
+        "playwright"
+      ],
+      "artifactIds": [
+        "founder-decision-pack"
+      ],
+      "exitGate": "The founder records a bounded ship, hold, or rollback decision without converting approval into false execution proof.",
+      "status": "human-required"
+    }
+  ],
+  "artifacts": [
+    {
+      "id": "mission-brief",
+      "title": "Controlled-alpha founder mission brief",
+      "kind": "mission-brief",
+      "ownerLane": "chatgpt",
+      "supportLanes": [
+        "founder",
+        "github"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/mission-brief.md",
+      "evidenceRequired": [
+        "5W1H scope",
+        "preserved constraints",
+        "activation and exclusion list",
+        "decision owner"
+      ],
+      "status": "building"
+    },
+    {
+      "id": "system-map",
+      "title": "Alpha system and dependency map",
+      "kind": "architecture",
+      "ownerLane": "codex",
+      "supportLanes": [
+        "chatgpt",
+        "supabase",
+        "cloudflare"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/system-map.md",
+      "evidenceRequired": [
+        "app and preview profiles",
+        "Worker routing",
+        "authorization boundaries",
+        "relationship and deletion dependencies"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "red-team-register",
+      "title": "Controlled-alpha privacy and failure register",
+      "kind": "decision",
+      "ownerLane": "chatgpt",
+      "supportLanes": [
+        "founder",
+        "codex",
+        "playwright"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/red-team-register.md",
+      "evidenceRequired": [
+        "raw-content exposure risks",
+        "cross-user denial risks",
+        "false-green risks",
+        "rollback triggers"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "artifact-ledger",
+      "title": "Ordered controlled-alpha artifact ledger",
+      "kind": "ledger",
+      "ownerLane": "chatgpt",
+      "supportLanes": [
+        "codex",
+        "github",
+        "founder"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/artifact-ledger.json",
+      "evidenceRequired": [
+        "one owner per artifact",
+        "ordered dependencies",
+        "evidence path",
+        "status and approval gate"
+      ],
+      "status": "building"
+    },
+    {
+      "id": "bottleneck-map",
+      "title": "First-principles alpha bottleneck map",
+      "kind": "decision",
+      "ownerLane": "chatgpt",
+      "supportLanes": [
+        "codex",
+        "cloudflare",
+        "supabase"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/bottleneck-map.md",
+      "evidenceRequired": [
+        "highest-leverage constraint",
+        "smallest reversible slice",
+        "next executable action"
+      ],
+      "status": "planned"
+    },
+    {
+      "id": "alpha-runtime-record",
+      "title": "Dedicated alpha runtime and preview-build record",
+      "kind": "release",
+      "ownerLane": "cloudflare",
+      "supportLanes": [
+        "codex",
+        "github"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/alpha-runtime-record.md",
+      "evidenceRequired": [
+        "alpha Worker configuration",
+        "non-secret variable inventory",
+        "exact runtime identifier",
+        "teen and parent preview identifiers",
+        "production remains disabled",
+        "rollback"
+      ],
+      "approvalGate": "Founder approval is required before credential use, paid build capacity, deployment, or wider distribution.",
+      "status": "human-required"
+    },
+    {
+      "id": "trust-journey-evidence",
+      "title": "Bridge, Crew, revocation, deletion, and isolation evidence",
+      "kind": "verification",
+      "ownerLane": "playwright",
+      "supportLanes": [
+        "supabase",
+        "codex"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/trust-journey-evidence.json",
+      "evidenceRequired": [
+        "link and consent",
+        "summary-only parent visibility",
+        "revoke, re-share, and unlink",
+        "Crew isolation",
+        "account cleanup",
+        "second-user isolation"
+      ],
+      "approvalGate": "Founder approval is required before deleting any controlled account or applying a live data change.",
+      "status": "human-required"
+    },
+    {
+      "id": "device-evidence",
+      "title": "iOS and Android controlled-alpha evidence",
+      "kind": "verification",
+      "ownerLane": "playwright",
+      "supportLanes": [
+        "codex",
+        "founder"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/device-evidence.json",
+      "evidenceRequired": [
+        "teen and parent install",
+        "critical route smoke",
+        "accessibility",
+        "offline and failure states",
+        "screenshots or recordings"
+      ],
+      "status": "verification-required"
+    },
+    {
+      "id": "verification-report",
+      "title": "Controlled-alpha verification report",
+      "kind": "verification",
+      "ownerLane": "playwright",
+      "supportLanes": [
+        "local-agent",
+        "codex",
+        "github"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/verification-report.json",
+      "evidenceRequired": [
+        "executed checks",
+        "exact state when available",
+        "browser and device artifacts",
+        "infrastructure classification",
+        "remaining blockers"
+      ],
+      "status": "verification-required"
+    },
+    {
+      "id": "founder-decision-pack",
+      "title": "Controlled-alpha founder decision and rollback pack",
+      "kind": "release",
+      "ownerLane": "founder",
+      "supportLanes": [
+        "chatgpt",
+        "github",
+        "playwright"
+      ],
+      "pathHint": "reports/control-room/founder-operator/20260718-controlled-alpha-activation/founder-decision-pack.md",
+      "evidenceRequired": [
+        "phase summaries",
+        "open risks",
+        "audience and duration",
+        "approval checklist",
+        "rollback plan"
+      ],
+      "approvalGate": "Founder approval is required before merge, deployment, credential use, controlled-account deletion, distribution, or opening the alpha.",
+      "status": "human-required"
+    }
+  ],
+  "approvalGates": [
+    "Founder approval is required before merge or pull-request closure.",
+    "Founder approval is required before provisioning, using, rotating, or exposing credentials.",
+    "Founder approval is required before deploying the alpha Worker or changing production routing.",
+    "Founder approval is required before applying or rolling back a database or authorization change.",
+    "Founder approval is required before spending money, consuming paid build capacity, or widening distribution.",
+    "Founder approval is required before deleting controlled accounts, user data, or repository material.",
+    "Founder approval is required before opening the controlled alpha to invited teen or parent participants."
+  ],
+  "nonClaims": [
+    "A configured alpha Worker file is not proof that the dedicated alpha Worker is deployed.",
+    "A canonical Worker branch preview is not proof of the dedicated alpha service.",
+    "Zero-step GitHub Actions failures are infrastructure evidence, not executed test results.",
+    "The scoped configuration contract does not replace bundle, export, browser, device, database, or two-account proof.",
+    "Enabled client flags do not bypass authorization, consent, guardian verification, deletion, or Worker rollout boundaries.",
+    "Founder approval records a decision but does not itself execute an external action."
+  ],
+  "evidenceLevel": "plan-only"
+}

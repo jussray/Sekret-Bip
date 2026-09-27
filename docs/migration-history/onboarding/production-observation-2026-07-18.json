@@ -1,0 +1,118 @@
+{
+  "schemaVersion": "1.0.0",
+  "observedAtUtc": "2026-07-18",
+  "observationMode": "read_only_catalog_and_aggregate",
+  "projectId": "tbsevonvegdnlyjgplmm",
+  "founderControlRoomIssue": 502,
+  "repositoryMainObserved": "b6cbb4f8c6e7b5153bbc7106b31d0db4aa903951",
+  "migrationHistory": {
+    "liveVersion": "20260718040638",
+    "liveName": "onboarding_state",
+    "repositoryVersionsAbsentLive": [
+      "20260718000000",
+      "20260718000001"
+    ]
+  },
+  "onboardingStageValues": [
+    "signup",
+    "welcome_seen",
+    "consent_complete",
+    "age_confirmed",
+    "identity_set",
+    "name_set",
+    "reflection_complete",
+    "parent_link_skipped",
+    "parent_link_complete",
+    "parent_setup_complete",
+    "activated",
+    "offboarded"
+  ],
+  "onboardingColumns": [
+    "user_id",
+    "stage",
+    "role",
+    "activation_action",
+    "activated_at",
+    "signup_to_consent_secs",
+    "consent_to_age_secs",
+    "age_to_identity_secs",
+    "identity_to_name_secs",
+    "name_to_reflection_secs",
+    "reflection_to_parentlink_secs",
+    "identity_to_activated_secs",
+    "created_at",
+    "updated_at"
+  ],
+  "rls": {
+    "enabled": true,
+    "forced": false,
+    "policies": [
+      {
+        "name": "users_own_onboarding",
+        "command": "ALL",
+        "roles": ["public"],
+        "predicate": "auth.uid() = user_id"
+      },
+      {
+        "name": "service_read_all_onboarding",
+        "command": "SELECT",
+        "roles": ["service_role"],
+        "predicate": "true"
+      }
+    ]
+  },
+  "tablePrivilegesObserved": {
+    "anon": ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"],
+    "authenticated": ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"],
+    "service_role": ["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"]
+  },
+  "triggers": {
+    "user_onboarding_state": [
+      {
+        "name": "uos_updated_at",
+        "function": "uos_set_updated_at",
+        "securityDefiner": false,
+        "searchPathPinned": false,
+        "clientExecuteRevoked": false
+      }
+    ],
+    "moods": [
+      {
+        "name": "trg_moods_updated_at",
+        "function": "set_updated_at"
+      }
+    ],
+    "onboardingMoodActivationPresent": false,
+    "onboardingTransitionGuardPresent": false
+  },
+  "dependencies": {
+    "dependentViews": 0,
+    "dependentApplicationFunctions": 0,
+    "otherTablesUsingOnboardingStage": 0,
+    "stageIndexes": 1,
+    "onboardingTriggers": 1
+  },
+  "aggregateState": {
+    "onboardingRows": 0,
+    "activatedOnboardingRows": 0,
+    "rowsWithActivationAction": 0,
+    "moodRows": 0,
+    "distinctMoodUsers": 0
+  },
+  "securityAdvisor": {
+    "anonymousAccessWarning": true,
+    "mutableSearchPathWarning": true
+  },
+  "privacy": {
+    "identifiersRetrieved": false,
+    "rowContentRetrieved": false,
+    "onlyCatalogAndAggregateCounts": true
+  },
+  "mutation": {
+    "ddlExecuted": false,
+    "dmlExecuted": false,
+    "migrationHistoryChanged": false,
+    "productionChanged": false
+  },
+  "decision": "hold_for_development_branch_reconciliation"
+}

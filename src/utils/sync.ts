@@ -13,6 +13,7 @@
 // because the cloud is down. Errors are logged and swallowed.
 
 import { getSupabase, TABLES } from './supabase';
+import { ensureAnonymousSession as startAnonymousSession, getCurrentSessionUserId } from '@/services/session';
 import { loadState } from './storage';
 import { emitEvent } from '@/features/activity/events';
 import type {
@@ -27,19 +28,59 @@ import type {
   ParentCirclePost as CircleParentPost,
 } from '../../types/circle';
 
+
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+type SyncRow = Record<string, JsonValue | undefined>;
+type ReactionCounts = Record<string, number>;
+const EMPTY_PARENT_REACTIONS: ReactionCounts = {
+  beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0,
+};
+function compactReactions(reactions: Record<string, number | undefined> | undefined): ReactionCounts {
+  if (!reactions) return {};
+  return Object.fromEntries(
+    Object.entries(reactions).filter((entry): entry is [string, number] => typeof entry[1] === 'number'),
+  );
+}
+type SupabaseErrorLike = { message?: string; code?: string };
+type SupabaseDataResult<T> = { data: T | null; error: SupabaseErrorLike | null };
+type ParentCirclePostRow = {
+  id: number; text: string; date: string; time: string;
+  reactions: ReactionCounts | null; circle_tag: string | null;
+};
+type PublicCirclePostRow = {
+  id: string | number; text: string; post_mood: string | null; media_kind: string | null;
+  reactions: ReactionCounts | null; created_at: string;
+};
+type SharedCirclePostRow = PublicCirclePostRow & { user_id: string };
+type CircleProfileRow = { user_id: string; nickname: string; avatar_emoji: string };
+type RoomMemoryRow = {
+  character: string; last_visit: string | null; last_hotspot: string | null;
+  last_summon: string | null; visit_count: number | null;
+};
+type MoodHistoryRow = Pick<MoodEntry, 'id' | 'mood' | 'date' | 'time'>;
+type JournalEntryRow = Pick<JournalEntry, 'id' | 'text' | 'mood' | 'date' | 'time'> & { sekret_reply: string | null };
+type CirclePostRow = Pick<CirclePost, 'id' | 'text' | 'date' | 'time' | 'reactions'> & { circle_tag: string | null; post_mood: string | null; media_kind: string | null };
+type VoiceNoteRow = Pick<VoiceNote, 'id' | 'title' | 'date' | 'time' | 'duration'>;
+type ComfortSessionRow = Pick<ComfortSession, 'id' | 'type' | 'date' | 'time'> & { mood: string | null };
+type CrewMemberRow = Pick<CrewMember, 'id' | 'name' | 'emoji' | 'commitment' | 'cadence'> & {
+  invite_code: string | null | undefined; added_at: string | null;
+};
+type CrewCheckInRow = {
+  id: number; member_id: string | number; note: string | undefined;
+  mood: string | null; date: string; time: string;
+};
+
 // ── Internal helpers ──────────────────────────────────────────────
 async function currentUserId(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
   try {
-    const { data } = await sb.auth.getUser();
-    return data?.user?.id ?? null;
+    return await getCurrentSessionUserId();
   } catch {
     return null;
   }
 }
 
-async function safeUpsert(table: string, payload: any | any[]): Promise<void> {
+async function safeUpsert(table: string, payload: SyncRow | SyncRow[]): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
   const uid = await currentUserId();
@@ -76,14 +117,9 @@ export async function ensureAnonymousSession(): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return null;
   try {
-    const { data } = await sb.auth.getUser();
-    if (data?.user?.id) return data.user.id;
-    const { data: signed, error } = await sb.auth.signInAnonymously();
-    if (error) {
-      if (__DEV__) console.warn('[sync] anon sign-in failed', error);
-      return null;
-    }
-    return signed?.user?.id ?? null;
+    const uid = await startAnonymousSession();
+    if (uid) return uid;
+    return null;
   } catch (e) {
     if (__DEV__) console.warn('[sync] ensureAnonymousSession threw', e);
     return null;
@@ -124,7 +160,7 @@ export function syncCirclePost(post: CirclePost): void {
     text:       post.text,
     date:       post.date,
     time:       post.time,
-    reactions:  post.reactions,
+    reactions:  compactReactions(post.reactions),
     circle_tag: post.circleTag ?? null,
     post_mood:  post.postMood  ?? null,
     media_kind: post.mediaKind ?? null,
@@ -137,7 +173,7 @@ export function syncParentCirclePost(post: ParentCirclePost): void {
     text:       post.text,
     date:       post.date,
     time:       post.time,
-    reactions:  post.reactions,
+    reactions:  compactReactions(post.reactions),
     circle_tag: post.circleTag ?? null,
   });
 }
@@ -158,12 +194,12 @@ export async function loadParentCircleFeed(
       .order('id', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []).map((r: any) => ({
+    return (data ?? []).map((r: ParentCirclePostRow) => ({
       id:        r.id,
       text:      r.text,
       date:      r.date,
       time:      r.time,
-      reactions: r.reactions ?? { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
+      reactions: r.reactions ?? EMPTY_PARENT_REACTIONS,
       circleTag: r.circle_tag ?? undefined,
     })) as ParentCirclePost[];
   } catch (e) {
@@ -187,7 +223,7 @@ export async function loadCircleFeed(
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data ?? []).map((r: any) => ({
+      return (data ?? []).map((r: PublicCirclePostRow) => ({
         id: r.id, text: r.text, post_mood: r.post_mood ?? null,
         media_kind: r.media_kind ?? null, reactions: r.reactions ?? {},
         created_at: r.created_at,
@@ -203,17 +239,17 @@ export async function loadCircleFeed(
       if (error) throw error;
       const rows = posts ?? [];
       let profileMap: Record<string, { nickname: string; avatar_emoji: string }> = {};
-      const userIds = [...new Set(rows.map((r: any) => r.user_id as string))];
+      const userIds = [...new Set(rows.map((r: SharedCirclePostRow) => r.user_id))];
       if (userIds.length > 0) {
         const { data: profiles } = await sb
           .from(TABLES.circleProfiles)
           .select('user_id, nickname, avatar_emoji')
           .in('user_id', userIds);
         profileMap = Object.fromEntries(
-          (profiles ?? []).map((p: any) => [p.user_id, { nickname: p.nickname, avatar_emoji: p.avatar_emoji }]),
+          (profiles ?? []).map((p: CircleProfileRow) => [p.user_id, { nickname: p.nickname, avatar_emoji: p.avatar_emoji }]),
         );
       }
-      return rows.map((r: any) => ({
+      return rows.map((r: SharedCirclePostRow) => ({
         id: r.id, user_id: r.user_id,
         nickname:     profileMap[r.user_id]?.nickname     ?? 'Anonymous',
         avatar_emoji: profileMap[r.user_id]?.avatar_emoji ?? '🌙',
@@ -229,11 +265,11 @@ export async function loadCircleFeed(
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data ?? []).map((r: any) => ({
+      return (data ?? []).map((r: Pick<ParentCirclePostRow, 'id' | 'text' | 'reactions' | 'circle_tag'> & { created_at: string }) => ({
         id:               r.id,
         user_id:          '',
         text:             r.text,
-        reactions:        r.reactions ?? { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
+        reactions:        r.reactions ?? EMPTY_PARENT_REACTIONS,
         circle_tag:       r.circle_tag ?? null,
         created_at:       r.created_at,
         identity_revealed: false,
@@ -450,7 +486,7 @@ export async function loadPeriodDays(): Promise<string[]> {
       .eq('user_id', uid)
       .order('day', { ascending: true });
     if (error) throw error;
-    return (data ?? []).map((r: any) => r.day as string);
+    return (data ?? []).map((r: { day: string }) => r.day);
   } catch (e) {
     if (__DEV__) console.warn('[sync] loadPeriodDays failed', e);
     return [];
@@ -504,8 +540,8 @@ export async function loadOracleSession(
     if (error) throw error;
     if (!data) return null;
     return {
-      memory:       (data.memory as Record<string, unknown>) ?? {},
-      sessionCount: (data.session_count as number) ?? 0,
+      memory:       (data.memory) ?? {},
+      sessionCount: (data.session_count) ?? 0,
     };
   } catch (e) {
     if (__DEV__) console.warn('[sync] loadOracleSession failed', e);
@@ -584,9 +620,9 @@ export async function fetchTeenActivitySummary(
     if (error) throw error;
     if (!data) return null;
     return {
-      streak_days:   data.streak_days   as number,
-      session_count: data.session_count as number,
-      points_tier:   data.points_tier   as string,
+      streak_days:   data.streak_days,
+      session_count: data.session_count,
+      points_tier:   data.points_tier,
     };
   } catch (e) {
     if (__DEV__) console.warn('[sync] fetchTeenActivitySummary failed', e);
@@ -631,21 +667,21 @@ export async function pullAll(): Promise<{
       sb.from(TABLES.roomMemory).select('character, last_visit, last_hotspot, last_summon, visit_count').eq('user_id', uid).maybeSingle(),
     ]);
 
-    function settled<T>(res: PromiseSettledResult<{ data: T | null; error: any }>): T | null {
+    function settled<T>(res: PromiseSettledResult<SupabaseDataResult<T>>): T | null {
       if (res.status === 'rejected') return null;
       if (res.value.error) { console.warn('[sync] pullAll partial error:', res.value.error.message); return null; }
       return res.value.data;
     }
 
-    const moods       = settled<any[]>(moodRes as any)         ?? [];
-    const journals    = settled<any[]>(journalRes as any)      ?? [];
-    const circles     = settled<any[]>(circleRes as any)       ?? [];
-    const voices      = settled<any[]>(voiceRes as any)        ?? [];
-    const comforts    = settled<any[]>(comfortRes as any)      ?? [];
-    const crewMs      = settled<any[]>(crewMemberRes as any)   ?? [];
-    const crewCIs     = settled<any[]>(crewCheckInRes as any)  ?? [];
-    const parentPosts = settled<any[]>(parentCircleRes as any) ?? [];
-    const room        = settled<any>(roomRes as any);
+    const moods       = settled<MoodHistoryRow[]>(moodRes as PromiseSettledResult<SupabaseDataResult<MoodHistoryRow[]>>)         ?? [];
+    const journals    = settled<JournalEntryRow[]>(journalRes as PromiseSettledResult<SupabaseDataResult<JournalEntryRow[]>>)      ?? [];
+    const circles     = settled<CirclePostRow[]>(circleRes as PromiseSettledResult<SupabaseDataResult<CirclePostRow[]>>)       ?? [];
+    const voices      = settled<VoiceNoteRow[]>(voiceRes as PromiseSettledResult<SupabaseDataResult<VoiceNoteRow[]>>)        ?? [];
+    const comforts    = settled<ComfortSessionRow[]>(comfortRes as PromiseSettledResult<SupabaseDataResult<ComfortSessionRow[]>>)      ?? [];
+    const crewMs      = settled<CrewMemberRow[]>(crewMemberRes as PromiseSettledResult<SupabaseDataResult<CrewMemberRow[]>>)   ?? [];
+    const crewCIs     = settled<CrewCheckInRow[]>(crewCheckInRes as PromiseSettledResult<SupabaseDataResult<CrewCheckInRow[]>>)  ?? [];
+    const parentPosts = settled<ParentCirclePostRow[]>(parentCircleRes as PromiseSettledResult<SupabaseDataResult<ParentCirclePostRow[]>>) ?? [];
+    const room        = settled<RoomMemoryRow>(roomRes as PromiseSettledResult<SupabaseDataResult<RoomMemoryRow>>);
 
     return {
       moodHistory: moods.map(r => ({ id: r.id, mood: r.mood, date: r.date, time: r.time })) as MoodEntry[],

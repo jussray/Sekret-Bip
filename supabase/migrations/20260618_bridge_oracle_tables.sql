@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS public.oracle_sessions (
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. bridge_signals
---    Teen-side send creates one row per Bridge tap.  Message text is NEVER
+--    Teen-side send creates one row per Bridge tap. Message text is NEVER
 --    stored; only share_type / conv_mode / char_key metadata is persisted so
 --    the parent-side can surface a gentle nudge.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -47,8 +47,8 @@ CREATE TABLE IF NOT EXISTS public.bridge_signals (
   id            bigint      GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   teen_user_id  uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   char_key      text        NOT NULL CHECK (char_key IN ('raylene', 'rylane')),
-  share_type    text        NOT NULL,   -- 'mood' | 'thought' | 'need' | 'win'
-  conv_mode     text,                   -- 'soft' | 'honest' | 'boundary' | 'safety' | NULL
+  share_type    text        NOT NULL,
+  conv_mode     text,
   sent_at       timestamptz NOT NULL,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
@@ -58,37 +58,31 @@ CREATE INDEX IF NOT EXISTS bridge_signals_teen_user_id_idx
 
 ALTER TABLE public.bridge_signals ENABLE ROW LEVEL SECURITY;
 
--- Teens may only insert their own rows.
 DROP POLICY IF EXISTS "bridge_signals: teen insert" ON public.bridge_signals;
 CREATE POLICY "bridge_signals: teen insert"
   ON public.bridge_signals FOR INSERT
   WITH CHECK (auth.uid() = teen_user_id);
 
--- Teens may read their own sent signals.
 DROP POLICY IF EXISTS "bridge_signals: teen read" ON public.bridge_signals;
 CREATE POLICY "bridge_signals: teen read"
   ON public.bridge_signals FOR SELECT
   USING (auth.uid() = teen_user_id);
 
--- Linked parents may read signals for their teen.
 DROP POLICY IF EXISTS "bridge_signals: linked parent read" ON public.bridge_signals;
 CREATE POLICY "bridge_signals: linked parent read"
   ON public.bridge_signals FOR SELECT
   USING (
     EXISTS (
       SELECT 1
-      FROM   public.parent_links pl
-      WHERE  pl.teen_user_id   = bridge_signals.teen_user_id
-        AND  pl.parent_user_id = auth.uid()
-        AND  pl.status         = 'active'
+      FROM public.parent_links pl
+      WHERE pl.teen_user_id = bridge_signals.teen_user_id
+        AND pl.parent_user_id = auth.uid()
+        AND pl.status = 'active'
     )
   );
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. oracle_records
---    One row per (user_id, mode).  Upserted on every saveOracleRecord call.
---    profile_snapshot holds the full JSON-serialised OracleRecord for
---    cross-device restore; dimension_summary is indexed for analytics.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.oracle_records (
@@ -105,21 +99,23 @@ CREATE TABLE IF NOT EXISTS public.oracle_records (
 
 ALTER TABLE public.oracle_records ENABLE ROW LEVEL SECURITY;
 
+-- Production retained both policies. The later canonical June 29 hardening
+-- migrations alter both by name, so fresh replay must reconstruct both here.
+DROP POLICY IF EXISTS "Enable users to view their own data only" ON public.oracle_records;
+CREATE POLICY "Enable users to view their own data only"
+  ON public.oracle_records FOR SELECT
+  USING (auth.uid() = user_id);
+
 DROP POLICY IF EXISTS "oracle_records: owner all" ON public.oracle_records;
 CREATE POLICY "oracle_records: owner all"
   ON public.oracle_records FOR ALL
-  USING     (auth.uid() = user_id)
+  USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 3. oracle_sessions
---    The base companion-memory columns are created above for fresh databases.
---    P7/P8 adds an append-only insert path via markSessionComplete() that writes
---    mode, session_index, total_turns, question_ids, dimension_summary,
---    profile_snapshot, and completed_at.
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Add P7/P8 columns (safe no-ops if already present).
 ALTER TABLE public.oracle_sessions
   ADD COLUMN IF NOT EXISTS mode              text,
   ADD COLUMN IF NOT EXISTS session_index     integer     NOT NULL DEFAULT 0,
@@ -137,28 +133,24 @@ CREATE INDEX IF NOT EXISTS oracle_sessions_user_mode_idx
 
 ALTER TABLE public.oracle_sessions ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "oracle_sessions: owner read"   ON public.oracle_sessions;
+DROP POLICY IF EXISTS "oracle_sessions: owner read" ON public.oracle_sessions;
 DROP POLICY IF EXISTS "oracle_sessions: owner insert" ON public.oracle_sessions;
 DROP POLICY IF EXISTS "oracle_sessions: owner update" ON public.oracle_sessions;
 DROP POLICY IF EXISTS "oracle_sessions: owner delete" ON public.oracle_sessions;
 
--- Users may read their own rows (upsert + append paths).
 CREATE POLICY "oracle_sessions: owner read"
   ON public.oracle_sessions FOR SELECT
   USING (auth.uid() = user_id);
 
--- Users may insert their own rows (markSessionComplete append path).
 CREATE POLICY "oracle_sessions: owner insert"
   ON public.oracle_sessions FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
--- Users may update their own rows (companion-memory upsert path).
 CREATE POLICY "oracle_sessions: owner update"
   ON public.oracle_sessions FOR UPDATE
-  USING     (auth.uid() = user_id)
+  USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- Users may delete their own rows.
 CREATE POLICY "oracle_sessions: owner delete"
   ON public.oracle_sessions FOR DELETE
   USING (auth.uid() = user_id);

@@ -6,6 +6,7 @@ import { IMAGES } from '@/constants/theme';
 import { routeForSide } from '@/shared/routes';
 import { useAppContext } from '@/context/AppContext';
 import { PARENT_MORE_GROUPS } from '@/constants/screenPurpose';
+import { isFounderPreviewEnabled } from '@/constants/founderPreview';
 import { isDevTestFamilyEnabled } from '@/features/testing/devTestFamily';
 import { useLinkedBridge } from '@/hooks/useLinkedBridge';
 import { fetchPendingTaskSubmissions, fetchPendingRewardRedemptions } from '@/utils/parentApprovals';
@@ -13,6 +14,7 @@ import { ControlRoomEntry } from '@/components/ControlRoomEntry';
 
 export default function ParentMoreRoute() {
   const { setUserSide } = useAppContext();
+  const founderPreview = isFounderPreviewEnabled();
   const allowSideSwitch = process.env.EXPO_PUBLIC_ENABLE_SIDE_SWITCH === 'true' || isDevTestFamilyEnabled();
   const { linkedTeenId, isLinked } = useLinkedBridge();
   const [pendingApprovals, setPendingApprovals] = useState(0);
@@ -49,6 +51,21 @@ export default function ParentMoreRoute() {
         <Text style={styles.subtitle}>
           Extra tools, connection management, and support resources. Bridge carries Doorbell signals, S2Tell shares, and replies.
         </Text>
+
+        {founderPreview ? (
+          <TouchableOpacity
+            style={styles.previewHero}
+            onPress={() => router.push('/(dev)/feature-preview' as any)}
+            activeOpacity={0.86}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.previewKicker}>EXPO GO · FOUNDER PREVIEW</Text>
+              <Text style={styles.previewTitle}>Open every Bip feature</Text>
+              <Text style={styles.previewBody}>Jump between every teen, parent, hidden, setup-dependent, and prototype surface.</Text>
+            </View>
+            <Text style={styles.previewArrow}>›</Text>
+          </TouchableOpacity>
+        ) : null}
 
         <ControlRoomEntry />
 
@@ -115,6 +132,11 @@ const styles = StyleSheet.create({
   kicker: { color: '#a7f3d0', fontSize: 10, fontWeight: '900', letterSpacing: 2.3, marginBottom: 8 },
   logo: { fontSize: 34, fontWeight: '900', color: '#fff', marginBottom: 8 },
   subtitle: { fontSize: 14, color: '#c6d5cc', marginBottom: 24, lineHeight: 21 },
+  previewHero: { minHeight: 118, flexDirection: 'row', alignItems: 'center', borderRadius: 22, borderWidth: 1, borderColor: '#f59e0b66', backgroundColor: 'rgba(74,35,10,0.92)', padding: 17, marginBottom: 16 },
+  previewKicker: { color: '#fde68a', fontSize: 9, fontWeight: '900', letterSpacing: 1.4, marginBottom: 5 },
+  previewTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  previewBody: { color: '#dbc9a8', fontSize: 11, lineHeight: 17, marginTop: 5 },
+  previewArrow: { color: '#fde68a', fontSize: 34, marginLeft: 10 },
   group: { marginBottom: 22 },
   groupTitle: { color: '#85aa96', fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginBottom: 10 },
   row: { minHeight: 76, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#a7f3d026', borderRadius: 18, backgroundColor: 'rgba(17,37,28,0.90)', paddingHorizontal: 14, paddingVertical: 12, marginBottom: 10 },

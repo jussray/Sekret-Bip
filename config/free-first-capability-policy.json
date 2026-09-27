@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "policy": "free-first-capability-routing",
+  "purpose": "Prefer no-provider-fee or verified free-allowance capabilities only after Bip safety, privacy, rights, quality, quota, and automation requirements pass.",
+  "routingOrder": [
+    "EXISTING_INCLUDED_CAPABILITY",
+    "LOCAL_NO_PROVIDER_FEE",
+    "HOSTED_FREE_ALLOWANCE",
+    "PAID"
+  ],
+  "mandatoryGates": [
+    "safety",
+    "privacy",
+    "commercial_rights",
+    "minimum_quality",
+    "current_quota",
+    "required_automation_access"
+  ],
+  "rules": {
+    "costNeverOverridesSafety": true,
+    "costNeverOverridesPrivacy": true,
+    "unknownCommercialRightsFailClosedWhenCommercialUseRequired": true,
+    "providerFreeStatusMustBeReverified": true,
+    "providerNamesAreNotPermanentlyClassifiedAsFree": true,
+    "paidFallbackRequiresNoEligibleLowerCostCandidate": true,
+    "localExecutionMayStillHaveHardwareOrElectricityCost": true,
+    "receiptRequired": true
+  },
+  "receiptFields": [
+    "capability",
+    "provider_or_runtime",
+    "cost_class",
+    "eligibility_revision",
+    "license_evidence",
+    "quota_evidence",
+    "privacy_classification",
+    "safety_classification",
+    "selection_reason"
+  ],
+  "bipBoundary": {
+    "teenAndFamilyPrivacyOutranksCost": true,
+    "sensitiveContentMayNotBeSentToAProviderMerelyBecauseItIsFree": true,
+    "existingSupabaseCloudflareFirebaseBoundariesRemainUnchanged": true,
+    "newProviderCredentialsRequireExplicitSecretBoundaryReview": true
+  }
+}

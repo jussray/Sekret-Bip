@@ -1,0 +1,364 @@
+{
+  "schemaVersion": 1,
+  "status": "structural_only",
+  "projectRef": "tbsevonvegdnlyjgplmm",
+  "observedAt": "2026-08-15",
+  "inventorySource": "read_only_live_pg_catalog",
+  "scope": {
+    "schemas": ["public", "auth"],
+    "returnType": "trigger",
+    "securityDefinerOnly": true,
+    "platformSchemasExcluded": ["extensions", "realtime", "storage"]
+  },
+  "verification": {
+    "repositoryStructuralCoverage": true,
+    "liveCatalogObserved": true,
+    "liveBehaviorVerified": false,
+    "externalEffectsSafelyStubbed": false
+  },
+  "behaviorProbePhases": [
+    {
+      "phase": "trigger_behavior_phase1",
+      "probePath": "supabase/probes/trigger_behavior_phase1.sql",
+      "observedAt": "2026-07-24",
+      "transactionOutcome": "rolled_back",
+      "passedChecks": 7,
+      "failedChecks": 0,
+      "syntheticRowsRetained": 0,
+      "coveredFunctions": [
+        "public.apply_point_transaction()",
+        "public.auto_resolve_issue_on_event_resolve()",
+        "public.enforce_circle_anonymity()",
+        "public.handle_bip_event_points()"
+      ],
+      "proofSummary": [
+        "apply_point_transaction() accumulates point_balances.available across sequential point_transactions inserts for the same user rather than overwriting it",
+        "handle_bip_event_points() awards the documented point value for a known event_type and inserts zero rows for an unrecognized one",
+        "enforce_circle_anonymity() rejects is_identity_revealed=true on a public circle post and allows it on a friends circle post",
+        "auto_resolve_issue_on_event_resolve() leaves a linked control_room_issues row open while any linked audit_events row is unresolved, and resolves it only once all linked events are resolved"
+      ],
+      "notCoveredThisPhase": {
+        "public.trigger_safety_scan()": "Calls net.http_post to the deployed safety-scan Edge Function. pg_net requests are queued outside the enclosing transaction and are not undone by ROLLBACK, so this function must never be exercised with real scannable content in a probe. Only its early-return guards could be safely probed in a future phase, without ever supplying content that reaches the http_post call.",
+        "public.initialize_account_verification()": "Attached to auth.users AFTER INSERT. Behavioral proof requires writing to auth.users, a different risk class from ordinary public-schema rows; deferred until explicitly authorized.",
+        "public.initialize_app_profile()": "Same auth.users AFTER INSERT constraint as initialize_account_verification().",
+        "public.sync_app_profile_email_from_auth()": "Attached to auth.users AFTER UPDATE; same constraint.",
+        "public.cleanup_crew_relationship_access()": "Deferred to a future bounded phase to keep this phase small and reviewable, not because it is unsafe.",
+        "public.record_bridge_signal_activity()": "Deferred to a future bounded phase for the same reason.",
+        "public.award_points_for_app_activity()": "Documented live-only catalog drift (repositoryExpected: false); behavior proof for a function slated for retirement is lower value than for canonical paths.",
+        "public.enforce_onboarding_state_transition()": "deployedLive: false -- cannot be behaviorally probed against a project where the function does not exist yet.",
+        "public.handle_first_mood_log()": "deployedLive: false -- same constraint."
+      }
+    },
+    {
+      "phase": "trigger_behavior_phase2",
+      "probePath": "supabase/probes/trigger_behavior_phase2.sql",
+      "observedAt": "2026-07-31",
+      "transactionOutcome": "rolled_back",
+      "passedChecks": 5,
+      "failedChecks": 0,
+      "syntheticRowsRetained": 0,
+      "coveredFunctions": [
+        "public.cleanup_crew_relationship_access()",
+        "public.record_bridge_signal_activity()"
+      ],
+      "proofSummary": [
+        "cleanup_crew_relationship_access() deletes bidirectional legacy crew_memberships rows when a crew_members row's connection_status transitions to 'blocked'",
+        "cleanup_crew_relationship_access() revokes an active crew_check_in_shares row (status -> 'revoked') between the same two accounts on that same transition",
+        "cleanup_crew_relationship_access() deletes the blocked member's circle_members row from the owner's 'crew'-kind circle on that same transition",
+        "cleanup_crew_relationship_access() no-ops (old.connection_status = new.connection_status guard) when connection_status is reassigned its existing value, leaving crew_memberships untouched even though \"UPDATE OF connection_status\" still fires the trigger",
+        "record_bridge_signal_activity() inserts a bip_events row with event_type 'bridge_shared', user_id = bridge_signals.teen_user_id, and meta.sourceId/category/route/receiptKey/responsePreference matching the inserted bridge_signals row"
+      ],
+      "syntheticIdentityNote": "This project has exactly one real auth.users row (the founder). Per explicit founder direction (2026-07-31: \"Insert a synthetic second auth.users row, rollback-contained\"), this phase inserted synthetic auth.users rows inside the same rollback-contained transaction to supply the second and third identities public.crew_members/crew_memberships/crew_check_in_shares/bridge_signals relationships require. Live pg_catalog inspection confirmed the only two AFTER INSERT triggers on auth.users (initialize_account_verification(), initialize_app_profile()) are pure public-schema inserts with no pg_net/Edge Function calls, so the synthetic inserts carried no effect that would survive ROLLBACK. Post-run verification confirmed auth.users count returned to 1 and zero tagged rows remained in any touched table.",
+      "notCoveredThisPhase": {
+        "public.trigger_safety_scan()": "Unchanged from trigger_behavior_phase1 -- pg_net side effect, never safe to exercise with real content in a probe.",
+        "public.initialize_account_verification()": "This phase's synthetic auth.users inserts exercised it as an observed side effect (confirmed pg_net-free), not as a directly asserted, scoped behavior check of the function itself; still deferred as a probed subject.",
+        "public.initialize_app_profile()": "Same as initialize_account_verification() above.",
+        "public.sync_app_profile_email_from_auth()": "Attached to auth.users AFTER UPDATE; not exercised this phase (no auth.users email update performed).",
+        "public.award_points_for_app_activity()": "Unchanged from trigger_behavior_phase1 -- documented live-only catalog drift, lower value than canonical paths.",
+        "public.enforce_onboarding_state_transition()": "deployedLive: false -- unchanged from trigger_behavior_phase1.",
+        "public.handle_first_mood_log()": "deployedLive: false -- unchanged from trigger_behavior_phase1."
+      }
+    }
+  ],
+  "catalogDrift": [
+    {
+      "kind": "live_only_legacy_trigger_path",
+      "status": "open",
+      "liveMigration": "20260704012007_award_points_for_app_actions",
+      "function": "public.award_points_for_app_activity()",
+      "trigger": "activity_events_award_points",
+      "table": "public.activity_events",
+      "repositoryCanonicalPath": "public.bip_events -> public.handle_bip_event_points()",
+      "currentClientWriter": "src/features/activity/events.ts writes public.bip_events only",
+      "requiredResolution": "Create and verify a bounded Supabase migration that retires the legacy trigger/function, or document a real remaining producer before preserving it. Do not mutate production from this structural-audit PR."
+    }
+  ],
+  "functions": [
+    {
+      "signature": "public.apply_point_transaction()",
+      "searchPath": "public",
+      "risk": "high",
+      "rationale": "Applies server-owned point ledger effects after transaction inserts.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": true,
+      "behaviorEvidence": "trigger_behavior_phase1"
+    },
+    {
+      "signature": "public.auto_resolve_issue_on_event_resolve()",
+      "searchPath": "public",
+      "risk": "high",
+      "rationale": "Mutates Control Room issue state from audit-event resolution changes.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": true,
+      "behaviorEvidence": "trigger_behavior_phase1"
+    },
+    {
+      "signature": "public.award_points_for_app_activity()",
+      "searchPath": "public",
+      "risk": "high",
+      "rationale": "Live-only legacy path that creates derived point transactions from activity_events.",
+      "clientExecuteRevokedLive": true,
+      "repositoryExpected": false,
+      "catalogDrift": "live_only",
+      "behaviorVerified": false
+    },
+    {
+      "signature": "public.cleanup_crew_relationship_access()",
+      "searchPath": "pg_catalog, pg_temp",
+      "risk": "critical",
+      "rationale": "Removes relationship-derived access after crew membership state changes.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": true,
+      "behaviorEvidence": "trigger_behavior_phase2"
+    },
+    {
+      "signature": "public.enforce_circle_anonymity()",
+      "searchPath": "public",
+      "risk": "critical",
+      "rationale": "Enforces pseudonymous Circle identity before post writes become durable.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": true,
+      "behaviorEvidence": "trigger_behavior_phase1"
+    },
+    {
+      "signature": "public.handle_bip_event_points()",
+      "searchPath": "public",
+      "risk": "high",
+      "rationale": "Awards idempotent point transactions from Bip events.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": true,
+      "behaviorEvidence": "trigger_behavior_phase1"
+    },
+    {
+      "signature": "public.initialize_account_verification()",
+      "searchPath": "public, auth",
+      "risk": "critical",
+      "rationale": "Creates verification state for new authentication users.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": false
+    },
+    {
+      "signature": "public.initialize_app_profile()",
+      "searchPath": "pg_catalog, pg_temp",
+      "risk": "critical",
+      "rationale": "Creates the durable application profile shell for new auth users.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": false
+    },
+    {
+      "signature": "public.record_bridge_signal_activity()",
+      "searchPath": "public",
+      "risk": "high",
+      "rationale": "Records metadata-only activity when a Bridge signal is created.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": true,
+      "behaviorEvidence": "trigger_behavior_phase2"
+    },
+    {
+      "signature": "public.sync_app_profile_email_from_auth()",
+      "searchPath": "pg_catalog, pg_temp",
+      "risk": "critical",
+      "rationale": "Synchronizes private profile email state from auth.users updates.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": false
+    },
+    {
+      "signature": "public.sync_owned_founder_profile()",
+      "searchPath": "pg_catalog, public, auth",
+      "risk": "critical",
+      "rationale": "Synchronizes founder authorization from the owned, confirmed, non-anonymous auth identity and revokes founder role when that identity boundary no longer matches.",
+      "clientExecuteRevokedLive": true,
+      "deployedLive": true,
+      "deploymentStatus": "Read-only live pg_catalog inspection on 2026-08-15 confirmed the function and both auth.users triggers are live with client EXECUTE revoked. The exact migration version 20260813222000 was not present in supabase_migrations.schema_migrations, so live catalog state is proven while migration-ledger provenance remains unresolved.",
+      "behaviorVerified": false
+    },
+    {
+      "signature": "public.trigger_safety_scan()",
+      "searchPath": "public",
+      "risk": "critical",
+      "rationale": "Queues child-safety scanning for newly inserted user content.",
+      "clientExecuteRevokedLive": true,
+      "behaviorVerified": false
+    },
+    {
+      "signature": "public.enforce_onboarding_state_transition()",
+      "searchPath": "pg_catalog, public",
+      "risk": "critical",
+      "rationale": "Fails closed on non-baseline client inserts, cross-user rewrites, onboarding stage regression, assigned-role changes, and inconsistent activation/completion metadata for public.user_onboarding_state.",
+      "clientExecuteRevokedLive": true,
+      "deployedLive": true,
+      "deploymentStatus": "Read-only live pg_catalog inspection on 2026-08-15 confirmed the function and onboarding_state_transition_guard trigger are deployed with client EXECUTE revoked. This supersedes the older 2026-07-21 live observation that the function was not yet present.",
+      "behaviorVerified": false
+    },
+    {
+      "signature": "public.handle_first_mood_log()",
+      "searchPath": "public",
+      "risk": "high",
+      "rationale": "Belt-and-suspenders activation: advances user_onboarding_state to activated on a user's first public.moods insert, idempotent against the existing app-side markActivated() call.",
+      "clientExecuteRevokedLive": true,
+      "deployedLive": true,
+      "deploymentStatus": "Read-only live pg_catalog inspection on 2026-08-15 confirmed the function and trg_first_mood_activation trigger are deployed with client EXECUTE revoked. This supersedes the older 2026-07-21 live observation that the function was not yet present.",
+      "behaviorVerified": false
+    }
+  ],
+  "attachments": [
+    {
+      "trigger": "point_transactions_apply_balance",
+      "table": "public.point_transactions",
+      "function": "public.apply_point_transaction()",
+      "timing": "AFTER",
+      "events": ["INSERT"]
+    },
+    {
+      "trigger": "trg_auto_resolve_issue",
+      "table": "public.audit_events",
+      "function": "public.auto_resolve_issue_on_event_resolve()",
+      "timing": "AFTER",
+      "events": ["UPDATE"]
+    },
+    {
+      "trigger": "activity_events_award_points",
+      "table": "public.activity_events",
+      "function": "public.award_points_for_app_activity()",
+      "timing": "AFTER",
+      "events": ["INSERT"],
+      "repositoryExpected": false,
+      "catalogDrift": "live_only"
+    },
+    {
+      "trigger": "crew_members_cleanup_access",
+      "table": "public.crew_members",
+      "function": "public.cleanup_crew_relationship_access()",
+      "timing": "AFTER",
+      "events": ["UPDATE"]
+    },
+    {
+      "trigger": "enforce_circle_anonymity",
+      "table": "public.posts",
+      "function": "public.enforce_circle_anonymity()",
+      "timing": "BEFORE",
+      "events": ["INSERT", "UPDATE"]
+    },
+    {
+      "trigger": "bip_events_award_points",
+      "table": "public.bip_events",
+      "function": "public.handle_bip_event_points()",
+      "timing": "AFTER",
+      "events": ["INSERT"]
+    },
+    {
+      "trigger": "initialize_account_verification_on_signup",
+      "table": "auth.users",
+      "function": "public.initialize_account_verification()",
+      "timing": "AFTER",
+      "events": ["INSERT"]
+    },
+    {
+      "trigger": "initialize_app_profile_on_signup",
+      "table": "auth.users",
+      "function": "public.initialize_app_profile()",
+      "timing": "AFTER",
+      "events": ["INSERT"]
+    },
+    {
+      "trigger": "bridge_signals_record_meaningful_activity",
+      "table": "public.bridge_signals",
+      "function": "public.record_bridge_signal_activity()",
+      "timing": "AFTER",
+      "events": ["INSERT"]
+    },
+    {
+      "trigger": "sync_app_profile_email_on_auth_update",
+      "table": "auth.users",
+      "function": "public.sync_app_profile_email_from_auth()",
+      "timing": "AFTER",
+      "events": ["UPDATE"]
+    },
+    {
+      "trigger": "sync_owned_founder_profile_insert",
+      "table": "auth.users",
+      "function": "public.sync_owned_founder_profile()",
+      "timing": "AFTER",
+      "events": ["INSERT"],
+      "deployedLive": true
+    },
+    {
+      "trigger": "sync_owned_founder_profile_update",
+      "table": "auth.users",
+      "function": "public.sync_owned_founder_profile()",
+      "timing": "AFTER",
+      "events": ["UPDATE"],
+      "deployedLive": true
+    },
+    {
+      "trigger": "safety_scan_circle",
+      "table": "public.circle_posts",
+      "function": "public.trigger_safety_scan()",
+      "timing": "AFTER",
+      "events": ["INSERT"],
+      "repositoryExpected": false,
+      "catalogDrift": "historical_live_only_tc01_retired"
+    },
+    {
+      "trigger": "safety_scan_journal",
+      "table": "public.journal_entries",
+      "function": "public.trigger_safety_scan()",
+      "timing": "AFTER",
+      "events": ["INSERT"],
+      "repositoryExpected": false,
+      "catalogDrift": "historical_live_only_tc01_retired"
+    },
+    {
+      "trigger": "safety_scan_posts",
+      "table": "public.posts",
+      "function": "public.trigger_safety_scan()",
+      "timing": "AFTER",
+      "events": ["INSERT"],
+      "repositoryExpected": false,
+      "catalogDrift": "historical_live_only_tc01_retired"
+    },
+    {
+      "trigger": "safety_scan_public_circle",
+      "table": "public.public_circle_posts",
+      "function": "public.trigger_safety_scan()",
+      "timing": "AFTER",
+      "events": ["INSERT"]
+    },
+    {
+      "trigger": "onboarding_state_transition_guard",
+      "table": "public.user_onboarding_state",
+      "function": "public.enforce_onboarding_state_transition()",
+      "timing": "BEFORE",
+      "events": ["INSERT", "UPDATE"],
+      "deployedLive": true
+    },
+    {
+      "trigger": "trg_first_mood_activation",
+      "table": "public.moods",
+      "function": "public.handle_first_mood_log()",
+      "timing": "AFTER",
+      "events": ["INSERT"],
+      "deployedLive": true
+    }
+  ]
+}

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PROFILE_IDENTITY_KEYS: string[] = [
+  'bip_account_profile_cache',
   'teen_profile_done',
   'teen_profile_data',
   'teen_circle_identity',

@@ -1,0 +1,58 @@
+name: Cookie Contract Mirror
+
+on:
+  pull_request:
+    paths:
+      - '.security/cookies.json'
+      - 'scripts/verify-cookie-contract.mjs'
+      - 'test/cookie-contract-verifier.test.mjs'
+      - 'app/**'
+      - 'src/**'
+      - 'utils/**'
+      - 'worker/**'
+      - 'scripts/**'
+      - 'supabase/**'
+      - '.github/workflows/cookie-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cookie-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  cookie-contract:
+    name: Cookie contract
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install parser dependency from lockfile
+        run: npm ci
+
+      - name: Verify cookie policy and scanner regression
+        run: node --test test/cookie-contract-verifier.test.mjs && node scripts/verify-cookie-contract.mjs

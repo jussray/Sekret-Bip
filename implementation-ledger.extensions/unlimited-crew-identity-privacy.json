@@ -1,0 +1,58 @@
+{
+  "features": [
+    {
+      "id": "unlimited-crew-identity-privacy",
+      "name": "Unlimited Bip Crew with accepted-connection identity privacy",
+      "status": "integrated",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/432",
+      "acceptanceCriteria": [
+        "Bip Crew and Crew check-in sharing contain no numeric member or recipient cap while recipient lists remain deduplicated and atomic.",
+        "Accounts remain anonymous outside accepted Crew; pending, blocked, removed, self, and stranger accounts cannot receive private display identity.",
+        "Invite acceptance is permanent-account and server controlled, ignores caller-supplied identity, rejects self and blocked relationships, and creates one durable relationship per owner/member pair.",
+        "Every Crew check-in recipient must be accepted and non-blocked, and one invalid recipient rolls back the complete check-in and share operation.",
+        "Either participant may leave or block, immediately revoking trusted identity, active check-in shares, and legacy membership access."
+      ],
+      "contractPaths": [
+        "docs/UNLIMITED_CREW_IDENTITY_PRIVACY.md",
+        "docs/PHASE2_CREW_ACCOUNTABILITY.md",
+        "docs/OPENAI_ANTHROPIC_CREW_ADDENDUM.md",
+        "supabase/migrations/20260714183100_remove_crew_caps_and_guard_relationships.sql",
+        "supabase/migrations/20260714183200_guard_crew_invite_acceptance.sql",
+        "supabase/migrations/20260714183300_accepted_crew_identity_rpc.sql",
+        "supabase/migrations/20260714183400_unlimited_crew_check_in_rpc.sql",
+        "supabase/migrations/20260714183500_harden_crew_membership_paths.sql",
+        "supabase/migrations/20260714183600_lock_crew_function_search_paths.sql"
+      ],
+      "runtimePaths": [
+        "src/services/crewAccountabilityService.ts",
+        "src/services/crewAccountabilityServiceV2.ts",
+        "src/services/crewRelationshipRepository.ts",
+        "src/screens/CrewAccountabilityScreen.tsx",
+        "src/screens/CrewAccountabilityScreenV3.tsx",
+        "screens/BipCrewScreen.tsx",
+        "screens/BipCrewScreenV2.tsx"
+      ],
+      "testPaths": [
+        "test/unlimited-crew-identity-privacy.test.mjs",
+        "test/feature-flow-contracts.test.mjs",
+        "test/founder-preview-unlock.test.mjs"
+      ],
+      "telemetryPaths": [
+        "src/services/crewAccountabilityServiceV2.ts",
+        "supabase/migrations/20260714183400_unlimited_crew_check_in_rpc.sql",
+        "supabase/migrations/20260714183500_harden_crew_membership_paths.sql"
+      ],
+      "rollout": {
+        "state": "internal",
+        "controlPath": "src/constants/relationshipFeatureFlags.ts",
+        "controlKey": "crewAccountability"
+      },
+      "verification": {
+        "state": "partial",
+        "evidence": "https://github.com/jussray/Sekret-Bip/issues/432",
+        "blocker": "Exact-head CI, two-account anonymous-to-accepted identity proof, more-than-fifteen-member fixture proof, more-than-ten-recipient atomic sharing proof, invalid-recipient rollback proof, and iOS/Android long-list accessibility QA remain before verified status."
+      },
+      "rollback": "Revert the app merge and apply reviewed follow-up migrations to restore the prior max_members constraint and trigger only if product policy reverses. Preserve relationship rows and audit-safe status history; do not re-expose caller-supplied names."
+    }
+  ]
+}

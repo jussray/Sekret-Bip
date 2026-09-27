@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-13",
+  "project": {
+    "name": "Se'kret Bip",
+    "ref": "tbsevonvegdnlyjgplmm",
+    "status": "ACTIVE_HEALTHY"
+  },
+  "migration": {
+    "version": "20260713073608",
+    "name": "restrict_guardian_review_helper_execute",
+    "repositoryPath": "supabase/migrations/20260713073608_restrict_guardian_review_helper_execute.sql",
+    "applied": true,
+    "verified": true,
+    "repositoryAndLiveMigrationParity": true
+  },
+  "boundary": {
+    "function": "public.can_manage_guardian_reviews()",
+    "classification": "internal_authorization_predicate",
+    "securityDefiner": true,
+    "fixedSearchPath": true,
+    "anonExecute": false,
+    "authenticatedExecute": false,
+    "serviceRoleExecute": true,
+    "postgresOwnerSupportsInternalCalls": true,
+    "mobileClientDirectCallSites": 0
+  },
+  "wrapperContinuity": {
+    "normalQueueDenied": true,
+    "normalReviewDenied": true,
+    "founderQueueAllowed": true,
+    "founderReviewReachedTargetValidation": true,
+    "parentLinkConsentChanged": false,
+    "teenDataAccessChanged": false
+  },
+  "advisor": {
+    "authenticatedSecurityDefinerFindingCleared": true,
+    "remainingWrapperWarningsRequireBehaviorReview": true
+  },
+  "liveProof": {
+    "transactionOutcome": "rolled_back",
+    "passedChecks": 7,
+    "failedChecks": 0,
+    "syntheticUsersCreated": 0,
+    "applicationRowsWritten": 0,
+    "productionDataRetained": false
+  },
+  "source": {
+    "pullRequest": 379,
+    "mergeCommit": "0985c15ad93c2cfdfecc282d78d9309f010c3b24"
+  }
+}

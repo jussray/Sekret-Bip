@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { extname, join, relative, resolve, sep } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
@@ -17,6 +17,15 @@ function walk(directory) {
   });
 }
 
+function readRuntimeSource(file) {
+  try {
+    return readFileSync(file, 'utf8');
+  } catch (error) {
+    if (error?.code === 'EISDIR') return null;
+    throw error;
+  }
+}
+
 const runtimeFiles = runtimeRoots
   .map((directory) => join(root, directory))
   .flatMap((directory) => walk(directory))
@@ -24,8 +33,8 @@ const runtimeFiles = runtimeRoots
 runtimeFiles.push(join(root, 'app.json'));
 
 for (const file of runtimeFiles) {
-  if (!statSync(file).isFile()) continue;
-  const contents = readFileSync(file, 'utf8');
+  const contents = readRuntimeSource(file);
+  if (contents === null) continue;
   contents.split(/\r?\n/).forEach((line, index) => {
     for (const match of line.matchAll(quotedPath)) {
       const candidate = match[1];

@@ -1,23 +1,26 @@
 {
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
-    "ignoreDeprecations": "6.0",
     "strict": true,
     "noImplicitAny": false,
     "jsx": "react-jsx",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "baseUrl": ".",
+    "ignoreDeprecations": "5.0",
     "paths": {
-      "@/*":                 ["./src/*"],
-      "@hooks/*":            ["./src/hooks/*"],
-      "@utils/*":            ["./src/utils/*"],
-      "@components/*":       ["./src/components/*"],
-      "@constants/theme":    ["./src/constants/theme.ts"],
-      "@constants/*":        ["./src/constants/*", "./constants/*"],
-      "@screens/*":          ["./screens/*"],
-      "@types/*":            ["./src/types/*"]
+      "@/*": ["./src/*"],
+      "@hooks/*": ["./src/hooks/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@components/*": ["./src/components/*"],
+      "@constants/theme": ["./src/constants/theme.ts"],
+      "@constants/*": ["./src/constants/*", "./constants/*"],
+      "@screens/*": ["./screens/*"],
+      "@types/*": ["./src/types/*"]
     }
   },
-  "exclude": ["supabase/functions/**"]
+  "exclude": [
+    "supabase/functions/**",
+    "tools/zapier/**"
+  ]
 }

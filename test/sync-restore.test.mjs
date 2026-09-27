@@ -426,14 +426,10 @@ test('ensureAnonymousSession returns null when Supabase is not configured', () =
   assert.match(fn, /if \(!sb\) return null/);
 });
 
-test('ensureAnonymousSession reuses existing session if one exists', () => {
+test('ensureAnonymousSession delegates session reuse and anonymous fallback to the session service', () => {
   const fn = syncSrc.slice(syncSrc.indexOf('export async function ensureAnonymousSession'));
-  // Must check for an existing user before calling signInAnonymously.
-  const existingCheckIdx   = fn.indexOf('data?.user?.id');
-  const anonSignInIdx      = fn.indexOf('signInAnonymously');
-  assert.ok(existingCheckIdx > 0,           'Must check for existing session');
-  assert.ok(anonSignInIdx    > 0,           'Must call signInAnonymously as fallback');
-  assert.ok(existingCheckIdx < anonSignInIdx, 'Existing session check must come before signInAnonymously');
+  assert.match(syncSrc, /ensureAnonymousSession as startAnonymousSession/);
+  assert.match(fn, /await startAnonymousSession\(\)/);
 });
 
 test('ensureAnonymousSession catches errors and returns null (never throws)', () => {

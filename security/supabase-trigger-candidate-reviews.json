@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "status": "candidate_not_live",
+  "sourceMigration": "20260919190000_auth_signup_onboarding_baseline.sql",
+  "functions": [
+    {
+      "signature": "public.initialize_onboarding_state_from_auth()",
+      "searchPath": "pg_catalog, public, auth",
+      "risk": "critical",
+      "rationale": "Creates the minimal server-owned onboarding baseline for new permanent auth identities and anonymous-to-permanent upgrades without minting consent, verification, relationship, or authorization authority.",
+      "clientExecuteRevokedLive": false,
+      "deployedLive": false,
+      "deploymentStatus": "PR #1099 candidate only. Production migration ledger has not applied 20260919190000; repository structure and rollback-contained replay are the current evidence.",
+      "behaviorVerified": false
+    }
+  ],
+  "attachments": [
+    {
+      "trigger": "initialize_onboarding_state_on_signup",
+      "table": "auth.users",
+      "function": "public.initialize_onboarding_state_from_auth()",
+      "timing": "AFTER",
+      "events": ["INSERT"]
+    },
+    {
+      "trigger": "initialize_onboarding_state_on_permanent_upgrade",
+      "table": "auth.users",
+      "function": "public.initialize_onboarding_state_from_auth()",
+      "timing": "AFTER",
+      "events": ["UPDATE"]
+    }
+  ]
+}

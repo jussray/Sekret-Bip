@@ -3,7 +3,7 @@
 **Version 1.1 — June 2026**  
 **Applies to:** Se'kret Bip production app and Se'kret Bip Demo web preview
 
-> **Status notice:** This document describes Se'kret Bip's intended 13+ privacy posture and current architectural principles. It is not a legal opinion or a certification of compliance. Public launch remains blocked on the implementation and verification items listed below.
+> **Status notice:** This document describes Se'kret Bip's intended 13+ privacy posture and current architectural principles. It is not a legal opinion or a certification of compliance. Public launch, public demos, app-store release, and production teen-data collection remain blocked on the implementation and verification items listed below.
 
 ## Product Position
 
@@ -18,7 +18,7 @@ COPPA applies to online services directed to children under 13 and to services w
 - Minimum account age: **13**.
 - Users whose date of birth indicates they are under 13 must be blocked before account creation or collection of non-essential personal information.
 - Age enforcement must exist at both the user-interface layer and the server/API layer.
-- The demo must not invite users to submit real personal, journal, voice, or crisis information.
+- Any non-production demo must warn users not to submit real personal, journal, voice, or crisis information.
 - Se'kret Bip does not currently offer an under-13 experience.
 
 A self-declared age field alone is not considered sufficient launch verification until API bypass tests pass.
@@ -133,7 +133,7 @@ A local cache reset or account deactivation does not satisfy full deletion.
 
 ## Launch Blockers
 
-The following must be completed and verified before public launch:
+The following must be completed and verified before public launch, public demo, app-store release, or production teen-data collection:
 
 - [ ] Public Privacy Policy at a stable URL
 - [ ] Age-appropriate Terms of Service at a stable URL

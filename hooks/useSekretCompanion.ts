@@ -19,8 +19,8 @@ import { COMPANION_CURRICULUM, type CompanionId } from '../src/config/companionC
 import type { CompanionActivityInput, CompanionLevel, CompanionState, MemorySummary } from '../types/sekretCompanion';
 
 const PERSONALITY_LABELS = {
-  raylene: 'Raylene',
-  rylane: 'Rylane',
+  suhana: 'Suhana',
+  sy: 'Sy',
   cloud: 'Cloud',
   night: 'Night',
 } as const;
@@ -41,11 +41,11 @@ const EMPTY_LEVEL: CompanionLevel = {
 const DEFAULT_STATE: CompanionState = {
   memorySummary: EMPTY_SUMMARY,
   companionLevel: EMPTY_LEVEL,
-  greeting: COMPANION_CURRICULUM.raylene.greeting,
+  greeting: COMPANION_CURRICULUM.suhana.greeting,
   presenceMessage: 'You do not have to act fine with me.',
   checkIn: null,
   lastUpdated: '',
-  personality: 'Raylene',
+  personality: 'Suhana',
 };
 
 function buildLevel(summary: MemorySummary): CompanionLevel {
@@ -69,12 +69,12 @@ function buildGreeting(voice: CompanionId, summary: MemorySummary, relationshipN
   const dislikesNicknames = relationshipNote.includes('nickname comfort: dislikes');
 
   if (!familiar) {
-    if (dislikesNicknames && voice === 'raylene') return 'Okay. What really happened?';
-    if (dislikesNicknames && voice === 'rylane') return 'Run it back. What really happened?';
+    if (dislikesNicknames && voice === 'suhana') return 'Okay. What really happened?';
+    if (dislikesNicknames && voice === 'sy') return 'Run it back. What really happened?';
     return COMPANION_CURRICULUM[voice].greeting;
   }
 
-  if (voice === 'rylane') return dislikesNicknames
+  if (voice === 'sy') return dislikesNicknames
     ? 'You’re back. What’s really up?'
     : 'Aight, you back. Run it back for me—what’s really up?';
   if (voice === 'cloud') return 'You’re back. We can keep it small and gentle again.';

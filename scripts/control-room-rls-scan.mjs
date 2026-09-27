@@ -3,6 +3,14 @@ import path from 'node:path';
 
 const migrationsDir = path.join(process.cwd(), 'supabase', 'migrations');
 const findings = [];
+const verifiedExceptions = [];
+
+const SERVICE_ROLE_ONLY_TABLES = new Map([
+  [
+    'notification_deliveries',
+    'Server-owned push delivery ledger. RLS is enabled and all table privileges are revoked from anon and authenticated in 20260704030000_harden_push_notifications.sql.',
+  ],
+]);
 
 if (!fs.existsSync(migrationsDir)) {
   findings.push({
@@ -36,9 +44,15 @@ if (!fs.existsSync(migrationsDir)) {
   for (const table of tables) {
     const enablePattern = new RegExp(`alter\\s+table\\s+(?:public\\.)?${table}\\s+enable\\s+row\\s+level\\s+security`, 'i');
     const policyPattern = new RegExp(`create\\s+policy[^;]*?on\\s+(?:public\\.)?${table}\\b`, 'i');
+    const revokeClientPattern = new RegExp(
+      `revoke\\s+all\\s+on\\s+table\\s+(?:public\\.)?${table}\\s+from\\s+anon\\s*,\\s*authenticated`,
+      'i',
+    );
     const coveredByDynamicLoop = dynamicTableNames.has(table);
     const rlsEnabled = enablePattern.test(sql) || (dynamicRlsLoop && coveredByDynamicLoop);
     const policyExists = policyPattern.test(sql) || (dynamicPolicyLoop && coveredByDynamicLoop);
+    const exceptionRationale = SERVICE_ROLE_ONLY_TABLES.get(table);
+    const verifiedServiceRoleOnly = Boolean(exceptionRationale && rlsEnabled && revokeClientPattern.test(sql));
 
     if (!rlsEnabled) {
       findings.push({
@@ -48,6 +62,12 @@ if (!fs.existsSync(migrationsDir)) {
         screen: table,
         message: `Row-level security is not enabled for ${table}.`,
         metadata: { table },
+      });
+    } else if (!policyExists && verifiedServiceRoleOnly) {
+      verifiedExceptions.push({
+        table,
+        classification: 'service_role_only',
+        rationale: exceptionRationale,
       });
     } else if (!policyExists) {
       findings.push({
@@ -68,6 +88,8 @@ const result = {
   ok: findings.every((item) => !['critical', 'error'].includes(item.severity)),
   finding_count: findings.length,
   findings,
+  verified_exception_count: verifiedExceptions.length,
+  verified_exceptions: verifiedExceptions,
 };
 
 console.log(JSON.stringify(result, null, 2));

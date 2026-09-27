@@ -1,0 +1,221 @@
+name: Cloudflare ACM Read Audit
+
+on:
+  push:
+    branches:
+      - fix/cloudflare-build-cost-guard
+    paths:
+      - .github/workflows/cloudflare-acm-read-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-acm:
+    name: Read-only ACM, Total TLS, and certificate inventory
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+      CF_BUILD_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+      CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CF_ACCESS_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+    steps:
+      - name: Inspect Cloudflare TLS state without mutation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const API = 'https://api.cloudflare.com/client/v4';
+          const zoneId = String(process.env.CF_ZONE_ID || '').trim();
+          if (!/^[0-9a-f]{32}$/.test(zoneId)) throw new Error('ZONE_ID_INVALID_FORMAT');
+
+          const normalize = (value) => {
+            const raw = String(value ?? '');
+            if (!raw) return { token: '', validTransport: false, shape: 'empty' };
+            let token = raw.trim().normalize('NFKC');
+            let previous;
+            do {
+              previous = token;
+              token = token.trim();
+              token = token.replace(/^[A-Z_][A-Z0-9_]*[\p{White_Space}\p{Cf}]*=[\p{White_Space}\p{Cf}]*/u, '');
+              const quoted = token.match(/^(["'])([\s\S]*)\1$/u);
+              if (quoted) token = quoted[2].trim();
+              const smartDouble = token.match(/^“([\s\S]*)”$/u);
+              if (smartDouble) token = smartDouble[1].trim();
+              const smartSingle = token.match(/^‘([\s\S]*)’$/u);
+              if (smartSingle) token = smartSingle[1].trim();
+              token = token.replace(/^Bearer[\p{White_Space}\p{Cf}]+/iu, '');
+            } while (token !== previous);
+            token = token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+            const shape = /^[0-9a-f]{32}$/i.test(token) ? 'likely-token-id'
+              : token.startsWith('cfut_') ? 'user-prefixed'
+                : token.startsWith('cfat_') ? 'account-prefixed'
+                  : token.startsWith('cfk_') ? 'key-prefixed'
+                    : token ? 'opaque-ascii' : 'empty';
+            return {
+              token,
+              validTransport: Boolean(token) && !/[^\x21-\x7e]/.test(token),
+              shape,
+            };
+          };
+
+          const candidates = [
+            { source: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', ...normalize(process.env.CF_BUILD_TOKEN) },
+            { source: 'CLOUDFLARE_API_TOKEN', ...normalize(process.env.CF_API_TOKEN) },
+            { source: 'CLOUDFLARE_ACCESS_API_TOKEN', ...normalize(process.env.CF_ACCESS_TOKEN) },
+          ];
+
+          const receipt = {
+            schema: 'sekret-bip/cloudflare-acm-read-audit@v1',
+            generatedAt: new Date().toISOString(),
+            mutationRequested: false,
+            zone: null,
+            credentialResults: [],
+            certificatePacks: null,
+            advancedCertificatePacks: null,
+            certificatePackQuota: null,
+            totalTls: null,
+            universalSsl: null,
+            zoneSubscription: null,
+            verdict: 'BLOCKED_NO_READ_AUTHORITY',
+          };
+          const persist = () => fs.writeFileSync(
+            'artifacts/cloudflare-acm-read-audit.json',
+            `${JSON.stringify(receipt, null, 2)}\n`,
+          );
+          persist();
+
+          const providerSummary = (body, status) => {
+            const errors = Array.isArray(body?.errors) ? body.errors : [];
+            return errors.map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`).join(';') || `HTTP ${status}`;
+          };
+
+          const request = async (token, path) => {
+            const response = await fetch(`${API}${path}`, {
+              method: 'GET',
+              headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            });
+            const body = await response.json().catch(() => null);
+            return {
+              ok: response.ok && body?.success !== false,
+              status: response.status,
+              body,
+            };
+          };
+
+          const readPaths = {
+            zone: `/zones/${zoneId}`,
+            packs: `/zones/${zoneId}/ssl/certificate_packs?status=all`,
+            quota: `/zones/${zoneId}/ssl/certificate_packs/quota`,
+            totalTls: `/zones/${zoneId}/acm/total_tls`,
+            universal: `/zones/${zoneId}/ssl/universal/settings`,
+            subscription: `/zones/${zoneId}/subscription`,
+          };
+
+          let selected = null;
+          let selectedReads = null;
+
+          for (const candidate of candidates) {
+            const evidence = {
+              source: candidate.source,
+              configured: Boolean(candidate.token),
+              transportValid: candidate.validTransport,
+              shape: candidate.shape,
+              zoneRead: 'not-attempted',
+              certificatePacksRead: 'not-attempted',
+              totalTlsRead: 'not-attempted',
+            };
+            receipt.credentialResults.push(evidence);
+
+            if (!candidate.validTransport || candidate.shape === 'likely-token-id') continue;
+
+            const zone = await request(candidate.token, readPaths.zone);
+            evidence.zoneRead = zone.ok ? 'ok' : providerSummary(zone.body, zone.status);
+            if (!zone.ok) continue;
+
+            const packs = await request(candidate.token, readPaths.packs);
+            evidence.certificatePacksRead = packs.ok ? 'ok' : providerSummary(packs.body, packs.status);
+
+            const totalTls = await request(candidate.token, readPaths.totalTls);
+            evidence.totalTlsRead = totalTls.ok ? 'ok' : providerSummary(totalTls.body, totalTls.status);
+
+            if (packs.ok && totalTls.ok) {
+              selected = candidate;
+              selectedReads = { zone, packs, totalTls };
+              break;
+            }
+          }
+
+          if (!selected || !selectedReads) {
+            persist();
+            throw new Error('ACM_AUDIT_BLOCKED_NO_SSL_READ_CREDENTIAL');
+          }
+
+          receipt.zone = {
+            name: String(selectedReads.zone.body?.result?.name || ''),
+            status: String(selectedReads.zone.body?.result?.status || ''),
+            type: String(selectedReads.zone.body?.result?.type || ''),
+          };
+
+          const packs = Array.isArray(selectedReads.packs.body?.result) ? selectedReads.packs.body.result : [];
+          const packSummary = packs.map((pack) => ({
+            type: String(pack?.type || ''),
+            status: String(pack?.status || ''),
+            hosts: Array.isArray(pack?.hosts) ? pack.hosts.map(String).sort() : [],
+            validityDays: Number.isFinite(Number(pack?.validity_days)) ? Number(pack.validity_days) : null,
+            certificateAuthority: String(pack?.certificate_authority || ''),
+          }));
+          receipt.certificatePacks = packSummary;
+          receipt.advancedCertificatePacks = packSummary.filter((pack) => pack.type === 'advanced');
+          receipt.totalTls = {
+            enabled: Boolean(selectedReads.totalTls.body?.result?.enabled),
+            certificateAuthority: String(selectedReads.totalTls.body?.result?.certificate_authority || ''),
+            validityPeriod: selectedReads.totalTls.body?.result?.validity_period ?? null,
+          };
+
+          const [quota, universal, subscription] = await Promise.all([
+            request(selected.token, readPaths.quota),
+            request(selected.token, readPaths.universal),
+            request(selected.token, readPaths.subscription),
+          ]);
+
+          receipt.certificatePackQuota = quota.ok ? {
+            advancedAllocated: quota.body?.result?.advanced?.allocated ?? null,
+            advancedUsed: quota.body?.result?.advanced?.used ?? null,
+          } : { readBlocked: providerSummary(quota.body, quota.status) };
+
+          receipt.universalSsl = universal.ok ? {
+            enabled: Boolean(universal.body?.result?.enabled),
+          } : { readBlocked: providerSummary(universal.body, universal.status) };
+
+          receipt.zoneSubscription = subscription.ok ? {
+            state: String(subscription.body?.result?.state || ''),
+            frequency: String(subscription.body?.result?.frequency || ''),
+            price: subscription.body?.result?.price ?? null,
+            ratePlanId: String(subscription.body?.result?.rate_plan?.id || ''),
+            ratePlanName: String(subscription.body?.result?.rate_plan?.name || ''),
+          } : { readBlocked: providerSummary(subscription.body, subscription.status) };
+
+          const activeAdvanced = receipt.advancedCertificatePacks.filter((pack) => pack.status !== 'deleted');
+          if (activeAdvanced.length === 0 && receipt.totalTls.enabled === false) {
+            receipt.verdict = 'NO_ACTIVE_ACM_CERT_OR_TOTAL_TLS_DEPENDENCY';
+          } else {
+            receipt.verdict = 'ACM_DEPENDENCY_PRESENT_REVIEW_REQUIRED';
+          }
+          persist();
+          console.log(`ACM_READ_AUDIT_VERDICT ${receipt.verdict}`);
+          NODE
+
+      - name: Upload sanitized ACM audit receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-acm-read-audit-${{ github.run_id }}
+          path: artifacts/cloudflare-acm-read-audit.json
+          if-no-files-found: warn
+          retention-days: 30

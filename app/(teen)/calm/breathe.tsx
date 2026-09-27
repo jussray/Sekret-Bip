@@ -239,9 +239,13 @@ export default function BreatheScreen() {
       });
       setReminderSet(true);
       Alert.alert('Reminder set 💜', 'You\'ll get a gentle nudge every hour to breathe.');
-    } catch {
-      Alert.alert('Breathe Reminder', 'Reminder set. You\'ll get a gentle nudge to breathe. 💜');
-      setReminderSet(true);
+    } catch (error) {
+      setReminderSet(false);
+      console.warn('Failed to schedule breathing reminder', error);
+      Alert.alert(
+        'Reminder not set',
+        'We could not schedule the reminder. Check notification settings and try again.'
+      );
     }
   }
 

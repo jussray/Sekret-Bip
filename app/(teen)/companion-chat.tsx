@@ -1,13 +1,13 @@
 // app/(teen)/companion-chat.tsx
-// Se'kret Bip — Persistent Companion Chat Route
+// Se’kret Bip — Persistent Companion Chat Route
 //
-// Registered under the (teen) route group so the root layout's userSide
+// Registered under the (teen) route group so the root layout’s userSide
 // guard protects it automatically — no extra auth logic needed here.
 //
 // Navigation:
 //   router.push({
-//     pathname: '/(teen)/companion-chat',
-//     params: { companion: selectedSekret, surface: 'journal' },
+//     pathname: ‘/(teen)/companion-chat’,
+//     params: { companion: selectedSekret, surface: ‘journal’ },
 //   });
 //
 // History is keyed per companion + surface so conversations never bleed:
@@ -17,6 +17,11 @@
 //   - Pre-flight: checkTextBeforePost before every send
 //   - Post-reply: if safetyFlag, surface SafetyExperienceSheet
 //   - Post-reply: if suggestedComfortTool, show LoopNudge → Comfort
+//
+// Phase 3B additions:
+//   - tone threaded from backend reply into ChatMsg and ChatBubble
+//   - questionBudget tracked in state; pill shown when budget ≤ 1
+//   - replySource ‘fallback’ shows amber trust indicator on companion row
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -42,6 +47,7 @@ import { SafetyExperienceSheet } from '../../components/safety/SafetyExperienceS
 import {
   sendCompanionMessage,
   toCompanionId,
+  COMPANION_PROFILES,
   type CompanionSurface,
 } from '../../src/features/sekret/companionEngine';
 import {
@@ -58,15 +64,21 @@ import {
   type Character,
 } from '../../constants/theme';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────────────
+
 export type ChatMsg = {
   id: string;
   from: 'companion' | 'user';
   text: string;
   time: string;
+  /** Backend tone for companion messages — drives ChatBubble visual register. */
+  tone?: string;
+  /** True when the companion reply came from the fallback path. */
+  isFallback?: boolean;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
 function nowTime(): string {
   return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
@@ -94,7 +106,8 @@ async function persistHistory(key: string, msgs: ChatMsg[]): Promise<void> {
   }
 }
 
-// ── Route ─────────────────────────────────────────────────────────────────────
+// ── Route ──────────────────────────────────────────────────────────────────────────
+
 export default function CompanionChatScreen() {
   const router = useRouter();
 
@@ -106,11 +119,14 @@ export default function CompanionChatScreen() {
   const companionKey = params.companion ?? 'raylene';
   const surface = (params.surface ?? 'journal') as CompanionSurface;
 
-  // Resolve profile — fall back to 'soft' (Raylene) for legacy 'soft' key
+  // Resolve profile — fall back to 'raylene' for legacy keys
   const profileKey = companionKey in SEKRET_PROFILES ? companionKey : 'soft';
   const profile    = SEKRET_PROFILES[profileKey];
   const charKey: Character = normalizeCharacterKey(profileKey);
   const companionId = toCompanionId(profileKey);
+
+  // Accent colour from COMPANION_PROFILES so ChatBubble can tint correctly.
+  const accentColor = COMPANION_PROFILES[companionId]?.accentColor ?? '#a78bfa';
 
   // Room background, time-of-day aware
   const roomPhase = useMemo(() => getRoomPhase(), []);
@@ -125,12 +141,19 @@ export default function CompanionChatScreen() {
     [profileKey, surface],
   );
 
-  // ── State ─────────────────────────────────────────────────────────────────
+  // ── State ──────────────────────────────────────────────────────────────────────
   const [msgs, setMsgs]                           = useState<ChatMsg[]>([]);
   const [loading, setLoading]                     = useState(false);
   const [safetyExperience, setSafetyExperience]   = useState<SafetyExperience | null>(null);
   const [comfortNudge, setComfortNudge]           = useState<string | null>(null);
   const [teenGender, setTeenGender]               = useState<'girl' | 'boy' | 'other' | null>(null);
+  /**
+   * questionBudget — how many questions the companion has left this session.
+   * Initialised to null (unknown) and updated from each backend reply.
+   * When ≤ 1 we show a subtle pill so the teen isn’t confused if the
+   * companion stops asking questions.
+   */
+  const [questionBudget, setQuestionBudget] = useState<number | null>(null);
   const listRef = useRef<FlatList<ChatMsg>>(null);
 
   // Load teen gender from profile so companions can tailor their responses
@@ -164,7 +187,7 @@ export default function CompanionChatScreen() {
     });
   }, [storageKey]);
 
-  // ── Send ──────────────────────────────────────────────────────────────────
+  // ── Send ──────────────────────────────────────────────────────────────────────────
   const handleSend = async (text: string) => {
     if (!text.trim() || loading) return;
 
@@ -172,7 +195,6 @@ export default function CompanionChatScreen() {
     const preflight = checkTextBeforePost(text.trim(), companionId);
     if (preflight) {
       setSafetyExperience(preflight);
-      // Still proceed — the teen chose to send; backend scan runs independently
     }
 
     const userMsg: ChatMsg = {
@@ -182,12 +204,9 @@ export default function CompanionChatScreen() {
       time: nowTime(),
     };
 
-    // 1. Append user message + set loading
     const withUser = [...msgs, userMsg];
     setMsgs(withUser);
     setLoading(true);
-
-    // 2. Persist user message IMMEDIATELY — never lost on network failure
     await persistHistory(storageKey, withUser);
 
     try {
@@ -201,27 +220,36 @@ export default function CompanionChatScreen() {
           content: m.text,
         })),
       });
-      const replyText = result.reply;
 
+      const replyText = result.reply;
       if (!replyText.trim()) throw new Error('Empty reply');
 
+      // Thread backend metadata into the message so ChatBubble can use it.
       const companionMsg: ChatMsg = {
-        id:   String(Date.now() + 1),
-        from: 'companion',
-        text: replyText,
-        time: nowTime(),
+        id:         String(Date.now() + 1),
+        from:       'companion',
+        text:       replyText,
+        time:       nowTime(),
+        tone:       result.tone,
+        isFallback: result.replySource === 'fallback',
       };
+
       const final = [...withUser, companionMsg];
       setMsgs(final);
       await persistHistory(storageKey, final);
 
-      // Post-reply: if backend flagged this, surface the safety experience
+      // Update question budget from backend.
+      if (typeof result.questionBudget === 'number') {
+        setQuestionBudget(result.questionBudget);
+      }
+
+      // Post-reply safety surface.
       if (result.safetyFlag && !preflight) {
         const flagged = await checkForFlaggedItems(companionId);
         if (flagged) setSafetyExperience(flagged);
       }
 
-      // Post-reply: comfort nudge if companion suggested it
+      // Post-reply: comfort nudge.
       if (result.suggestedComfortTool && !preflight) {
         setComfortNudge(result.suggestedComfortTool);
       }
@@ -241,7 +269,7 @@ export default function CompanionChatScreen() {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────────
   return (
     <ImageBackground source={bgSource} style={s.root} resizeMode="cover">
       <LinearGradient
@@ -268,7 +296,22 @@ export default function CompanionChatScreen() {
             data={msgs}
             keyExtractor={(m) => m.id}
             renderItem={({ item }) => (
-              <ChatBubble from={item.from} text={item.text} time={item.time} />
+              <View>
+                <ChatBubble
+                  from={item.from}
+                  text={item.text}
+                  time={item.time}
+                  accentColor={item.from === 'companion' ? accentColor : undefined}
+                  tone={item.tone}
+                />
+                {/* Fallback indicator — amber dot when companion used fallback path */}
+                {item.from === 'companion' && item.isFallback && (
+                  <View style={s.fallbackRow}>
+                    <View style={[s.fallbackDot, { backgroundColor: accentColor }]} />
+                    <Text style={s.fallbackText}>connection was spotty</Text>
+                  </View>
+                )}
+              </View>
             )}
             contentContainerStyle={s.msgList}
             showsVerticalScrollIndicator={false}
@@ -279,6 +322,15 @@ export default function CompanionChatScreen() {
 
           {loading && (
             <CompanionTypingIndicator name={profile.name} emoji={profile.emoji} />
+          )}
+
+          {/* Question budget pill — shown when companion is near their question limit */}
+          {questionBudget !== null && questionBudget <= 1 && !loading && (
+            <View style={s.budgetPill}>
+              <Text style={s.budgetText}>
+                {profile.name} is just listening right now
+              </Text>
+            </View>
           )}
 
           {/* Loop nudge: companion suggested Comfort after heavy reply */}
@@ -292,78 +344,122 @@ export default function CompanionChatScreen() {
                   style={s.nudgeBtn}
                   onPress={() => {
                     setComfortNudge(null);
-                    router.push('/(teen)/comfort' as any);
+                    router.push('/(teen)/comfort');
                   }}
-                  activeOpacity={0.8}
-                  accessibilityRole="button"
-                  accessibilityLabel="Open Comfort"
                 >
-                  <Text style={s.nudgeBtnText}>open Comfort</Text>
+                  <Text style={s.nudgeBtnLabel}>Go to Comfort</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setComfortNudge(null)}
                   style={s.nudgeDismiss}
-                  accessibilityRole="button"
-                  accessibilityLabel="Dismiss"
+                  onPress={() => setComfortNudge(null)}
                 >
-                  <Text style={s.nudgeDismissText}>I'm okay</Text>
+                  <Text style={s.nudgeDismissLabel}>Stay here</Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
 
-          <ChatInput
-            onSend={handleSend}
-            disabled={loading}
-            placeholder={`talk to ${profile.name}…`}
-          />
+          <ChatInput onSend={handleSend} disabled={loading} />
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Safety experience sheet — rendered above everything */}
-      <SafetyExperienceSheet
-        experience={safetyExperience}
-        onDismiss={() => setSafetyExperience(null)}
-      />
+      {safetyExperience && (
+        <SafetyExperienceSheet
+          experience={safetyExperience}
+          onDismiss={() => setSafetyExperience(null)}
+        />
+      )}
     </ImageBackground>
   );
 }
 
+// ── Styles ────────────────────────────────────────────────────────────────────────
+
 const s = StyleSheet.create({
-  root: { flex: 1, width: '100%', height: '100%', backgroundColor: '#110a28' },
-  safe: { flex: 1 },
-  flex: { flex: 1 },
-  msgList: {
-    paddingHorizontal: 16,
-    paddingTop:        12,
-    paddingBottom:     16,
+  root:    { flex: 1 },
+  safe:    { flex: 1 },
+  flex:    { flex: 1 },
+  msgList: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 8 },
+
+  fallbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 18,
+    marginTop: -2,
+    marginBottom: 6,
+    gap: 5,
   },
+  fallbackDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    opacity: 0.6,
+  },
+  fallbackText: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.28)',
+    fontStyle: 'italic',
+  },
+
+  budgetPill: {
+    alignSelf: 'center',
+    marginBottom: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
+  },
+  budgetText: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.38)',
+    fontStyle: 'italic',
+  },
+
   nudgeWrap: {
     marginHorizontal: 16,
-    marginBottom:      8,
-    backgroundColor:  'rgba(196,181,253,0.10)',
-    borderWidth:       1,
-    borderColor:      'rgba(196,181,253,0.25)',
-    borderRadius:      16,
-    padding:           14,
+    marginBottom: 10,
+    padding: 14,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
   },
   nudgeText: {
-    color:        '#c4b5fd',
-    fontSize:      13,
-    fontWeight:   '600',
-    marginBottom:  10,
+    color: 'rgba(255,255,255,0.70)',
+    fontSize: 13,
+    marginBottom: 10,
+    textAlign: 'center',
   },
-  nudgeRow:        { flexDirection: 'row', gap: 10 },
+  nudgeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'center',
+  },
   nudgeBtn: {
-    flex:             1,
-    backgroundColor:  'rgba(196,181,253,0.18)',
-    borderRadius:      12,
-    paddingVertical:   9,
-    alignItems:       'center',
-    borderWidth:       1,
-    borderColor:      'rgba(196,181,253,0.4)',
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: 'rgba(167,139,250,0.22)',
+    borderWidth: 1,
+    borderColor: 'rgba(167,139,250,0.35)',
   },
-  nudgeBtnText:     { color: '#f0ebff', fontSize: 13, fontWeight: '700' },
-  nudgeDismiss:     { justifyContent: 'center', paddingHorizontal: 12 },
-  nudgeDismissText: { color: '#64748b', fontSize: 12 },
+  nudgeBtnLabel: {
+    color: '#e9d5ff',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  nudgeDismiss: {
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    borderRadius: 20,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+  },
+  nudgeDismissLabel: {
+    color: 'rgba(255,255,255,0.45)',
+    fontSize: 13,
+  },
 });

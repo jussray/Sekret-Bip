@@ -1,0 +1,306 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-13",
+  "project": {
+    "name": "Se'kret Bip",
+    "ref": "tbsevonvegdnlyjgplmm",
+    "region": "us-east-1",
+    "status": "ACTIVE_HEALTHY",
+    "latestLiveMigration": {
+      "version": "20260713052603",
+      "name": "harden_notification_delivery_ledger"
+    }
+  },
+  "scope": {
+    "productionDdlApplied": true,
+    "productionDataRetained": false,
+    "purpose": "Authorization evidence plus verified config-grant hardening, JWT-protected retirement of obsolete Edge Functions, founder/guardian authorization proof, notification delivery ledger hardening, and live migration parity before L4 persistence"
+  },
+  "advisorSnapshot": {
+    "rlsEnabledNoPolicy": [
+      {
+        "table": "app_config",
+        "classification": "service_role_only_after_grant_hardening",
+        "rlsEnabled": true,
+        "policyCount": 0,
+        "anonHasTablePrivileges": false,
+        "authenticatedHasTablePrivileges": false,
+        "serviceRoleHasTablePrivileges": true
+      },
+      {
+        "table": "app_private_config",
+        "classification": "service_role_only_after_grant_hardening",
+        "rlsEnabled": true,
+        "policyCount": 0,
+        "anonHasTablePrivileges": false,
+        "authenticatedHasTablePrivileges": false,
+        "serviceRoleHasTablePrivileges": true
+      },
+      {
+        "table": "guardian_verification_reviews",
+        "classification": "service_role_only",
+        "rlsEnabled": true,
+        "policyCount": 0,
+        "anonHasTablePrivileges": false,
+        "authenticatedHasTablePrivileges": false,
+        "serviceRoleHasTablePrivileges": true
+      }
+    ],
+    "anonymousCapablePolicyWarning": {
+      "classification": "requires_predicate_proof_not_blanket_rewrite",
+      "verifiedProbeTables": [
+        "journal_entries",
+        "mood_history",
+        "voice_notes",
+        "room_memory",
+        "audit_events",
+        "control_room_fingerprints",
+        "control_room_issue_events",
+        "control_room_issue_history",
+        "control_room_issues",
+        "control_room_releases"
+      ],
+      "nextAction": "Expand rollback-contained anonymous and two-user denial probes by trust boundary before changing remaining policy roles or predicates."
+    },
+    "leakedPasswordProtection": {
+      "enabled": false,
+      "classification": "auth_configuration_gap",
+      "nextAction": "Enable only after signup, login, reset, and existing-account regression planning is ready."
+    }
+  },
+  "phase1ConfigGrantHardening": {
+    "migrationVersion": "20260713011803",
+    "repositoryMigrationPath": "supabase/migrations/20260713011803_harden_config_table_grants.sql",
+    "applied": true,
+    "verified": true,
+    "tables": [
+      {
+        "table": "app_config",
+        "rlsEnabled": true,
+        "policyCount": 0,
+        "clientGrantCount": 0,
+        "serviceRoleGrantCount": 7,
+        "rowCountBefore": 2,
+        "rowCountAfter": 2
+      },
+      {
+        "table": "app_private_config",
+        "rlsEnabled": true,
+        "policyCount": 0,
+        "clientGrantCount": 0,
+        "serviceRoleGrantCount": 7,
+        "rowCountBefore": 2,
+        "rowCountAfter": 2
+      }
+    ]
+  },
+  "phase1FounderGuardianHardening": {
+    "applied": true,
+    "verified": true,
+    "repositoryAndLiveMigrationParity": true,
+    "migrations": [
+      {
+        "version": "20260713024231",
+        "name": "harden_founder_helper_anonymous_guard",
+        "repositoryPath": "supabase/migrations/20260713024231_harden_founder_helper_anonymous_guard.sql"
+      },
+      {
+        "version": "20260713024245",
+        "name": "harden_audit_control_room_policies",
+        "repositoryPath": "supabase/migrations/20260713024245_harden_audit_control_room_policies.sql"
+      },
+      {
+        "version": "20260713024253",
+        "name": "remove_anon_audit_control_room_grants",
+        "repositoryPath": "supabase/migrations/20260713024253_remove_anon_audit_control_room_grants.sql"
+      }
+    ],
+    "founderHelper": {
+      "anonymousAuthenticatedDenied": true,
+      "anonExecute": false,
+      "authenticatedExecute": true,
+      "serviceRoleExecute": true,
+      "fixedSearchPath": true
+    },
+    "auditAndControlRoomTables": [
+      "audit_events",
+      "control_room_fingerprints",
+      "control_room_issue_events",
+      "control_room_issue_history",
+      "control_room_issues",
+      "control_room_releases"
+    ],
+    "anonTablePrivilegesRemoved": true,
+    "policyRole": "authenticated",
+    "probePath": "supabase/probes/authorization_founder_guardian_phase1.sql",
+    "transactionOutcome": "rolled_back",
+    "passedChecks": 23,
+    "failedChecks": 0,
+    "proofSummary": [
+      "normal authenticated users cannot access founder or guardian administration paths",
+      "non-anonymous founder access remains functional",
+      "anonymous-authenticated sessions are denied founder, guardian, audit, and Control Room access",
+      "elevated Control Room writes are denied to normal and anonymous-authenticated sessions",
+      "guardian review authorization fails before target validation for unauthorized callers",
+      "no probe rows or private data were retained"
+    ]
+  },
+  "phase1NotificationLedgerHardening": {
+    "migrationVersion": "20260713052603",
+    "migrationName": "harden_notification_delivery_ledger",
+    "repositoryMigrationPath": "supabase/migrations/20260713052603_harden_notification_delivery_ledger.sql",
+    "applied": true,
+    "verified": true,
+    "repositoryAndLiveMigrationParity": true,
+    "table": "notification_deliveries",
+    "rlsEnabled": true,
+    "policyCount": 1,
+    "denyPolicy": "notification_deliveries_deny_clients",
+    "anonHasTablePrivileges": false,
+    "authenticatedHasTablePrivileges": false,
+    "serviceRoleTablePrivileges": [
+      "INSERT",
+      "SELECT"
+    ],
+    "serviceRoleSequencePrivileges": [
+      "USAGE"
+    ],
+    "serviceRoleUpdateAllowed": false,
+    "serviceRoleDeleteAllowed": false,
+    "deployedConsumer": "send-push",
+    "deployedOperations": [
+      "SELECT",
+      "INSERT"
+    ],
+    "advisorNoPolicyFindingCleared": true,
+    "transactionOutcome": "rolled_back",
+    "serviceRoleInsertProof": "passed",
+    "syntheticUsersRetained": 0,
+    "notificationRowsRetained": 0
+  },
+  "migrationParity": {
+    "verified": true,
+    "restoredRepositoryMigrations": [
+      {
+        "version": "20260704014518",
+        "name": "create_bip_event_points_function",
+        "repositoryPath": "supabase/migrations/20260704014518_create_bip_event_points_function.sql"
+      },
+      {
+        "version": "20260713052511",
+        "name": "restore_bip_events_points_trigger",
+        "repositoryPath": "supabase/migrations/20260713052511_restore_bip_events_points_trigger.sql"
+      },
+      {
+        "version": "20260713052603",
+        "name": "harden_notification_delivery_ledger",
+        "repositoryPath": "supabase/migrations/20260713052603_harden_notification_delivery_ledger.sql"
+      }
+    ],
+    "pointsTrigger": {
+      "table": "bip_events",
+      "trigger": "bip_events_award_points",
+      "function": "handle_bip_event_points",
+      "idempotencyKey": "point_transactions(user_id, source_type, source_id)"
+    }
+  },
+  "securityDefiner": {
+    "totalReviewed": 35,
+    "anonExecutable": [],
+    "authenticatedExecutableCount": 24,
+    "serviceRoleOnlyOrTriggerInternalCount": 11,
+    "commonControlsObserved": [
+      "anonymous execution denied on every reviewed function",
+      "explicit search path configured on every reviewed function",
+      "authenticated functions use owner, founder, or guardian authorization helpers",
+      "founder and guardian administrative paths reject anonymous-authenticated sessions"
+    ],
+    "nextAction": "Continue behavior-testing authenticated functions by trust boundary, especially parent-link, Bridge, push-token, task/reward review, and remaining Control Room ingestion paths."
+  },
+  "edgeFunctions": {
+    "activeCount": 18,
+    "verifyJwtFalse": [
+      {
+        "slug": "account-delete",
+        "classification": "custom_shared_secret",
+        "control": "dedicated server-to-server deletion header"
+      },
+      {
+        "slug": "safety-scan",
+        "classification": "postgres_trigger_shared_secret",
+        "control": "dedicated database-trigger scan header"
+      }
+    ],
+    "jwtProtectedRetirements": [
+      {
+        "slug": "release-health",
+        "version": 2,
+        "status": "ACTIVE",
+        "verifyJwt": true,
+        "expectedAuthenticatedStatus": 410,
+        "sourceVerified": true,
+        "sha256": "318a684a363ebc2a4b9229e10f89c4327ddf4cb13d7ffe64f3a201dc44e3157a",
+        "replacement": "Cloudflare-native deployment verifier and exact-release evidence"
+      },
+      {
+        "slug": "bridge-e2e-probe",
+        "version": 3,
+        "status": "ACTIVE",
+        "verifyJwt": true,
+        "expectedAuthenticatedStatus": 410,
+        "sourceVerified": true,
+        "sha256": "0a1af7dc23df5a581318cfc2dcefc4e163c3f649c7a570607e0fb8dfd145f7e7",
+        "replacement": "Issue #270 controlled two-account proof and Playwright guardrails"
+      },
+      {
+        "slug": "github-workflow-status",
+        "version": 4,
+        "status": "ACTIVE",
+        "verifyJwt": true,
+        "expectedAuthenticatedStatus": 410,
+        "sourceVerified": true,
+        "sha256": "5acdefc5a133b0d8384f41a247b4f2c9af656c003ebaa2e60714faa7e451c108",
+        "replacement": "GitHub Actions checks and Cloudflare-native deployment evidence"
+      }
+    ],
+    "httpProbe": {
+      "unauthenticated": "not_run_dns_unavailable_in_execution_environment",
+      "authenticated": "not_run_no_safe_test_identity_available",
+      "evidenceUsed": "Supabase deployment registry plus deployed source retrieval"
+    },
+    "nextAction": "Add focused negative-auth tests for account-delete and safety-scan and remove retired registrations when supported deletion tooling is available."
+  },
+  "liveProof": {
+    "phase0": {
+      "probePath": "supabase/probes/authorization_phase0.sql",
+      "transactionOutcome": "rolled_back",
+      "passedChecks": 4,
+      "failedChecks": 0,
+      "cleanup": {
+        "phase0Users": 0,
+        "phase0Journals": 0,
+        "phase0Moods": 0,
+        "phase0VoiceNotes": 0
+      }
+    },
+    "founderGuardianPhase1": {
+      "probePath": "supabase/probes/authorization_founder_guardian_phase1.sql",
+      "transactionOutcome": "rolled_back",
+      "passedChecks": 23,
+      "failedChecks": 0,
+      "syntheticDataRetained": false
+    },
+    "notificationLedgerPhase1": {
+      "transactionOutcome": "rolled_back",
+      "passedChecks": 8,
+      "failedChecks": 0,
+      "serviceRoleInsertProof": true,
+      "syntheticUsersRetained": 0,
+      "notificationRowsRetained": 0
+    }
+  },
+  "releaseGate": {
+    "l4SchemaAllowed": false,
+    "reason": "Config grants, obsolete Edge Function exposure, founder/guardian authorization, notification delivery ledger access, and live migration parity are hardened. Remaining blockers are additional authenticated database-function denial suites, negative tests for the two custom-auth Edge Functions, and password-breach protection regression evidence."
+  }
+}

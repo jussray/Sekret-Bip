@@ -3,25 +3,27 @@ import { fetchSekretBrainReply, type SekretAvatarState } from './api';
 import {
   getSekretFallback,
   isArrivalMessage,
-  keepSekretReply,
+  guardSekretReply,
 } from '../../services/sekretVoice';
 import { normalizeSekretPersonality } from '../../services/sekretPresence';
 import { buildReplyRequest } from '../services/ai/buildReplyRequest';
 import type { PagesTab } from '../../screens/PagesScreen';
 import type { ChatMessage } from '../../src/services/ai/chat';
 
-export type PagesAvatarKey = 'raylene' | 'rylane' | 'cloud' | 'night';
-const REPLY_TABS = new Set<PagesTab>(['raylene', 'rylane', 'cloud', 'night']);
+export type PagesAvatarKey = 'suhana' | 'sy' | 'cloud' | 'night';
+const REPLY_TABS = new Set<PagesTab>(['suhana', 'sy', 'cloud', 'night']);
 
 const avatarState: Record<PagesAvatarKey, SekretAvatarState> = {
-  raylene: 'neutral',
-  rylane: 'neutral',
+  suhana: 'neutral',
+  sy: 'neutral',
   cloud: 'neutral',
   night: 'neutral',
 };
 
+// IMAGES.rayleneXxx / IMAGES.rylaneXxx are the underlying asset-file constant
+// names (unrenamed on disk) for the characters now displayed as Suhana/Sy.
 const avatarAssets: Record<PagesAvatarKey, Record<SekretAvatarState, any>> = {
-  raylene: {
+  suhana: {
     neutral: IMAGES.rayleneNeutral,
     listening: IMAGES.rayleneThinking,
     thinking: IMAGES.rayleneThinking,
@@ -30,7 +32,7 @@ const avatarAssets: Record<PagesAvatarKey, Record<SekretAvatarState, any>> = {
     concerned: IMAGES.rayleeneSad,
     responding: IMAGES.rayleneConfident,
   },
-  rylane: {
+  sy: {
     neutral: IMAGES.rylaneNeutral,
     listening: IMAGES.rylaneThinking,
     thinking: IMAGES.rylaneThinking,
@@ -70,8 +72,8 @@ function installDynamicAvatar(
   });
 }
 
-installDynamicAvatar('rayleneNeutral', 'raylene');
-installDynamicAvatar('rylaneNeutral', 'rylane');
+installDynamicAvatar('rayleneNeutral', 'suhana');
+installDynamicAvatar('rylaneNeutral', 'sy');
 installDynamicAvatar('cloudAvatarNeutral', 'cloud');
 installDynamicAvatar('nightNeutral', 'night');
 
@@ -93,8 +95,8 @@ export function tabToAvatarKey(tab: PagesTab): PagesAvatarKey | null {
 }
 
 export const THINKING_LABELS: Record<string, string> = {
-  raylene: 'Raylene is thinking…',
-  rylane: 'Rylane is thinking…',
+  suhana: 'Suhana is thinking…',
+  sy: 'Sy is thinking…',
   cloud: 'Cloud is thinking…',
   night: 'Night is thinking…',
 };
@@ -187,8 +189,12 @@ export async function fetchPagesReplyDetails(input: {
 
     setAvatarState(avatarKey, nextState);
 
-    const guardedReply = keepSekretReply(response.reply, fallback);
-    const guardBlocked = guardedReply !== (response.reply ?? '').trim();
+    // A safety reply carries crisis resources (988, trusted adult). The voice
+    // guard is a style filter and must never swap it for a casual fallback.
+    const safetyText = response.safetyFlag === true ? (response.reply ?? '').trim() : '';
+    const { reply: guardedReply, blocked: guardBlocked } = safetyText
+      ? { reply: safetyText, blocked: false }
+      : guardSekretReply(response.reply, fallback);
 
     if (__DEV__ && guardBlocked) {
       console.warn('[fetchPagesReplyDetails] keepSekretReply blocked Worker reply.', {
@@ -202,9 +208,9 @@ export async function fetchPagesReplyDetails(input: {
       reply: guardedReply,
       tone: response.tone,
       avatarState: nextState,
-      replySource: 'worker',
-      fallbackUsed: false,
-      fallbackReason: null,
+      replySource: guardBlocked ? 'local-fallback' : 'worker',
+      fallbackUsed: guardBlocked,
+      fallbackReason: guardBlocked ? 'Reply guard replaced Worker reply with character fallback' : null,
     };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);

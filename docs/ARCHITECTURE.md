@@ -82,9 +82,9 @@ The client must never contain service-role credentials or provider secret keys.
 
 ## Companion intelligence
 
-Current maturity is L2: short-term history and supplied context are passed into stateless turns.
+Current enforced maturity is L2: short-term history and approved context are passed into stateless turns.
 
-L3/L4 features such as durable semantic memory, persistent goals, scheduled reflection, and inter-companion coordination are proposals only. See `AGENT_L4_ARCHITECTURE.md`.
+L3/L4 features such as durable semantic memory, persistent goals, scheduled reflection, and inter-companion coordination are proposals only and must not be represented as demo-ready implementation until the required migrations, services, privacy controls, and tests exist. See `AGENT_L4_ARCHITECTURE.md`.
 
 ## Deployment boundaries
 

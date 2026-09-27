@@ -1,0 +1,55 @@
+name: Safety Alert Runtime Schema
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20260808222500_reconcile_safety_alert_runtime_schema.sql'
+      - 'supabase/migrations/20260808223500_lock_safety_alert_table_grants.sql'
+      - 'supabase/probes/authorization_safety_alert_runtime_schema_phase1.sql'
+      - 'test/safety-alert-runtime-schema.test.mjs'
+      - 'test/safety-alert-table-grants.test.mjs'
+      - '.github/workflows/safety-alert-runtime-schema.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/migrations/20260808222500_reconcile_safety_alert_runtime_schema.sql'
+      - 'supabase/migrations/20260808223500_lock_safety_alert_table_grants.sql'
+      - 'supabase/probes/authorization_safety_alert_runtime_schema_phase1.sql'
+      - 'test/safety-alert-runtime-schema.test.mjs'
+      - 'test/safety-alert-table-grants.test.mjs'
+      - '.github/workflows/safety-alert-runtime-schema.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  contract:
+    name: Verify exact-head safety runtime schema contract
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Verify safety runtime schema contracts
+        run: node --test test/safety-alert-runtime-schema.test.mjs test/safety-alert-table-grants.test.mjs

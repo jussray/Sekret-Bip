@@ -1,13 +1,13 @@
 import type { MemorySummary } from '../types/sekretCompanion';
 
-export type SekretPersonality = 'raylene' | 'rylane' | 'cloud' | 'night';
+export type SekretPersonality = 'suhana' | 'sy' | 'cloud' | 'night';
 
 export function normalizeSekretPersonality(value?: string): SekretPersonality {
-  const personality = (value || '').toLowerCase();
-  if (personality.includes('rylane')) return 'rylane';
+  const personality = (value || '').toLowerCase().replace(/[’']/g, '').replace(/[\s_-]+/g, '');
+  if (personality.includes('sy') || personality.includes('rylane') || personality === 'bro') return 'sy';
   if (personality.includes('cloud')) return 'cloud';
   if (personality.includes('night')) return 'night';
-  return 'raylene';
+  return 'suhana';
 }
 
 function shouldNoticeMemory(summary?: Partial<MemorySummary>, screen?: string): boolean {
@@ -18,7 +18,7 @@ function shouldNoticeMemory(summary?: Partial<MemorySummary>, screen?: string): 
 
 function rememberedPresence(summary: Partial<MemorySummary>, voice: SekretPersonality): string | null {
   if (summary.recentGrowth || (summary.winningStreak || 0) >= 3) {
-    if (voice === 'rylane') return 'look at you still standing. keep going.';
+    if (voice === 'sy') return 'look at you still standing. keep going.';
     if (voice === 'cloud') return 'something feels different today. lighter, maybe.';
     if (voice === 'night') return 'yesterday had hands. you’re still here.';
     return 'look at that. yesterday had hands and you’re still standing.';
@@ -26,7 +26,7 @@ function rememberedPresence(summary: Partial<MemorySummary>, voice: SekretPerson
 
   const recurringEmotion = summary.recurringEmotions?.[0];
   if (recurringEmotion) {
-    if (voice === 'rylane') return `${recurringEmotion} again, huh. aight. what happened?`;
+    if (voice === 'sy') return `${recurringEmotion} again, huh. aight. what happened?`;
     if (voice === 'cloud') return `that ${recurringEmotion} feeling came back. no rush.`;
     if (voice === 'night') return 'rough again? stay here a minute.';
     return `friend... that ${recurringEmotion} feeling again? c’mere.`;
@@ -48,20 +48,20 @@ export function buildSekretPresence(
   if (memoryLine) return memoryLine;
 
   if (!screen && oracleSignals?.growthEdge) {
-    if (voice === 'rylane') return `i see you ${oracleSignals.growthEdge}. that's not nothing.`;
+    if (voice === 'sy') return `i see you ${oracleSignals.growthEdge}. that's not nothing.`;
     if (voice === 'cloud') return "something's shifting. i can feel it.";
     if (voice === 'night') return 'still in it. and still going. that matters.';
-    return `i see it — you're ${oracleSignals.growthEdge}.`;
+    return `i see it. you're ${oracleSignals.growthEdge}.`;
   }
 
   if (!screen && oracleSignals?.personalityNote && (summary?.conversations || 0) >= 5) {
-    if (voice === 'rylane') return 'i know how you move. stay real with me.';
-    if (voice === 'cloud') return "i'm starting to understand you.";
+    if (voice === 'sy') return 'i know how you move. stay real with me.';
+    if (voice === 'cloud') return "i'm starting to understand your weather.";
     if (voice === 'night') return 'i know how you carry things.';
     return "i'm starting to really understand you.";
   }
 
-  if (voice === 'rylane') {
+  if (voice === 'sy') {
     if (screen === 'voiceBip') return 'drop a voice bip. say it straight.';
     if (screen === 'comfort') return 'aight. one thing at a time.';
     return 'aight. what REALLY happened?';

@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "project": "Se’kret Bip Living Companion Rooms",
+  "owner": "jussray",
+  "repository": "jussray/Sekret-Bip",
+  "policies": {
+    "bottomNavigation": ["Room", "Pages", "Calm", "Circle", "More"],
+    "bottomNavigationLocked": true,
+    "mockupCharactersAreReferencesOnly": true,
+    "canonicalCharactersOnly": true,
+    "userRoomOwnsDashboardCards": true,
+    "companionRoomsRejectDashboardCards": true,
+    "companionRoomsArePermanentDestinations": true,
+    "existingRoutesMustBePreserved": true
+  },
+  "productionScope": {
+    "characters": ["night"],
+    "rooms": ["night"]
+  },
+  "creativeTools": {
+    "canva": {
+      "role": "approval-board",
+      "designId": "DAHPZ_MO8og",
+      "editUrl": "https://www.canva.com/d/Scu1kaawH_v_vVP",
+      "requiredStatus": "approved"
+    },
+    "figma": {
+      "role": "motion-and-hitbox-spec",
+      "workspaceUrlEnv": "ROOM_FOREMAN_FIGMA_URL",
+      "importBlueprint": "design-handoff/figma/night-room-runtime-blueprint.svg",
+      "requiredStatus": "approved"
+    },
+    "leonardo": {
+      "role": "production-art-generation",
+      "workspaceUrlEnv": "ROOM_FOREMAN_LEONARDO_URL",
+      "promptPack": "config/leonardo/night-asset-prompt-pack.json",
+      "requiredStatus": "approved"
+    },
+    "github": {
+      "role": "runtime-source-of-truth",
+      "branchPrefix": "feat/room-runtime-",
+      "requiredStatus": "verified"
+    }
+  },
+  "phases": ["day", "midday", "afternoon", "evening", "rain", "night", "deepNight"],
+  "characters": {
+    "night": {
+      "canonicalMaster": "assets/images/companions/teen/night/neutral.png",
+      "requiredPoses": ["neutral", "thinking", "writing", "window", "listening", "headphones", "microphone", "moonChair", "resting"]
+    }
+  },
+  "rooms": {
+    "night": {
+      "baseAsset": "assets/images/resized-bg/bg-night-room-day.jpg",
+      "anchors": ["door", "desk", "journal", "window", "moonChair", "microphone", "recordPlayer", "floor"],
+      "defaultAnchor": "window",
+      "verticalSlice": true
+    }
+  },
+  "runtime": {
+    "assetRegistry": "src/config/nightRoomAssetRegistry.ts",
+    "registryConsumers": ["src/components/room/character/SekretSprite.tsx"],
+    "actorStates": ["idle", "walking", "thinking", "writing", "listening", "usingHeadphones", "usingMicrophone", "lookingOutWindow", "resting", "talking"],
+    "memoryKeys": ["lastRoom", "lastAnchor", "lastActivity", "lastPose", "lastVisit"],
+    "reducedMotionFallback": "crossfade",
+    "missingPoseFallback": "canonical-neutral",
+    "missingPhaseFallback": "day"
+  },
+  "screenReferenceMap": {
+    "calm": "existing Calm route visual target",
+    "circle": "existing Circle route visual target",
+    "pages": "existing Pages route visual target",
+    "bridgeTeen": "existing teen Bridge route visual target",
+    "bridgeParent": "existing parent Bridge route visual target",
+    "bippin2": "existing Bippin 2 route visual target",
+    "parentDashboard": "existing parent dashboard visual target",
+    "userRoom": "updates, streaks, reminders, rewards, customization and continue cards"
+  }
+}

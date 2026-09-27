@@ -1,0 +1,166 @@
+name: Control Room Test Ledger
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: read
+  id-token: write
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  CONTROL_ROOM_LEDGER_SELF_CHECK: Publish exact-head test ledger
+  CONTROL_ROOM_TEST_LEDGER_PATH: artifacts/control-room-test-ledger.json
+  CONTROL_ROOM_JUSS_PROOF_PATH: artifacts/control-room-juss-proof.json
+  FCR_BIP_PROOF_URL: https://api.foundercontrolroom.org/ingest/bip-control-room-proof
+  FCR_BIP_OIDC_AUDIENCE: https://api.foundercontrolroom.org/bip-control-room-proof
+
+concurrency:
+  group: control-room-test-ledger-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ledger-contract:
+    name: Verify test-ledger contract
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Run Control Room test-ledger contracts
+        run: node --test test/control-room-test-ledger.test.mjs test/control-room-test-ledger-workflow-contract.test.mjs test/control-room-juss-proof.test.mjs
+
+  publish-ledger:
+    name: Publish exact-head test ledger
+    needs: ledger-contract
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Observe every exact-head check lane
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/control-room-test-ledger.mjs
+
+      - name: Normalize ledger to federated proof
+        run: node scripts/control-room-juss-proof.mjs
+
+      - name: Upload repository-local Control Room ledger
+        if: ${{ always() && hashFiles('artifacts/control-room-test-ledger.json') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: control-room-test-ledger-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/control-room-test-ledger.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload sanitized juss-proof receipt
+        if: ${{ hashFiles('artifacts/control-room-juss-proof.json') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: juss-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/control-room-juss-proof.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Relay sanitized proof through FCR to Chief
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const required = [
+            'ACTIONS_ID_TOKEN_REQUEST_URL',
+            'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+            'FCR_BIP_OIDC_AUDIENCE',
+            'FCR_BIP_PROOF_URL',
+            'CONTROL_ROOM_JUSS_PROOF_PATH',
+            'EXPECTED_HEAD_SHA',
+          ];
+          for (const name of required) {
+            if (!process.env[name]) throw new Error(`${name} is required for the FCR proof relay`);
+          }
+
+          const oidcUrl = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          oidcUrl.searchParams.set('audience', process.env.FCR_BIP_OIDC_AUDIENCE);
+          const oidcResponse = await fetch(oidcUrl, {
+            headers: {
+              Authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}`,
+              Accept: 'application/json',
+            },
+          });
+          const oidcText = await oidcResponse.text();
+          if (!oidcResponse.ok) {
+            throw new Error(`GitHub OIDC request failed (${oidcResponse.status}): ${oidcText.slice(0, 300)}`);
+          }
+          const oidcPayload = JSON.parse(oidcText);
+          if (typeof oidcPayload.value !== 'string' || !oidcPayload.value) {
+            throw new Error('GitHub OIDC response omitted token value');
+          }
+
+          const proof = fs.readFileSync(process.env.CONTROL_ROOM_JUSS_PROOF_PATH, 'utf8');
+          const relayResponse = await fetch(process.env.FCR_BIP_PROOF_URL, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${oidcPayload.value}`,
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: proof,
+          });
+          const relayText = await relayResponse.text();
+          if (!relayResponse.ok) {
+            throw new Error(`FCR proof relay failed (${relayResponse.status}): ${relayText.slice(0, 500)}`);
+          }
+          const relay = JSON.parse(relayText);
+          if (relay.accepted !== true || relay.sourceRevision !== process.env.EXPECTED_HEAD_SHA) {
+            throw new Error('FCR proof relay response did not bind to the exact expected head');
+          }
+          console.log(JSON.stringify({
+            accepted: true,
+            sourceReceiptId: relay.sourceReceiptId,
+            sourceRevision: relay.sourceRevision,
+            chiefReleaseSha: relay.chiefReleaseSha,
+            contract: relay.contract,
+          }));
+          NODE

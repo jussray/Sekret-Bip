@@ -1,0 +1,53 @@
+language: "en-US"
+tone_instructions: >
+  Teen safety and privacy are invariants, not suggestions. Flag any change
+  that could expose teen data to parents, public surfaces, or unauthenticated
+  callers. Be assertive about data boundary violations.
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: true
+  high_level_summary: true
+  poem: false
+  review_status: true
+
+  path_filters:
+    - "!**/*.lock"
+    - "!**/dist/**"
+    - "!**/node_modules/**"
+
+  path_instructions:
+    - path: "src/api/**"
+      instructions: >
+        API contracts. Flag any removed field, changed type, or missing auth
+        check. Flag any endpoint reachable without verified authentication.
+        Private teen data must never appear in parent or public API responses.
+    - path: "src/features/parent*/**"
+      instructions: >
+        Parent bridge is a security boundary. Flag any logic that could
+        surface teen private content (journals, mood logs, messages) to a
+        parent or guardian without explicit teen consent action.
+    - path: "supabase/migrations/**"
+      instructions: >
+        RLS policies are invariant. Flag any migration that disables or
+        weakens row-level security on teen_posts, moods, journals, or
+        messages. Require rollback path.
+    - path: "src/data/**"
+      instructions: >
+        Data contracts. Flag any schema change that removes or renames fields
+        consumed downstream. Flag any unvalidated input that could produce
+        data drift.
+    - path: "src/sync/**"
+      instructions: >
+        Device sync is a required check. Flag any change to sync logic that
+        could result in data loss, duplicate records, or out-of-order writes.
+
+  auto_review:
+    enabled: true
+    drafts: false
+    base_branches:
+      - "main"
+      - "staging"
+
+chat:
+  auto_reply: true

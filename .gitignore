@@ -4,6 +4,9 @@
 .env.*.local
 .dev.vars
 
+# ── MCP config (may contain project refs / tokens) ────────────────────────
+.mcp.json
+
 # ── Expo / React Native ───────────────────────────────────────────────────
 node_modules/
 .expo/
@@ -17,6 +20,13 @@ npm-debug.*
 *.orig.*
 web-build/
 
+# ── Browser test artifacts ────────────────────────────────────────────────
+playwright-report/
+test-results/
+
+# ── CI script output / evidence artifacts ────────────────────────────────
+artifacts/
+
 # ── Native build outputs ──────────────────────────────────────────────────
 android/
 ios/
@@ -27,6 +37,15 @@ ios/
 # ── Supabase CLI local state ──────────────────────────────────────────────
 supabase/.temp/
 supabase/.branches/
+
+# ── Design artifacts — store in Figma / Notion, not git ──────────────────
+figma/
+design-references/
+
+# ── Archived / duplicate binary assets ───────────────────────────────────
+# UUID-named PNGs in assets/images/ are duplicates of named files.
+# Run the BFG cleanup in docs/REPO_HYGIENE.md to purge from history.
+assets/images/archive/
 
 # ── macOS ─────────────────────────────────────────────────────────────────
 .DS_Store

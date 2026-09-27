@@ -1,11 +1,10 @@
-/* eslint-disable */
 import fs from 'node:fs';
 import path from 'node:path';
 
 const inputPath = process.env.CLOUDFLARE_WORKER_LOG_PATH;
 const reportOnly = process.env.CONTROL_ROOM_REPORT_ONLY === 'true';
 const supabaseUrl = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const reportPath = path.join(process.cwd(), 'artifacts', 'control-room', 'worker-logs-report.json');
 
 const allowed = new Set([
@@ -13,6 +12,10 @@ const allowed = new Set([
   'status', 'duration_ms', 'provider', 'operation', 'character_id',
   'error_name', 'request_id', 'model', 'fallback_used', 'retry_count',
   'voice_source',
+  // L99 assurance-gateway fields (see worker/telemetry.ts WorkerTelemetryEvent)
+  'trace_id', 'input_tokens', 'output_tokens', 'total_tokens',
+  'estimated_cost_usd', 'prompt_version', 'policy_version', 'schema_valid',
+  'decision', 'violation_codes',
 ]);
 
 function sanitize(event) {

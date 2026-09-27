@@ -26,10 +26,12 @@ test('root layout waits for auth and verification hydration before enforcing rou
   assert.match(source, /SOCIAL_SEGMENTS/);
 });
 
-test('verification remains server-owned and sign-out clears the in-memory snapshot', async () => {
+test('verification remains server-owned and permanent sign-out clears the in-memory snapshot', async () => {
   const source = await read('src/context/VerificationContext.tsx');
   assert.doesNotMatch(source, /AsyncStorage/);
   assert.match(source, /onAuthStateChange/);
-  assert.match(source, /if \(!session\)/);
+  assert.match(source, /session && !session\.user\.is_anonymous/);
+  assert.match(source, /if \(!permanentSession\)/);
+  assert.match(source, /setAuthenticated\(permanentSession\)/);
   assert.match(source, /setSnapshot\(INITIAL_VERIFICATION_SNAPSHOT\)/);
 });

@@ -1,8 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { navigateTo } from '@/utils/navigation';
-import { syncParentCirclePost, loadParentCircleFeed } from '@/utils/sync';
+import { loadParentCircleFeed } from '@/utils/sync';
 import { ParentCircleScreen } from '@screens/ParentCircleScreen';
 import type { ParentCirclePost } from '@/types';
 
@@ -14,65 +14,33 @@ export default function ParentCircleRoute() {
     setParentCirclePostText,
     saveParentCirclePost,
     reactToParentPost,
-    parentMood,
   } = useAppContext();
-
-  const [refreshing, setRefreshing] = useState(false);
 
   const mergeCloudPosts = useCallback(async () => {
     const cloud = await loadParentCircleFeed();
     if (!cloud.length) return;
+
     setParentCirclePosts((local: ParentCirclePost[]) => {
-      const localIds = new Set(local.map((p: ParentCirclePost) => String(p.id)));
-      const newFromCloud = cloud.filter(p => !localIds.has(String(p.id)));
-      if (!newFromCloud.length) return local;
-      return [...newFromCloud, ...local];
+      const cloudIds = new Set(cloud.map(post => String(post.id)));
+      const localOnly = local.filter(post => !cloudIds.has(String(post.id)));
+      return [...cloud, ...localOnly];
     });
   }, [setParentCirclePosts]);
 
   useEffect(() => {
-    parentCirclePosts.forEach(post => {
-      void syncParentCirclePost({
-        id: post.id,
-        text: post.text,
-        date: post.date,
-        time: post.time,
-        reactions: post.reactions as any,
-      });
-    });
     void mergeCloudPosts();
-  }, []);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await mergeCloudPosts();
-    setRefreshing(false);
   }, [mergeCloudPosts]);
-
-  function handleSave() {
-    if (!parentCirclePostText.trim()) return;
-    const text = parentCirclePostText.trim();
-    const now = new Date();
-    saveParentCirclePost();
-    void syncParentCirclePost({
-      id: Date.now(),
-      text,
-      date: now.toLocaleDateString(),
-      time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      reactions: { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
-    });
-  }
 
   return (
     <ParentCircleScreen
       parentCirclePosts={parentCirclePosts}
       parentCirclePostText={parentCirclePostText}
       setParentCirclePostText={setParentCirclePostText}
-      saveParentCirclePost={handleSave}
+      saveParentCirclePost={saveParentCirclePost}
       reactToParentPost={(id: string | number, type: string) => reactToParentPost(Number(id), type)}
       setScreen={navigateTo}
       BottomNav={null}
-      onPostPress={(id) => router.push(`/(parent)/circle/${id}` as any)}
+      onPostPress={id => router.push(`/(parent)/circle/${id}` as never)}
     />
   );
 }

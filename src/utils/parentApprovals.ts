@@ -1,9 +1,10 @@
 // src/utils/parentApprovals.ts
 //
 // Parent-side data layer for the chore/task and reward-redemption approval
-// flow. The Supabase schema and RPCs already exist and are RLS-scoped to the
-// active parent_links row (see supabase/migrations/20260627193000_phase_2_tasks_approvals_rewards.sql);
-// this file is the first client to call them.
+// flow. The reward schema currently has two compatible database lineages:
+// production uses rewards + reward_redemptions.user_id, while clean replay
+// uses reward_catalog + reward_redemptions.teen_id. Reads normalize both to
+// one client shape while the RPC boundary owns authorization and mutations.
 
 import { getSupabase } from './supabase';
 
@@ -44,12 +45,12 @@ export interface PendingTaskSubmission {
 
 export interface RewardCatalogItem {
   id: string;
-  slug: string;
+  slug: string | null;
   name: string;
   description: string | null;
-  category: 'digital' | 'merch' | 'experience' | 'custom';
+  category: 'digital' | 'merch' | 'experience' | 'custom' | null;
   point_cost: number;
-  fulfillment_type: 'manual' | 'digital' | 'shopify';
+  fulfillment_type: 'manual' | 'digital' | 'shopify' | null;
 }
 
 export interface PendingRewardRedemption {
@@ -88,19 +89,73 @@ export async function fetchPendingTaskSubmissions(teenId: string): Promise<Pendi
   })) as PendingTaskSubmission[];
 }
 
+function normalizeReward(value: any): RewardCatalogItem | null {
+  const reward = Array.isArray(value) ? value[0] ?? null : value ?? null;
+  if (!reward) return null;
+  return {
+    id: String(reward.id),
+    slug: typeof reward.slug === 'string' ? reward.slug : null,
+    name: typeof reward.name === 'string' && reward.name.trim() ? reward.name : 'Reward',
+    description: typeof reward.description === 'string' ? reward.description : null,
+    category: ['digital', 'merch', 'experience', 'custom'].includes(reward.category)
+      ? reward.category
+      : null,
+    point_cost: Number.isFinite(Number(reward.point_cost)) ? Number(reward.point_cost) : 0,
+    fulfillment_type: ['manual', 'digital', 'shopify'].includes(reward.fulfillment_type)
+      ? reward.fulfillment_type
+      : null,
+  };
+}
+
 export async function fetchPendingRewardRedemptions(teenId: string): Promise<PendingRewardRedemption[]> {
   const sb = getSupabase();
   if (!sb || !teenId) return [];
-  const { data } = await sb
-    .from('reward_redemptions')
-    .select('id, teen_id, reward_id, point_cost, requested_at, reward:reward_catalog(id, slug, name, description, category, point_cost, fulfillment_type)')
-    .eq('teen_id', teenId)
-    .eq('status', 'pending_parent')
-    .order('requested_at', { ascending: false });
-  return (data ?? []).map((row: any) => ({
-    ...row,
-    reward: Array.isArray(row.reward) ? row.reward[0] ?? null : row.reward ?? null,
-  })) as PendingRewardRedemption[];
+
+  // Query both known schema lineages. One side will normally return a schema
+  // error; the other is authorized only for the active linked parent. Running
+  // both keeps a single app binary compatible during the migration window.
+  const [liveResult, replayResult] = await Promise.all([
+    sb
+      .from('reward_redemptions')
+      .select('id, user_id, reward_id, point_cost, requested_at, reward:rewards(id, name, description, point_cost)')
+      .eq('user_id', teenId)
+      .eq('status', 'pending_parent')
+      .order('requested_at', { ascending: false }),
+    sb
+      .from('reward_redemptions')
+      .select('id, teen_id, reward_id, point_cost, requested_at, reward:reward_catalog(id, slug, name, description, category, point_cost, fulfillment_type)')
+      .eq('teen_id', teenId)
+      .eq('status', 'pending_parent')
+      .order('requested_at', { ascending: false }),
+  ]);
+
+  const rows = new Map<string, PendingRewardRedemption>();
+
+  for (const row of liveResult.data ?? []) {
+    const normalized: PendingRewardRedemption = {
+      id: String((row as any).id),
+      teen_id: String((row as any).user_id),
+      reward_id: String((row as any).reward_id),
+      point_cost: Number((row as any).point_cost) || 0,
+      requested_at: String((row as any).requested_at),
+      reward: normalizeReward((row as any).reward),
+    };
+    rows.set(normalized.id, normalized);
+  }
+
+  for (const row of replayResult.data ?? []) {
+    const normalized: PendingRewardRedemption = {
+      id: String((row as any).id),
+      teen_id: String((row as any).teen_id),
+      reward_id: String((row as any).reward_id),
+      point_cost: Number((row as any).point_cost) || 0,
+      requested_at: String((row as any).requested_at),
+      reward: normalizeReward((row as any).reward),
+    };
+    rows.set(normalized.id, normalized);
+  }
+
+  return [...rows.values()].sort((a, b) => b.requested_at.localeCompare(a.requested_at));
 }
 
 export async function createBipTask(params: {

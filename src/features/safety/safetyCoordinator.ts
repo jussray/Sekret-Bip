@@ -77,24 +77,24 @@ type CompanionMessages = Record<SafetyTier, Partial<Record<CompanionId, string>>
 const MESSAGES: CompanionMessages = {
   emotional_support: {
     default: "hey. sounds like something's heavy. I'm here — no pressure to explain.",
-    raylene: "hey. sounds like something's heavy. I'm here if you want to talk, or just sit.",
-    rylane:  "that's a lot to hold. I'm here. no judgment, no pressure.",
+    suhana: "hey. sounds like something's heavy. I'm here if you want to talk, or just sit.",
+    sy:     "that's a lot to hold. I'm here. no judgment, no pressure.",
     cloud:   "come sit for a sec. you don't have to carry this one alone.",
     night:   "rough night. I'm still here. one breath at a time.",
     sekret:  "I noticed. You don't have to name it right now. I'm here.",
   },
   concerning_pattern: {
     default: "I'm noticing this feels heavy. You don't have to push through alone — Comfort is here, and Bridge can help you reach someone who loves you.",
-    raylene: "okay, I'm right here. This feels like a lot. Comfort is here, and if you want your parent to know you need support, Bridge can help with that.",
-    rylane:  "this is the moment to not carry it alone. Comfort. Bridge. One of those — your call. I'll be here.",
+    suhana: "okay, I'm right here. This feels like a lot. Comfort is here, and if you want your parent to know you need support, Bridge can help with that.",
+    sy:     "this is the moment to not carry it alone. Comfort. Bridge. One of those — your call. I'll be here.",
     cloud:   "let's make it smaller. Comfort first. And Bridge is there if you want someone to know you need support.",
     night:   "you don't have to hold this in the dark. Comfort or Bridge — both are safe.",
     sekret:  "the pattern says you've been here before. You deserve support. Comfort and Bridge are both here.",
   },
   immediate_danger: {
     default: "You matter. Right now — cold water, sit down, one breath. If it feels like you might hurt yourself, please reach out to a real person or a crisis line.",
-    raylene: "I love you and I'm scared for you right now. Please — cold water, sit down. Call or text 988. Your parent has been quietly notified.",
-    rylane:  "I'm serious right now. Cold water. Sit down. Call 988. You're not alone in this.",
+    suhana: "I love you and I'm scared for you right now. Please — cold water, sit down. Call or text 988. Your parent has been quietly notified.",
+    sy:     "I'm serious right now. Cold water. Sit down. Call 988. You're not alone in this.",
     cloud:   "one thing. cold water on your face. then 988 or text HOME to 741741. I'm staying right here.",
     night:   "stay here with me. one breath. then call 988 or text HOME to 741741. please.",
     sekret:  "this is the moment that matters most. One breath. Then 988 or text HOME to 741741. You are worth staying.",
@@ -201,7 +201,7 @@ async function isAcknowledged(alertId: number): Promise<boolean> {
  */
 export function checkTextBeforePost(
   text:        string,
-  companionId: CompanionId = 'raylene',
+  companionId: CompanionId = 'suhana',
 ): SafetyExperience | null {
   for (const rule of PRE_FLIGHT_RULES) {
     if (rule.re.test(text)) {
@@ -218,7 +218,7 @@ export function checkTextBeforePost(
  * Returns the most recent unacknowledged experience, or null if clean.
  */
 export async function checkForFlaggedItems(
-  companionId: CompanionId = 'raylene',
+  companionId: CompanionId = 'suhana',
 ): Promise<SafetyExperience | null> {
   const sb = getSupabase();
   if (!sb) return null;

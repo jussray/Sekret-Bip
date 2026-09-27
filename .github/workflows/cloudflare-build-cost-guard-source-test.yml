@@ -1,0 +1,44 @@
+name: Cloudflare Build Cost Guard Source Test
+
+on:
+  push:
+    branches:
+      - fix/cloudflare-build-cost-guard
+    paths:
+      - scripts/reconcile-cloudflare-workers-build-trigger.mjs
+      - test/cloudflare-workers-build-trigger-*.test.mjs
+      - test/cloudflare-workers-build-watch-path-*.test.mjs
+      - test/cloudflare-workers-release-identity-trigger.test.mjs
+      - test/cloudflare-workers-token-fallback.test.mjs
+      - .github/workflows/cloudflare-build-cost-guard-source-test.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-contracts:
+    name: Prove Workers Builds cost-guard source contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact source head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Run focused Workers Builds contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test \
+            test/cloudflare-workers-build-trigger-control-plane.test.mjs \
+            test/cloudflare-workers-build-trigger-approval.test.mjs \
+            test/cloudflare-workers-build-trigger-failure-evidence.test.mjs \
+            test/cloudflare-workers-build-watch-path-observation.test.mjs \
+            test/cloudflare-workers-release-identity-trigger.test.mjs \
+            test/cloudflare-workers-token-fallback.test.mjs

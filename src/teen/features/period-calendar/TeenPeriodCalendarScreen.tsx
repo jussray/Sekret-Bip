@@ -1,4 +1,4 @@
 // Teen-side period calendar: private cycle tracker.
-// All data stays on-device; nothing is shared with the parent side unless the teen
-// explicitly triggers sharing (future feature).
+// Cycle days are local-first and sync to the teen's account.
+// They are not shown in Parent Pages.
 export { PeriodCalendarScreen as TeenPeriodCalendarScreen } from '@screens/PeriodCalendarScreen';

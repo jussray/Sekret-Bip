@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-13",
+  "projectRef": "tbsevonvegdnlyjgplmm",
+  "migration": {
+    "version": "20260713154809",
+    "name": "harden_parent_link_rpc_behavior",
+    "repositoryPath": "supabase/migrations/20260713154809_harden_parent_link_rpc_behavior.sql",
+    "applied": true,
+    "repositoryAndLiveMigrationParity": true
+  },
+  "scope": {
+    "functions": [
+      "public.create_parent_link_invite()",
+      "public.redeem_parent_link_invite(text)"
+    ],
+    "productionDataRetained": false,
+    "guardianIdentityContractChanged": false,
+    "bridgeVisibilityChanged": false
+  },
+  "preDeployDefects": {
+    "transactionOutcome": "rolled_back",
+    "parentProfileCouldCreateTeenInvite": true,
+    "profilelessPermanentAccountCouldCreateTeenInvite": true,
+    "inviteRegenerationConflictedWithCanonicalTeenRow": true,
+    "expiredRedemptionRolledBackItsOwnExpiration": true
+  },
+  "createInviteControls": {
+    "permanentSessionRequired": true,
+    "completedTeenProfileRequired": true,
+    "suspendedTeenDenied": true,
+    "manualReviewTeenDenied": true,
+    "activeRelationshipReplacementDenied": true,
+    "canonicalRelationshipRowReused": true,
+    "expiryHours": 48
+  },
+  "redeemInviteControls": {
+    "permanentSessionRequired": true,
+    "pendingActiveInviteRequired": true,
+    "rowLockedBeforeTransition": true,
+    "selfLinkDenied": true,
+    "consumedCodeDenied": true,
+    "expiredStatePersists": true,
+    "expiredResponseRows": 0,
+    "targetTeenOnlyMutation": true
+  },
+  "postDeployProof": {
+    "probePath": "supabase/probes/authorization_parent_link_rpc_phase1.sql",
+    "transactionOutcome": "rolled_back",
+    "passedChecks": 10,
+    "failedChecks": 0,
+    "retainedSyntheticUsers": 0,
+    "retainedParentLinks": 0,
+    "retainedVerificationRows": 0
+  },
+  "advisorClassification": {
+    "createParentLinkInvite": "intentional_authenticated_security_definer_api_with_behavior_proof",
+    "redeemParentLinkInvite": "intentional_authenticated_security_definer_api_with_behavior_proof",
+    "warningExpectedToRemain": true,
+    "reason": "Both RPCs are intentional authenticated application APIs. The warning is controlled through explicit grants, internal authorization, fixed search paths, and live behavior proof rather than hidden by revoking required client access."
+  },
+  "releaseGate": {
+    "authenticatedFunctionBlockerComplete": false,
+    "reason": "The parent-link trust boundary is proved, but additional authenticated SECURITY DEFINER function families remain before L4 activation."
+  }
+}
