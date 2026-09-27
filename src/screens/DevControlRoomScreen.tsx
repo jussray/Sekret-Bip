@@ -7,9 +7,10 @@ import PromptOsPanel from '@/features/control-room/PromptOsPanel';
 import GuardianReviewsPanel from '@/features/control-room/GuardianReviewsPanel';
 import WorkerPanel from '@/features/control-room/WorkerPanel';
 import FallbackTelemetryPanel from '@/features/control-room/FallbackTelemetryPanel';
+import SiteContinuityPanel from '@/features/control-room/SiteContinuityPanel';
 import { getCurrentFounderProfile, isFounderProfile, type FounderProfile } from '@/services/founderAudit';
 
-type ControlRoomSurface = 'founder-operator' | 'operations' | 'fallbacks' | 'guardian-reviews' | 'prompt-os' | 'worker';
+type ControlRoomSurface = 'founder-operator' | 'operations' | 'fallbacks' | 'guardian-reviews' | 'prompt-os' | 'site-continuity' | 'worker';
 
 export default function DevControlRoomScreen() {
   const [surface, setSurface] = useState<ControlRoomSurface>('founder-operator');
@@ -60,6 +61,7 @@ export default function DevControlRoomScreen() {
         ['fallbacks', 'Fallbacks'],
         ['guardian-reviews', 'Guardians'],
         ['prompt-os', 'Prompt OS'],
+        ['site-continuity', 'Site'],
         ['worker', 'Worker'],
       ] as const).map(([id, label]) => (
         <TouchableOpacity
@@ -85,7 +87,9 @@ export default function DevControlRoomScreen() {
               ? <GuardianReviewsPanel />
               : surface === 'prompt-os'
                 ? <PromptOsPanel />
-                : <WorkerPanel />}
+                : surface === 'site-continuity'
+                  ? <SiteContinuityPanel />
+                  : <WorkerPanel />}
     </View>
   </View>;
 }
