@@ -1,0 +1,48 @@
+name: Active Defense Proof
+
+on:
+  push:
+    branches:
+      - feat/active-defense-hallway-48000
+    paths:
+      - 'worker/active-defense.ts'
+      - 'worker/voice-entry.ts'
+      - 'test/active-defense-worker.test.mjs'
+      - 'e2e-active-defense/**'
+      - 'playwright.active-defense.config.ts'
+      - '.github/workflows/active-defense-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  prove:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Verify exact head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Focused source-contract proof
+        run: node --test test/active-defense-worker.test.mjs
+      - name: Type proof
+        run: npm run type-check
+      - name: Worker dry-run proof
+        run: npx wrangler deploy --config wrangler.toml --dry-run
+      - name: Playwright Worker runtime proof
+        run: npx playwright test --config=playwright.active-defense.config.ts
