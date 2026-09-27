@@ -1,5 +1,5 @@
 name = "sekret-backend"
-main = "worker/voice-entry.ts"
+main = "security/sekret-edge-entry.ts"
 compatibility_date = "2026-06-13"
 compatibility_flags = ["nodejs_compat"]
 logpush = true
@@ -32,8 +32,8 @@ binding = "AI"
 
 # Non-secret model vars — safe to commit.
 # To rotate a model: edit here and run `wrangler deploy --name sekret-backend`.
-# Secrets (OPENAI_API_KEY, ELEVENLABS_API_KEY, and SUPABASE_SERVICE_ROLE_KEY)
-# must use `wrangler secret put`, never this file.
+# Secrets (OPENAI_API_KEY, ELEVENLABS_API_KEY, SUPABASE_SERVICE_ROLE_KEY, and
+# RECIPROCAL_DEFENSE_SECRET) must use provider-held secret bindings, never this file.
 [vars]
 SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
 OPENAI_CHAT_MODEL = "gpt-4o"
@@ -66,14 +66,10 @@ VOICE_PROVIDER_MODE = "hybrid"
 # have been verified.
 BRIDGE_SUMMARIES_ROLLOUT = "disabled"
 
-# ── CPU time limit ────────────────────────────────────────────────────
 # Do not commit `[limits] cpu_ms` in the default Worker config.
 # Cloudflare rejects CPU limits on Free-plan deploys, so the repo default
 # must stay free-plan safe for PR previews and documentation-only changes.
-# Paid production CPU limits can be restored only through an approved
-# paid-plan release lane after Founder Control Room records that gate.
 
-# ── Production routing authority ──────────────────────────────────────
 # api.sekretbip.net remains the canonical production Worker hostname, but
 # its Custom Domain is provider-managed rather than re-provisioned on every
 # Workers Build. Keep route/routes absent here and workers_dev=false so a
@@ -81,7 +77,6 @@ BRIDGE_SUMMARIES_ROLLOUT = "disabled"
 # build token to mutate Custom Domain DNS/certificate records.
 # Production verification must still prove https://api.sekretbip.net/health.
 
-# ── Rate limiting binding ─────────────────────────────────────────────
 # 60 requests per 10-second window per user/IP key.
 # Current first-class Wrangler Rate Limiting binding syntax.
 # Binding name must match Env interface: SEKRET_RATE_LIMITER
