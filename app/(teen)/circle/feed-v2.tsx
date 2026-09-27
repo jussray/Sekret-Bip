@@ -188,7 +188,7 @@ export default function PublicCircleFeedV2() {
             <Text style={styles.heroIconText}>🪐</Text>
           </LinearGradient>
           <View style={{ flex: 1 }}>
-            <Text style={styles.heroTitle} accessibilityRole="header">{OPEN_BIP_LABEL}</Text>
+            <Text style={styles.heroTitle} accessibilityRole="header">{OPEN_BIP_AUDIENCE.label}</Text>
             <Text style={styles.heroSub}>Anonymous by default</Text>
             <Text style={styles.heroSub}>Real thoughts. Kind people.</Text>
           </View>
@@ -203,61 +203,64 @@ export default function PublicCircleFeedV2() {
         </View>
       </LinearGradient>
 
-      {composerOpen ? (
-        <View style={styles.composeCard}>
-          <View style={styles.audienceRow}>
-            <View style={styles.audiencePill} accessibilityLabel={`Audience: ${OPEN_BIP_LABEL}`}>
-              <Text style={styles.audiencePillText}>{OPEN_BIP_LABEL}</Text>
-            </View>
-            <Text style={styles.audienceHint}>inside Circle · faces stay hidden here</Text>
+      <View style={styles.composeCard}>
+        {/* The Open Bip face rule stays visible before anyone starts typing. */}
+        <View style={styles.audienceRow}>
+          <View style={styles.audiencePill} accessibilityLabel={`Audience: ${OPEN_BIP_LABEL}`}>
+            <Text style={styles.audiencePillText}>{OPEN_BIP_LABEL}</Text>
           </View>
-          <TextInput
-            ref={inputRef}
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Share what's on your mind… keep private names out."
-            placeholderTextColor={C.faint}
-            multiline
-            maxLength={280}
-            style={styles.input}
-          />
-          <Text style={styles.audienceRule}>{OPEN_BIP_AUDIENCE.description}</Text>
-          <View style={styles.composeFooter}>
-            <TouchableOpacity onPress={() => setComposerOpen(false)} hitSlop={8}>
-              <Text style={styles.cancel}>not now</Text>
-            </TouchableOpacity>
-            <View style={styles.composeActions}>
-              <Text style={styles.count}>{draft.length}/280</Text>
-              <TouchableOpacity
-                disabled={!draft.trim() || posting}
-                onPress={submitPost}
-                style={(!draft.trim() || posting) && styles.disabled}
-                accessibilityRole="button"
-                accessibilityLabel="Bip it"
-              >
-                <LinearGradient colors={CIRCLE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.postButton}>
-                  {posting
-                    ? <ActivityIndicator color="#fff" />
-                    : <Text style={styles.postButtonText}>Bip it 💜</Text>}
-                </LinearGradient>
-              </TouchableOpacity>
-            </View>
-          </View>
+          <Text style={styles.audienceHint}>inside Circle · faces stay hidden here</Text>
         </View>
-      ) : (
-        <TouchableOpacity
-          style={styles.shareBar}
-          onPress={openComposer}
-          activeOpacity={0.85}
-          accessibilityRole="button"
-          accessibilityLabel="Share what's on your mind"
-        >
-          <Text style={styles.shareBarText}>Share what's on your mind…</Text>
-          <LinearGradient colors={CIRCLE_GRADIENT} style={styles.shareBarIcon}>
-            <Text style={styles.shareBarIconText}>✎</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
+        {composerOpen ? (
+          <>
+            <TextInput
+              ref={inputRef}
+              value={draft}
+              onChangeText={setDraft}
+              placeholder="Share what's on your mind… keep private names out."
+              placeholderTextColor={C.faint}
+              multiline
+              maxLength={280}
+              style={styles.input}
+            />
+            <View style={styles.composeFooter}>
+              <TouchableOpacity onPress={() => setComposerOpen(false)} hitSlop={8}>
+                <Text style={styles.cancel}>not now</Text>
+              </TouchableOpacity>
+              <View style={styles.composeActions}>
+                <Text style={styles.count}>{draft.length}/280</Text>
+                <TouchableOpacity
+                  disabled={!draft.trim() || posting}
+                  onPress={submitPost}
+                  style={(!draft.trim() || posting) && styles.disabled}
+                  accessibilityRole="button"
+                  accessibilityLabel="Bip it"
+                >
+                  <LinearGradient colors={CIRCLE_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.postButton}>
+                    {posting
+                      ? <ActivityIndicator color="#fff" />
+                      : <Text style={styles.postButtonText}>Bip it 💜</Text>}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
+        ) : (
+          <TouchableOpacity
+            style={styles.shareBar}
+            onPress={openComposer}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel="Share what's on your mind"
+          >
+            <Text style={styles.shareBarText}>Share what's on your mind…</Text>
+            <LinearGradient colors={CIRCLE_GRADIENT} style={styles.shareBarIcon}>
+              <Text style={styles.shareBarIconText}>✎</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+        <Text style={styles.audienceRule}>{OPEN_BIP_AUDIENCE.description}</Text>
+      </View>
 
       <View style={styles.lensRow} accessibilityRole="tablist">
         {LENSES.map(option => {
@@ -400,7 +403,7 @@ const styles = StyleSheet.create({
   plus: { width: 40, height: 40, borderRadius: 12, borderWidth: 1, borderColor: C.border, backgroundColor: C.cardRaised, alignItems: 'center', justifyContent: 'center' },
   plusText: { color: C.text, fontSize: 24, fontWeight: '500', marginTop: -2 },
 
-  shareBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 16, borderWidth: 1, borderColor: C.border, backgroundColor: C.card, paddingLeft: 16, paddingRight: 8, paddingVertical: 8, marginBottom: 12 },
+  shareBar: { flexDirection: 'row', alignItems: 'center', borderRadius: 14, backgroundColor: C.bgDeep, paddingLeft: 14, paddingRight: 6, paddingVertical: 6 },
   shareBarText: { flex: 1, color: C.muted, fontSize: 14 },
   shareBarIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   shareBarIconText: { color: '#fff', fontSize: 15, fontWeight: '900' },
