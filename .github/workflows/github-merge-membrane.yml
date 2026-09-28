@@ -42,6 +42,22 @@ jobs:
           test "$actual" = "$TRUSTED_BASE_SHA"
           test -n "$EXPECTED_HEAD_SHA"
 
+      - name: Confirm trusted base carries the merge-membrane evaluator
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for f in test/github-merge-membrane.test.mjs scripts/verify-github-merge-membrane.mjs; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Trusted base $TRUSTED_BASE_SHA is missing $f." >&2
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "::error::PR #$PR_NUMBER's base predates the merge-membrane evaluator's introduction to main. This gate evaluates from the PR's declared base (not its head or current main) so a PR cannot weaken its own required-checks policy — but that means a base from before the evaluator existed can never satisfy it. Rebase PR #$PR_NUMBER onto a current main commit that includes test/github-merge-membrane.test.mjs and scripts/verify-github-merge-membrane.mjs, then re-sync." >&2
+            exit 1
+          fi
+
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
