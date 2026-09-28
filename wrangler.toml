@@ -1,5 +1,5 @@
 name = "sekret-backend"
-main = "worker/voice-entry.ts"
+main = "worker/provider-entry.ts"
 compatibility_date = "2026-06-13"
 compatibility_flags = ["nodejs_compat"]
 logpush = true
@@ -32,13 +32,17 @@ binding = "AI"
 
 # Non-secret model vars — safe to commit.
 # To rotate a model: edit here and run `wrangler deploy --name sekret-backend`.
-# Secrets (OPENAI_API_KEY, ELEVENLABS_API_KEY, and SUPABASE_SERVICE_ROLE_KEY)
-# must use `wrangler secret put`, never this file.
+# Secrets (OPENAI_API_KEY, ANTHROPIC_API_KEY, MODEL_API_KEY, ELEVENLABS_API_KEY,
+# SUPABASE_SERVICE_ROLE_KEY, and BIP_AI_OPERATOR_KEY) must use `wrangler secret put`,
+# never this file.
 [vars]
 SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
 OPENAI_CHAT_MODEL = "gpt-4o"
 OPENAI_TTS_MODEL  = "gpt-4o-mini-tts"
 OPENAI_STT_MODEL  = "whisper-1"
+BIP_OPENAI_MODEL = "gpt-5.6-sol"
+BIP_ANTHROPIC_MODEL = "claude-sonnet-5"
+BIP_MUSE_MODEL = "muse-spark-1.3"
 
 # Founder emergency brake is intentionally NOT committed with an engaged value.
 # Runtime authority is FOUNDER_OPERATION_KILL_SWITCH, supplied only through
