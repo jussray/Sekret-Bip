@@ -1,6 +1,6 @@
 import { bipProviderStates, invokeBipProvider, type BipProviderEnv } from './provider-runtime';
 
-type Env = BipProviderEnv & { BIP_AI_OPERATOR_KEY?: string };
+type ProviderRouteEnv = BipProviderEnv & { BIP_AI_OPERATOR_KEY?: string };
 
 function json(body: unknown, status: number, headers: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
@@ -9,7 +9,7 @@ function json(body: unknown, status: number, headers: Record<string, string>): R
   });
 }
 
-function authorized(request: Request, env: Env): boolean {
+function authorized(request: Request, env: ProviderRouteEnv): boolean {
   if (!env.BIP_AI_OPERATOR_KEY) return false;
   const direct = request.headers.get('x-bip-ai-key');
   const bearer = (request.headers.get('authorization') || '').match(/^Bearer\s+(.+)$/i)?.[1];
@@ -18,7 +18,7 @@ function authorized(request: Request, env: Env): boolean {
 
 export async function handleBipProviderRequest(
   request: Request,
-  env: Env,
+  rawEnv: unknown,
   headers: Record<string, string>,
 ): Promise<Response | null> {
   const url = new URL(request.url);
@@ -26,6 +26,10 @@ export async function handleBipProviderRequest(
   const invokePath = url.pathname === '/api/internal/providers/invoke';
   if (!statusPath && !invokePath) return null;
 
+  // The canonical voice-entry Env intentionally remains the product-wide
+  // authority contract. This route narrows it only after route selection so
+  // provider bindings do not become a requirement for unrelated Bip traffic.
+  const env = rawEnv as ProviderRouteEnv;
   if (!env.BIP_AI_OPERATOR_KEY) return json({error: 'AI operator lane is not configured'}, 503, headers);
   if (!authorized(request, env)) return json({error: 'Unauthorized'}, 401, headers);
 
