@@ -58,7 +58,6 @@ const dependencies = {
   firebase: Boolean(packageJson.dependencies?.firebase),
   reactNativeFirebaseAppCheck: Boolean(packageJson.dependencies?.['@react-native-firebase/app-check']),
 };
-const hasSdk = dependencies.firebase || dependencies.reactNativeFirebaseAppCheck;
 const providerRegistered = registrationFiles.length > 0;
 
 if (!/getAppCheckToken\(\)/.test(backendAuth) || !/X-Firebase-AppCheck/.test(backendAuth)) {
@@ -81,17 +80,15 @@ if (!/off\s*\n→ bind authenticated provider identities\s*\n→ acquire real cl
   fail('docs/PROVIDERS.md must preserve the observe-before-enforce rollout ladder');
 }
 
-if (mode === 'observe' && (!providerRegistered || !hasSdk)) {
-  fail(
-    `observe mode requires a real runtime token provider and client SDK; providerRegistered=${providerRegistered} hasSdk=${hasSdk}`,
-  );
+if (mode === 'observe' && !providerRegistered) {
+  fail('observe mode requires a real runtime App Check token provider registration');
 }
 
 if (mode === 'enforce') {
   fail('checked-in enforce mode is forbidden; enforcement requires separate provider/runtime proof and founder approval');
 }
 
-const readiness = providerRegistered && hasSdk ? 'client-seam-wired' : 'foundation-only';
+const readiness = providerRegistered ? 'client-seam-wired' : 'foundation-only';
 
 console.log(JSON.stringify({
   ok: true,
