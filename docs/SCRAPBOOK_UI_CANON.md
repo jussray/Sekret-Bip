@@ -28,7 +28,7 @@ The dark room remains the product world. Paper, tape, doodles, and Polaroids sit
 
 ## Companion identity
 
-Visible names are canonical:
+Visible peer-companion names for this reusable character-scene system are canonical:
 
 - **Suhana**
 - **Sy**
@@ -43,6 +43,8 @@ rylane  -> Sy
 ```
 
 Do not surface `Raylene` or `Rylane` as current character copy.
+
+**Oracle/Se’kret remains part of the Bip world.** Existing project authority defines Oracle/Se’kret as the continuity presence rather than the same peer/voice-companion actor class as Suhana, Sy, Cloud, and Night. This slice therefore does not silently reclassify Oracle/Se’kret into a Polaroid peer-companion slot. A future scrapbook treatment for that presence should preserve its distinct continuity role instead of pretending it is missing or identical to the four peer companions.
 
 ## First approved scene
 
@@ -80,7 +82,7 @@ Founder Preview catalog:
 
 - `src/constants/founderPreview.ts` → `Scrapbook Companion Check-In`
 
-The scene resolves the selected companion into the existing compatibility key, chooses the existing companion/room assets, resolves the current room phase, and renders one shared scrapbook composition rather than four copied screens.
+The scene resolves the selected peer companion into the existing compatibility key, chooses the existing companion/room assets, resolves the current room phase, and renders one shared scrapbook composition rather than four copied screens.
 
 The hidden route may also receive a normalized `companion` query parameter for deterministic deep links and visual verification. Normal Room entry continues to use the teen’s selected companion.
 
