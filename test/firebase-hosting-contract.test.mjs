@@ -32,6 +32,6 @@ test('Firebase Hosting config cannot replace canonical Cloudflare frontend or AP
   assert.equal(eas.build['parent-development'].env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
   assert.equal(eas.build.production.env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
   assert.equal(eas.build['parent-production'].env.EXPO_PUBLIC_BACKEND_URL, 'https://api.sekretbip.net');
-  assert.match(ownership, /`sekret-bip` — Cloudflare Pages frontend project/);
-  assert.match(ownership, /`sekret-backend` — canonical public API\/front-door/);
+  assert.ok(ownership.includes('`sekret-bip` — Cloudflare Pages frontend project'));
+  assert.ok(ownership.includes('`sekret-backend` — canonical public API/front-door'));
 });
