@@ -33,6 +33,16 @@ test('approved Sy evening scrapbook check-in renders at 390x844 and hands off to
   await expect(cta).toBeVisible();
   await expect(cta).toHaveAccessibleName('Bip with Sy');
 
+  // This is an immersive scene, not a normal tab surface. The screen owns its
+  // single scrapbook back control; global Mood/back chrome and the tab bar must
+  // not stack on top of the approved composition.
+  await expect(page.getByText('Mood', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Back', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Pages', { exact: true })).toBeHidden();
+  await expect(page.getByText('Calm', { exact: true })).toBeHidden();
+  await expect(page.getByText('Circle', { exact: true })).toBeHidden();
+  await expect(page.getByText('More', { exact: true })).toBeHidden();
+
   const metrics = await page.evaluate(() => ({
     innerWidth: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
