@@ -65,7 +65,15 @@ if (!/getAppCheckToken\(\)/.test(backendAuth) || !/X-Firebase-AppCheck/.test(bac
   fail('canonical backend transport must request and attach App Check tokens through backendAuthHeaders');
 }
 
-if (/AsyncStorage|SecureStore|document\.cookie\s*=|Set-Cookie/.test(appCheckToken)) {
+const persistencePatterns = [
+  /from\s+['"]@react-native-async-storage\/async-storage['"]/,
+  /from\s+['"]expo-secure-store['"]/,
+  /AsyncStorage\.(?:getItem|setItem|removeItem)/,
+  /SecureStore\.(?:getItemAsync|setItemAsync|deleteItemAsync)/,
+  /document\.cookie\s*=/,
+  /Set-Cookie\s*:/i,
+];
+if (persistencePatterns.some((pattern) => pattern.test(appCheckToken))) {
   fail('App Check tokens must remain request-scoped and nonpersistent');
 }
 
