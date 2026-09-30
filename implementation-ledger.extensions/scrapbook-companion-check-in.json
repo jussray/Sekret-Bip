@@ -1,0 +1,40 @@
+{
+  "id": "scrapbook-companion-check-in",
+  "name": "Reusable scrapbook-style teen companion check-in scene",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/1127",
+  "acceptanceCriteria": [
+    "The canonical teen Room exposes a small scrapbook check-in launcher without replacing the illustrated Room with a dashboard.",
+    "One reusable companion scene renders Suhana, Sy, Cloud, or Night with warm-white paper, masking tape, doodles, a Polaroid-style frame, cozy dark-mode room art, and time-of-day-aware atmosphere.",
+    "Visible companion copy uses Suhana, Sy, Cloud, and Night while raylene and rylane remain compatibility-only internal identifiers.",
+    "The first approved Sy evening composition keeps the note 'you made it through today.' and a Bip-with-companion CTA while preserving the existing Pages destination.",
+    "This UI slice adds no Supabase, Worker, auth, telemetry, parent-visibility, journal-read, microphone, or private-data boundary."
+  ],
+  "contractPaths": [
+    "docs/SCRAPBOOK_UI_CANON.md",
+    "docs/design/reference/scrapbook-evening-sy-reference.jpg"
+  ],
+  "runtimePaths": [
+    "components/rooms/ScrapbookCompanionScene.tsx",
+    "app/(teen)/scrapbook-check-in.tsx",
+    "app/(teen)/room.tsx",
+    "app/(teen)/_layout.tsx",
+    "src/teen/routes.ts"
+  ],
+  "testPaths": [
+    "test/scrapbook-ui-contract.test.mjs",
+    "test/implementation-ledger.test.mjs"
+  ],
+  "telemetryPaths": [],
+  "rollout": {
+    "state": "internal",
+    "controlPath": "app/(teen)/room.tsx",
+    "controlKey": "ScrapbookCheckInLauncher on the canonical teen Room"
+  },
+  "verification": {
+    "state": "partial",
+    "evidence": "https://github.com/jussray/Sekret-Bip/issues/1127",
+    "blocker": "Focused contract test, exact-head type-check/lint, Product Design Playwright or equivalent rendered capture, 390x844 visual comparison against the approved reference, accessibility/responsiveness review, and exact-head repository/release gates remain before verified or released status."
+  },
+  "rollback": "Revert the scrapbook companion check-in feature merge. Remove the route registration, hidden tab entry, Room launcher, scene component, design reference, canon document, contract test, and this ledger extension; no database or provider rollback is required."
+}
