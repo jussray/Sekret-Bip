@@ -25,9 +25,12 @@ const DISPLAY_NAMES: Record<Character, string> = {
   night: 'Night',
 };
 
+// Use actor assets that sit cleanly inside the Polaroid. Sy intentionally uses
+// the existing full-body profile asset rather than the neutral portrait that
+// carries a pale card/background in browser evidence.
 const AVATARS: Record<Character, ImageSourcePropType> = {
   raylene: IMAGES.rayleneFullbody,
-  rylane: IMAGES.rylaneFullbody,
+  rylane: IMAGES.rylaneProfile,
   cloud: IMAGES.cloudAvatarNeutral,
   night: IMAGES.nightFullbody,
 };
@@ -116,8 +119,14 @@ export function ScrapbookCompanionScene({
       testID="scrapbook-companion-scene"
     >
       <LinearGradient
-        colors={['rgba(8, 4, 24, 0.38)', 'rgba(22, 8, 43, 0.28)', 'rgba(5, 3, 18, 0.78)']}
+        colors={['rgba(7, 4, 25, 0.66)', 'rgba(34, 12, 52, 0.56)', 'rgba(7, 3, 19, 0.88)']}
         locations={[0, 0.48, 1]}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      <LinearGradient
+        colors={['rgba(75, 29, 112, 0.14)', 'rgba(255, 111, 184, 0.06)', 'rgba(14, 20, 62, 0.18)']}
+        locations={[0, 0.56, 1]}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
@@ -126,6 +135,8 @@ export function ScrapbookCompanionScene({
         <Text style={styles.doodleMoon}>☾</Text>
         <Text style={styles.doodleStars}>☆  ☆{`\n`}  ☆</Text>
         <Text style={[styles.doodleHeart, { color: phaseCopy.accent }]}>♡</Text>
+        <Text style={styles.leftDoodleCopy}>good things{`\n`}still happen here… ♡</Text>
+        <Text style={styles.rightDoodleCopy}>same you…{`\n`}brighter days ♡</Text>
       </View>
 
       <View style={styles.topRow}>
@@ -135,6 +146,7 @@ export function ScrapbookCompanionScene({
             accessibilityLabel="Back to Room"
             onPress={onBack}
             style={({ pressed }) => [styles.backScrap, pressed && styles.pressed]}
+            testID="scrapbook-back"
           >
             <Text style={styles.backText}>← Room</Text>
           </Pressable>
@@ -152,10 +164,11 @@ export function ScrapbookCompanionScene({
           <View style={styles.polaroid}>
             <View style={styles.photoWell}>
               <LinearGradient
-                colors={['rgba(24, 11, 50, 0.24)', 'rgba(7, 4, 18, 0.72)']}
+                colors={['rgba(30, 14, 61, 0.28)', 'rgba(8, 5, 22, 0.82)']}
                 style={StyleSheet.absoluteFill}
                 pointerEvents="none"
               />
+              <View style={styles.photoGlow} pointerEvents="none" />
               <Image
                 source={AVATARS[character]}
                 resizeMode="contain"
@@ -229,8 +242,8 @@ export function ScrapbookCheckInLauncher({ companion, onPress }: ScrapbookCheckI
 
 const handwritingFont = Platform.select({
   ios: 'Noteworthy',
-  android: 'sans-serif',
-  web: 'Comic Sans MS',
+  android: 'sans-serif-medium',
+  web: 'cursive',
   default: undefined,
 });
 
@@ -252,17 +265,17 @@ const styles = StyleSheet.create({
   },
   doodleMoon: {
     position: 'absolute',
-    top: '11%',
-    right: '12%',
-    color: 'rgba(255, 247, 232, 0.92)',
+    top: '9%',
+    right: '14%',
+    color: 'rgba(255, 247, 232, 0.95)',
     fontSize: 54,
     transform: [{ rotate: '-12deg' }],
   },
   doodleStars: {
     position: 'absolute',
-    top: '17%',
-    left: '8%',
-    color: 'rgba(255,255,255,0.88)',
+    top: '16%',
+    left: '9%',
+    color: 'rgba(255,255,255,0.9)',
     fontSize: 21,
     lineHeight: 22,
     transform: [{ rotate: '8deg' }],
@@ -270,29 +283,50 @@ const styles = StyleSheet.create({
   doodleHeart: {
     position: 'absolute',
     top: '28%',
-    right: '8%',
+    right: '7%',
     fontSize: 34,
     fontFamily: handwritingFont,
     transform: [{ rotate: '8deg' }],
   },
+  leftDoodleCopy: {
+    position: 'absolute',
+    top: '23%',
+    left: 18,
+    color: 'rgba(255,255,255,0.88)',
+    fontFamily: handwritingFont,
+    fontSize: 12,
+    lineHeight: 16,
+    transform: [{ rotate: '-4deg' }],
+  },
+  rightDoodleCopy: {
+    position: 'absolute',
+    top: '31%',
+    right: 12,
+    color: 'rgba(255,255,255,0.82)',
+    fontFamily: handwritingFont,
+    fontSize: 11,
+    lineHeight: 15,
+    textAlign: 'right',
+    transform: [{ rotate: '4deg' }],
+  },
   topRow: {
-    minHeight: 68,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    zIndex: 3,
+    zIndex: 5,
   },
   backScrap: {
     minHeight: 44,
     minWidth: 82,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: 'rgba(252, 247, 237, 0.94)',
+    backgroundColor: 'rgba(252, 247, 237, 0.95)',
     borderRadius: 3,
     transform: [{ rotate: '-2deg' }],
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.24,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
   },
@@ -315,7 +349,7 @@ const styles = StyleSheet.create({
     right: 14,
     width: 44,
     height: 14,
-    backgroundColor: 'rgba(211, 176, 112, 0.72)',
+    backgroundColor: 'rgba(211, 176, 112, 0.76)',
     transform: [{ rotate: '-4deg' }],
   },
   eyebrow: {
@@ -328,45 +362,54 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: -8,
+    marginTop: -14,
   },
   polaroidWrap: {
     position: 'relative',
-    width: '82%',
-    maxWidth: 330,
-    transform: [{ rotate: '-2.4deg' }],
+    width: '84%',
+    maxWidth: 334,
+    transform: [{ rotate: '-2.6deg' }],
     zIndex: 2,
   },
   polaroid: {
     width: '100%',
-    padding: 14,
-    paddingBottom: 20,
-    backgroundColor: '#f7f2ea',
+    padding: 13,
+    paddingBottom: 16,
+    backgroundColor: '#f8f3eb',
     shadowColor: '#000',
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.38,
     shadowRadius: 18,
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
   },
   photoWell: {
-    height: 330,
-    maxHeight: '48%',
-    minHeight: 250,
-    backgroundColor: '#110b1d',
+    height: 345,
+    maxHeight: '52%',
+    minHeight: 270,
+    backgroundColor: '#0b0718',
     overflow: 'hidden',
     justifyContent: 'flex-end',
+  },
+  photoGlow: {
+    position: 'absolute',
+    left: '18%',
+    right: '18%',
+    bottom: '-12%',
+    height: '58%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(241, 103, 187, 0.08)',
   },
   avatar: {
     width: '100%',
     height: '100%',
   },
   polaroidCaptionRow: {
-    minHeight: 42,
+    minHeight: 38,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 4,
-    paddingTop: 10,
+    paddingTop: 8,
   },
   polaroidCaption: {
     color: '#2f2537',
@@ -385,30 +428,30 @@ const styles = StyleSheet.create({
     left: -22,
     width: 88,
     height: 34,
-    backgroundColor: 'rgba(215, 181, 117, 0.78)',
+    backgroundColor: 'rgba(215, 181, 117, 0.8)',
     transform: [{ rotate: '-36deg' }],
   },
   tapeRight: {
     position: 'absolute',
     zIndex: 4,
     right: -18,
-    bottom: 24,
+    bottom: 22,
     width: 76,
     height: 30,
-    backgroundColor: 'rgba(215, 181, 117, 0.72)',
+    backgroundColor: 'rgba(215, 181, 117, 0.75)',
     transform: [{ rotate: '-24deg' }],
   },
   notePaper: {
-    width: '78%',
-    maxWidth: 310,
-    minHeight: 112,
+    width: '79%',
+    maxWidth: 314,
+    minHeight: 110,
     backgroundColor: '#fbf7ef',
-    marginTop: -5,
+    marginTop: -4,
     paddingHorizontal: 24,
-    paddingVertical: 18,
+    paddingVertical: 16,
     transform: [{ rotate: '1.5deg' }],
     shadowColor: '#000',
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.22,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 6 },
     zIndex: 1,
@@ -418,7 +461,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    top: 42,
+    top: 40,
     height: 1,
     backgroundColor: 'rgba(77, 100, 135, 0.14)',
   },
@@ -426,7 +469,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    top: 76,
+    top: 73,
     height: 1,
     backgroundColor: 'rgba(77, 100, 135, 0.14)',
   },
@@ -440,7 +483,7 @@ const styles = StyleSheet.create({
   },
   noteHeart: {
     alignSelf: 'center',
-    marginTop: 4,
+    marginTop: 3,
     fontFamily: handwritingFont,
     fontSize: 25,
   },
@@ -454,23 +497,25 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '8deg' }],
   },
   cta: {
-    minHeight: 58,
-    marginHorizontal: 28,
+    minHeight: 60,
+    marginHorizontal: 25,
+    marginTop: 6,
     borderRadius: 18,
     borderWidth: 2,
-    borderColor: 'rgba(43, 24, 50, 0.86)',
+    borderColor: 'rgba(43, 24, 50, 0.9)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 18,
     shadowColor: '#000',
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.32,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 7 },
     transform: [{ rotate: '-0.7deg' }],
   },
   ctaStar: {
     color: '#24152c',
+    fontFamily: handwritingFont,
     fontSize: 22,
     marginRight: 10,
   },
@@ -483,12 +528,12 @@ const styles = StyleSheet.create({
   },
   ctaArrow: {
     color: '#24152c',
+    fontFamily: handwritingFont,
     fontSize: 25,
     marginLeft: 10,
   },
   pressed: {
     opacity: 0.76,
-    transform: [{ scale: 0.985 }],
   },
   launcher: {
     position: 'absolute',
