@@ -281,7 +281,7 @@ test('creates the first marked release receipt when none exists', async () => {
 test('production workflow publishes blocked attempts after retaining evidence', () => {
   assert.match(workflow, /id: cloudflare_release/);
   assert.match(workflow, /id: backend_health/);
-  assert.match(workflow, /id: supabase_health/);
+  assert.match(workflow, /id: supabase_schema/);
   assert.match(workflow, /id: production_playwright/);
   assert.match(workflow, /Publish blocked exact production observation/);
   assert.match(workflow, /if: failure\(\)/);

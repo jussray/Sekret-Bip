@@ -69,6 +69,12 @@ jobs:
             return 'opaque-ascii';
           };
 
+          const verificationPathFor = (shape) => {
+            if (shape === 'account-prefixed') return `/accounts/${accountId}/tokens/verify`;
+            if (shape === 'user-prefixed' || shape === 'opaque-ascii') return '/user/tokens/verify';
+            return null;
+          };
+
           const candidates = [
             { source: 'CLOUDFLARE_APP_DOMAIN_API_TOKEN', raw: process.env.CF_APP_DOMAIN_TOKEN },
             { source: 'CLOUDFLARE_ACCESS_API_TOKEN', raw: process.env.CF_ACCESS_TOKEN },
@@ -116,13 +122,19 @@ jobs:
               continue;
             }
 
-            console.log(`TOKEN_CANDIDATE source=${candidate.source} configured=true transport=valid normalized=${normalized.changed} ascii=true shape=${shape}`);
-            const verify = await request(normalized.token, '/user/tokens/verify');
-            if (!verify.response.ok || verify.body?.success === false) {
-              console.log(`TOKEN_VERIFY source=${candidate.source} result=failed provider=${summarize(verify.body, verify.response.status)}`);
+            const verificationPath = verificationPathFor(shape);
+            if (!verificationPath) {
+              console.log(`TOKEN_CANDIDATE source=${candidate.source} configured=true transport=unsupported shape=${shape}`);
               continue;
             }
-            console.log(`TOKEN_VERIFY source=${candidate.source} result=ok status=${verify.body?.result?.status ?? 'unknown'}`);
+
+            console.log(`TOKEN_CANDIDATE source=${candidate.source} configured=true transport=valid normalized=${normalized.changed} ascii=true shape=${shape}`);
+            const verify = await request(normalized.token, verificationPath);
+            if (!verify.response.ok || verify.body?.success === false) {
+              console.log(`TOKEN_VERIFY source=${candidate.source} result=failed shape=${shape} provider=${summarize(verify.body, verify.response.status)}`);
+              continue;
+            }
+            console.log(`TOKEN_VERIFY source=${candidate.source} result=ok shape=${shape} status=${verify.body?.result?.status ?? 'unknown'}`);
 
             for (const probe of probes) {
               const result = await request(normalized.token, probe.path);
