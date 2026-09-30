@@ -10,6 +10,16 @@ const reportDir = path.join(root, 'reports', 'control-room');
 const jsonPath = path.join(reportDir, 'latest.json');
 const mdPath = path.join(reportDir, 'latest.md');
 const TEST_SKIP_MARKER = 'CONTROL_ROOM_TEST_SKIP_RECEIPT ';
+const SELF_GENERATED_LOCAL_REPORTS = new Set([
+  'reports/control-room/latest.json',
+  'reports/control-room/latest.md',
+  'reports/control-room/test-skips-latest.json',
+]);
+const SECRET_ENV_NAME = /(?:TOKEN|SECRET|PASSWORD|PASSCODE|PRIVATE|API[_-]?KEY|SERVICE[_-]?ROLE|AUTH)/i;
+const secretValues = Object.entries(process.env)
+  .filter(([name, value]) => SECRET_ENV_NAME.test(name) && typeof value === 'string' && value.length >= 8)
+  .map(([, value]) => value)
+  .sort((a, b) => b.length - a.length);
 
 function loadVerificationRegistry() {
   let registry;
@@ -45,6 +55,83 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function redactOutput(value) {
+  let text = String(value || '');
+  for (const secret of secretValues) {
+    text = text.split(secret).join('[redacted-env-secret]');
+  }
+  return text
+    .replace(/\bgh[pousr]_[A-Za-z0-9_]{20,}\b/g, '[redacted-github-token]')
+    .replace(/\bsk-[A-Za-z0-9_-]{16,}\b/g, '[redacted-api-key]')
+    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[redacted-aws-key]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}\b/gi, 'Bearer [redacted]')
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, '[redacted-jwt]');
+}
+
+function gitText(args) {
+  const result = spawnSync('git', args, {
+    cwd: root,
+    encoding: 'utf8',
+    shell: false,
+  });
+  return result.status === 0 ? String(result.stdout || '').trim() : null;
+}
+
+function repositoryFromRemote(remote) {
+  if (!remote) return null;
+  const value = String(remote).trim().replace(/\.git$/, '');
+  const https = value.match(/^https?:\/\/github\.com\/([^/]+\/[^/]+)$/i);
+  if (https) return https[1];
+  const scp = value.match(/^git@github\.com:([^/]+\/[^/]+)$/i);
+  if (scp) return scp[1];
+  const ssh = value.match(/^ssh:\/\/git@github\.com\/([^/]+\/[^/]+)$/i);
+  return ssh ? ssh[1] : null;
+}
+
+function porcelainPath(line) {
+  const raw = String(line || '').slice(3);
+  const target = raw.includes(' -> ') ? raw.split(' -> ').pop() : raw;
+  if (!target) return '';
+  if (target.startsWith('"') && target.endsWith('"')) {
+    try {
+      return JSON.parse(target);
+    } catch {
+      return target.slice(1, -1);
+    }
+  }
+  return target;
+}
+
+function gitIdentity() {
+  const headSha = gitText(['rev-parse', 'HEAD']);
+  const branch = gitText(['rev-parse', '--abbrev-ref', 'HEAD']);
+  const status = gitText(['status', '--porcelain=v1', '--untracked-files=all']);
+  const repository = repositoryFromRemote(gitText(['config', '--get', 'remote.origin.url']))
+    || process.env.GITHUB_REPOSITORY
+    || null;
+  const statusEntries = status === null ? null : status.split('\n').filter(Boolean);
+  const generatedReportEntries = statusEntries === null
+    ? null
+    : statusEntries.filter((line) => SELF_GENERATED_LOCAL_REPORTS.has(porcelainPath(line)));
+  const sourceDirtyEntries = statusEntries === null
+    ? null
+    : statusEntries.filter((line) => !SELF_GENERATED_LOCAL_REPORTS.has(porcelainPath(line)));
+  const clean = sourceDirtyEntries !== null && sourceDirtyEntries.length === 0;
+  const validHead = typeof headSha === 'string' && /^[0-9a-f]{40}$/i.test(headSha);
+  const validRepository = typeof repository === 'string' && /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository);
+
+  return {
+    repository: validRepository ? repository : null,
+    branch: branch || null,
+    head_sha: validHead ? headSha.toLowerCase() : null,
+    clean,
+    dirty_entry_count: sourceDirtyEntries?.length ?? null,
+    generated_report_dirty_count: generatedReportEntries?.length ?? null,
+    raw_dirty_entry_count: statusEntries?.length ?? null,
+    correlatable: Boolean(validRepository && validHead && clean),
+  };
+}
+
 function classifyStatus(check, exitCode, stdout, stderr) {
   const combined = `${stdout}\n${stderr}`;
   if (exitCode === 0 && combined.includes(TEST_SKIP_MARKER)) return 'warning';
@@ -63,11 +150,13 @@ function runCheck(check) {
   });
 
   const durationMs = Date.now() - startedAt;
-  const stdout = result.stdout || '';
-  const stderr = result.stderr || '';
+  const rawStdout = result.stdout || '';
+  const rawStderr = result.stderr || '';
   const exitCode = typeof result.status === 'number' ? result.status : 1;
-  const status = classifyStatus(check, exitCode, stdout, stderr);
-  const skipped = `${stdout}\n${stderr}`.includes(TEST_SKIP_MARKER);
+  const status = classifyStatus(check, exitCode, rawStdout, rawStderr);
+  const skipped = `${rawStdout}\n${rawStderr}`.includes(TEST_SKIP_MARKER);
+  const stdout = redactOutput(rawStdout);
+  const stderr = redactOutput(rawStderr);
 
   return {
     ...check,
@@ -106,7 +195,7 @@ function summarize(results) {
   };
 }
 
-function writeReports(results, summary) {
+function writeReports(results, summary, sourceIdentity) {
   fs.mkdirSync(reportDir, { recursive: true });
 
   const report = {
@@ -114,14 +203,19 @@ function writeReports(results, summary) {
     mode: 'local-control-room',
     purpose: 'Free local verification when GitHub Actions minutes are unavailable.',
     registry: path.relative(root, registryPath),
+    git: sourceIdentity,
     summary,
     checks: results,
     guardrails: [
       'No GitHub PAT is required or read by this script.',
       'No OpenAI key is required or read by this script.',
+      'Command output is redacted before report persistence; external ingestion never receives raw stdout/stderr tails.',
       'Do not run fixture audits on real teen private content.',
       'Use GitHub Actions only as a release/PR backup while minutes are constrained.',
       'Skipped tests are warning evidence, never silent green proof.',
+      'Only source-clean local work with an exact repository and HEAD may correlate to a GitHub failure incident.',
+      'Only this verifier’s three known generated local receipt paths are excluded from source cleanliness; their dirty count remains visible.',
+      'Any other dirty local path blocks cross-source correlation and cannot impersonate exact-head GitHub proof.',
     ],
   };
 
@@ -131,6 +225,9 @@ function writeReports(results, summary) {
   lines.push('# Bip Control Room — local report');
   lines.push('');
   lines.push(`Generated: ${report.generatedAt}`);
+  lines.push(`Repository: ${sourceIdentity.repository || 'unknown'}`);
+  lines.push(`HEAD: ${sourceIdentity.head_sha || 'unknown'}`);
+  lines.push(`Source worktree: ${sourceIdentity.clean ? 'clean' : 'dirty or unavailable'} · generated receipt dirtiness: ${sourceIdentity.generated_report_dirty_count ?? 'unknown'} · cross-source correlation: ${sourceIdentity.correlatable ? 'eligible' : 'blocked'}`);
   lines.push('');
   lines.push(`Status: **${summary.status.toUpperCase()}**`);
   lines.push(`Score: **${summary.score}%**`);
@@ -205,6 +302,7 @@ function writeReports(results, summary) {
 console.log('Bip Control Room: running local verification...');
 console.log('GitHub Actions minutes are not required for this command.');
 
+const sourceIdentity = gitIdentity();
 const results = [];
 for (const check of checks) {
   process.stdout.write(`- ${check.label}... `);
@@ -214,7 +312,7 @@ for (const check of checks) {
 }
 
 const summary = summarize(results);
-writeReports(results, summary);
+writeReports(results, summary, sourceIdentity);
 
 console.log('');
 console.log(`Control Room status: ${summary.status.toUpperCase()}`);

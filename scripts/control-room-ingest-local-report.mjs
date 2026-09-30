@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import failureIdentity from './control-room-failure-identity.cjs';
 
+const { buildFailureIdentity, canonicalFailureKey } = failureIdentity;
 const root = process.cwd();
 const candidates = [
   path.join(root, 'artifacts', 'control-room', 'local-verification-report.json'),
@@ -52,10 +54,6 @@ async function supabaseRequest(pathname, options = {}) {
   return body ? JSON.parse(body) : null;
 }
 
-function fingerprint(check) {
-  return `local_control_room:${check.id}:local`;
-}
-
 function severityFor(check) {
   if (['type-check', 'unit-tests', 'control-room-rls'].includes(check.id)) return 'error';
   return 'warning';
@@ -71,7 +69,26 @@ function suggestedFix(check) {
   return 'Review the local verification output and fix the failing command before pushing.';
 }
 
+function identityForCheck(check) {
+  const git = report.git && typeof report.git === 'object' ? report.git : {};
+  return buildFailureIdentity({
+    repository: git.repository || process.env.GITHUB_REPOSITORY || null,
+    headSha: git.head_sha || null,
+    failureKey: canonicalFailureKey(check.id || check.label),
+    correlatable: git.correlatable === true && git.clean === true,
+    source: 'local_control_room',
+    evidence: {
+      report_generated_at: report.generatedAt || report.generated_at || null,
+      command: check.commandText || null,
+      exit_code: check.exitCode ?? null,
+      duration_ms: check.durationMs ?? null,
+      worktree_clean: git.clean === true,
+    },
+  });
+}
+
 async function ingestFailure(check) {
+  const identity = identityForCheck(check);
   const metadata = {
     source: 'local_control_room',
     report_generated_at: report.generatedAt || report.generated_at || null,
@@ -79,8 +96,17 @@ async function ingestFailure(check) {
     command: check.commandText || null,
     exit_code: check.exitCode ?? null,
     duration_ms: check.durationMs ?? null,
-    stdout_tail: String(check.stdoutTail || '').slice(0, 2000),
-    stderr_tail: String(check.stderrTail || '').slice(0, 2000),
+    repository: identity.repository,
+    head_sha: identity.head_sha,
+    failure_key: identity.failure_key,
+    incident_fingerprint: identity.incident_fingerprint,
+    proof_cookie: identity.proof_cookie,
+    correlatable: identity.correlatable,
+    authority: false,
+    merge_authority: false,
+    proof_satisfied: false,
+    browser_cookie: false,
+    authorizing: false,
   };
 
   const inserted = await supabaseRequest('/rest/v1/audit_events', {
@@ -102,7 +128,7 @@ async function ingestFailure(check) {
   await supabaseRequest('/rest/v1/rpc/upsert_control_room_issue', {
     method: 'POST',
     body: JSON.stringify({
-      p_fingerprint: fingerprint(check),
+      p_fingerprint: identity.incident_fingerprint,
       p_source: 'local_control_room',
       p_category: check.area || 'verification',
       p_severity: severityFor(check),
@@ -117,7 +143,12 @@ async function ingestFailure(check) {
     }),
   });
 
-  return check.id;
+  return {
+    check_id: check.id,
+    incident_fingerprint: identity.incident_fingerprint,
+    proof_cookie: identity.proof_cookie,
+    correlatable: identity.correlatable,
+  };
 }
 
 async function ingestSkip(item) {
