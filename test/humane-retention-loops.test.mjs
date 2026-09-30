@@ -93,6 +93,9 @@ test('Bridge carries teen-selected metadata, fails loud on delivery errors, and 
   assert.match(parentCard, /setLatest\(signals\[0\] \?\? null\)/);
   assert.match(parentCard, /LATEST TEEN-CHOSEN BRIDGE SIGNAL/);
   assert.match(parentCard, /Linking does not unlock journals, chats, mood history/);
+  assert.match(bridgeCompat, /async function permanentUid\(\)/);
+  assert.match(bridgeCompat, /if \(!user \|\| user\.is_anonymous\) return null/);
+  assert.doesNotMatch(bridgeCompat, /async function uid\(\)/);
   assert.match(bridgeCompat, /const \{ error \} = await sb\.from\('bridge_signals'\)\.insert/);
   assert.match(bridgeCompat, /if \(error\) throw error/);
   assert.match(bridgeCompat, /response_preference: responsePreference/);
