@@ -38,13 +38,15 @@ test('scrapbook scene reuses the current companion and existing Pages destinatio
   assert.doesNotMatch(route, /companion-chat/);
 });
 
-test('visible companion canon stays Suhana, Sy, Cloud, and Night while legacy ids remain compatibility-only', () => {
+test('visible peer companion canon stays Suhana, Sy, Cloud, and Night while Oracle remains a distinct continuity presence', () => {
   assert.match(component, /raylene:\s*'Suhana'/);
   assert.match(component, /rylane:\s*'Sy'/);
   assert.match(component, /cloud:\s*'Cloud'/);
   assert.match(component, /night:\s*'Night'/);
   assert.doesNotMatch(component, /['"`]Raylene['"`]/);
   assert.doesNotMatch(component, /['"`]Rylane['"`]/);
+  assert.match(canon, /Oracle\/Se’kret remains part of the Bip world/);
+  assert.match(canon, /continuity presence/);
 });
 
 test('approved scrapbook visual grammar and time-of-day behavior remain wired', () => {
