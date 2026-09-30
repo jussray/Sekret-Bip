@@ -19,13 +19,14 @@
     "app/(teen)/scrapbook-check-in.tsx",
     "app/(teen)/room.tsx",
     "app/(teen)/_layout.tsx",
-    "src/teen/routes.ts"
+    "src/teen/routes.ts",
+    "src/constants/founderPreview.ts"
   ],
   "testPaths": [
     "test/scrapbook-ui-contract.test.mjs",
-    "test/implementation-ledger.test.mjs"
+    "test/implementation-ledger.test.mjs",
+    "test/founder-preview-unlock.test.mjs"
   ],
-  "telemetryPaths": [],
   "rollout": {
     "state": "internal",
     "controlPath": "app/(teen)/room.tsx",
@@ -36,5 +37,5 @@
     "evidence": "https://github.com/jussray/Sekret-Bip/issues/1127",
     "blocker": "Focused contract test, exact-head type-check/lint, Product Design Playwright or equivalent rendered capture, 390x844 visual comparison against the approved reference, accessibility/responsiveness review, and exact-head repository/release gates remain before verified or released status."
   },
-  "rollback": "Revert the scrapbook companion check-in feature merge. Remove the route registration, hidden tab entry, Room launcher, scene component, design reference, canon document, contract test, and this ledger extension; no database or provider rollback is required."
+  "rollback": "Revert the scrapbook companion check-in feature merge. Remove the route registration, hidden tab entry, Room launcher, scene component, design reference, canon document, contract test, Founder Preview catalog entry, and this ledger extension; no database or provider rollback is required."
 }
