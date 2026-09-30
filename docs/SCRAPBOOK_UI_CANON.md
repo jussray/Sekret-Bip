@@ -76,7 +76,13 @@ Route registry:
 
 - `src/teen/routes.ts` → `scrapbookCheckIn`
 
+Founder Preview catalog:
+
+- `src/constants/founderPreview.ts` → `Scrapbook Companion Check-In`
+
 The scene resolves the selected companion into the existing compatibility key, chooses the existing companion/room assets, resolves the current room phase, and renders one shared scrapbook composition rather than four copied screens.
+
+The hidden route may also receive a normalized `companion` query parameter for deterministic deep links and visual verification. Normal Room entry continues to use the teen’s selected companion.
 
 The main CTA continues into the existing Se’kret Pages path with the active companion selected. This slice does not introduce a second chat backend, second journal system, new database state, or new telemetry.
 
@@ -98,10 +104,28 @@ Supabase dependency for this UI slice: **none**.
 
 The scene reads the already-selected companion and local theme/asset state. It does not add journal reads, message reads, parent visibility, analytics payloads, profile data, image uploads, microphone access, or private-data persistence.
 
+## Exact-head visual witness
+
+Dedicated Playwright witness:
+
+- `e2e/scrapbook-companion-check-in.spec.ts`
+
+The witness:
+
+- renders the real `/scrapbook-check-in` route at **390 × 844**;
+- requests **Sy** through the normalized companion route parameter;
+- freezes only the test browser’s `Date.prototype.getHours()` to `18` so the approved evening state is deterministic;
+- verifies `EVENING CHECK-IN`, `Sy`, `you made it through today.`, and the accessible `Bip with Sy` CTA;
+- rejects horizontal document overflow;
+- writes `artifacts/product-design-playwright/scrapbook-companion-check-in/sy-evening-390x844.png`;
+- verifies the CTA hands off to the existing Pages route.
+
+The browser-clock override exists only inside Playwright evidence. Production behavior continues to use the real local time.
+
 ## Verification state
 
 Implementation status: **integrated on feature branch**.  
-Design QA status: **blocked until an actual rendered 390 × 844 capture of the route is compared with the approved reference**.  
+Design QA status: **blocked until the exact-head 390 × 844 witness passes and its rendered screenshot is compared with the approved reference**.  
 Release status: **not released by this document**.
 
 Required before merge/release claims:
@@ -110,10 +134,10 @@ Required before merge/release claims:
 2. TypeScript check;
 3. lint;
 4. Expo/web build as required by the current release gate;
-5. Product Design Playwright or equivalent rendered-route capture;
+5. dedicated Product Design Playwright rendered-route witness;
 6. visual comparison for typography, spacing, paper/tape/Polaroid fidelity, companion placement, time-of-day atmosphere, responsiveness, and visible accessibility risks;
 7. exact-head repository/release checks.
 
 ## Rollback
 
-Remove the scrapbook route registration, hidden tab entry, Room launcher, reusable scene component, reference asset, contract test, and this canon document. No database or provider rollback is required for this slice.
+Remove the scrapbook route registration, hidden tab entry, Room launcher, reusable scene component, reference asset, dedicated Playwright witness, contract test, Founder Preview catalog entry, ledger extension, and this canon document. No database or provider rollback is required for this slice.
