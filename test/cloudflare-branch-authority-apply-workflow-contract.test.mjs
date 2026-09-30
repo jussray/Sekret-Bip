@@ -71,14 +71,17 @@ test('read-only audit observes bip separately while keeping backend branch repai
   assert.match(workerVerifier, /mutationPerformed: false/);
 });
 
-test('Workers credential shape checks stay fail-closed while supporting user, account-owned, and legacy token verification', () => {
+test('Workers Builds credential checks fail closed and reject account-owned tokens before provider reads', () => {
   assert.match(workerVerifier, /startsWith\('cfat_'\)/);
   assert.match(workerVerifier, /account-prefixed/);
   assert.match(workerVerifier, /startsWith\('cfut_'\)/);
   assert.match(workerVerifier, /user-prefixed/);
   assert.match(workerVerifier, /legacy-opaque/);
-  assert.match(workerVerifier, /token-verify-account/);
+  assert.match(workerVerifier, /workers-builds-account-token-unsupported/);
+  assert.match(workerVerifier, /Workers Builds API does not support account-owned API tokens/);
+  assert.match(workerVerifier, /workers-builds-token-scope/);
   assert.match(workerVerifier, /token-verify-user/);
+  assert.doesNotMatch(workerVerifier, /token-verify-account/);
   assert.match(workerVerifier, /token-leading-or-trailing-whitespace/);
   assert.match(workerVerifier, /token-bearer-prefix-stored/);
   assert.match(workerVerifier, /token-quoted-secret/);

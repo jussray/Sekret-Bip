@@ -124,10 +124,9 @@ function inspectToken(rawValue, source) {
   };
 }
 
-async function verifyApiTokenAt(inspected, owner) {
-  const accountOwned = owner === 'account';
-  const providerPath = accountOwned ? `/accounts/${accountId}/tokens/verify` : '/user/tokens/verify';
-  const probe = accountOwned ? 'token-verify-account' : 'token-verify-user';
+async function verifyUserApiToken(inspected) {
+  const providerPath = '/user/tokens/verify';
+  const probe = 'token-verify-user';
   let response;
   try {
     response = await fetch(`${API}${providerPath}`, {
@@ -144,7 +143,7 @@ async function verifyApiTokenAt(inspected, owner) {
     return {
       ok: false,
       code: 'token-verify-request-failed',
-      message: `${inspected.source} could not be verified as a Cloudflare ${owner} API token before provider response.`,
+      message: `${inspected.source} could not be verified as a Cloudflare user API token before provider response.`,
       shape: inspected.shape,
       providerStatus: null,
       providerCode: null,
@@ -171,7 +170,7 @@ async function verifyApiTokenAt(inspected, owner) {
     return {
       ok: false,
       code: 'token-not-active-or-invalid',
-      message: `${inspected.source} is not an active Cloudflare ${owner} API token; verify status ${response.status}${providerCode === null ? '' : ` code ${providerCode}`}.`,
+      message: `${inspected.source} is not an active Cloudflare user API token; verify status ${response.status}${providerCode === null ? '' : ` code ${providerCode}`}.`,
       shape: inspected.shape,
       providerStatus: response.status,
       providerCode,
@@ -179,24 +178,30 @@ async function verifyApiTokenAt(inspected, owner) {
     };
   }
 
-  return { ok: true, owner };
+  return { ok: true, owner: 'user' };
 }
 
 async function verifyApiToken(inspected) {
-  if (inspected.shape === 'account-prefixed') return verifyApiTokenAt(inspected, 'account');
-  if (inspected.shape === 'user-prefixed') return verifyApiTokenAt(inspected, 'user');
+  if (inspected.shape === 'account-prefixed') {
+    receipt.credential.attempts.push({
+      source: inspected.source,
+      shape: inspected.shape,
+      probe: 'workers-builds-token-scope',
+      result: 'rejected-preflight',
+      failureCode: 'workers-builds-account-token-unsupported',
+    });
+    return {
+      ok: false,
+      code: 'workers-builds-account-token-unsupported',
+      message: `${inspected.source} must be a user-scoped Cloudflare API token because the Workers Builds API does not support account-owned API tokens.`,
+      shape: inspected.shape,
+      providerStatus: null,
+      providerCode: null,
+      tokenStatus: null,
+    };
+  }
 
-  const userResult = await verifyApiTokenAt(inspected, 'user');
-  if (userResult.ok) return userResult;
-
-  const accountResult = await verifyApiTokenAt(inspected, 'account');
-  if (accountResult.ok) return accountResult;
-
-  return {
-    ...accountResult,
-    code: 'token-not-active-or-invalid',
-    message: `${inspected.source} is not an active Cloudflare user or account API token.`,
-  };
+  return verifyUserApiToken(inspected);
 }
 
 async function probeWorkersRead(rawValue, source) {
