@@ -1,5 +1,5 @@
 import React from 'react';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '@/context/AppContext';
 import { TEEN_ROUTES } from '@/teen/routes';
@@ -10,7 +10,10 @@ import {
 
 export default function ScrapbookCheckInRoute() {
   const { selectedSekret } = useAppContext();
-  const companionKey = normalizeScrapbookCompanion(selectedSekret);
+  const { companion } = useLocalSearchParams<{ companion?: string | string[] }>();
+  const requestedCompanion = Array.isArray(companion) ? companion[0] : companion;
+  const activeCompanion = requestedCompanion ?? selectedSekret;
+  const companionKey = normalizeScrapbookCompanion(activeCompanion);
 
   const openPages = () => {
     router.push({
@@ -22,7 +25,7 @@ export default function ScrapbookCheckInRoute() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#09031c' }} edges={['top', 'bottom']}>
       <ScrapbookCompanionScene
-        companion={selectedSekret}
+        companion={activeCompanion}
         onBack={() => router.replace(TEEN_ROUTES.room as never)}
         onBipPress={openPages}
       />
