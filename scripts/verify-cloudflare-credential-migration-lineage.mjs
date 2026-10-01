@@ -171,8 +171,10 @@ function loadReceipts(rootDir, ref, violations = []) {
     const raw = show(rootDir, ref, relativePath);
     try {
       const receipt = JSON.parse(raw ?? 'null');
-      validateReceipt(receipt, relativePath, violations);
-      if (receipt?.newSecret && SECRET_NAME.test(receipt.newSecret)) receipts.set(receipt.newSecret, { path: relativePath, receipt });
+      const valid = validateReceipt(receipt, relativePath, violations);
+      if (valid && receipt?.newSecret && SECRET_NAME.test(receipt.newSecret)) {
+        receipts.set(receipt.newSecret, { path: relativePath, receipt });
+      }
     } catch (error) {
       pushViolation(violations, 'credential-migration-receipt-json-invalid', `Credential migration receipt is not valid JSON: ${error.message}`, { path: relativePath });
     }
