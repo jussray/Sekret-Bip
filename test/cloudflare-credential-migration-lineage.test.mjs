@@ -66,10 +66,7 @@ function cutoverReceipt(newSecret, previousSecrets = ['CLOUDFLARE_API_TOKEN']) {
     phase: 'cutover',
     secretStoreScope: 'GitHub Production',
     providerEvidence: {
-      ref: 'https://github.com/jussray/Sekret-Bip/actions/runs/123456789',
-      observedAt: '2026-10-01T08:30:00.000Z',
-      providerAccepted: true,
-      secretValueExposed: false,
+      runId: 123456789,
     },
   };
 }
@@ -106,7 +103,7 @@ test('bracket-style GitHub secret references cannot bypass the migration guard',
   assert.equal(result.workflowTransitionCount, 1);
 });
 
-test('one-phase replacement fails even when a cutover receipt claims provider evidence', () => {
+test('one-phase replacement fails even when a cutover receipt references a workflow run', () => {
   const root = init();
   write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_API_TOKEN'));
   const base = commit(root, 'base');
@@ -120,7 +117,7 @@ test('one-phase replacement fails even when a cutover receipt claims provider ev
   assert.ok(codes(result).includes('credential-migration-cutover-not-staged-on-base'));
 });
 
-test('cutover passes only after the dedicated consumer already exists on the base and provider proof is retained', () => {
+test('cutover passes structurally only after the dedicated consumer exists on the base and a run ID is retained', () => {
   const root = init();
   write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN', 'CLOUDFLARE_API_TOKEN'));
   writeJson(root, '.github/credential-migrations/CLOUDFLARE_PAGES_READ_API_TOKEN.json', stageReceipt('CLOUDFLARE_PAGES_READ_API_TOKEN'));
@@ -128,7 +125,7 @@ test('cutover passes only after the dedicated consumer already exists on the bas
 
   write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN'));
   writeJson(root, '.github/credential-migrations/CLOUDFLARE_PAGES_READ_API_TOKEN.json', cutoverReceipt('CLOUDFLARE_PAGES_READ_API_TOKEN'));
-  const head = commit(root, 'provider proven cutover');
+  const head = commit(root, 'run-referenced cutover');
 
   const result = verifyCloudflareCredentialMigrationLineage({ rootDir: root, baseRef: base, headRef: head });
   assert.equal(result.verified, true);
@@ -148,7 +145,7 @@ test('stage fails if it removes the previous credential in the same candidate', 
   assert.ok(codes(result).includes('credential-migration-one-phase-removal'));
 });
 
-test('cutover without provider-backed acceptance fails closed', () => {
+test('cutover without a valid provider-audit run ID fails closed', () => {
   const root = init();
   write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_APP_BINDING_READ_API_TOKEN', 'CLOUDFLARE_API_TOKEN'));
   writeJson(root, '.github/credential-migrations/CLOUDFLARE_APP_BINDING_READ_API_TOKEN.json', stageReceipt('CLOUDFLARE_APP_BINDING_READ_API_TOKEN'));
@@ -156,14 +153,31 @@ test('cutover without provider-backed acceptance fails closed', () => {
 
   write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_APP_BINDING_READ_API_TOKEN'));
   const invalid = cutoverReceipt('CLOUDFLARE_APP_BINDING_READ_API_TOKEN');
-  invalid.providerEvidence.providerAccepted = false;
+  invalid.providerEvidence.runId = 0;
   writeJson(root, '.github/credential-migrations/CLOUDFLARE_APP_BINDING_READ_API_TOKEN.json', invalid);
   const head = commit(root, 'unproven cutover');
 
   const result = verifyCloudflareCredentialMigrationLineage({ rootDir: root, baseRef: base, headRef: head });
   assert.equal(result.verified, false);
-  assert.ok(codes(result).includes('credential-migration-provider-not-accepted'));
+  assert.ok(codes(result).includes('credential-migration-provider-run-id-invalid'));
   assert.ok(codes(result).includes('credential-migration-cutover-receipt-missing'));
+});
+
+test('receipt cannot self-certify provider acceptance fields', () => {
+  const root = init();
+  write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN', 'CLOUDFLARE_API_TOKEN'));
+  writeJson(root, '.github/credential-migrations/CLOUDFLARE_PAGES_READ_API_TOKEN.json', stageReceipt('CLOUDFLARE_PAGES_READ_API_TOKEN'));
+  const base = commit(root, 'staged base');
+
+  write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN'));
+  const selfCertified = cutoverReceipt('CLOUDFLARE_PAGES_READ_API_TOKEN');
+  selfCertified.providerEvidence.providerAccepted = true;
+  writeJson(root, '.github/credential-migrations/CLOUDFLARE_PAGES_READ_API_TOKEN.json', selfCertified);
+  const head = commit(root, 'self certified cutover');
+
+  const result = verifyCloudflareCredentialMigrationLineage({ rootDir: root, baseRef: base, headRef: head });
+  assert.equal(result.verified, false);
+  assert.ok(codes(result).includes('credential-migration-provider-evidence-unexpected-fields'));
 });
 
 test('invalid inherited cutover metadata cannot authorize reuse on a later workflow', () => {
@@ -197,15 +211,15 @@ test('removing a Cloudflare credential without a matching cutover receipt fails 
   assert.ok(codes(result).includes('credential-migration-cutover-receipt-missing'));
 });
 
-test('a previously provider-proven dedicated credential may be added to another workflow without fabricating a new migration', () => {
+test('a previously run-referenced dedicated credential may be added to another workflow without fabricating a new migration', () => {
   const root = init();
   write(root, '.github/workflows/primary.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN'));
   write(root, '.github/workflows/secondary.yml', 'name: secondary\n');
   writeJson(root, '.github/credential-migrations/CLOUDFLARE_PAGES_READ_API_TOKEN.json', cutoverReceipt('CLOUDFLARE_PAGES_READ_API_TOKEN'));
-  const base = commit(root, 'proven base');
+  const base = commit(root, 'run-referenced base');
 
   write(root, '.github/workflows/secondary.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN'));
-  const head = commit(root, 'reuse proven credential');
+  const head = commit(root, 'reuse referenced credential');
 
   const result = verifyCloudflareCredentialMigrationLineage({ rootDir: root, baseRef: base, headRef: head });
   assert.equal(result.verified, true);
