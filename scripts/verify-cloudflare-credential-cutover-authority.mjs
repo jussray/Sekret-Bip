@@ -27,7 +27,7 @@ function positiveRunId(value) {
   return Number.isSafeInteger(runId) && runId > 0 ? runId : null;
 }
 
-function extractCloudflareSecrets(source) {
+export function extractCloudflareSecrets(source) {
   const secrets = new Set();
   for (const match of String(source ?? '').matchAll(SECRET_REFERENCE)) {
     secrets.add(match[1] ?? match[2]);
@@ -84,7 +84,11 @@ async function fetchChangedFiles({ owner, repo, prNumber, token }) {
   return fetchAllPages(
     (page) => `${API_BASE}/repos/${owner}/${repo}/pulls/${encodeURIComponent(prNumber)}/files?per_page=100&page=${page}`,
     token,
-  ).then((rows) => rows.map((row) => clean(row?.filename)).filter(Boolean));
+  ).then((rows) => rows.map((row) => ({
+    path: clean(row?.filename),
+    previousPath: clean(row?.previous_filename) || null,
+    status: clean(row?.status),
+  })).filter((row) => Boolean(row.path)));
 }
 
 async function fetchFileText({ owner, repo, ref, filePath, token }) {
@@ -150,7 +154,7 @@ export function evaluateProviderRun({ run, expectedBaseSha, expectedWorkflowPath
   };
 }
 
-function validateCutoverReceipt(receipt, secret) {
+export function validateCutoverReceipt(receipt, secret) {
   if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
     return { verified: false, runId: null, reason: 'receipt-missing' };
   }
@@ -194,14 +198,20 @@ export async function verifyCloudflareCredentialCutoverAuthority({ env = process
   }
 
   const changedFiles = await fetchChangedFiles({ owner, repo, prNumber, token });
-  const workflowPaths = changedFiles.filter((file) => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(file));
+  const workflowChanges = changedFiles.filter((file) => /^\.github\/workflows\/[^/]+\.ya?ml$/u.test(file.path));
   const requiredProofs = [];
 
-  for (const workflowPath of workflowPaths) {
+  for (const change of workflowChanges) {
+    if (change.status === 'removed') continue;
+    const basePath = change.status === 'renamed' && change.previousPath ? change.previousPath : change.path;
     const [baseSource, headSource] = await Promise.all([
-      fetchFileText({ owner, repo, ref: trustedBaseSha, filePath: workflowPath, token }),
-      fetchFileText({ owner, repo, ref: expectedHeadSha, filePath: workflowPath, token }),
+      change.status === 'added'
+        ? Promise.resolve(null)
+        : fetchFileText({ owner, repo, ref: trustedBaseSha, filePath: basePath, token }),
+      fetchFileText({ owner, repo, ref: expectedHeadSha, filePath: change.path, token }),
     ]);
+    if (headSource === null) continue;
+
     const baseSecrets = extractCloudflareSecrets(baseSource);
     const headSecrets = extractCloudflareSecrets(headSource);
     const added = difference(headSecrets, baseSecrets);
@@ -209,7 +219,7 @@ export async function verifyCloudflareCredentialCutoverAuthority({ env = process
 
     for (const newSecret of added) {
       const receipt = await fetchReceipt({ owner, repo, headSha: expectedHeadSha, secret: newSecret, token });
-      if (receipt?.phase === 'cutover') requiredProofs.push({ workflowPath, newSecret, previousSecret: null, receipt });
+      if (receipt?.phase === 'cutover') requiredProofs.push({ workflowPath: change.path, newSecret, previousSecret: null, receipt });
     }
 
     for (const previousSecret of removed) {
@@ -222,7 +232,7 @@ export async function verifyCloudflareCredentialCutoverAuthority({ env = process
           && Array.isArray(receipt?.previousSecrets)
           && receipt.previousSecrets.includes(previousSecret)
         ) {
-          candidates.push({ workflowPath, newSecret, previousSecret, receipt });
+          candidates.push({ workflowPath: change.path, newSecret, previousSecret, receipt });
         }
       }
       if (candidates.length !== 1) throw new Error('CREDENTIAL_CUTOVER_RECEIPT_CARDINALITY_INVALID');
