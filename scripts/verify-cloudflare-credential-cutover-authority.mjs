@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -28,6 +29,13 @@ function normalizeSha(value) {
 function positiveRunId(value) {
   const runId = Number(value);
   return Number.isSafeInteger(runId) && runId > 0 ? runId : null;
+}
+
+function sameText(left, right) {
+  const leftBytes = Buffer.from(String(left), 'utf8');
+  const rightBytes = Buffer.from(String(right), 'utf8');
+  if (leftBytes.length !== rightBytes.length) return false;
+  return timingSafeEqual(leftBytes, rightBytes);
 }
 
 export function extractCloudflareSecrets(source) {
@@ -176,7 +184,7 @@ export function validateCutoverReceipt(receipt, secret) {
   if (receipt.schema !== RECEIPT_SCHEMA) {
     return { verified: false, runId: null, reason: 'schema' };
   }
-  if (!SECRET_NAME.test(secret) || receipt.newSecret !== secret || receipt.phase !== 'cutover') {
+  if (!SECRET_NAME.test(secret) || !sameText(receipt.newSecret, secret) || receipt.phase !== 'cutover') {
     return { verified: false, runId: null, reason: 'cutover-shape' };
   }
   if (receipt.secretStoreScope !== SECRET_STORE_SCOPE) {
@@ -189,7 +197,7 @@ export function validateCutoverReceipt(receipt, secret) {
   if (uniquePrevious.size !== receipt.previousSecrets.length) {
     return { verified: false, runId: null, reason: 'previous-secrets' };
   }
-  if (receipt.previousSecrets.some((previousSecret) => !SECRET_NAME.test(previousSecret) || previousSecret === secret)) {
+  if (receipt.previousSecrets.some((previousSecret) => !SECRET_NAME.test(previousSecret) || sameText(previousSecret, secret))) {
     return { verified: false, runId: null, reason: 'previous-secrets' };
   }
 
@@ -257,9 +265,9 @@ export async function verifyCloudflareCredentialCutoverAuthority({ env = process
         const receipt = await fetchReceipt({ owner, repo, headSha: expectedHeadSha, secret: newSecret, token });
         if (
           receipt?.phase === 'cutover'
-          && receipt?.newSecret === newSecret
+          && sameText(receipt?.newSecret, newSecret)
           && Array.isArray(receipt?.previousSecrets)
-          && receipt.previousSecrets.includes(previousSecret)
+          && receipt.previousSecrets.some((candidate) => sameText(candidate, previousSecret))
         ) {
           candidates.push({ workflowPath: change.path, newSecret, previousSecret, receipt });
         }
@@ -280,7 +288,7 @@ export async function verifyCloudflareCredentialCutoverAuthority({ env = process
     if (!expectedWorkflowPath) throw new Error('CREDENTIAL_CUTOVER_PROVIDER_WORKFLOW_UNMAPPED');
 
     const receiptVerdict = validateCutoverReceipt(proof.receipt, proof.newSecret);
-    if (!receiptVerdict.verified) throw new Error(`CREDENTIAL_CUTOVER_RECEIPT_INVALID:${receiptVerdict.reason}`);
+    if (!receiptVerdict.verified) throw new Error('CREDENTIAL_CUTOVER_RECEIPT_INVALID');
 
     const run = await githubJson(`${API_BASE}/repos/${owner}/${repo}/actions/runs/${receiptVerdict.runId}`, token);
     const runVerdict = evaluateProviderRun({
@@ -288,7 +296,7 @@ export async function verifyCloudflareCredentialCutoverAuthority({ env = process
       expectedBaseSha: trustedBaseSha,
       expectedWorkflowPath,
     });
-    if (!runVerdict.verified) throw new Error(`CREDENTIAL_CUTOVER_PROVIDER_RUN_INVALID:${runVerdict.failures.join(',')}`);
+    if (!runVerdict.verified) throw new Error('CREDENTIAL_CUTOVER_PROVIDER_RUN_INVALID');
 
     proofs.push({
       workflowPath: proof.workflowPath,
@@ -313,21 +321,21 @@ export async function verifyCloudflareCredentialCutoverAuthority({ env = process
     proofs,
   };
   await writeReceipt(receipt);
-  console.log(`CLOUDFLARE_CREDENTIAL_CUTOVER_AUTHORITY_VERIFIED proofs=${proofs.length}`);
+  console.log('CLOUDFLARE_CREDENTIAL_CUTOVER_AUTHORITY_VERIFIED');
   return receipt;
 }
 
 const invokedDirectly = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 if (invokedDirectly) {
-  verifyCloudflareCredentialCutoverAuthority().catch(async (error) => {
+  verifyCloudflareCredentialCutoverAuthority().catch(async () => {
     await writeReceipt({
       schemaVersion: 1,
       authority: 'trusted-base-github-provider-run-readback',
       mutationPerformed: false,
       verified: false,
-      failure: error instanceof Error ? error.message : String(error),
+      failure: 'trusted-cutover-authority-failed',
     }).catch(() => {});
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error('CLOUDFLARE_CREDENTIAL_CUTOVER_AUTHORITY_FAILED');
     process.exitCode = 1;
   });
 }
