@@ -315,8 +315,11 @@ export async function main(argv = process.argv.slice(2)) {
     fs.writeFileSync(report, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   }
 
-  console.log(`CLOUDFLARE_CREDENTIAL_MIGRATION_LINEAGE ${result.verified ? 'VERIFIED' : 'FAILED'} transitions=${result.workflowTransitionCount} violations=${result.violations.length}`);
-  if (!result.verified) process.exitCode = 1;
+  if (result.verified) console.log('CLOUDFLARE_CREDENTIAL_MIGRATION_LINEAGE_VERIFIED');
+  else {
+    console.error('CLOUDFLARE_CREDENTIAL_MIGRATION_LINEAGE_FAILED');
+    process.exitCode = 1;
+  }
   return result;
 }
 
