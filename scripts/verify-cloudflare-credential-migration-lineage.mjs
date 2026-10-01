@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -66,6 +67,13 @@ function validIsoTimestamp(value) {
   return typeof value === 'string' && value.trim() !== '' && Number.isFinite(Date.parse(value));
 }
 
+function sameText(left, right) {
+  const leftBytes = Buffer.from(String(left), 'utf8');
+  const rightBytes = Buffer.from(String(right), 'utf8');
+  if (leftBytes.length !== rightBytes.length) return false;
+  return timingSafeEqual(leftBytes, rightBytes);
+}
+
 function pushViolation(violations, code, detail, extra = {}) {
   violations.push({ code, detail, ...extra });
 }
@@ -118,7 +126,7 @@ function validateReceipt(receipt, relativePath, violations) {
       if (!SECRET_NAME.test(previousSecret)) {
         pushViolation(violations, 'credential-migration-previous-secret-invalid', 'Every previous secret must be a CLOUDFLARE_* GitHub secret name.', { path: relativePath, previousSecret });
       }
-      if (previousSecret === receipt.newSecret) {
+      if (sameText(previousSecret, receipt.newSecret)) {
         pushViolation(violations, 'credential-migration-self-reference', 'newSecret cannot also be listed as a previous secret.', { path: relativePath });
       }
     }
@@ -317,7 +325,7 @@ export async function main(argv = process.argv.slice(2)) {
 
   console.log(`CLOUDFLARE_CREDENTIAL_MIGRATION_LINEAGE ${result.verified ? 'VERIFIED' : 'FAILED'} transitions=${result.workflowTransitionCount} violations=${result.violations.length}`);
   if (!result.verified) {
-    for (const violation of result.violations) console.error(`${violation.code}: ${violation.detail}`);
+    for (const violation of result.violations) console.error(violation.code);
     process.exitCode = 1;
   }
   return result;
