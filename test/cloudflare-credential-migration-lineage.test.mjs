@@ -43,6 +43,10 @@ function workflow(...secrets) {
   return `name: fixture\njobs:\n  read:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo read-only\n        env:\n${secrets.map((secret) => `          ${secret}: \${{ secrets.${secret} }}`).join('\n')}\n`;
 }
 
+function bracketWorkflow(newSecret, previousSecret) {
+  return `name: fixture\njobs:\n  read:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo read-only\n        env:\n          ${newSecret}: \${{ secrets['${newSecret}'] }}\n          ${previousSecret}: \${{ secrets.${previousSecret} }}\n`;
+}
+
 function stageReceipt(newSecret, previousSecrets = ['CLOUDFLARE_API_TOKEN']) {
   return {
     schema: 'juss/cloudflare-credential-migration@v1',
@@ -82,6 +86,20 @@ test('stage may introduce a dedicated credential only while previous authority r
   write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN', 'CLOUDFLARE_API_TOKEN'));
   writeJson(root, '.github/credential-migrations/CLOUDFLARE_PAGES_READ_API_TOKEN.json', stageReceipt('CLOUDFLARE_PAGES_READ_API_TOKEN'));
   const head = commit(root, 'stage dedicated credential');
+
+  const result = verifyCloudflareCredentialMigrationLineage({ rootDir: root, baseRef: base, headRef: head });
+  assert.equal(result.verified, true);
+  assert.equal(result.workflowTransitionCount, 1);
+});
+
+test('bracket-style GitHub secret references cannot bypass the migration guard', () => {
+  const root = init();
+  write(root, '.github/workflows/provider.yml', workflow('CLOUDFLARE_API_TOKEN'));
+  const base = commit(root, 'base');
+
+  write(root, '.github/workflows/provider.yml', bracketWorkflow('CLOUDFLARE_ACCESS_API_TOKEN', 'CLOUDFLARE_API_TOKEN'));
+  writeJson(root, '.github/credential-migrations/CLOUDFLARE_ACCESS_API_TOKEN.json', stageReceipt('CLOUDFLARE_ACCESS_API_TOKEN'));
+  const head = commit(root, 'stage bracket credential');
 
   const result = verifyCloudflareCredentialMigrationLineage({ rootDir: root, baseRef: base, headRef: head });
   assert.equal(result.verified, true);
@@ -145,7 +163,25 @@ test('cutover without provider-backed acceptance fails closed', () => {
   const result = verifyCloudflareCredentialMigrationLineage({ rootDir: root, baseRef: base, headRef: head });
   assert.equal(result.verified, false);
   assert.ok(codes(result).includes('credential-migration-provider-not-accepted'));
-  assert.ok(codes(result).includes('credential-migration-cutover-provider-proof-missing'));
+  assert.ok(codes(result).includes('credential-migration-cutover-receipt-missing'));
+});
+
+test('invalid inherited cutover metadata cannot authorize reuse on a later workflow', () => {
+  const root = init();
+  write(root, '.github/workflows/primary.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN'));
+  write(root, '.github/workflows/secondary.yml', 'name: secondary\n');
+  const invalid = cutoverReceipt('CLOUDFLARE_PAGES_READ_API_TOKEN');
+  invalid.secretValue = 'must-never-authorize-reuse';
+  writeJson(root, '.github/credential-migrations/CLOUDFLARE_PAGES_READ_API_TOKEN.json', invalid);
+  const base = commit(root, 'invalid inherited receipt');
+
+  write(root, '.github/workflows/secondary.yml', workflow('CLOUDFLARE_PAGES_READ_API_TOKEN'));
+  const head = commit(root, 'attempt reuse from invalid receipt');
+
+  const result = verifyCloudflareCredentialMigrationLineage({ rootDir: root, baseRef: base, headRef: head });
+  assert.equal(result.verified, false);
+  assert.ok(codes(result).includes('credential-migration-receipt-unexpected-fields'));
+  assert.ok(codes(result).includes('credential-migration-receipt-missing'));
 });
 
 test('removing a Cloudflare credential without a matching cutover receipt fails closed', () => {
