@@ -6,7 +6,7 @@ import { pathToFileURL } from 'node:url';
 const WORKFLOW_ROOT = '.github/workflows';
 const RECEIPT_ROOT = '.github/credential-migrations';
 const SECRET_NAME = /^CLOUDFLARE_[A-Z0-9_]+$/;
-const SECRET_REFERENCE = /secrets\.(CLOUDFLARE_[A-Z0-9_]+)/g;
+const SECRET_REFERENCE = /secrets(?:\.(CLOUDFLARE_[A-Z0-9_]+)|\[['"](CLOUDFLARE_[A-Z0-9_]+)['"]\])/g;
 const RECEIPT_SCHEMA = 'juss/cloudflare-credential-migration@v1';
 
 function git(rootDir, ...args) {
@@ -48,7 +48,9 @@ function extractSecrets(content) {
   const secrets = new Set();
   if (!content) return secrets;
 
-  for (const match of content.matchAll(SECRET_REFERENCE)) secrets.add(match[1]);
+  for (const match of content.matchAll(SECRET_REFERENCE)) {
+    secrets.add(match[1] ?? match[2]);
+  }
   return secrets;
 }
 
@@ -244,7 +246,7 @@ export function verifyCloudflareCredentialMigrationLineage({ rootDir = process.c
         }
       }
 
-      if (receipt.phase === 'cutover' && !baseSecrets.has(newSecret)) {
+      if (receipt.phase === 'cutover' && !baseAlreadyProven && !baseSecrets.has(newSecret)) {
         pushViolation(violations, 'credential-migration-cutover-not-staged-on-base', `Cutover for ${newSecret} is one-phase: the new credential consumer did not exist on the base ref. Stage and prove it first.`, { workflow: workflowPath, newSecret });
       }
     }
