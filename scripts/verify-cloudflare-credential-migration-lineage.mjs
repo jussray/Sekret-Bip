@@ -63,8 +63,9 @@ function receiptPath(secret) {
   return `${RECEIPT_ROOT}/${secret}.json`;
 }
 
-function validIsoTimestamp(value) {
-  return typeof value === 'string' && value.trim() !== '' && Number.isFinite(Date.parse(value));
+function validRunId(value) {
+  const runId = Number(value);
+  return Number.isSafeInteger(runId) && runId > 0;
 }
 
 function sameText(left, right) {
@@ -142,31 +143,22 @@ function validateReceipt(receipt, relativePath, violations) {
 
   if (receipt.phase === 'stage') {
     if (receipt.providerEvidence !== null) {
-      pushViolation(violations, 'credential-migration-stage-evidence-must-be-null', 'Stage receipts must not claim provider acceptance before the staged credential has been observed.', { path: relativePath });
+      pushViolation(violations, 'credential-migration-stage-evidence-must-be-null', 'Stage receipts must not claim provider evidence before the staged credential has been observed.', { path: relativePath });
     }
   }
 
   if (receipt.phase === 'cutover') {
     const evidence = receipt.providerEvidence;
-    const allowedEvidenceFields = new Set(['ref', 'observedAt', 'providerAccepted', 'secretValueExposed']);
+    const allowedEvidenceFields = new Set(['runId']);
     if (!evidence || typeof evidence !== 'object' || Array.isArray(evidence)) {
-      pushViolation(violations, 'credential-migration-provider-evidence-missing', 'Cutover requires provider-backed evidence.', { path: relativePath });
+      pushViolation(violations, 'credential-migration-provider-evidence-missing', 'Cutover requires a provider-audit workflow run reference.', { path: relativePath });
     } else {
       const unexpectedEvidence = Object.keys(evidence).filter((key) => !allowedEvidenceFields.has(key));
       if (unexpectedEvidence.length > 0) {
-        pushViolation(violations, 'credential-migration-provider-evidence-unexpected-fields', 'Provider evidence must remain sanitized and metadata-only.', { path: relativePath, fields: unexpectedEvidence.sort() });
+        pushViolation(violations, 'credential-migration-provider-evidence-unexpected-fields', 'Provider evidence may carry only an immutable GitHub Actions run ID. Provider acceptance is decided by the trusted merge membrane, not by the receipt.', { path: relativePath, fields: unexpectedEvidence.sort() });
       }
-      if (typeof evidence.ref !== 'string' || !evidence.ref.startsWith('https://github.com/')) {
-        pushViolation(violations, 'credential-migration-provider-evidence-ref-invalid', 'Cutover evidence must reference a retained GitHub Actions/issue/PR receipt.', { path: relativePath });
-      }
-      if (!validIsoTimestamp(evidence.observedAt)) {
-        pushViolation(violations, 'credential-migration-provider-evidence-time-invalid', 'Cutover evidence must include an ISO-compatible observedAt timestamp.', { path: relativePath });
-      }
-      if (evidence.providerAccepted !== true) {
-        pushViolation(violations, 'credential-migration-provider-not-accepted', 'Cutover is forbidden until the provider accepted the staged credential.', { path: relativePath });
-      }
-      if (evidence.secretValueExposed !== false) {
-        pushViolation(violations, 'credential-migration-secret-exposure-boundary', 'Provider evidence must explicitly confirm no secret value was exposed.', { path: relativePath });
+      if (!validRunId(evidence.runId)) {
+        pushViolation(violations, 'credential-migration-provider-run-id-invalid', 'Cutover evidence must include a positive GitHub Actions run ID.', { path: relativePath });
       }
     }
   }
@@ -228,7 +220,7 @@ export function verifyCloudflareCredentialMigrationLineage({ rootDir = process.c
     for (const newSecret of added) {
       const headEntry = headReceipts.get(newSecret);
       const baseEntry = baseReceipts.get(newSecret);
-      const baseAlreadyProven = baseEntry?.receipt?.phase === 'cutover' && baseEntry.receipt.providerEvidence?.providerAccepted === true;
+      const baseAlreadyProven = baseEntry?.receipt?.phase === 'cutover' && validRunId(baseEntry.receipt.providerEvidence?.runId);
 
       if (!headEntry) {
         pushViolation(violations, 'credential-migration-receipt-missing', `Introducing ${newSecret} requires ${receiptPath(newSecret)}.`, { workflow: workflowPath, newSecret });
@@ -282,8 +274,8 @@ export function verifyCloudflareCredentialMigrationLineage({ rootDir = process.c
       if (!baseSecrets.has(receipt.newSecret)) {
         pushViolation(violations, 'credential-migration-cutover-not-staged-on-base', `Cutover for ${receipt.newSecret} is forbidden because the new consumer was not already present on the base ref.`, { workflow: workflowPath, previousSecret, newSecret: receipt.newSecret });
       }
-      if (receipt.providerEvidence?.providerAccepted !== true) {
-        pushViolation(violations, 'credential-migration-cutover-provider-proof-missing', `Cutover for ${receipt.newSecret} requires retained provider acceptance evidence.`, { workflow: workflowPath, previousSecret, newSecret: receipt.newSecret });
+      if (!validRunId(receipt.providerEvidence?.runId)) {
+        pushViolation(violations, 'credential-migration-cutover-provider-proof-missing', `Cutover for ${receipt.newSecret} requires a provider-audit workflow run ID for trusted merge-membrane validation.`, { workflow: workflowPath, previousSecret, newSecret: receipt.newSecret });
       }
     }
   }
