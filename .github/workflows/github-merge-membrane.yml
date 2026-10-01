@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   checks: read
   pull-requests: read
 
@@ -48,12 +49,26 @@ jobs:
           node-version: '24'
 
       - name: Verify trusted merge-membrane contracts
-        run: node --test test/github-merge-membrane.test.mjs
+        run: node --test test/github-merge-membrane.test.mjs test/cloudflare-credential-cutover-authority.test.mjs
+
+      - name: Verify Cloudflare credential cutover authority from trusted base
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/verify-cloudflare-credential-cutover-authority.mjs
 
       - name: Require exact-head machine proof
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/verify-github-merge-membrane.mjs
+
+      - name: Retain Cloudflare credential cutover authority receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-credential-cutover-authority-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/cloudflare-credential-cutover-authority.json
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Retain merge-membrane receipt
         if: always()
