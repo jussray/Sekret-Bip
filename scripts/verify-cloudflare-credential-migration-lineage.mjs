@@ -324,10 +324,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   console.log(`CLOUDFLARE_CREDENTIAL_MIGRATION_LINEAGE ${result.verified ? 'VERIFIED' : 'FAILED'} transitions=${result.workflowTransitionCount} violations=${result.violations.length}`);
-  if (!result.verified) {
-    for (const violation of result.violations) console.error(violation.code);
-    process.exitCode = 1;
-  }
+  if (!result.verified) process.exitCode = 1;
   return result;
 }
 
