@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import {
@@ -11,6 +11,7 @@ import {
 
 const root = process.cwd();
 const testRoot = path.join(root, 'test');
+const isGitHubActions = process.env.GITHUB_ACTIONS === 'true';
 
 function collectTests(directory) {
   if (!fs.existsSync(directory)) return [];
@@ -24,11 +25,42 @@ function collectTests(directory) {
   return files.sort();
 }
 
+function collectTrackedTests() {
+  const output = execFileSync('git', ['ls-files', '-z', '--', 'test'], {
+    cwd: root,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  return output
+    .split('\0')
+    .filter((file) => file.endsWith('.test.mjs'))
+    .map((file) => path.resolve(root, file))
+    .sort();
+}
+
+function reportWorkspaceTestContamination(trackedTests, physicalTests) {
+  const tracked = new Set(trackedTests.map((file) => path.resolve(file)));
+  const extras = physicalTests.filter((file) => !tracked.has(path.resolve(file)));
+  if (extras.length === 0) return;
+
+  console.warn(`CONTROL_ROOM_UNTRACKED_TEST_FILES count=${extras.length}`);
+  for (const file of extras) {
+    console.warn(`CONTROL_ROOM_UNTRACKED_TEST_FILE: ${path.relative(root, file)}`);
+  }
+  console.warn('CONTROL_ROOM_EXACT_HEAD_TEST_DISCOVERY: untracked tests are non-authoritative and are not executed in GitHub Actions.');
+}
+
 const requestedTests = process.argv.slice(2).map((file) => path.resolve(root, file));
-const tests = requestedTests.length > 0 ? requestedTests : collectTests(testRoot);
+const physicalTests = collectTests(testRoot);
+const defaultTests = isGitHubActions ? collectTrackedTests() : physicalTests;
+const tests = requestedTests.length > 0 ? requestedTests : defaultTests;
+
+if (isGitHubActions && requestedTests.length === 0) {
+  reportWorkspaceTestContamination(defaultTests, physicalTests);
+}
 
 if (tests.length === 0) {
-  console.warn('CONTROL_ROOM_NO_TESTS: No .test.mjs files were found under test/.');
+  console.warn('CONTROL_ROOM_NO_TESTS: No authoritative .test.mjs files were found under test/.');
   process.exit(2);
 }
 
@@ -39,7 +71,7 @@ for (const file of tests) {
   }
 }
 
-console.log(`Discovered ${tests.length} unit test file${tests.length === 1 ? '' : 's'}.`);
+console.log(`Discovered ${tests.length} authoritative unit test file${tests.length === 1 ? '' : 's'}.`);
 const command = `node --test --test-reporter=tap ${tests.map((file) => path.relative(root, file)).join(' ')}`;
 const observations = [];
 const seenTap = new Set();
@@ -61,7 +93,7 @@ function consumeStdout(chunk) {
       command,
       testId: parsed.testId,
       reason: parsed.reason,
-      surface: process.env.GITHUB_ACTIONS === 'true' ? 'github_actions' : 'local',
+      surface: isGitHubActions ? 'github_actions' : 'local',
     }));
   }
 }

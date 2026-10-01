@@ -1,4 +1,5 @@
 import type { Principal } from './auth';
+import { handleBridgeFamilyVisitSummaryGenerate } from './bridge-family-visit';
 import { getModels } from './config/models';
 import {
   BRIDGE_JSON_SCHEMA,
@@ -27,10 +28,13 @@ interface BridgeSummaryEnv extends BridgeSummaryStoreEnv {
    * wrangler.toml — changeable without an app release, unlike the client flag.
    */
   BRIDGE_SUMMARIES_ROLLOUT?: string;
+  /** Family Visit Mode has a separate server-side rollout membrane. */
+  BRIDGE_FAMILY_VISITS_ROLLOUT?: string;
 }
 
 interface BridgeSummaryRequestBody {
   requestId?: unknown;
+  sessionId?: unknown;
 }
 
 const BRIDGE_SYSTEM_PROMPT = `
@@ -65,12 +69,13 @@ interface BridgeSummaryResponse {
 }
 
 const PROMPT_VERSION = 'bridge-summary-v3';
+const BRIDGE_OPENAI_REQUEST_TIMEOUT_MS = 12_000;
 const FALLBACK_SUMMARY = {
   themes: ['A teen chose to share emotional context with you.'],
   conversationStarters: [
     'I saw you wanted me to understand something. Do you want to talk about what support would feel helpful?',
   ],
-  limitations: 'This is context, not the teen’s full private content, a diagnosis, or proof of what happened.',
+  limitations: 'This is context, not the teen’s full private content, a diagnosis, or proof of what happened. No provider model output was accepted; Se’kret used its conservative built-in fallback.',
 };
 
 function requireUser(principal: Principal): string {
@@ -102,6 +107,7 @@ async function requestSummaryCompletion(apiKey: string, model: string, snippets:
       response_format: { type: 'json_schema', json_schema: BRIDGE_JSON_SCHEMA },
       messages,
     }),
+    signal: AbortSignal.timeout(BRIDGE_OPENAI_REQUEST_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`openai_${res.status}`);
   const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
@@ -144,6 +150,7 @@ async function generateSummary(env: BridgeSummaryEnv, snippets: string[]): Promi
 }
 
 export async function handleBridgeSummaryGenerate(request: Request, env: BridgeSummaryEnv, principal: Principal, cors: Record<string, string>): Promise<Response> {
+  const familyVisitRequest = request.clone();
   let body: BridgeSummaryRequestBody;
   try {
     body = await request.json() as BridgeSummaryRequestBody;
@@ -151,8 +158,13 @@ export async function handleBridgeSummaryGenerate(request: Request, env: BridgeS
     return json({ error: 'Invalid JSON' }, 400, cors);
   }
 
+  const sessionId = typeof body.sessionId === 'string' ? body.sessionId.trim() : '';
   const requestId = typeof body.requestId === 'string' ? body.requestId.trim() : '';
-  if (!requestId) return json({ error: 'requestId is required' }, 400, cors);
+  if (sessionId) {
+    if (requestId) return json({ error: 'Provide either requestId or sessionId, not both.' }, 400, cors);
+    return handleBridgeFamilyVisitSummaryGenerate(familyVisitRequest, env, principal, cors);
+  }
+  if (!requestId) return json({ error: 'requestId or sessionId is required' }, 400, cors);
 
   let userId = '';
   const store = createBridgeSummaryStore(env);
@@ -183,8 +195,8 @@ export async function handleBridgeSummaryGenerate(request: Request, env: BridgeS
     } catch (error) {
       const sourceFailure = error instanceof Error ? error.message : 'source_lookup_failed';
       if (sourceFailure === 'source_not_available') {
-        await store.patchRequestStatus(requestId, userId, 'failed', sourceFailure);
-        return json({ requestId, status: 'failed', failureCode: sourceFailure }, 422, cors);
+        await store.patchRequestStatus(requestId, userId, 'failed', 'source_not_available');
+        return json({ requestId, status: 'failed', failureCode: 'source_not_available' }, 422, cors);
       }
       throw error;
     }
@@ -231,13 +243,13 @@ export async function handleBridgeSummaryGenerate(request: Request, env: BridgeS
     };
     return json(response, 200, cors);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'server_error';
-    if (message === 'user_jwt_required') return json({ error: message }, 403, cors);
+    const failure = error instanceof Error ? error.message : 'server_error';
+    if (failure === 'user_jwt_required') return json({ error: 'user_jwt_required' }, 403, cors);
     if (userId) {
       try {
-        await store.patchRequestStatus(requestId, userId, 'failed', message.slice(0, 80));
+        await store.patchRequestStatus(requestId, userId, 'failed', 'server_error');
       } catch {
-        // Preserve the original failure.
+        // Preserve the original failure while keeping persistence bounded.
       }
     }
     return json({ requestId, status: 'failed', failureCode: 'server_error' }, 500, cors);

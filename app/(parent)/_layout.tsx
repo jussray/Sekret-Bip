@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SideSafeBackButton } from '@/components/SideSafeBackButton';
 import { isFounderPreviewEnabled } from '@/constants/founderPreview';
+import { fetchProfessionalBridgeCapability } from '@/services/bridgeFamilyVisitService';
 import { getDevSplitViewSideOverride } from '@/utils/devSplitViewSide';
 import {
   resolveParentEntryState,
@@ -57,6 +58,7 @@ function ParentTabs() {
 
 export default function ParentLayout() {
   const [entryState, setEntryState] = useState<ParentEntryState | null>(null);
+  const [professionalBridgeAvailable, setProfessionalBridgeAvailable] = useState<boolean | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const founderPreview = isFounderPreviewEnabled();
@@ -72,18 +74,32 @@ export default function ParentLayout() {
 
     let active = true;
     setEntryState(null);
+    setProfessionalBridgeAvailable(null);
     setError(null);
 
-    void resolveParentEntryState()
-      .then(state => {
+    async function resolveAdultEntry() {
+      const capability = await fetchProfessionalBridgeCapability();
+      if (!active) return;
+
+      if (capability.ok && capability.value?.verificationStatus === 'verified') {
+        setProfessionalBridgeAvailable(true);
+        return;
+      }
+
+      // Missing professional tables/capability is ordinary for normal parents
+      // and for pre-migration releases. It must never block Parent Side.
+      setProfessionalBridgeAvailable(false);
+      try {
+        const state = await resolveParentEntryState();
         if (active) setEntryState(state);
-      })
-      .catch(cause => {
+      } catch (cause) {
         if (active) {
           setError(cause instanceof Error ? cause.message : 'Unable to verify Parent Side access.');
         }
-      });
+      }
+    }
 
+    void resolveAdultEntry();
     return () => {
       active = false;
     };
@@ -101,6 +117,10 @@ export default function ParentLayout() {
   // apply to actual reads and writes.
   if (founderPreview) return <ParentTabs />;
 
+  if (professionalBridgeAvailable === true) {
+    return <Redirect href={'/bridge-family-visit' as never} />;
+  }
+
   if (error) {
     return (
       <View style={styles.guardRoot}>
@@ -113,7 +133,7 @@ export default function ParentLayout() {
     );
   }
 
-  if (!entryState) {
+  if (professionalBridgeAvailable === null || !entryState) {
     return (
       <View style={styles.guardRoot}>
         <ActivityIndicator color="#a7f3d0" />
