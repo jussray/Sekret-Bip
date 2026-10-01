@@ -26,6 +26,18 @@ function providerRun(overrides = {}) {
   };
 }
 
+function cutoverReceipt(overrides = {}) {
+  return {
+    schema: 'juss/cloudflare-credential-migration@v1',
+    newSecret: 'CLOUDFLARE_PAGES_READ_API_TOKEN',
+    previousSecrets: ['CLOUDFLARE_API_TOKEN'],
+    phase: 'cutover',
+    secretStoreScope: 'GitHub Production',
+    providerEvidence: { runId: 123456789 },
+    ...overrides,
+  };
+}
+
 test('trusted validator recognizes dot and bracket GitHub secret syntax', () => {
   const source = `
     env:
@@ -83,26 +95,41 @@ for (const [name, run, failure] of [
 }
 
 test('cutover receipt carries only an immutable run ID, never a self-certified verdict', () => {
-  const valid = validateCutoverReceipt({
-    schema: 'juss/cloudflare-credential-migration@v1',
-    newSecret: 'CLOUDFLARE_PAGES_READ_API_TOKEN',
-    previousSecrets: ['CLOUDFLARE_API_TOKEN'],
-    phase: 'cutover',
-    secretStoreScope: 'GitHub Production',
-    providerEvidence: { runId: 123456789 },
-  }, 'CLOUDFLARE_PAGES_READ_API_TOKEN');
+  const valid = validateCutoverReceipt(cutoverReceipt(), 'CLOUDFLARE_PAGES_READ_API_TOKEN');
   assert.deepEqual(valid, { verified: true, runId: 123456789, reason: null });
 
-  const selfCertified = validateCutoverReceipt({
-    schema: 'juss/cloudflare-credential-migration@v1',
-    newSecret: 'CLOUDFLARE_PAGES_READ_API_TOKEN',
-    previousSecrets: ['CLOUDFLARE_API_TOKEN'],
-    phase: 'cutover',
-    secretStoreScope: 'GitHub Production',
+  const selfCertified = validateCutoverReceipt(cutoverReceipt({
     providerEvidence: { runId: 123456789, providerAccepted: true },
-  }, 'CLOUDFLARE_PAGES_READ_API_TOKEN');
+  }), 'CLOUDFLARE_PAGES_READ_API_TOKEN');
   assert.equal(selfCertified.verified, false);
   assert.equal(selfCertified.reason, 'provider-evidence-shape');
+});
+
+test('trusted receipt parser rejects extra top-level data, wrong store scope, and invalid previous lineage', () => {
+  const extraField = validateCutoverReceipt({
+    ...cutoverReceipt(),
+    secretValue: 'never-allowed',
+  }, 'CLOUDFLARE_PAGES_READ_API_TOKEN');
+  assert.equal(extraField.verified, false);
+  assert.equal(extraField.reason, 'unexpected-fields');
+
+  const wrongStore = validateCutoverReceipt(cutoverReceipt({
+    secretStoreScope: 'Repository',
+  }), 'CLOUDFLARE_PAGES_READ_API_TOKEN');
+  assert.equal(wrongStore.verified, false);
+  assert.equal(wrongStore.reason, 'secret-store-scope');
+
+  const noPrevious = validateCutoverReceipt(cutoverReceipt({
+    previousSecrets: [],
+  }), 'CLOUDFLARE_PAGES_READ_API_TOKEN');
+  assert.equal(noPrevious.verified, false);
+  assert.equal(noPrevious.reason, 'previous-secrets');
+
+  const selfPrevious = validateCutoverReceipt(cutoverReceipt({
+    previousSecrets: ['CLOUDFLARE_PAGES_READ_API_TOKEN'],
+  }), 'CLOUDFLARE_PAGES_READ_API_TOKEN');
+  assert.equal(selfPrevious.verified, false);
+  assert.equal(selfPrevious.reason, 'previous-secrets');
 });
 
 test('trusted merge membrane owns provider-run validation and retains its receipt', () => {
