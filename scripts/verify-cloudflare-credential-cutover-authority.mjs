@@ -5,7 +5,10 @@ import { pathToFileURL } from 'node:url';
 const API_BASE = 'https://api.github.com';
 const OUTPUT_PATH = 'artifacts/cloudflare-credential-cutover-authority.json';
 const RECEIPT_ROOT = '.github/credential-migrations';
+const SECRET_NAME = /^CLOUDFLARE_[A-Z0-9_]+$/;
 const SECRET_REFERENCE = /secrets(?:\.(CLOUDFLARE_[A-Z0-9_]+)|\[['"](CLOUDFLARE_[A-Z0-9_]+)['"]\])/g;
+const RECEIPT_SCHEMA = 'juss/cloudflare-credential-migration@v1';
+const SECRET_STORE_SCOPE = 'GitHub Production';
 
 export const PROVIDER_WORKFLOW_BY_SECRET = Object.freeze({
   CLOUDFLARE_ACCESS_API_TOKEN: '.github/workflows/audit-cloudflare-zone-access-coverage.yml',
@@ -158,12 +161,38 @@ export function validateCutoverReceipt(receipt, secret) {
   if (!receipt || typeof receipt !== 'object' || Array.isArray(receipt)) {
     return { verified: false, runId: null, reason: 'receipt-missing' };
   }
-  if (receipt.schema !== 'juss/cloudflare-credential-migration@v1') {
+
+  const allowedTopLevel = new Set([
+    'schema',
+    'newSecret',
+    'previousSecrets',
+    'phase',
+    'secretStoreScope',
+    'providerEvidence',
+  ]);
+  if (Object.keys(receipt).some((key) => !allowedTopLevel.has(key))) {
+    return { verified: false, runId: null, reason: 'unexpected-fields' };
+  }
+  if (receipt.schema !== RECEIPT_SCHEMA) {
     return { verified: false, runId: null, reason: 'schema' };
   }
-  if (receipt.newSecret !== secret || receipt.phase !== 'cutover') {
+  if (!SECRET_NAME.test(secret) || receipt.newSecret !== secret || receipt.phase !== 'cutover') {
     return { verified: false, runId: null, reason: 'cutover-shape' };
   }
+  if (receipt.secretStoreScope !== SECRET_STORE_SCOPE) {
+    return { verified: false, runId: null, reason: 'secret-store-scope' };
+  }
+  if (!Array.isArray(receipt.previousSecrets) || receipt.previousSecrets.length === 0) {
+    return { verified: false, runId: null, reason: 'previous-secrets' };
+  }
+  const uniquePrevious = new Set(receipt.previousSecrets);
+  if (uniquePrevious.size !== receipt.previousSecrets.length) {
+    return { verified: false, runId: null, reason: 'previous-secrets' };
+  }
+  if (receipt.previousSecrets.some((previousSecret) => !SECRET_NAME.test(previousSecret) || previousSecret === secret)) {
+    return { verified: false, runId: null, reason: 'previous-secrets' };
+  }
+
   const evidenceKeys = Object.keys(receipt.providerEvidence ?? {});
   if (evidenceKeys.length !== 1 || evidenceKeys[0] !== 'runId') {
     return { verified: false, runId: null, reason: 'provider-evidence-shape' };
