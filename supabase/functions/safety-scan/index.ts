@@ -15,6 +15,7 @@
 //   • Privileged Supabase access begins only after the source contract passes
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceServerEdgeRateLimit } from '../_shared/edge-rate-limit.ts';
 import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const SCAN_SECRET  = Deno.env.get('SAFETY_SCAN_SECRET') ?? '';
@@ -187,6 +188,11 @@ Deno.serve(async (req: Request) => {
   }
 
   const supabase = createClient(SUPA_URL, SUPA_SVC_KEY, { auth: { persistSession: false } });
+
+  // Preserve TC-01: private/mixed source rejection above happens before any
+  // privileged database access, including the abuse-control RPC itself.
+  const limited = await enforceServerEdgeRateLimit(supabase, 'safety-scan');
+  if (limited) return limited;
 
   const { data: sourceRow, error: sourceError } = await supabase
     .from(sourceTable)
