@@ -13,6 +13,7 @@
 // with x-account-deletion-secret instead of a user session.
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceEdgeFunctionRateLimit } from '../_shared/rate-limit.ts';
 import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const PROCESS_SECRET = Deno.env.get('ACCOUNT_DELETION_PROCESS_SECRET') ?? '';
@@ -218,6 +219,8 @@ async function markFailed(
 }
 
 Deno.serve(async (req: Request) => {
+  const limited = await enforceEdgeFunctionRateLimit(req, 'account-delete');
+  if (limited) return limited;
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   const suppliedSecret = req.headers.get('x-account-deletion-secret') ?? '';
@@ -277,8 +280,6 @@ Deno.serve(async (req: Request) => {
     const cleanup = await removePrivateFiles(admin, userId);
     await clearDeletionBlockers(admin, userId);
 
-    // The live schema uses SET NULL for crew_members.member_user_id. Remove the
-    // accepted display row so a deleted person's real name is not retained.
     const { error: crewError } = await admin
       .from('crew_members')
       .delete()
@@ -288,7 +289,6 @@ Deno.serve(async (req: Request) => {
     await prepareReceipt(admin, requestId, await sha256(userId), cleanup);
     receiptPrepared = true;
 
-    // Remaining account-owned rows cascade from auth.users in the live project.
     const { error: deleteError } = await admin.auth.admin.deleteUser(userId);
     if (deleteError) throw new Error(`auth_delete_failed:${deleteError.message}`);
 
