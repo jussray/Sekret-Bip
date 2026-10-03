@@ -21,6 +21,10 @@ import {
   buildConversationPhaseInstruction,
   type ConversationPhase,
 } from '../../../services/sekretVoice';
+import {
+  getLocalSafetyFallback,
+  shouldBypassReplyGuard,
+} from '../../../services/sekretSafety';
 
 export interface ChatMessage {
   id: string;
@@ -184,13 +188,14 @@ export async function sendMessage(
               : context === 'selfDiscovery' ? 'selfDiscovery'
                 : context === 'parentCoach' ? 'parentCoach'
                   : 'journal');
+  const localSafetyFallback = getLocalSafetyFallback(text);
 
   if (!WORKER_BASE_URL) {
-    const fallbackText = localFallback(personalityId, text, learnedRelationship);
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
     if (__DEV__) {
       console.warn(
         '[sendMessage] No EXPO_PUBLIC_BACKEND_URL set — using local fallback.',
-        { companion: personalityId, surface: normalizedSurface, userText: text },
+        { companion: personalityId, surface: normalizedSurface, userTextLength: text.length },
       );
     }
     return {
@@ -243,7 +248,7 @@ export async function sendMessage(
   if (!result.ok) {
     const reason = `${result.error.code}${result.error.status ? ` (${result.error.status})` : ''}`;
     console.error('[sendMessage] Worker request failed:', reason, result.error.traceId ?? 'no-trace');
-    const fallbackText = localFallback(personalityId, text, learnedRelationship);
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
     return {
       reply: fallbackText,
       replySource: 'local-fallback',
@@ -255,7 +260,7 @@ export async function sendMessage(
   const data = result.data;
   const rawReply = data.reply ?? '';
   if (!rawReply) {
-    const fallbackText = localFallback(personalityId, text, learnedRelationship);
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
     return {
       reply: fallbackText,
       replySource: 'local-fallback',
@@ -265,9 +270,9 @@ export async function sendMessage(
   }
 
   const isParentCoach = personalityId === 'parentCoach';
-  const sekretFallback = isParentCoach
+  const sekretFallback = localSafetyFallback ?? (isParentCoach
     ? localFallback(personalityId, text, learnedRelationship)
-    : getSekretFallback(personalityId, text);
+    : getSekretFallback(personalityId, text));
 
   // Teen-companion voices reject em/en dashes as an AI tell. Parent Coach may
   // use those marks naturally, so remove dash separators only for evaluation.
@@ -277,22 +282,31 @@ export async function sendMessage(
   const guardInput = isParentCoach
     ? rawReply.replace(/\s*(?:—|–|--)\s*/g, ' ').replace(/\s+/g, ' ').trim()
     : rawReply;
-  const { reply: guardedCandidate, blocked: guardBlocked } = guardSekretReply(guardInput, sekretFallback);
-  // A safety reply carries crisis resources (988, trusted adult). The voice
-  // guard is a style filter and must never swap it for a casual fallback.
-  const isSafetyReply = data.safetyFlag === true;
-  const guardedReply = isSafetyReply
+  const guardBypass = shouldBypassReplyGuard(rawReply, data.safetyFlag);
+  const { reply: guardedCandidate, blocked: guardBlocked } = guardBypass.bypass
+    ? { reply: rawReply.trim(), blocked: false }
+    : guardSekretReply(guardInput, sekretFallback);
+  const guardedReply = guardBypass.bypass
     ? rawReply.trim()
     : isParentCoach && !guardBlocked
       ? rawReply.trim()
       : guardedCandidate;
-  const guardSubstituted = guardBlocked && !isSafetyReply;
+  const guardSubstituted = guardBlocked && !guardBypass.bypass;
+  const safetyBackstopTriggered = guardBypass.reason === 'crisis-resource-backstop';
 
   if (__DEV__ && guardSubstituted) {
     console.warn('[sendMessage] keepSekretReply blocked Worker reply — substituted character fallback.', {
       companion: personalityId,
-      blocked: rawReply.slice(0, 80),
-      substituted: guardedReply.slice(0, 80),
+      blockedReplyLength: rawReply.length,
+      substitutedReplyLength: guardedReply.length,
+      traceId: data.traceId ?? result.meta.traceId,
+    });
+  }
+
+  if (__DEV__ && safetyBackstopTriggered) {
+    console.warn('[sendMessage] crisis-resource backstop bypassed reply guard because safetyFlag was missing.', {
+      companion: personalityId,
+      surface: normalizedSurface,
       traceId: data.traceId ?? result.meta.traceId,
     });
   }
@@ -308,6 +322,7 @@ export async function sendMessage(
       history_length: historyLength,
       fallback_used: result.meta.fallbackUsed || guardSubstituted,
       reply_guard_substituted: guardSubstituted,
+      safety_resource_backstop: safetyBackstopTriggered,
       trace_id: data.traceId ?? result.meta.traceId ?? null,
       avatar_state: data.avatarState ?? null,
     },
@@ -315,7 +330,7 @@ export async function sendMessage(
 
   return {
     reply: guardedReply,
-    replySource: isSafetyReply ? 'safety' : guardSubstituted ? 'local-fallback' : 'worker',
+    replySource: guardBypass.bypass ? 'safety' : guardSubstituted ? 'local-fallback' : 'worker',
     fallbackUsed: result.meta.fallbackUsed || guardSubstituted,
     fallbackReason: guardSubstituted
       ? 'Reply guard replaced Worker reply with character fallback'
