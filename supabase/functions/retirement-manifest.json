@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-07-13",
+  "updatedAt": "2026-10-03",
   "functions": [
     {
       "slug": "release-health",
@@ -22,6 +22,13 @@
       "verifyJwt": true,
       "expectedStatus": 410,
       "replacement": "GitHub Actions check runs and Cloudflare-native evidence"
+    },
+    {
+      "slug": "twilio-test-sms",
+      "sourcePath": "supabase/functions/twilio-test-sms/index.ts",
+      "verifyJwt": true,
+      "expectedStatus": 410,
+      "replacement": "provider-scoped test tooling outside production Edge Functions"
     }
   ]
 }
