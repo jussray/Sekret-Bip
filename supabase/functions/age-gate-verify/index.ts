@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceEdgeFunctionRateLimit } from "../_shared/rate-limit.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -28,6 +29,8 @@ function ageOn(dateOfBirth: Date, now: Date): number {
 }
 
 Deno.serve(async (req: Request) => {
+  const limited = await enforceEdgeFunctionRateLimit(req, "age-gate-verify");
+  if (limited) return limited;
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const authorization = req.headers.get("authorization");
