@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceAuthenticatedEdgeRateLimit } from "../_shared/edge-rate-limit.ts";
 import { getSupabasePublishableKey } from "../_shared/supabase-api-keys.ts";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -26,6 +27,9 @@ Deno.serve(async (req: Request) => {
 
   const { data: authData, error: authError } = await db.auth.getUser();
   if (authError || !authData.user) return json({ error: "unauthorized" }, 401);
+
+  const limited = await enforceAuthenticatedEdgeRateLimit(db, "parent-link-revoke");
+  if (limited) return limited;
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
   const linkId = typeof body.linkId === "string" && body.linkId.trim().length > 0
