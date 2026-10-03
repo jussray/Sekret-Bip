@@ -237,7 +237,7 @@ test('Circle renders Open Bip as the public audience layer with the face rule', 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/circle?bipDevSide=teen', { waitUntil: 'networkidle' });
 
-  await expect(page.getByText('🌐 Circle', { exact: true })).toBeVisible();
+  await expect(page.getByText('🪐 Open Bip', { exact: true })).toBeVisible();
   await expect(page.getByText('🌎 Open Bip', { exact: true })).toBeVisible();
   await expect(page.getByText('inside Circle · faces stay hidden here', { exact: true })).toBeVisible();
   await expect(page.getByText('Public Circle and public niches. Visible faces are not allowed.', { exact: true })).toBeVisible();
