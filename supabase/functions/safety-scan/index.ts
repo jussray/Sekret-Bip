@@ -11,8 +11,11 @@
 //
 // Security:
 //   • --no-verify-jwt: caller is Postgres trigger, no user JWT available
-//   • Shared secret guard: x-scan-secret must match SAFETY_SCAN_SECRET
-//   • Privileged Supabase access begins only after the source contract passes
+//   • A content-free, hashed abuse-control bucket is consumed before auth so
+//     invalid callers cannot brute-force this endpoint without a bound.
+//   • Shared secret guard: x-scan-secret must match SAFETY_SCAN_SECRET.
+//   • All child/content access still begins only after the shared-secret and
+//     source-contract checks pass.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { enforceEdgeFunctionRateLimit } from '../_shared/rate-limit.ts';
