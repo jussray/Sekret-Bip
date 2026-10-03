@@ -13,6 +13,7 @@
 // with x-account-deletion-secret instead of a user session.
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceServerEdgeRateLimit } from '../_shared/edge-rate-limit.ts';
 import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const PROCESS_SECRET = Deno.env.get('ACCOUNT_DELETION_PROCESS_SECRET') ?? '';
@@ -229,6 +230,13 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'server_config' }, 500);
   }
 
+  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const limited = await enforceServerEdgeRateLimit(admin, 'account-delete');
+  if (limited) return limited;
+
   let body: DeleteRequestBody;
   try {
     body = (await req.json()) as DeleteRequestBody;
@@ -238,10 +246,6 @@ Deno.serve(async (req: Request) => {
 
   const requestId = body.requestId?.trim() ?? '';
   if (!isUuid(requestId)) return json({ error: 'invalid_request_id' }, 400);
-
-  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
 
   const { data: deletionRequest, error: lookupError } = await admin
     .from('account_deletion_requests')
