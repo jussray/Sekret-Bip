@@ -7,18 +7,19 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 const normalizeParentCoachGuardInput = (reply) =>
   reply.replace(/\s*(?:—|–|--)\s*/g, ' ').replace(/\s+/g, ' ').trim();
 
-test('parent coach receives a parent-safe local fallback on every failure path', async () => {
+test('parent coach keeps its parent-safe local fallback while safety fallback takes precedence for high-risk input', async () => {
   const chat = await read('src/services/ai/chat.ts');
 
   assert.match(chat, /if \(personalityId === 'parentCoach'\) \{/);
   assert.match(chat, /Start with what happened at home and what you want to handle differently\./);
-  assert.match(chat, /const fallbackText = localFallback\(personalityId, text, learnedRelationship\)/);
+  assert.match(chat, /const localSafetyFallback = getLocalSafetyFallback\(text\)/);
+  assert.match(chat, /const fallbackText = localSafetyFallback \?\? localFallback\(personalityId, text, learnedRelationship\)/);
 
   const parentBranch = chat.match(/if \(personalityId === 'parentCoach'\) \{[\s\S]*?\n  \}/)?.[0] ?? '';
   assert.doesNotMatch(parentBranch, /girl|aight|gang|what REALLY happened/i);
 });
 
-test('parent coach dashes are preserved without bypassing the rest of the reply guard', async () => {
+test('parent coach dashes are preserved without bypassing the safety-aware reply guard', async () => {
   const chat = await read('src/services/ai/chat.ts');
 
   assert.equal(normalizeParentCoachGuardInput("I'm here — to support you"), "I'm here to support you");
@@ -26,14 +27,16 @@ test('parent coach dashes are preserved without bypassing the rest of the reply 
   assert.match(chat, /const isParentCoach = personalityId === 'parentCoach'/);
   assert.ok(chat.includes("rawReply.replace(/\\s*(?:—|–|--)\\s*/g, ' ').replace(/\\s+/g, ' ').trim()"));
   assert.doesNotMatch(chat, /rawReply\.replace\(\/\[—–\]\/g, '-'\)/);
-  assert.match(chat, /const \{ reply: guardedCandidate, blocked: guardBlocked \} = guardSekretReply\(guardInput, sekretFallback\)/);
+  assert.match(chat, /const guardBypass = shouldBypassReplyGuard\(rawReply, data\.safetyFlag\)/);
+  assert.match(chat, /guardBypass\.bypass\s*\? \{ reply: rawReply\.trim\(\), blocked: false \}\s*: guardSekretReply\(guardInput, sekretFallback\)/);
   assert.match(chat, /isParentCoach && !guardBlocked\s*\? rawReply\.trim\(\)\s*:\s*guardedCandidate/);
   assert.match(chat, /keeps blocked word sequences contiguous/);
 });
 
-test('teen companion surfaces still use the original strict reply guard', async () => {
+test('teen companion surfaces still use the strict reply guard when no safety bypass applies', async () => {
   const chat = await read('src/services/ai/chat.ts');
 
   assert.match(chat, /const guardInput = isParentCoach[\s\S]*:\s*rawReply;/);
   assert.match(chat, /getSekretFallback\(personalityId, text\)/);
+  assert.match(chat, /guardSekretReply\(guardInput, sekretFallback\)/);
 });
