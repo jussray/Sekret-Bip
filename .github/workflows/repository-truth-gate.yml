@@ -72,11 +72,13 @@ jobs:
       - name: Parse-check repository truth auditors
         run: |
           node --check scripts/audit-failure-truth.mjs
+          node --check scripts/verify-cloudflare-credential-cutover-authority.mjs
+          node --check scripts/verify-cloudflare-credential-migration-lineage.mjs
           node --check scripts/verify-supabase-migration-lineage.mjs
           node --check scripts/verify-supabase-production-ledger.mjs
 
       - name: Verify repository-truth gate contracts
-        run: node --test test/repository-truth-gates.test.mjs test/resumable-production-verification.test.mjs test/supabase-migration-lineage.test.mjs test/supabase-production-ledger.test.mjs test/supabase-production-receipt-authority.test.mjs test/production-authority-workflow-contracts.test.mjs test/cloudflare-branch-authority-workflow-contract.test.mjs test/consent-permanent-account-boundary.test.mjs test/bip-engineering-os-authority.test.mjs
+        run: node --test test/repository-truth-gates.test.mjs test/cloudflare-credential-cutover-authority.test.mjs test/cloudflare-credential-migration-lineage.test.mjs test/resumable-production-verification.test.mjs test/supabase-migration-lineage.test.mjs test/supabase-production-ledger.test.mjs test/supabase-production-receipt-authority.test.mjs test/production-authority-workflow-contracts.test.mjs test/cloudflare-branch-authority-workflow-contract.test.mjs test/consent-permanent-account-boundary.test.mjs test/bip-engineering-os-authority.test.mjs
 
       - name: Audit failure truth on current change
         id: failure_truth
@@ -100,6 +102,11 @@ jobs:
         continue-on-error: true
         run: node scripts/verify-supabase-migration-lineage.mjs --base=${{ steps.verification_base.outputs.base_sha }} --head=${{ env.EXPECTED_HEAD_SHA }} --report=artifacts/supabase-migration-lineage.json
 
+      - name: Verify two-phase Cloudflare credential migration lineage
+        id: cloudflare_credential_lineage
+        continue-on-error: true
+        run: node scripts/verify-cloudflare-credential-migration-lineage.mjs --base=${{ steps.verification_base.outputs.base_sha }} --head=${{ env.EXPECTED_HEAD_SHA }} --report=artifacts/cloudflare-credential-migration-lineage.json
+
       - name: Record aggregate truth conclusion
         if: always()
         shell: bash
@@ -108,9 +115,10 @@ jobs:
           BRANCH_HYGIENE_OUTCOME: ${{ steps.branch_hygiene.outcome }}
           IMPLEMENTATION_LEDGER_OUTCOME: ${{ steps.implementation_ledger.outcome }}
           MIGRATION_LINEAGE_OUTCOME: ${{ steps.migration_lineage.outcome }}
+          CLOUDFLARE_CREDENTIAL_LINEAGE_OUTCOME: ${{ steps.cloudflare_credential_lineage.outcome }}
         run: |
           set -euo pipefail
-          printf '{\n  "schemaVersion": 2,\n  "eventName": "%s",\n  "exactHead": "%s",\n  "diffBase": "%s",\n  "failureTruth": "%s",\n  "branchHygiene": "%s",\n  "implementationLedger": "%s",\n  "supabaseMigrationLineage": "%s"\n}\n' \
+          printf '{\n  "schemaVersion": 3,\n  "eventName": "%s",\n  "exactHead": "%s",\n  "diffBase": "%s",\n  "failureTruth": "%s",\n  "branchHygiene": "%s",\n  "implementationLedger": "%s",\n  "supabaseMigrationLineage": "%s",\n  "cloudflareCredentialMigrationLineage": "%s"\n}\n' \
             "$GITHUB_EVENT_NAME" \
             "$EXPECTED_HEAD_SHA" \
             "${{ steps.verification_base.outputs.base_sha }}" \
@@ -118,6 +126,7 @@ jobs:
             "$BRANCH_HYGIENE_OUTCOME" \
             "$IMPLEMENTATION_LEDGER_OUTCOME" \
             "$MIGRATION_LINEAGE_OUTCOME" \
+            "$CLOUDFLARE_CREDENTIAL_LINEAGE_OUTCOME" \
             | tee artifacts/repository-truth-conclusion.json
 
       - name: Upload repository-truth evidence
@@ -137,9 +146,11 @@ jobs:
           BRANCH_HYGIENE_OUTCOME: ${{ steps.branch_hygiene.outcome }}
           IMPLEMENTATION_LEDGER_OUTCOME: ${{ steps.implementation_ledger.outcome }}
           MIGRATION_LINEAGE_OUTCOME: ${{ steps.migration_lineage.outcome }}
+          CLOUDFLARE_CREDENTIAL_LINEAGE_OUTCOME: ${{ steps.cloudflare_credential_lineage.outcome }}
         run: |
           set -euo pipefail
           test "$FAILURE_TRUTH_OUTCOME" = success
           test "$BRANCH_HYGIENE_OUTCOME" = success
           test "$IMPLEMENTATION_LEDGER_OUTCOME" = success
           test "$MIGRATION_LINEAGE_OUTCOME" = success
+          test "$CLOUDFLARE_CREDENTIAL_LINEAGE_OUTCOME" = success

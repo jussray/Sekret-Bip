@@ -217,6 +217,8 @@ test('repository truth workflow verifies PR and post-merge heads against the eve
   assert.match(workflow, /BASE_SHA="\$DIFF_BASE_SHA"/);
   assert.match(workflow, /BASE_SHA="\$\(git rev-parse HEAD\^\)"/);
   assert.match(workflow, /node --check scripts\/audit-failure-truth\.mjs/);
+  assert.match(workflow, /node --check scripts\/verify-cloudflare-credential-migration-lineage\.mjs/);
+  assert.match(workflow, /test\/cloudflare-credential-migration-lineage\.test\.mjs/);
   assert.match(
     workflow,
     /audit-failure-truth\.mjs --strict --changed-since=\$\{\{ steps\.verification_base\.outputs\.base_sha \}\} --report=/,
@@ -225,6 +227,12 @@ test('repository truth workflow verifies PR and post-merge heads against the eve
     workflow,
     /verify-implementation-ledger\.mjs --changed-since=\$\{\{ steps\.verification_base\.outputs\.base_sha \}\}/,
   );
+  assert.match(
+    workflow,
+    /verify-cloudflare-credential-migration-lineage\.mjs --base=\$\{\{ steps\.verification_base\.outputs\.base_sha \}\} --head=\$\{\{ env\.EXPECTED_HEAD_SHA \}\} --report=artifacts\/cloudflare-credential-migration-lineage\.json/,
+  );
+  assert.match(workflow, /CLOUDFLARE_CREDENTIAL_LINEAGE_OUTCOME/);
+  assert.match(workflow, /"schemaVersion": 3/);
 });
 
 test('branch hygiene classifies prohibited duplicate naming without deleting refs', () => {
