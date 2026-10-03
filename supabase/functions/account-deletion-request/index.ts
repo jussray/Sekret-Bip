@@ -2,6 +2,7 @@
 // Creates a reversible deletion request with a seven-day grace period.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceAuthenticatedEdgeRateLimit } from '../_shared/edge-rate-limit.ts';
 import { getSupabasePublishableKey } from '../_shared/supabase-api-keys.ts';
 
 function json(body: unknown, status = 200): Response {
@@ -29,6 +30,9 @@ Deno.serve(async (req: Request) => {
   const { data: authData } = await db.auth.getUser();
   const userId = authData.user?.id;
   if (!userId) return json({ error: 'unauthorized' }, 401);
+
+  const limited = await enforceAuthenticatedEdgeRateLimit(db, 'account-deletion-request');
+  if (limited) return limited;
 
   const body = await req.json().catch(() => ({})) as { confirmed?: boolean };
   if (body.confirmed !== true) return json({ error: 'confirmation_required' }, 400);
