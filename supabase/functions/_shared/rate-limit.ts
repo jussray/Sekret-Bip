@@ -30,8 +30,8 @@ async function sha256(value: string): Promise<string> {
 
 async function callerKey(request: Request): Promise<string> {
   // Supabase's gateway sits behind Cloudflare and forwards cf-connecting-ip to
-  // Edge Functions. Prefer that provider-controlled network identity. Never use
-  // caller-controlled x-forwarded-for to rotate limiter buckets.
+  // Edge Functions. Prefer that provider-controlled network identity and never
+  // accept caller-supplied forwarding metadata as a bucket selector.
   const cloudflareIp = request.headers.get("cf-connecting-ip")?.trim();
   if (cloudflareIp) return sha256(`ip:${cloudflareIp}`);
 
