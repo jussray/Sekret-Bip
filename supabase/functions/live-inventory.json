@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "projectRef": "tbsevonvegdnlyjgplmm",
+  "observedDateUtc": "2026-10-03",
+  "source": "supabase-live-inventory",
+  "functions": [
+    {"slug":"age-gate-verify","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"parent-link-create","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"parent-link-revoke","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"bridge-share-create","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"bridge-share-revoke","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"circle-identity-sync","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"crew-invite-redeem","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"memory-marker-create","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"reward-redemption-request","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"account-deletion-request","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"account-request-cancel","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"parent-link-redeem","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"account-delete","verifyJwt":false,"disposition":"active-custom-auth-rate-limited"},
+    {"slug":"safety-scan","verifyJwt":false,"disposition":"active-custom-auth-rate-limited"},
+    {"slug":"send-push","verifyJwt":true,"disposition":"active-rate-limited"},
+    {"slug":"runtime-contract-health","verifyJwt":false,"disposition":"active-rate-limited"},
+    {"slug":"release-health","verifyJwt":true,"disposition":"retired-410"},
+    {"slug":"bridge-e2e-probe","verifyJwt":true,"disposition":"retired-410"},
+    {"slug":"github-workflow-status","verifyJwt":true,"disposition":"retired-410"},
+    {"slug":"twilio-test-sms","verifyJwt":true,"disposition":"retire-410-candidate"}
+  ]
+}
