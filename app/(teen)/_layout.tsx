@@ -61,6 +61,7 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
         <Tabs.Screen name="period-calendar" options={{ href: null }} />
         <Tabs.Screen name="discover" options={{ href: null }} />
         <Tabs.Screen name="profile" options={{ href: null }} />
+        <Tabs.Screen name="scrapbook-check-in" options={{ href: null }} />
         <Tabs.Screen name="chat/index" options={{ href: null }} />
         <Tabs.Screen name="chat/[personalityId]" options={{ href: null }} />
         <Tabs.Screen name="bippin2" options={{ href: null }} />
