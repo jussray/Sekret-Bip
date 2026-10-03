@@ -21,6 +21,15 @@ test('live Supabase inventory is complete, unique, and source-controlled', () =>
   }
 });
 
+test('Supabase config explicitly preserves every live verify_jwt policy', () => {
+  const config = read('supabase/config.toml');
+  for (const entry of inventory.functions) {
+    const slug = entry.slug.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const section = new RegExp(`\\[functions\\.${slug}\\]\\s+verify_jwt\\s*=\\s*${entry.verifyJwt}`);
+    assert.match(config, section, `${entry.slug} verify_jwt must match live inventory`);
+  }
+});
+
 test('every consequential active Edge Function enters the shared limiter before route work', () => {
   assert.equal(active.length, 16);
 
