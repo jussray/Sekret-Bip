@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceServerEdgeRateLimit } from '../_shared/edge-rate-limit.ts';
 import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -47,6 +48,9 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+
+  const limited = await enforceServerEdgeRateLimit(admin, 'runtime-contract-health');
+  if (limited) return limited;
 
   const requiredKeys = REQUIRED_CONTRACTS.map(contract => contract.contractKey);
   const [contractsResult, schemaResult] = await Promise.all([
