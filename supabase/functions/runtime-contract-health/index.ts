@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceEdgeFunctionRateLimit } from '../_shared/rate-limit.ts';
 import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
@@ -39,6 +40,8 @@ function json(body: unknown, status: number): Response {
 }
 
 Deno.serve(async (req: Request) => {
+  const limited = await enforceEdgeFunctionRateLimit(req, 'runtime-contract-health');
+  if (limited) return limited;
   if (req.method !== 'GET') return json({ error: 'method_not_allowed' }, 405);
   if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
     return json({ healthy: false, error: 'server_config' }, 500);

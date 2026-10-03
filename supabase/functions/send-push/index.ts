@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceEdgeFunctionRateLimit } from '../_shared/rate-limit.ts';
 import { getSupabasePublishableKey, getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const corsHeaders = {
@@ -40,6 +41,8 @@ function json(data: unknown, status = 200): Response {
 }
 
 Deno.serve(async (request) => {
+  const limited = await enforceEdgeFunctionRateLimit(request, 'send-push');
+  if (limited) return limited;
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   if (request.method !== 'POST') return json({ error: 'Method not allowed.' }, 405);
 
