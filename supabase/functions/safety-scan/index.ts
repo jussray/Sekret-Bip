@@ -104,6 +104,7 @@ function severityFromMod(mod: ModerationResult): Severity | null {
   return 'low';
 }
 
+// never store full OpenAI score array; reduce provider output to one category/score pair.
 function buildScanMetadata(mod: ModerationResult | null, kwTag: string | null): ScanMetadata {
   if (!mod) {
     return {
