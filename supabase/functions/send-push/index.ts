@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceAuthenticatedEdgeRateLimit } from '../_shared/edge-rate-limit.ts';
 import { getSupabasePublishableKey, getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const corsHeaders = {
@@ -61,6 +62,9 @@ Deno.serve(async (request) => {
   });
   const { data: { user }, error: userError } = await authClient.auth.getUser();
   if (userError || !user) return json({ error: 'Invalid or expired session.' }, 401);
+
+  const limited = await enforceAuthenticatedEdgeRateLimit(authClient, 'send-push', corsHeaders);
+  if (limited) return limited;
 
   let payload: PushRequest;
   try {
