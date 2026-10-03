@@ -6,15 +6,15 @@ test('Pages preserves explicit safety resources when the Worker is unavailable',
 
   await page.goto('/pages?bipDevSide=teen', { waitUntil: 'domcontentloaded' });
 
-  const suhanaTab = page.getByRole('button', { name: /Suhana/i }).first();
-  await expect(suhanaTab).toBeVisible({ timeout: 15_000 });
-  await suhanaTab.click();
+  await expect(page.getByText('Start talking to Suhana', { exact: true })).toBeVisible({ timeout: 15_000 });
 
-  const pageInput = page.getByPlaceholder('Tell it how it happened…');
+  const pageInput = page.getByRole('textbox').first();
   await expect(pageInput).toBeVisible({ timeout: 15_000 });
   await pageInput.fill('I am not safe here');
 
-  await page.getByRole('button', { name: 'Save page', exact: true }).click();
+  const sendControl = page.getByText('💜', { exact: true }).last();
+  await expect(sendControl).toBeVisible({ timeout: 15_000 });
+  await sendControl.click();
 
   const reply = page.getByText(/Your safety comes first\./i);
   await expect(reply).toBeVisible({ timeout: 15_000 });
