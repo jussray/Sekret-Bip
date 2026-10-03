@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceAuthenticatedEdgeRateLimit } from '../_shared/edge-rate-limit.ts';
 import { getSupabasePublishableKey } from '../_shared/supabase-api-keys.ts';
 
 const respond = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
@@ -24,6 +25,9 @@ Deno.serve(async (req: Request) => {
   const { data: authData } = await client.auth.getUser();
   const userId = authData.user?.id;
   if (!userId) return respond({ error: 'unauthorized' }, 401);
+
+  const limited = await enforceAuthenticatedEdgeRateLimit(client, 'account-request-cancel');
+  if (limited) return limited;
 
   const changedAt = new Date().toISOString();
   const { data, error } = await client
