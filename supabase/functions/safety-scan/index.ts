@@ -15,6 +15,7 @@
 //   • Privileged Supabase access begins only after the source contract passes
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { enforceEdgeFunctionRateLimit } from '../_shared/rate-limit.ts';
 import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const SCAN_SECRET  = Deno.env.get('SAFETY_SCAN_SECRET') ?? '';
@@ -100,7 +101,6 @@ function severityFromMod(mod: ModerationResult): Severity | null {
   return 'low';
 }
 
-// Reduced metadata — never store full OpenAI score array
 function buildScanMetadata(mod: ModerationResult | null, kwTag: string | null): ScanMetadata {
   if (!mod) {
     return {
@@ -156,11 +156,12 @@ async function notifyParentIfLinked(
     .update({ parent_notified_at: new Date().toISOString() })
     .eq('id', alertId);
 
-  // Deliberately content-free. Actual delivery remains separate work.
   console.log(`[safety-scan] public-source parent notify queued severity=${severity}`);
 }
 
 Deno.serve(async (req: Request) => {
+  const limited = await enforceEdgeFunctionRateLimit(req, 'safety-scan');
+  if (limited) return limited;
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
 
   const incoming = req.headers.get('x-scan-secret') ?? '';
