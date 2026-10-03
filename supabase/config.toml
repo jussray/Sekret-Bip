@@ -1,0 +1,65 @@
+project_id = "tbsevonvegdnlyjgplmm"
+
+# Explicit live Edge Function auth policy. Keep this synchronized with
+# supabase/functions/live-inventory.json so deploys cannot silently change a
+# function from platform JWT verification to custom/public auth or vice versa.
+
+[functions.age-gate-verify]
+verify_jwt = true
+
+[functions.parent-link-create]
+verify_jwt = true
+
+[functions.parent-link-revoke]
+verify_jwt = true
+
+[functions.bridge-share-create]
+verify_jwt = true
+
+[functions.bridge-share-revoke]
+verify_jwt = true
+
+[functions.circle-identity-sync]
+verify_jwt = true
+
+[functions.crew-invite-redeem]
+verify_jwt = true
+
+[functions.memory-marker-create]
+verify_jwt = true
+
+[functions.reward-redemption-request]
+verify_jwt = true
+
+[functions.account-deletion-request]
+verify_jwt = true
+
+[functions.account-request-cancel]
+verify_jwt = true
+
+[functions.parent-link-redeem]
+verify_jwt = true
+
+[functions.account-delete]
+verify_jwt = false
+
+[functions.safety-scan]
+verify_jwt = false
+
+[functions.release-health]
+verify_jwt = true
+
+[functions.send-push]
+verify_jwt = true
+
+[functions.bridge-e2e-probe]
+verify_jwt = true
+
+[functions.github-workflow-status]
+verify_jwt = true
+
+[functions.twilio-test-sms]
+verify_jwt = true
+
+[functions.runtime-contract-health]
+verify_jwt = false
