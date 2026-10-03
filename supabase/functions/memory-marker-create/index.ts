@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceEdgeFunctionRateLimit } from "../_shared/rate-limit.ts";
 
 const respond = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -46,6 +47,8 @@ const BLOCKED_FIELDS = new Set([
 ]);
 
 Deno.serve(async (req: Request) => {
+  const limited = await enforceEdgeFunctionRateLimit(req, "memory-marker-create");
+  if (limited) return limited;
   if (req.method !== "POST") return respond({ error: "method_not_allowed" }, 405);
 
   const authorization = req.headers.get("authorization");

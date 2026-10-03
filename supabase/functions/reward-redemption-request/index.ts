@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceEdgeFunctionRateLimit } from "../_shared/rate-limit.ts";
 
 const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
   status,
@@ -9,6 +10,8 @@ const reply = (body: unknown, status = 200) => new Response(JSON.stringify(body)
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 Deno.serve(async (req: Request) => {
+  const limited = await enforceEdgeFunctionRateLimit(req, "reward-redemption-request");
+  if (limited) return limited;
   if (req.method !== "POST") return reply({ error: "method_not_allowed" }, 405);
 
   const authorization = req.headers.get("authorization");
