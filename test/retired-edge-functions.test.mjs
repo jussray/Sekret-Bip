@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const manifestPath = path.join(root, 'supabase', 'functions', 'retirement-manifest.json');
+const liveInventoryPath = path.join(root, 'supabase', 'functions', 'live-inventory.json');
+const baselineTestPath = path.join(root, 'test', 'edge-function-rate-limit-baseline.test.mjs');
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
 
 function walk(directory) {
@@ -35,7 +37,7 @@ test('retirement manifest requires JWT and HTTP 410 for all obsolete functions',
   assert.equal(manifest.schemaVersion, 1);
   assert.deepEqual(
     manifest.functions.map((item) => item.slug).sort(),
-    ['bridge-e2e-probe', 'github-workflow-status', 'release-health'],
+    ['bridge-e2e-probe', 'github-workflow-status', 'release-health', 'twilio-test-sms'],
   );
 
   for (const item of manifest.functions) {
@@ -60,9 +62,11 @@ for (const item of manifest.functions) {
 }
 
 test('no executable caller references retired function slugs', () => {
-  const allowedSources = new Set(
-    manifest.functions.map((item) => path.normalize(path.join(root, item.sourcePath))),
-  );
+  const allowedSources = new Set([
+    ...manifest.functions.map((item) => path.normalize(path.join(root, item.sourcePath))),
+    path.normalize(liveInventoryPath),
+    path.normalize(baselineTestPath),
+  ]);
   const violations = [];
 
   for (const filePath of executableFiles) {
