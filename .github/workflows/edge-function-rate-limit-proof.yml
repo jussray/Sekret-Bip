@@ -1,0 +1,82 @@
+name: Edge Function Rate Limit Proof
+
+on:
+  push:
+    branches:
+      - 'security/**'
+    paths:
+      - 'supabase/functions/**'
+      - 'supabase/migrations/20261003010000_edge_function_rate_limits.sql'
+      - 'test/edge-function-rate-limit-baseline.test.mjs'
+      - 'test/edge-function-auth-hardening.test.mjs'
+      - 'test/retired-edge-functions.test.mjs'
+      - 'e2e/smoke.spec.ts'
+      - 'playwright.config.ts'
+      - '.github/workflows/edge-function-rate-limit-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  exact-head-proof:
+    name: Exact-head source + Chromium proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Verify immutable head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Prove Edge Function security contracts
+        run: >-
+          node --test
+          test/edge-function-rate-limit-baseline.test.mjs
+          test/edge-function-auth-hardening.test.mjs
+          test/retired-edge-functions.test.mjs
+
+      - name: Type check
+        run: npm run type-check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run browser regression proof
+        run: npx playwright test e2e/smoke.spec.ts --workers=1 --reporter=line
+
+      - name: Upload browser evidence on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-function-rate-limit-playwright-${{ github.run_id }}
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 14
