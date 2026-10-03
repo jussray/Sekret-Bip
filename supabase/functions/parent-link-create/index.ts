@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { enforceAuthenticatedEdgeRateLimit } from "../_shared/edge-rate-limit.ts";
 import { getSupabasePublishableKey } from "../_shared/supabase-api-keys.ts";
 
 type ParentInviteRequest = {
@@ -142,6 +143,9 @@ Deno.serve(async (req: Request) => {
   const { data: authData, error: authError } = await db.auth.getUser();
   if (authError || !authData.user) return json({ error: "unauthorized" }, 401);
   if (authData.user.is_anonymous) return json({ error: "permanent_account_required" }, 403);
+
+  const limited = await enforceAuthenticatedEdgeRateLimit(db, "parent-link-create", CORS_HEADERS);
+  if (limited) return limited;
 
   let input: ParentInviteRequest = {};
   try {
