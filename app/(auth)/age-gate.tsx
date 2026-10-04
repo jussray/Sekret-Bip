@@ -29,11 +29,11 @@ const MONTHS = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-const CURRENT_YEAR = 2026;
+const CURRENT_YEAR = new Date().getFullYear();
 const YEARS = Array.from({ length: 100 }, (_, i) => CURRENT_YEAR - i);
 
 function computeAge(month: number, year: number): number {
-  const today = new Date(2026, 6, 24); // July 24 2026
+  const today = new Date();
   const dob   = new Date(year, month - 1, 1);
   let age = today.getFullYear() - dob.getFullYear();
   const m = today.getMonth() - dob.getMonth();

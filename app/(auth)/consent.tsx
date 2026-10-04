@@ -72,46 +72,41 @@ export default function ConsentScreen() {
     setSub(true);
     setError(null);
 
+    // Step 1: Write local gate — fatal if this fails
     try {
-      // 1. Record offline-first gate — this is the minimum needed to unlock the app
       await AsyncStorage.multiSet([
-        ['compliance_v1_done',       'true'],
-        ['compliance_account_type',  accountType ?? 'teen'],
-        ['compliance_dob',           dob ?? ''],
-        ['compliance_tos_version',   TOS_VERSION],
+        ['compliance_v1_done',         'true'],
+        ['compliance_account_type',    accountType ?? 'teen'],
+        ['compliance_dob',             dob ?? ''],
+        ['compliance_tos_version',     TOS_VERSION],
         ['compliance_privacy_version', PRIVACY_VERSION],
-        ['compliance_voice_consent', voiceChecked ? 'true' : 'false'],
-        ['compliance_completed_at',  new Date().toISOString()],
+        ['compliance_voice_consent',   voiceChecked ? 'true' : 'false'],
+        ['compliance_completed_at',    new Date().toISOString()],
       ]);
+    } catch {
+      setError('Could not save your preferences. Please try again.');
+      setSub(false);
+      return;
+    }
 
-      // 2. Persist to Supabase when a session exists (best-effort; non-blocking)
+    // Step 2: Persist to Supabase — best-effort, tolerated if offline or session missing
+    try {
       const sb = getSupabase();
       if (sb && dob) {
-        const platform = Platform.OS; // 'ios' | 'android' | 'web'
         await sb.rpc('record_initial_consent', {
           p_date_of_birth:   dob,
           p_account_type:    accountType ?? 'teen',
           p_terms_version:   TOS_VERSION,
           p_privacy_version: PRIVACY_VERSION,
           p_voice_consent:   voiceChecked,
-          p_platform:        platform,
+          p_platform:        Platform.OS,
           p_app_version:     '1.0.0-beta',
         });
       }
+    } catch { /* non-fatal — local consent already saved */ }
 
-      // 3. Continue to normal app flow
-      router.replace('/');
-    } catch (err) {
-      // AsyncStorage failure is fatal; Supabase failure is tolerated
-      const msg = err instanceof Error ? err.message : 'Something went wrong.';
-      if (msg.includes('AsyncStorage')) {
-        setError('Could not save your preferences. Please try again.');
-        setSub(false);
-      } else {
-        // Supabase failed but local consent is saved — let them in
-        router.replace('/');
-      }
-    }
+    // Step 3: Enter app
+    router.replace('/');
   }
 
   return (
@@ -135,7 +130,7 @@ export default function ConsentScreen() {
           required
           title="Terms of Service"
           body={
-            'I agree to the Se\'kret Bip Terms of Service (tos-v1.0). ' +
+            `I agree to the Se'kret Bip Terms of Service (${TOS_VERSION}). ` +
             'This includes community rules, acceptable use, and how disputes are handled.'
           }
         />
@@ -146,8 +141,8 @@ export default function ConsentScreen() {
           required
           title="Privacy Policy"
           body={
-            'I understand how Se\'kret Bip collects, uses, and stores my data — ' +
-            'including journal entries, mood history, and AI conversation logs (pp-v1.0). ' +
+            `I understand how Se'kret Bip collects, uses, and stores my data — ` +
+            `including journal entries, mood history, and AI conversation logs (${PRIVACY_VERSION}). ` +
             'I can request deletion at any time in Settings.'
           }
         />
