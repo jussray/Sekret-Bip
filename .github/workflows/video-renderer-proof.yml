@@ -1,0 +1,31 @@
+name: Bip Video Renderer Proof
+
+on:
+  push:
+    paths:
+      - 'scripts/render-video-master.mjs'
+      - 'test/video-render-master.test.mjs'
+      - '.github/workflows/video-renderer-proof.yml'
+  pull_request:
+    paths:
+      - 'scripts/render-video-master.mjs'
+      - 'test/video-render-master.test.mjs'
+      - '.github/workflows/video-renderer-proof.yml'
+
+jobs:
+  render-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install media tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+      - name: Render and probe a real Bip MP4
+        run: node --test test/video-render-master.test.mjs
