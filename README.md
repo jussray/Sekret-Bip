@@ -1,120 +1,142 @@
 <!-- truth-mode: durable -->
 # Se’kret Bip 💜
 
+**A private, age-aware space for reflection, self-expression, emotional growth, and healthier family communication.**
+
 🌐 **Official site:** https://sekretbip.net
 
-> Copyright © 2024–2026 Juss Ray. All rights reserved. Proprietary software; see `LICENSE`.
+Se’kret Bip is built for teens and the families who support them. It combines private reflection, journaling, voice, comfort tools, companions, relationship-aware family experiences, and expressive social spaces without turning parent access into surveillance.
 
-Se’kret Bip is a privacy-first emotional growth and self-expression product for teens, built with React Native, Expo Router, TypeScript, Supabase, and Cloudflare. Founder Control Room is the operating/evidence layer for approvals, changes, deployments, verification, and rollback.
+> **Boundary:** Se’kret Bip is not a medical, therapy, crisis, or emergency service. It does not diagnose users or replace professional or emergency care.
 
-## Live truth boundary
+Copyright © 2024–2026 Juss Ray. All rights reserved. Proprietary software; see `LICENSE`.
 
-This README describes durable product and operating contracts. It does **not** declare the live release SHA, provider status, open/closed issue state, or launch verdict.
+## What the product is trying to protect
 
-Before making a current claim, resolve live authority in this order:
+Se’kret Bip is designed around a simple principle: connection should not require giving up privacy.
 
-1. fresh GitHub `main`, PRs, issues, checks, reviews, jobs, and logs;
-2. the newest marked exact-production receipt on issue #696;
-3. Cloudflare Pages / Workers / Access evidence for the same target;
-4. the intended Supabase project and live migration/runtime evidence;
-5. production Playwright and, where required, physical-device and controlled-account proof.
+- Private reflections stay private unless the product explicitly says otherwise.
+- Teens choose what they share through supported sharing and relationship flows.
+- Parent and trusted-adult access is relationship-based, permission-aware, and intentionally separated from a teen’s private space.
+- Identity and access rules are enforced by runtime and database boundaries, not only by hidden UI.
+- Operational evidence must remain metadata-safe and must not become a back door into private teen content.
+- Public discovery pages and authenticated account content are separate layers.
 
-See `docs/TRUTH_AUTHORITY.md` for expiry and supersession rules. A fact that was verified earlier remains historical evidence, but newer contradictory authority revokes its use as present-tense truth.
-
-## State → Evidence → Claim
-
-For every material completion or blocker claim, identify:
-
-- the state observed;
-- the evidence and authority that observed it;
-- the exact scope of the claim;
-- what makes that evidence expire;
-- whether newer evidence superseded it.
-
-Keep repository, CI, Cloudflare, Supabase, browser, device, and account witnesses separate.
-
-## Product promise
-
-- Private reflections stay private.
-- Teens choose what they share.
-- Parent access is relationship-based, not surveillance-based.
-- Identity and permissions are enforced by runtime and database boundaries, not only by UI hiding.
-- Operational evidence remains metadata-safe and never becomes a back door into private teen content.
-
-## Product and UX direction
-
-Se’kret Bip is a premium, living app experience. Cosmic and character art is visual DNA and atmosphere, not product architecture.
-
-Prioritize interactive product states, companions embedded into real flows, responsive emotional feedback, personalized home behavior, clear Teen / Parent / Bip Jr journeys, accessible motion, and a coherent mobile design system. Do not regress the product into splash-art-led UX.
-
-## Architecture
-
-- **Frontend:** React Native, Expo Router, TypeScript
-- **Routes:** auth, onboarding, Teen, Parent, and founder/internal groups
-- **Local state:** React state, context, hooks, and AsyncStorage
-- **Cloud data:** Supabase Auth, Postgres, RLS, Storage, Edge Functions, ordered migrations
-- **Public API source contract:** production client configuration is single-homed to `https://api.sekretbip.net`; repository `wrangler.toml` identifies `sekret-backend` as the Worker source target. The live custom-domain attachment is Cloudflare provider truth and is not established by repository configuration alone.
-- **Companion runtime lineage:** Cloudflare Worker `sekret`; founder-confirmed active and historically the deployment identity for the Se’kret companion API. Exact live routes/custom domains remain Cloudflare provider-readback truth.
-- **Web source contract:** repository deployment configuration designates Cloudflare Pages project `sekret-bip`; current live Pages project/domain state requires provider readback.
-- **Production proof:** exact release identity + Worker health + Supabase runtime + production Playwright + any required account/device witnesses
-- **Schema source:** `supabase/migrations/`
-
-### Worker purpose boundary
-
-The checked-in production client is intentionally single-homed to `api.sekretbip.net`; product code must not choose between multiple public Worker URLs.
-
-The preferred purpose split is:
-
-- `sekret` owns the companion execution plane: `/api/sekret/reply`, `/api/sekret/voice`, `/api/sekret/transcribe`, companion style/safety enforcement, AI/voice provider capability, and companion-scoped telemetry;
-- `sekret-backend` owns the public API/front-door and privileged platform plane: authentication/rate-limit ingress, Bridge summary/data operations, server-side Supabase service-role work, inbound email, and other non-companion backend business logic;
-- when provider readback and code migration are approved, `sekret-backend` should delegate companion requests to `sekret` through a Cloudflare Service Binding rather than exposing a second client-facing URL;
-- `SUPABASE_SERVICE_ROLE_KEY` must not be duplicated into the companion Worker merely for telemetry. Privileged persistence should cross a narrow internal boundary or remain backend-owned.
-
-This is a **purpose/target contract**, not a claim that the service binding or route cutover is already deployed. Current provider binding remains Level 0 Cloudflare truth and must be proven before mutation.
-
-Legacy compatibility files and historical provider identities are not a second production authority. `sekret` is not classified as legacy while its active provider role remains founder-confirmed and provider-protected.
-
-## Product areas
+## Core experiences
 
 ### Teen
 
-Room, Pages, journaling, voice reflection, companions, Daily Intentions, Calm/Comfort/Mind + Body Reset, Cloud Thoughts, Circle, Bip Crew, Growth/Insights/History/Memories, period tools, points, and rewards infrastructure exist at different evidence levels. Repository presence is not equivalent to release proof.
+The repository contains Teen experiences across reflection, journaling, voice, Se’kret companions, Daily Intentions, Calm / Comfort / Mind + Body Reset, Cloud Thoughts, Circle, Bip Crew, Growth / Insights / History / Memories, period tools, points, and rewards infrastructure.
+
+These features exist at different evidence levels. **Code present in the repository is not the same thing as production-verified behavior.**
 
 ### Parent and trusted relationships
 
-Parent routes, account linking, Bridge contracts, relationship-aware access, Parent Circle, and guarded parent surfaces exist. Parent launch readiness remains independently evidence-gated across lifecycle, privacy, production, notification, device, revocation, unlink, and deletion journeys.
+Parent routes, linking, Bridge contracts, relationship-aware permissions, Parent Circle, and guarded parent surfaces are part of the product architecture. Parent launch readiness is independently gated by privacy, linking, revocation, unlink, deletion, notification, account, browser, and device evidence.
 
-## Future lanes
+### Bip Jr
 
-Unless newer exact repository implementation proves otherwise, durable L4 continuity memory, persistent companion goals, scheduled reflection jobs, evidence-derived relationship phases, inter-companion coordination, and L5 cross-companion synthesis remain future lanes. They are not automatic launch dependencies.
+Bip Jr experiences are part of the broader family product direction and remain subject to the app’s age, account, relationship, and release rules. Their existence in source does not override the product’s age-gating or launch requirements.
 
-## Local setup
+## Character world
+
+Se’kret Bip’s visual world is part of the experience, but character art is **not** the product architecture.
+
+The approved canonical character family currently includes:
+
+- **Night** — The Watcher
+- **Suhana** — The Center
+- **Sy** — The Mind
+- **Cloud** — The Calm
+
+Character identity is governed by `sekret-bip-character-canon/registry.json`. Ensemble art, world art, prompts, and design descriptions cannot silently redefine a canonical character.
+
+The UX target is a living product: companions embedded into real flows, responsive emotional feedback, personalized home behavior, coherent Teen / Parent / Bip Jr journeys, accessible motion, and a consistent mobile design system.
+
+## Architecture
+
+| Layer | Source of truth |
+| --- | --- |
+| App | React Native + Expo Router + TypeScript |
+| Targets | Web, iOS, Android |
+| Client state | React state, context, hooks, AsyncStorage |
+| Auth + data | Supabase Auth, Postgres, RLS, Storage, Edge Functions |
+| Schema | `supabase/migrations/` |
+| Web deployment target | Cloudflare Pages project `sekret-bip` |
+| Public API origin | `https://api.sekretbip.net` |
+| Checked-in Worker target | `sekret-backend` in `wrangler.toml` |
+| Companion Worker lineage | `sekret`, with exact live routing/bindings requiring provider readback |
+| Operating / evidence layer | Founder Control Room |
+
+### Worker purpose boundary
+
+The public client is intentionally single-homed to `api.sekretbip.net`.
+
+The durable target split is:
+
+- **`sekret`**: companion reply, voice, transcription, companion style/safety behavior, provider capability, and companion-scoped telemetry.
+- **`sekret-backend`**: public API/front-door work, authentication and rate-limit ingress, Bridge/data operations, privileged Supabase work, inbound email, and other backend business logic.
+
+A preferred future topology delegates companion requests from `sekret-backend` to `sekret` through a Cloudflare Service Binding while preserving one public API URL. **That service binding must not be described as live until provider and exact-release evidence prove it.**
+
+Privileged secrets such as `SUPABASE_SERVICE_ROLE_KEY` must not be duplicated into the companion Worker merely for convenience.
+
+## Truth boundary
+
+This README documents **durable product and architecture contracts**, not a live deployment verdict.
+
+Do not use README prose alone to claim the current production SHA, Cloudflare routing, Supabase runtime state, open/closed issue state, or launch readiness. Resolve current truth from fresh evidence:
+
+1. GitHub `main`, PRs, issues, checks, reviews, jobs, and logs;
+2. the newest marked exact-production receipt on issue #696;
+3. Cloudflare Pages / Workers / Access readback for the same target;
+4. the intended Supabase project and live migration/runtime evidence;
+5. production Playwright plus controlled-account or physical-device evidence where required.
+
+Use **State → Evidence → Claim**. Older successful evidence remains historical when a newer authority supersedes it.
+
+See `docs/TRUTH_AUTHORITY.md` and `docs/CURRENT_STATUS.md` for the full freshness and supersession rules.
+
+## Repository map
+
+```text
+app/                              Expo Router surfaces
+src/                              product features, contracts, services, utilities
+screens/                          retained screen implementations
+worker/                           Cloudflare Worker runtime
+supabase/migrations/              ordered database schema authority
+e2e/                              browser / journey proof
+test/                             unit and contract tests
+scripts/                          verification, audit, release, and operator tooling
+docs/                             architecture, truth, privacy, launch, and operating docs
+sekret-bip-character-canon/       canonical character identity registry
+implementation-ledger.json        machine-checked implementation state
+```
+
+## Local development
 
 ```bash
 gh repo clone jussray/Sekret-Bip
 cd Sekret-Bip
 npm install --legacy-peer-deps
-cp .env.example .env.local
+cp .env.example .env
 git lfs pull
-npx expo start --web -c
+npm run web
 ```
 
-### Supabase
+Use only local/development-safe values in `.env`. Never commit real provider secrets, service-role keys, or private credentials.
 
-```bash
-npx supabase login
-npx supabase link --project-ref <project-ref>
-npx supabase db push
-```
-
-Use ordered migrations as the schema authority; do not maintain a second bootstrap schema.
+Database migrations are authoritative under `supabase/migrations/`. Linking or pushing to a remote Supabase project is an explicit environment mutation and should only be done against the intended project with the appropriate authority and evidence.
 
 ## Validation
+
+Start with the cheapest relevant check and escalate only as needed.
 
 ```bash
 npm run type-check
 npm test
 npm run lint
+npm run verify:character-canon
 node scripts/audit-documentation-truth.mjs
 npm run verify:bundle
 npm run audit:control-room
@@ -124,18 +146,19 @@ npm run test:e2e:production
 npm run verify:prepush
 ```
 
-A Playwright file committed to the repository is not proof that it executed against deployed production.
+A committed Playwright test is not proof that the deployed production path passed. Production claims require an executed run against the intended release plus the resulting evidence.
 
 ## Canonical operating references
 
 - `docs/TRUTH_AUTHORITY.md` — claim freshness, expiry, and supersession
-- `docs/CURRENT_STATUS.md` — how to resolve current status without copying volatile state into docs
+- `docs/CURRENT_STATUS.md` — current-status resolution protocol
 - `docs/DOCUMENTATION_MAP.md` — documentation authority and archive rules
-- `docs/CLOUDFLARE_OWNERSHIP.md` — Worker identity, provider authority, and purpose boundary
-- `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md` — preservation, migration, and rollback sequence
-- `docs/LAUNCH_ROADMAP.md` — durable launch phases and exit evidence
+- `docs/CLOUDFLARE_OWNERSHIP.md` — Worker identity and provider authority
+- `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md` — Worker preservation, migration, and rollback
+- `docs/LAUNCH_ROADMAP.md` — launch phases and exit evidence
+- `docs/legal/COPPA_POSITION.md` — age/privacy product constraints
 - `DEPLOYMENT.md` — deployment and exact-production verification contract
 - `implementation-ledger.json` and validated extensions — machine-checked feature state
 - issue #696 — exact-production release packet and marked receipts
 
-Dated snapshots, historical PR bodies, and old issue comments remain evidence for their observation window only. When documentation and live authority disagree, preserve the history and repair the stale current-use claim.
+Historical snapshots, old PR descriptions, and old issue comments remain evidence for their observation window only. When documentation and fresh runtime authority disagree, preserve the history and repair the stale present-tense claim.
