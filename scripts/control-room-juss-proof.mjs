@@ -140,7 +140,7 @@ export function createJussProofFromTestLedger(ledger, options = {}) {
     acknowledges: [],
     dependsOn: [],
     supersedes,
-    nextAuthority: 'runtime-provider-mcp',
+    nextAuthority: 'founder-control-room',
     issuedAt,
   };
 }

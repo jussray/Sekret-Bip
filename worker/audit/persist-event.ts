@@ -7,6 +7,7 @@ import type { WorkerTelemetryEvent } from '../telemetry';
 
 export interface AuditPersistEnv {
   SUPABASE_URL?: string;
+  SUPABASE_SECRET_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
 }
 
@@ -74,7 +75,7 @@ async function post(baseUrl: string, serviceKey: string, pathname: string, body:
 
 export async function persistAuditEvent(event: WorkerTelemetryEvent, env: AuditPersistEnv): Promise<void> {
   const baseUrl = env.SUPABASE_URL?.trim();
-  const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY?.trim();
+  const serviceKey = env.SUPABASE_SECRET_KEY?.trim() || env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!baseUrl || !serviceKey) return;
 
   const metadata = metadataFor(event);

@@ -150,6 +150,46 @@
       "maxMatches": 2,
       "expiresAt": "2026-10-01T00:00:00Z",
       "rationale": "These two expressions inspect repository-owned Playwright source text to verify the public apex URL and hostname assertions survived the Access fail-closed repair. They do not validate or authorize an untrusted runtime URL."
+    },
+    {
+      "id": "control-room-advisor-report-http-to-file",
+      "language": "javascript-typescript",
+      "ruleId": "js/http-to-file-access",
+      "path": "scripts/control-room-ingest-supabase-advisors.mjs",
+      "messageIncludes": "Write to file system depends on",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The script writes Supabase advisor API responses to a local evidence artifact (supabase-advisors-report.json). This is an intentional CI reporting pattern: provider findings are persisted to disk for audit trail purposes only, not for security decisions at runtime. The file path is a hard-coded artifacts/ directory constant; no network response content influences the path."
+    },
+    {
+      "id": "configure-auth-email-file-to-http",
+      "language": "javascript-typescript",
+      "ruleId": "js/file-access-to-http",
+      "path": "scripts/configure-supabase-auth-email.mjs",
+      "messageIncludes": "Outbound network request depends on",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The script reads Supabase target identifiers from config/supabase-targets.json (a committed, repository-owned registry) and uses them to construct Supabase Management API requests. The file data is version-controlled configuration read at CI time, not user-supplied or externally controlled input."
+    },
+    {
+      "id": "control-room-advisor-ingest-file-to-http",
+      "language": "javascript-typescript",
+      "ruleId": "js/file-access-to-http",
+      "path": "scripts/control-room-ingest-supabase-advisors.mjs",
+      "messageIncludes": "Outbound network request depends on",
+      "maxMatches": 2,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "Both outbound requests use URLs derived from config/supabase-targets.json (a repository-owned identity registry) and the hard-coded api.supabase.com Management API base. Both callers are CI automation operating against a repository-registered project only; no external or user-controlled content influences the destination."
+    },
+    {
+      "id": "supabase-target-identity-file-to-http",
+      "language": "javascript-typescript",
+      "ruleId": "js/file-access-to-http",
+      "path": "scripts/supabase-target-identity.mjs",
+      "messageIncludes": "Outbound network request depends on",
+      "maxMatches": 1,
+      "expiresAt": "2026-10-01T00:00:00Z",
+      "rationale": "The script reads target identifiers from config/supabase-targets.json and verifies them against the Supabase Management API. The file data is the project registry that authorizes which Supabase project can be targeted; the HTTP call enforces that the registry matches the live provider, not the reverse. The URL is constructed as a template against the hard-coded api.supabase.com base."
     }
   ]
 }

@@ -7,8 +7,8 @@
 // journal, voice, calm, comfort, circle, crew check-ins). No backend needed.
 //
 // Voice:
-//   • Rylane: "the reps stack. respect."
-//   • Raylene: "soft points 💜 you earned every single one."
+//   • Sy: "the reps stack. respect."
+//   • Suhana: "soft points 💜 you earned every single one."
 //
 // Tiers are emotional, not competitive:
 //   • cloud just forming   (0–49)

@@ -31,16 +31,15 @@ test('production verification runs after relevant main pushes', () => {
 });
 
 test('Attack 2000 observes independent production planes before long release convergence', () => {
-  const schema = workflowStep('Verify exact Supabase production schema contract');
+  const supabaseRuntime = workflowStep('Verify exact Supabase runtime and schema contracts');
   const transport = workflowStep('Record safe frontend and backend transport evidence');
   const backend = workflowStep('Verify backend health');
-  const supabaseRuntime = workflowStep('Verify Supabase runtime contracts');
   const chromium = workflowStep('Install Chromium');
   const browserObservation = workflowStep('Observe public production browser journeys independently');
   const cloudflareRelease = workflowStep('Wait for exact frontend and backend Worker checks plus release marker');
   const exactPlaywright = workflowStep('Verify exact deployed release identity with Playwright');
 
-  for (const step of [schema, transport, backend, supabaseRuntime, chromium]) {
+  for (const step of [supabaseRuntime, transport, backend, chromium]) {
     assert.match(step, /steps\.trusted_current_main\.outcome == 'success'/);
   }
 

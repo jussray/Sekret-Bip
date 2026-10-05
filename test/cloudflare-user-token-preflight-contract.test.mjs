@@ -16,7 +16,12 @@ test('Cloudflare credential preflight covers every read credential candidate wit
   assert.match(workflow, /CF_BUILD_TOKEN: \$\{\{ secrets\.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN \}\}/);
 
   assert.match(workflow, /source: 'CLOUDFLARE_APP_DOMAIN_API_TOKEN'/);
+  assert.match(workflow, /verificationPathFor/);
+  assert.match(workflow, /shape === 'account-prefixed'/);
+  assert.match(workflow, /\/accounts\/\$\{accountId\}\/tokens\/verify/);
+  assert.match(workflow, /shape === 'user-prefixed' \|\| shape === 'opaque-ascii'/);
   assert.match(workflow, /\/user\/tokens\/verify/);
+  assert.match(workflow, /transport=unsupported shape=\$\{shape\}/);
   assert.match(workflow, /pages\/projects\/sekret-bip\/domains/);
   assert.match(workflow, /workers\/domains\?hostname=app\.sekretbip\.net/);
   assert.match(workflow, /workers\/routes/);
@@ -26,6 +31,14 @@ test('Cloudflare credential preflight covers every read credential candidate wit
   assert.match(workflow, /CLOUDFLARE_READ_AUTHORITY_READY/);
 
   assert.doesNotMatch(workflow, /method:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i);
+});
+
+test('Cloudflare account-owned tokens use the account verification endpoint', () => {
+  const accountBranch = workflow.match(
+    /if \(shape === 'account-prefixed'\) return `([^`]+)`;/,
+  );
+  assert.ok(accountBranch, 'account-prefixed tokens must have an explicit verification route');
+  assert.equal(accountBranch[1], '/accounts/${accountId}/tokens/verify');
 });
 
 test('Cloudflare credential preflight reports shape and provider status without printing token contents', () => {
