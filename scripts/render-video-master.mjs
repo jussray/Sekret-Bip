@@ -139,6 +139,7 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
       '-t', String(duration),
       '-map', '0:v:0', '-map', '1:a:0',
       '-vf', videoFilter,
+      '-r', String(master.fps), '-fps_mode', 'cfr',
       '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p',
       '-c:a', 'aac', '-b:a', '160k', '-ar', '48000',
       '-movflags', '+faststart',
