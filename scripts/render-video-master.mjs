@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { copyFile, mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, extname, isAbsolute, join } from 'node:path';
+import { basename, dirname, extname, isAbsolute, join } from 'node:path';
 
 export const BIP_VIDEO_RENDERER = 'sekret-bip/approved-media-ffmpeg-master@v1';
 
@@ -21,6 +21,13 @@ function fail(message, code = 'BIP_VIDEO_RENDER_REJECTED') {
   throw error;
 }
 
+function parseRate(value) {
+  if (!value) return NaN;
+  if (!String(value).includes('/')) return Number(value);
+  const [numerator, denominator] = String(value).split('/').map(Number);
+  return denominator ? numerator / denominator : NaN;
+}
+
 function assertManifestPolicy(manifest) {
   if (manifest?.$schema !== 'sekret-bip-video-master@v1') fail('UNSUPPORTED_MANIFEST_SCHEMA');
   if (manifest?.editor?.role !== 'post-production-only') fail('EDITOR_AUTHORITY_TOO_BROAD');
@@ -28,6 +35,7 @@ function assertManifestPolicy(manifest) {
   if (manifest?.sourcePolicy?.allowUnapprovedSource !== false) fail('UNAPPROVED_SOURCE_MUST_BE_FORBIDDEN');
   if (manifest?.sourcePolicy?.allowIdentityRegeneration !== false) fail('IDENTITY_REGENERATION_MUST_BE_FORBIDDEN');
   if (manifest?.sourcePolicy?.allowInventedCharacters !== false) fail('INVENTED_CHARACTERS_MUST_BE_FORBIDDEN');
+  if (manifest?.sourcePolicy?.allowWorldAuthorityAsCharacterAuthority !== false) fail('WORLD_AUTHORITY_AS_CHARACTER_AUTHORITY_MUST_BE_FORBIDDEN');
   if (!Array.isArray(manifest?.sourcePolicy?.requiredShots) || manifest.sourcePolicy.requiredShots.length < 1) fail('REQUIRED_SHOTS_MISSING');
   const master = manifest?.master || {};
   if (master.container !== 'mp4' || master.codec !== 'h264') fail('MASTER_FORMAT_UNSUPPORTED');
@@ -66,12 +74,9 @@ function probeMedia(path) {
     width: Number(video.width || 0),
     height: Number(video.height || 0),
     durationSeconds: Number(parsed.format?.duration || video.duration || 0),
+    fps: parseRate(video.avg_frame_rate || video.r_frame_rate),
     codec: video.codec_name || null,
   };
-}
-
-function quoteConcatPath(path) {
-  return `file '${String(path).replace(/'/g, "'\\''")}'`;
 }
 
 export async function renderBipVideoMaster({ manifest, sources, outputPath, receiptPath = null, audioPath = null }) {
@@ -86,8 +91,11 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
   }
 
   const requiredShots = manifest.sourcePolicy.requiredShots.map(Number);
+  if (sources.length !== requiredShots.length) fail('SOURCE_COUNT_MUST_MATCH_REQUIRED_SHOTS');
   const sourceByShot = new Map(sources.map((source) => [Number(source?.shot), source]));
-  if (sourceByShot.size !== requiredShots.length) fail('SOURCE_COUNT_MUST_MATCH_REQUIRED_SHOTS');
+  if (sourceByShot.size !== requiredShots.length || [...sourceByShot.keys()].some((shot) => !requiredShots.includes(shot))) {
+    fail('SOURCE_SET_MUST_MATCH_REQUIRED_SHOTS');
+  }
 
   const verifiedSources = [];
   for (const shot of requiredShots) {
@@ -109,7 +117,7 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
       localSources.push(localPath);
     }
     const concatPath = join(workDir, 'concat.txt');
-    await writeFile(concatPath, `${localSources.map(quoteConcatPath).join('\n')}\n`, 'utf8');
+    await writeFile(concatPath, `${localSources.map((path) => `file '${basename(path)}'`).join('\n')}\n`, 'utf8');
 
     await mkdir(dirname(outputPath), { recursive: true });
     const master = manifest.master;
@@ -142,6 +150,8 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
 
     const outputProbe = probeMedia(outputPath);
     if (outputProbe.width !== Number(master.width) || outputProbe.height !== Number(master.height)) fail('OUTPUT_DIMENSION_MISMATCH', 'BIP_VIDEO_VERIFY_FAILED');
+    if (!Number.isFinite(outputProbe.fps) || Math.abs(outputProbe.fps - Number(master.fps)) > 0.01) fail('OUTPUT_FPS_MISMATCH', 'BIP_VIDEO_VERIFY_FAILED');
+    if (outputProbe.codec !== master.codec) fail('OUTPUT_CODEC_MISMATCH', 'BIP_VIDEO_VERIFY_FAILED');
     if (Math.abs(outputProbe.durationSeconds - duration) > Number(master.durationToleranceSeconds ?? 0.5)) fail('OUTPUT_DURATION_MISMATCH', 'BIP_VIDEO_VERIFY_FAILED');
 
     const receipt = {
@@ -154,7 +164,7 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
       master: {
         width: outputProbe.width,
         height: outputProbe.height,
-        fps: Number(master.fps),
+        fps: outputProbe.fps,
         durationSeconds: outputProbe.durationSeconds,
         codec: outputProbe.codec,
       },
