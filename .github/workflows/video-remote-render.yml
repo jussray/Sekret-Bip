@@ -1,0 +1,155 @@
+name: Bip Remote Video Render
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/render-video-master.mjs'
+      - 'scripts/verify-video-master.mjs'
+      - 'scripts/verify-video-playback.mjs'
+      - '.github/workflows/video-remote-render.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sekret-bip-video-render-queue
+  cancel-in-progress: false
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.sha }}
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out exact render subject
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify exact head
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install media tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+      - name: Materialize approved-source proof request
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/bip-remote-video"
+          mkdir -p "$work"
+          ffmpeg -nostdin -y -f lavfi -i 'color=c=0x3b0764:s=320x180:r=24:d=1' -c:v libx264 -pix_fmt yuv420p "$work/shot-1.mp4"
+          ffmpeg -nostdin -y -f lavfi -i 'color=c=0x7c3aed:s=320x180:r=24:d=1' -c:v libx264 -pix_fmt yuv420p "$work/shot-2.mp4"
+          cat > "$work/manifest.json" <<'JSON'
+          {
+            "$schema": "sekret-bip-video-master@v1",
+            "editor": { "role": "post-production-only" },
+            "sourcePolicy": {
+              "requiredShots": [1, 2],
+              "requireApprovedShotEvidence": true,
+              "allowUnapprovedSource": false,
+              "allowIdentityRegeneration": false,
+              "allowInventedCharacters": false,
+              "allowWorldAuthorityAsCharacterAuthority": false
+            },
+            "master": {
+              "container": "mp4",
+              "codec": "h264",
+              "width": 320,
+              "height": 180,
+              "fps": 24,
+              "durationSeconds": 2,
+              "durationToleranceSeconds": 0.25
+            },
+            "proof": {
+              "playwrightPlayback": "required",
+              "continuityReview": "required",
+              "finalMasterApprovalAfterAllProof": true
+            }
+          }
+          JSON
+          shot1_sha=$(sha256sum "$work/shot-1.mp4" | awk '{print $1}')
+          shot2_sha=$(sha256sum "$work/shot-2.mp4" | awk '{print $1}')
+          cat > "$work/sources.json" <<JSON
+          {
+            "shots": [
+              { "shot": 1, "path": "$work/shot-1.mp4", "approved": true, "sha256": "$shot1_sha" },
+              { "shot": 2, "path": "$work/shot-2.mp4", "approved": true, "sha256": "$shot2_sha" }
+            ]
+          }
+          JSON
+          echo "BIP_REMOTE_WORK=$work" >> "$GITHUB_ENV"
+      - name: Render through Bip-owned master CLI
+        run: |
+          node scripts/render-video-master.mjs \
+            --manifest "$BIP_REMOTE_WORK/manifest.json" \
+            --sources "$BIP_REMOTE_WORK/sources.json" \
+            --output "$BIP_REMOTE_WORK/master.mp4" \
+            --receipt "$BIP_REMOTE_WORK/render-receipt.json" | tee "$BIP_REMOTE_WORK/render-output.json"
+          grep -q '"kind": "RENDERED"' "$BIP_REMOTE_WORK/render-output.json"
+          test -s "$BIP_REMOTE_WORK/master.mp4"
+      - name: Verify master contract
+        run: |
+          npm run verify:video:master -- \
+            --manifest "$BIP_REMOTE_WORK/manifest.json" \
+            --media "$BIP_REMOTE_WORK/master.mp4" \
+            --receipt "$BIP_REMOTE_WORK/master-proof.json"
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright playback proof
+        run: |
+          npm run verify:video:playback -- \
+            --manifest "$BIP_REMOTE_WORK/manifest.json" \
+            --media "$BIP_REMOTE_WORK/master.mp4" \
+            --receipt "$BIP_REMOTE_WORK/playback-proof.json"
+      - name: Bind remote execution receipt
+        env:
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import crypto from 'node:crypto';
+          const work = process.env.BIP_REMOTE_WORK;
+          const digest = (name) => crypto.createHash('sha256').update(fs.readFileSync(`${work}/${name}`)).digest('hex');
+          const receipt = {
+            schema: 'sekret-bip/remote-video-render@v1',
+            project: 'Sekret-Bip',
+            gitSha: process.env.GITHUB_SHA,
+            runId: process.env.RUN_ID,
+            runAttempt: process.env.RUN_ATTEMPT,
+            manifestSha256: digest('manifest.json'),
+            sourcesSha256: digest('sources.json'),
+            outputSha256: digest('master.mp4'),
+            renderAuthority: true,
+            publishAuthority: false,
+            sourcePolicy: {
+              approvedEvidenceRequired: true,
+              identityRegenerationAllowed: false,
+              inventedCharactersAllowed: false
+            },
+            verifiedBy: ['ffprobe', 'master-contract', 'playwright']
+          };
+          fs.writeFileSync(`${work}/remote-execution-receipt.json`, `${JSON.stringify(receipt, null, 2)}\n`);
+          NODE
+      - name: Retain master and proof receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: bip-video-render-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.BIP_REMOTE_WORK }}/
+          if-no-files-found: error
+          retention-days: 7
