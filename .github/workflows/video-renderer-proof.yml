@@ -4,28 +4,121 @@ on:
   push:
     paths:
       - 'scripts/render-video-master.mjs'
+      - 'scripts/verify-video-master.mjs'
+      - 'scripts/verify-video-playback.mjs'
       - 'test/video-render-master.test.mjs'
+      - '.claude/skills/makevideo/SKILL.md'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/video-renderer-proof.yml'
   pull_request:
     paths:
       - 'scripts/render-video-master.mjs'
+      - 'scripts/verify-video-master.mjs'
+      - 'scripts/verify-video-playback.mjs'
       - 'test/video-render-master.test.mjs'
+      - '.claude/skills/makevideo/SKILL.md'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/video-renderer-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
 jobs:
   render-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Check out exact proof subject
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Verify exact head
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: 22
+          cache: npm
+      - run: npm ci
       - name: Install media tooling
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
           ffmpeg -version | head -1
           ffprobe -version | head -1
-      - name: Render and probe a real Bip MP4
+      - name: Focused renderer tests
         run: node --test test/video-render-master.test.mjs
+      - name: Render through the public CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          work=/tmp/bip-video-proof
+          mkdir -p "$work"
+          ffmpeg -nostdin -y -f lavfi -i 'color=c=0x3b0764:s=320x180:r=24:d=1' -c:v libx264 -pix_fmt yuv420p "$work/shot-1.mp4"
+          ffmpeg -nostdin -y -f lavfi -i 'color=c=0x7c3aed:s=320x180:r=24:d=1' -c:v libx264 -pix_fmt yuv420p "$work/shot-2.mp4"
+          cat > "$work/manifest.json" <<'JSON'
+          {
+            "$schema": "sekret-bip-video-master@v1",
+            "editor": { "role": "post-production-only" },
+            "sourcePolicy": {
+              "requiredShots": [1, 2],
+              "requireApprovedShotEvidence": true,
+              "allowUnapprovedSource": false,
+              "allowIdentityRegeneration": false,
+              "allowInventedCharacters": false,
+              "allowWorldAuthorityAsCharacterAuthority": false
+            },
+            "master": {
+              "container": "mp4",
+              "codec": "h264",
+              "width": 320,
+              "height": 180,
+              "fps": 24,
+              "durationSeconds": 2,
+              "durationToleranceSeconds": 0.25
+            },
+            "proof": {
+              "playwrightPlayback": "required",
+              "continuityReview": "required",
+              "finalMasterApprovalAfterAllProof": true
+            }
+          }
+          JSON
+          shot1_sha=$(sha256sum "$work/shot-1.mp4" | awk '{print $1}')
+          shot2_sha=$(sha256sum "$work/shot-2.mp4" | awk '{print $1}')
+          cat > "$work/sources.json" <<JSON
+          {
+            "shots": [
+              { "shot": 1, "path": "$work/shot-1.mp4", "approved": true, "sha256": "$shot1_sha" },
+              { "shot": 2, "path": "$work/shot-2.mp4", "approved": true, "sha256": "$shot2_sha" }
+            ]
+          }
+          JSON
+          node scripts/render-video-master.mjs \
+            --manifest "$work/manifest.json" \
+            --sources "$work/sources.json" \
+            --output "$work/master.mp4" \
+            --receipt "$work/render-receipt.json" | tee "$work/render-output.json"
+          grep -q '"kind": "RENDERED"' "$work/render-output.json"
+          test -s "$work/master.mp4"
+          npm run verify:video:master -- \
+            --manifest "$work/manifest.json" \
+            --media "$work/master.mp4" \
+            --receipt "$work/master-proof.json"
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Playwright playback proof
+        run: |
+          npm run verify:video:playback -- \
+            --manifest /tmp/bip-video-proof/manifest.json \
+            --media /tmp/bip-video-proof/master.mp4 \
+            --receipt /tmp/bip-video-proof/playback-proof.json
