@@ -1,4 +1,5 @@
 name: Bip Remote Video Render
+run-name: Bip video render ${{ inputs.request_id || github.run_id }}
 
 on:
   push:
@@ -9,6 +10,24 @@ on:
       - 'scripts/verify-video-playback.mjs'
       - '.github/workflows/video-remote-render.yml'
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: 'Caller correlation id.'
+        required: true
+        type: string
+      expected_head_sha:
+        description: 'Exact current main SHA observed before dispatch.'
+        required: true
+        type: string
+      request_sha256:
+        description: 'SHA-256 of canonical {profile,requestId}.'
+        required: true
+        type: string
+      profile:
+        description: 'Locked render profile.'
+        required: true
+        default: 'approved-source-proof-v1'
+        type: string
 
 permissions:
   contents: read
@@ -18,7 +37,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  EXPECTED_HEAD_SHA: ${{ github.sha }}
+  EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha || github.sha }}
+  REQUEST_ID: ${{ inputs.request_id || '' }}
+  EXPECTED_REQUEST_SHA: ${{ inputs.request_sha256 || '' }}
+  RENDER_PROFILE: ${{ inputs.profile || 'approved-source-proof-v1' }}
 
 jobs:
   render:
@@ -32,7 +54,13 @@ jobs:
           fetch-depth: 1
           persist-credentials: false
       - name: Verify exact head
-        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            test "$GITHUB_SHA" = "$EXPECTED_HEAD_SHA"
+          fi
       - name: Set up Node
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444
         with:
@@ -46,12 +74,41 @@ jobs:
           sudo apt-get install -y ffmpeg
           ffmpeg -version | head -1
           ffprobe -version | head -1
+      - name: Admit locked external request
+        run: |
+          work="$RUNNER_TEMP/bip-remote-video"
+          mkdir -p "$work"
+          echo "BIP_REMOTE_WORK=$work" >> "$GITHUB_ENV"
+          node --input-type=module <<'NODE'
+          import crypto from 'node:crypto';
+          import fs from 'node:fs';
+
+          const requestId = process.env.REQUEST_ID?.trim() || null;
+          const profile = process.env.RENDER_PROFILE?.trim();
+          if (profile !== 'approved-source-proof-v1') throw new Error('Only the locked approved-source-proof-v1 profile is externally invokable.');
+          if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' && !requestId) throw new Error('request_id is required for external dispatch');
+          const canonical = JSON.stringify({ profile, requestId });
+          const requestSha256 = crypto.createHash('sha256').update(canonical).digest('hex');
+          const expected = process.env.EXPECTED_REQUEST_SHA?.trim();
+          if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' && !expected) throw new Error('request_sha256 is required for external dispatch');
+          if (expected && expected !== requestSha256) throw new Error('external request fingerprint mismatch');
+          fs.writeFileSync(`${process.env.RUNNER_TEMP}/bip-remote-video/admission-receipt.json`, `${JSON.stringify({
+            schema: 'sekret-bip/remote-video-admission@v1',
+            requestId,
+            profile,
+            requestSha256,
+            expectedHeadSha: process.env.EXPECTED_HEAD_SHA,
+            externalMediaIngressAllowed: false,
+            approvedSourceEvidenceRequired: true,
+            renderAuthority: true,
+            publishAuthority: false
+          }, null, 2)}\n`);
+          NODE
       - name: Materialize approved-source proof request
         shell: bash
         run: |
           set -euo pipefail
-          work="$RUNNER_TEMP/bip-remote-video"
-          mkdir -p "$work"
+          work="$BIP_REMOTE_WORK"
           ffmpeg -nostdin -y -f lavfi -i 'color=c=0x3b0764:s=320x180:r=24:d=1' -c:v libx264 -pix_fmt yuv420p "$work/shot-1.mp4"
           ffmpeg -nostdin -y -f lavfi -i 'color=c=0x7c3aed:s=320x180:r=24:d=1' -c:v libx264 -pix_fmt yuv420p "$work/shot-2.mp4"
           cat > "$work/manifest.json" <<'JSON'
@@ -92,7 +149,6 @@ jobs:
             ]
           }
           JSON
-          echo "BIP_REMOTE_WORK=$work" >> "$GITHUB_ENV"
       - name: Render through Bip-owned master CLI
         run: |
           node scripts/render-video-master.mjs \
@@ -126,10 +182,15 @@ jobs:
           import crypto from 'node:crypto';
           const work = process.env.BIP_REMOTE_WORK;
           const digest = (name) => crypto.createHash('sha256').update(fs.readFileSync(`${work}/${name}`)).digest('hex');
+          const admission = JSON.parse(fs.readFileSync(`${work}/admission-receipt.json`, 'utf8'));
           const receipt = {
             schema: 'sekret-bip/remote-video-render@v1',
             project: 'Sekret-Bip',
+            requestId: admission.requestId,
+            profile: admission.profile,
+            requestSha256: admission.requestSha256,
             gitSha: process.env.GITHUB_SHA,
+            expectedHeadSha: admission.expectedHeadSha,
             runId: process.env.RUN_ID,
             runAttempt: process.env.RUN_ATTEMPT,
             manifestSha256: digest('manifest.json'),
@@ -139,6 +200,7 @@ jobs:
             publishAuthority: false,
             sourcePolicy: {
               approvedEvidenceRequired: true,
+              externalMediaIngressAllowed: false,
               identityRegenerationAllowed: false,
               inventedCharactersAllowed: false
             },
