@@ -5,7 +5,7 @@
 
 🌐 **Official site:** https://sekretbip.net
 
-Se’kret Bip is built for teens and the families who support them. It combines private reflection, journaling, voice, comfort tools, companions, relationship-aware family experiences, and expressive social spaces without turning parent access into surveillance.
+Se’kret Bip is built for teens and the families who support them. It combines private reflection, journaling, voice, comfort tools, companions, relationship-aware family experiences, and expressive social spaces without turning parent access into surveillance. The product centers privacy-first emotional growth and self-expression while preserving clear family and safety boundaries.
 
 > **Boundary:** Se’kret Bip is not a medical, therapy, crisis, or emergency service. It does not diagnose users or replace professional or emergency care.
 
@@ -81,7 +81,7 @@ A preferred future topology delegates companion requests from `sekret-backend` t
 
 Privileged secrets such as `SUPABASE_SERVICE_ROLE_KEY` must not be duplicated into the companion Worker merely for convenience.
 
-## Truth boundary
+## Live truth boundary
 
 This README documents **durable product and architecture contracts**, not a live deployment verdict.
 
