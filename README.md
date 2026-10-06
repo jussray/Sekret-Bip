@@ -42,6 +42,8 @@ Bip Jr experiences are part of the broader family product direction and remain s
 
 Se’kret Bip’s visual world is part of the experience, but character art is **not** the product architecture.
 
+Cosmic and character art is visual DNA and atmosphere, not product architecture.
+
 The approved canonical character family currently includes:
 
 - **Night** — The Watcher
