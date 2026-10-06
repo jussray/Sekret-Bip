@@ -29,6 +29,10 @@ test('promoted cleanup migration stays bound to the reviewed candidate', () => {
 });
 
 test('cleanup fails closed on data and removes only the non-canonical duplicate path', () => {
+  const executableCleanup = cleanup
+    .split(/\r?\n/)
+    .filter((line) => !line.trimStart().startsWith('--'))
+    .join('\n');
   assert.match(cleanup, /select count\(\*\) from public\.user_profiles/i);
   assert.match(cleanup, /select count\(\*\) from public\.consent_log/i);
   assert.match(cleanup, /RAISE EXCEPTION/);
@@ -38,5 +42,5 @@ test('cleanup fails closed on data and removes only the non-canonical duplicate 
   assert.match(cleanup, /DROP FUNCTION IF EXISTS public\.record_initial_consent\(date, text, text, text, boolean, text, text\)/);
   assert.match(cleanup, /DROP TABLE IF EXISTS public\.consent_log/);
   assert.match(cleanup, /DROP TABLE IF EXISTS public\.user_profiles/);
-  assert.doesNotMatch(cleanup, /\bCASCADE\b/i);
+  assert.doesNotMatch(executableCleanup, /\bCASCADE\b/i);
 });
