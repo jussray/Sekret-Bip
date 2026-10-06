@@ -25,6 +25,11 @@ export function normalizeCloudflareTokenTransport(value) {
   } while (token !== previous);
 
   token = token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+  // A prior production secret was proven to contain U+0441 CYRILLIC SMALL
+  // LETTER ES in place of ASCII `c`. Cloudflare API tokens are ASCII-only,
+  // so repair only that exact observed transport homoglyph and fail closed on
+  // every other non-ASCII character.
+  token = token.replace(/\u0441/gu, 'c');
   return {
     token,
     changed: token !== raw,
