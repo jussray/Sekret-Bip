@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const migrationPath = 'supabase/migrations/20261006020000_social_surfaces_permanent_accounts_only.sql';
+const migrationPath = 'supabase/migrations/20261006040000_social_surfaces_permanent_accounts_only.sql';
 const readMigration = () => readFile(new URL(`../${migrationPath}`, import.meta.url), 'utf8');
 
 const SOCIAL_SURFACES = [
