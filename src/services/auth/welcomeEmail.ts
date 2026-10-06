@@ -1,5 +1,7 @@
 import { getSupabase } from '@/utils/supabase';
 
+const WELCOME_EMAIL_TIMEOUT_MS = 4_000;
+
 export type WelcomeEmailStatus =
   | 'sent'
   | 'already_sent'
@@ -24,9 +26,16 @@ export async function ensureWelcomeEmail(): Promise<WelcomeEmailResult> {
   if (!supabase) return { ok: false, status: 'unavailable' };
 
   try {
-    const { data, error } = await supabase.functions.invoke('send-welcome-email', {
+    const invocation = supabase.functions.invoke('send-welcome-email', {
       body: {},
     });
+    const timeout = new Promise<{ data: null; error: Error }>((resolve) => {
+      setTimeout(() => resolve({
+        data: null,
+        error: new Error('welcome_email_timeout'),
+      }), WELCOME_EMAIL_TIMEOUT_MS);
+    });
+    const { data, error } = await Promise.race([invocation, timeout]);
 
     if (error || !data || typeof data !== 'object') {
       console.warn('[welcome-email] delivery function unavailable');
