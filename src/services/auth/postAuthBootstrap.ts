@@ -2,7 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { hydrateAccountProfile, type AccountProfile, type AccountSide } from '@/features/identity/accountProfile';
 import { getCurrentFounderProfileForRouting, isFounderProfile } from '@/services/founderAudit';
-import { ensureWelcomeEmail } from '@/services/auth/welcomeEmail';\nimport { getSupabase } from '@/utils/supabase';
+import { ensureWelcomeEmail } from '@/services/auth/welcomeEmail';
+import { getSupabase } from '@/utils/supabase';
 import { consentService } from '../../../services/consentService';
 
 export const ONBOARDING_SIDE_KEY = 'bip_onboarding_side';
@@ -90,7 +91,12 @@ export async function fetchPostAuthBootstrap(
     };
   }
 
-  // Welcome delivery is deliberately non-authoritative for routing: the helper\n  // swallows provider failures so onboarding can continue, while the server\n  // owns recipient identity, personalization, and duplicate prevention.\n  await ensureWelcomeEmail();\n\n  const requestedSide = await resolvePreferredSide(preferredSide);
+  // Welcome delivery is deliberately non-authoritative for routing: the helper
+  // swallows provider failures so onboarding can continue, while the server
+  // owns recipient identity, personalization, and duplicate prevention.
+  await ensureWelcomeEmail();
+
+  const requestedSide = await resolvePreferredSide(preferredSide);
   const profile = prehydratedProfile === undefined
     ? await hydrateAccountProfileForRouting(requestedSide)
     : prehydratedProfile;
