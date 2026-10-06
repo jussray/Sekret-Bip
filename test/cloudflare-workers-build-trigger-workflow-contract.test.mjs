@@ -57,6 +57,7 @@ test('Cloudflare token transport canonicalizes common secret wrappers and flags 
     ["CLOUDFLARE_API_TOKEN='Bearer\u00a0abc\u200b123'", 'abc123', true],
     ['CLOUDFLARE_API_TOKEN=“Bearer\u00a0abc\u200b123”', 'abc123', true],
     ['abс123', 'abc123', true],
+    ['сlоudflаre‐token', 'cloudflare-token', true],
   ]) {
     const result = normalizeCloudflareTokenTransport(input);
     assert.equal(result.token, expected, input);
