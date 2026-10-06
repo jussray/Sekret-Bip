@@ -196,6 +196,7 @@ export const PRODUCTION_MIGRATION_VERSIONS = Object.freeze([
   '20260919191000',
   '20260927185000',
   '20261004215523',
+  '20261006031559',
 ]);
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -250,9 +251,9 @@ export function inspectProductionMigrationCoverage({
 }
 
 export function assertProductionMigrationCoverage(options = {}) {
-  if (PRODUCTION_MIGRATION_VERSIONS.length !== 191) {
+  if (PRODUCTION_MIGRATION_VERSIONS.length !== 192) {
     throw new Error(
-      `Pinned production migration ledger must contain exactly 191 versions; observed ${PRODUCTION_MIGRATION_VERSIONS.length}.`,
+      `Pinned production migration ledger must contain exactly 192 versions; observed ${PRODUCTION_MIGRATION_VERSIONS.length}.`,
     );
   }
 
