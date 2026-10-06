@@ -22,7 +22,7 @@ test('post-auth bootstrap invokes welcome delivery only after founder routing is
 });
 
 test('client never supplies recipient identity or personalization fields', () => {
-  assert.match(client, /functions\.invoke\('send-welcome-email',\s*\{\s*body:\s*\{\}\s*\}\)/);
+  assert.match(client, /functions\.invoke\('send-welcome-email',\s*\{\s*body:\s*\{\},?\s*\}\)/);
   assert.doesNotMatch(client, /email\s*:/);
   assert.doesNotMatch(client, /displayName\s*:/);
   assert.doesNotMatch(client, /accountSide\s*:/);
