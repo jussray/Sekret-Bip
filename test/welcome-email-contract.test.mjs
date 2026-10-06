@@ -52,3 +52,9 @@ test('welcome email includes onboarding and public documentation links', () => {
   assert.match(edge, /WELCOME_APP_ORIGIN/);
   assert.match(edge, /Se'kret Bip is not a diagnosis/);
 });
+
+
+test('welcome delivery cannot indefinitely block onboarding', () => {
+  assert.match(client, /WELCOME_EMAIL_TIMEOUT_MS = 4_000/);
+  assert.match(client, /Promise\.race\(\[invocation, timeout\]\)/);
+});
