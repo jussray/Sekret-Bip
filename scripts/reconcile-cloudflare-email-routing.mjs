@@ -188,7 +188,7 @@ async function ensureVerifiedDestination(config) {
       body: { email: config.destinationEmail },
     });
     destination = created?.result;
-    console.log(`DESTINATION_CREATED email=${maskEmail(config.destinationEmail)}`);
+    console.log('DESTINATION_CREATED');
   }
 
   if (!destination?.verified) {
@@ -197,7 +197,7 @@ async function ensureVerifiedDestination(config) {
     );
   }
 
-  console.log(`DESTINATION_VERIFIED email=${maskEmail(config.destinationEmail)}`);
+  console.log('DESTINATION_VERIFIED');
   return destination;
 }
 
