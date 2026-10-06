@@ -87,6 +87,8 @@ Privileged secrets such as `SUPABASE_SERVICE_ROLE_KEY` must not be duplicated in
 
 This README documents **durable product and architecture contracts**, not a live deployment verdict.
 
+This README does **not** declare the live release SHA.
+
 Do not use README prose alone to claim the current production SHA, Cloudflare routing, Supabase runtime state, open/closed issue state, or launch readiness. Resolve current truth from fresh evidence:
 
 1. GitHub `main`, PRs, issues, checks, reviews, jobs, and logs;
