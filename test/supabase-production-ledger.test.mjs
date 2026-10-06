@@ -9,12 +9,12 @@ import {
 
 test('repository covers the observed production Supabase migration ledger exactly by version', () => {
   assert.equal(PRODUCTION_PROJECT_REF, 'tbsevonvegdnlyjgplmm');
-  assert.equal(PRODUCTION_MIGRATION_VERSIONS.length, 183);
-  assert.equal(new Set(PRODUCTION_MIGRATION_VERSIONS).size, 183);
+  assert.equal(PRODUCTION_MIGRATION_VERSIONS.length, 191);
+  assert.equal(new Set(PRODUCTION_MIGRATION_VERSIONS).size, 191);
 
   const receipt = assertProductionMigrationCoverage();
 
-  assert.equal(receipt.expectedProductionCount, 183);
+  assert.equal(receipt.expectedProductionCount, 191);
   assert.deepEqual(receipt.missingProductionVersions, []);
   assert.deepEqual(receipt.duplicateLocalVersions, []);
 });
