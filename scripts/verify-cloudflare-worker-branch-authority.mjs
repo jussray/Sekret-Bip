@@ -17,7 +17,7 @@ const terminal = new Set(['success', 'fail', 'skipped', 'cancelled', 'terminated
 const active = (rows) => (Array.isArray(rows) ? rows : []).filter((row) => !row?.deleted_on);
 
 const receipt = {
-  schemaVersion: 12,
+  schemaVersion: 13,
   generatedAt: new Date().toISOString(),
   trustedGitRef: process.env.GITHUB_REF || null,
   trustedGitSha: process.env.GITHUB_SHA || null,
@@ -33,9 +33,9 @@ const receipt = {
   },
   providerTopology: {
     workers: [
-      { name: separateWorker, previousName: previousSeparateWorker, role: 'separate-protected', mutationAuthorized: false },
-      { name: productionWorker, role: 'production' },
-      { name: alphaWorker, role: 'founder-gated-alpha', mutationAuthorized: false },
+      { name: separateWorker, previousName: previousSeparateWorker, role: 'separate-protected', requiredPresence: true, mutationAuthorized: false },
+      { name: productionWorker, role: 'production', requiredPresence: true },
+      { name: alphaWorker, role: 'founder-gated-alpha', requiredPresence: false, mutationAuthorized: false },
     ],
     pages: [{ name: pagesProject, role: 'frontend', mutationAuthorized: false }],
   },
@@ -68,6 +68,9 @@ const receipt = {
   alphaWorker: {
     name: alphaWorker,
     scriptTag: null,
+    observed: false,
+    expectedPresence: 'optional-until-founder-approved',
+    deploymentState: 'not-deployed-until-founder-approved',
     activeTriggerCount: null,
     founderGatedObservationOnly: true,
   },
@@ -121,10 +124,9 @@ function inspectToken(rawValue, source) {
   };
 }
 
-async function verifyApiTokenAt(inspected, owner) {
-  const accountOwned = owner === 'account';
-  const providerPath = accountOwned ? `/accounts/${accountId}/tokens/verify` : '/user/tokens/verify';
-  const probe = accountOwned ? 'token-verify-account' : 'token-verify-user';
+async function verifyUserApiToken(inspected) {
+  const providerPath = '/user/tokens/verify';
+  const probe = 'token-verify-user';
   let response;
   try {
     response = await fetch(`${API}${providerPath}`, {
@@ -141,7 +143,7 @@ async function verifyApiTokenAt(inspected, owner) {
     return {
       ok: false,
       code: 'token-verify-request-failed',
-      message: `${inspected.source} could not be verified as a Cloudflare ${owner} API token before provider response.`,
+      message: `${inspected.source} could not be verified as a Cloudflare user API token before provider response.`,
       shape: inspected.shape,
       providerStatus: null,
       providerCode: null,
@@ -168,7 +170,7 @@ async function verifyApiTokenAt(inspected, owner) {
     return {
       ok: false,
       code: 'token-not-active-or-invalid',
-      message: `${inspected.source} is not an active Cloudflare ${owner} API token; verify status ${response.status}${providerCode === null ? '' : ` code ${providerCode}`}.`,
+      message: `${inspected.source} is not an active Cloudflare user API token; verify status ${response.status}${providerCode === null ? '' : ` code ${providerCode}`}.`,
       shape: inspected.shape,
       providerStatus: response.status,
       providerCode,
@@ -176,24 +178,30 @@ async function verifyApiTokenAt(inspected, owner) {
     };
   }
 
-  return { ok: true, owner };
+  return { ok: true, owner: 'user' };
 }
 
 async function verifyApiToken(inspected) {
-  if (inspected.shape === 'account-prefixed') return verifyApiTokenAt(inspected, 'account');
-  if (inspected.shape === 'user-prefixed') return verifyApiTokenAt(inspected, 'user');
+  if (inspected.shape === 'account-prefixed') {
+    receipt.credential.attempts.push({
+      source: inspected.source,
+      shape: inspected.shape,
+      probe: 'workers-builds-token-scope',
+      result: 'rejected-preflight',
+      failureCode: 'workers-builds-account-token-unsupported',
+    });
+    return {
+      ok: false,
+      code: 'workers-builds-account-token-unsupported',
+      message: `${inspected.source} must be a user-scoped Cloudflare API token because the Workers Builds API does not support account-owned API tokens.`,
+      shape: inspected.shape,
+      providerStatus: null,
+      providerCode: null,
+      tokenStatus: null,
+    };
+  }
 
-  const userResult = await verifyApiTokenAt(inspected, 'user');
-  if (userResult.ok) return userResult;
-
-  const accountResult = await verifyApiTokenAt(inspected, 'account');
-  if (accountResult.ok) return accountResult;
-
-  return {
-    ...accountResult,
-    code: 'token-not-active-or-invalid',
-    message: `${inspected.source} is not an active Cloudflare user or account API token.`,
-  };
+  return verifyUserApiToken(inspected);
 }
 
 async function probeWorkersRead(rawValue, source) {
@@ -297,17 +305,20 @@ const productionMatches = findWorker(productionWorker);
 const alphaMatches = findWorker(alphaWorker);
 if (separateMatches.length !== 1) fail('worker-identity-mismatch', `${separateWorker}: expected exactly one Worker, found ${separateMatches.length}.`, { worker: separateWorker, previousName: previousSeparateWorker, observedCount: separateMatches.length });
 if (productionMatches.length !== 1) fail('worker-identity-mismatch', `${productionWorker}: expected exactly one Worker, found ${productionMatches.length}.`, { worker: productionWorker, observedCount: productionMatches.length });
-if (alphaMatches.length !== 1) fail('worker-identity-mismatch', `${alphaWorker}: expected exactly one Worker, found ${alphaMatches.length}.`, { worker: alphaWorker, observedCount: alphaMatches.length });
+if (alphaMatches.length > 1) fail('worker-identity-mismatch', `${alphaWorker}: expected at most one founder-gated Worker, found ${alphaMatches.length}.`, { worker: alphaWorker, observedCount: alphaMatches.length, expectedPresence: 'optional-until-founder-approved' });
 
 const separateTag = clean(separateMatches[0]?.tag);
 const productionTag = clean(productionMatches[0]?.tag);
-const alphaTag = clean(alphaMatches[0]?.tag);
-if (!separateTag || !productionTag || !alphaTag) fail('worker-tag-missing', 'All protected Worker identities must expose immutable script tags.');
+const alphaTag = alphaMatches.length === 1 ? clean(alphaMatches[0]?.tag) : '';
+if (!separateTag || !productionTag) fail('worker-tag-missing', 'Required active Worker identities must expose immutable script tags.');
+if (alphaMatches.length === 1 && !alphaTag) fail('worker-tag-missing', `${alphaWorker}: observed founder-gated Worker must expose an immutable script tag.`, { worker: alphaWorker });
 
 receipt.separateWorker.scriptTag = separateTag;
 receipt.separateWorkerObserved = true;
 receipt.productionWorker.scriptTag = productionTag;
-receipt.alphaWorker.scriptTag = alphaTag;
+receipt.alphaWorker.observed = alphaMatches.length === 1;
+receipt.alphaWorker.scriptTag = alphaTag || null;
+receipt.alphaWorker.deploymentState = alphaTag ? 'deployed-founder-gated-observation-only' : 'not-deployed-until-founder-approved';
 writeReceipt();
 
 const separateTriggerRows = await get(`/accounts/${accountId}/builds/workers/${separateTag}/triggers`);
@@ -346,7 +357,7 @@ const verifiedMainOnly = activeTriggers.length === 1 &&
   deployCommand === 'npm run deploy:api:production' &&
   buildCommand === '' &&
   activeNonMainBuilds.length === 0;
-const alphaTriggers = await get(`/accounts/${accountId}/builds/workers/${alphaTag}/triggers`);
+const alphaTriggers = alphaTag ? await get(`/accounts/${accountId}/builds/workers/${alphaTag}/triggers`) : [];
 
 receipt.separateWorker.activeTriggerCount = separateActiveTriggers.length;
 receipt.separateWorker.branchIncludes = separateIncludes;

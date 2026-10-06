@@ -486,7 +486,7 @@ test('production verifier serializes release checks and revalidates current main
 
   const installIndex = workflow.indexOf('name: Install repository dependencies');
   const revalidateIndex = workflow.indexOf('name: Revalidate current main before Production secret use');
-  const schemaWitnessIndex = workflow.indexOf('name: Verify exact Supabase production schema contract');
+  const schemaWitnessIndex = workflow.indexOf('name: Verify exact Supabase runtime and schema contracts');
   const secretIndex = workflow.indexOf('SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}');
 
   for (const [label, index] of [

@@ -94,12 +94,12 @@ const createVibe = (
 
 export const VIBE_DESIGN_TOKENS: Record<VibeKey, VibeDesignTokenSet> = {
   raylene: createVibe(
-    { vibeKey: 'raylene', displayName: "Raylene's Room", atmosphere: 'companion-day', character: 'raylene', isAtmosphereOnly: false },
+    { vibeKey: 'raylene', displayName: "Suhana's Room", atmosphere: 'companion-day', character: 'raylene', isAtmosphereOnly: false },
     { bg: '#FFF8EE', card: '#FFF1E6', cardAlt: '#FFE8D6', accentA: '#FFB289', accentB: '#FFD166', accentC: '#F4A0C8', textHigh: '#2C1A0E', textMid: '#7A5030', textLow: '#B08060', divider: 'rgba(44,26,14,0.08)', glowColor: '#FFB289', glowRadius: 48, selectorRing: '#FFB289' },
     { base: 'rgba(255,248,238,0.70)', accent: 'rgba(255,209,102,0.14)', primary: 'rgba(255,178,137,0.06)' },
   ),
   rylane: createVibe(
-    { vibeKey: 'rylane', displayName: 'Rylane After Dark', atmosphere: 'companion-day', character: 'rylane', isAtmosphereOnly: false },
+    { vibeKey: 'rylane', displayName: 'Sy After Dark', atmosphere: 'companion-day', character: 'rylane', isAtmosphereOnly: false },
     { bg: '#EFF6FA', card: '#E4EFF6', cardAlt: '#D6E8F3', accentA: '#7EC8E3', accentB: '#A8E6CF', accentC: '#FFB289', textHigh: '#0E2433', textMid: '#3A6070', textLow: '#7AACBA', divider: 'rgba(14,36,51,0.08)', glowColor: '#7EC8E3', glowRadius: 52, selectorRing: '#7EC8E3' },
     { base: 'rgba(239,246,250,0.72)', accent: 'rgba(168,230,207,0.12)', primary: 'rgba(126,200,227,0.07)' },
   ),

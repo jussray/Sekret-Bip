@@ -8,11 +8,14 @@ const workerVerifier = await readFile(new URL('../scripts/verify-cloudflare-work
 const pagesVerifier = await readFile(new URL('../scripts/verify-cloudflare-pages-branch-authority.mjs', import.meta.url), 'utf8');
 const targets = JSON.parse(await readFile(new URL('../config/cloudflare-targets.json', import.meta.url), 'utf8'));
 
-test('provider topology preserves bip, canonical backend, founder-gated alpha, and Pages authorities', () => {
+test('provider topology preserves active Workers separately from the founder-gated alpha plan and Pages authority', () => {
   assert.equal(targets.production.worker.name, 'sekret-backend');
   assert.equal(targets.nonProduction.worker.name, 'sekret-backend-alpha');
+  assert.equal(targets.nonProduction.worker.status, 'founder-gated-not-deployed');
+  assert.equal(targets.nonProduction.worker.provisioningAuthority, 'explicit-founder-approval-required');
   assert.equal(targets.production.pages.name, 'sekret-bip');
-  assert.deepEqual(targets.providerInventory.workers, ['bip', 'sekret-backend', 'sekret-backend-alpha']);
+  assert.deepEqual(targets.providerInventory.workers, ['bip', 'sekret-backend']);
+  assert.deepEqual(targets.providerInventory.founderGatedPlannedWorkers, ['sekret-backend-alpha']);
   assert.deepEqual(targets.providerInventory.pages, ['sekret-bip']);
   assert.equal(targets.separateWorkerAuthorities.bip.status, 'founder-confirmed-renamed-from-sekret');
   assert.equal(targets.separateWorkerAuthorities.bip.previousName, 'sekret');
@@ -54,27 +57,31 @@ test('Pages audit remains read-only, Production-bound, and uses only explicitly 
   assert.match(pagesVerifier, /mutationPerformed: false/);
 });
 
-test('read-only audit observes bip separately while keeping backend branch repair isolated', () => {
+test('read-only audit observes bip separately while keeping backend branch repair isolated and alpha optional until approval', () => {
   assert.match(auditWorkflow, /Audit Cloudflare Worker and Pages Branch Authority/);
   assert.match(workerVerifier, /const separateWorker = 'bip'/);
   assert.match(workerVerifier, /const previousSeparateWorker = 'sekret'/);
   assert.match(workerVerifier, /const productionWorker = 'sekret-backend'/);
   assert.match(workerVerifier, /const alphaWorker = 'sekret-backend-alpha'/);
   assert.match(workerVerifier, /role: 'separate-protected'/);
+  assert.match(workerVerifier, /expectedPresence: 'optional-until-founder-approved'/);
   assert.match(workerVerifier, /bindingAuthority: 'provider-readback-required'/);
   assert.match(workerVerifier, /mutationAuthorized: false/);
   assert.match(workerVerifier, /mode: 'read-only'/);
   assert.match(workerVerifier, /mutationPerformed: false/);
 });
 
-test('Workers credential shape checks stay fail-closed while supporting user, account-owned, and legacy token verification', () => {
+test('Workers Builds credential checks fail closed and reject account-owned tokens before provider reads', () => {
   assert.match(workerVerifier, /startsWith\('cfat_'\)/);
   assert.match(workerVerifier, /account-prefixed/);
   assert.match(workerVerifier, /startsWith\('cfut_'\)/);
   assert.match(workerVerifier, /user-prefixed/);
   assert.match(workerVerifier, /legacy-opaque/);
-  assert.match(workerVerifier, /token-verify-account/);
+  assert.match(workerVerifier, /workers-builds-account-token-unsupported/);
+  assert.match(workerVerifier, /Workers Builds API does not support account-owned API tokens/);
+  assert.match(workerVerifier, /workers-builds-token-scope/);
   assert.match(workerVerifier, /token-verify-user/);
+  assert.doesNotMatch(workerVerifier, /token-verify-account/);
   assert.match(workerVerifier, /token-leading-or-trailing-whitespace/);
   assert.match(workerVerifier, /token-bearer-prefix-stored/);
   assert.match(workerVerifier, /token-quoted-secret/);
