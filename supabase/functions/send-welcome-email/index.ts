@@ -1,10 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import {
-  getSupabasePublishableKey,
-  getSupabaseSecretKey,
-} from "../_shared/supabase-api-keys.ts";
-
 type AccountSide = "teen" | "parent";
 
 type AppProfile = {
@@ -25,6 +20,39 @@ const JSON_HEADERS = {
 };
 
 const WELCOME_EMAIL_VERSION = 1;
+
+function cleanEnv(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
+}
+
+function readNamedDefault(envName: string): string | null {
+  const raw = cleanEnv(Deno.env.get(envName));
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    return typeof parsed.default === "string" ? cleanEnv(parsed.default) : null;
+  } catch {
+    return null;
+  }
+}
+
+function getSupabasePublishableKey(): string | null {
+  return (
+    readNamedDefault("SUPABASE_PUBLISHABLE_KEYS")
+    ?? cleanEnv(Deno.env.get("SUPABASE_PUBLISHABLE_KEY"))
+    ?? cleanEnv(Deno.env.get("SUPABASE_ANON_KEY"))
+  );
+}
+
+function getSupabaseSecretKey(): string | null {
+  return (
+    readNamedDefault("SUPABASE_SECRET_KEYS")
+    ?? cleanEnv(Deno.env.get("SUPABASE_SECRET_KEY"))
+    ?? cleanEnv(Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"))
+  );
+}
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: JSON_HEADERS });
