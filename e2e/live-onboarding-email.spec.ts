@@ -24,6 +24,12 @@ type InviteResponseBody = {
   };
 };
 
+type WelcomeResponseBody = {
+  ok?: boolean;
+  status?: string;
+  receipt_persisted?: boolean;
+};
+
 type AuthObservation = {
   kind: 'response' | 'requestfailed';
   path: string;
@@ -217,6 +223,18 @@ test.describe('live onboarding email smoke', () => {
 
     let lastFailure = 'sign-in was not attempted';
     let signedIn = false;
+    const welcomeResponses: Array<{ status: number; body: unknown }> = [];
+
+    page.on('response', async (response) => {
+      if (!response.url().includes('/functions/v1/send-welcome-email')) return;
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        body = await response.text().catch(() => null);
+      }
+      welcomeResponses.push({ status: response.status(), body });
+    });
 
     for (let attempt = 1; attempt <= Math.max(signInAttempts, 1); attempt += 1) {
       try {
@@ -238,6 +256,18 @@ test.describe('live onboarding email smoke', () => {
     }
 
     expect(signedIn, `Returning teen sign-in never completed: ${lastFailure}`).toBe(true);
+
+    const latestWelcome = welcomeResponses.at(-1);
+    await attachPageState(page, 'welcome-email-response', {
+      response: latestWelcome ?? { error: 'no send-welcome-email response captured' },
+    });
+
+    expect(latestWelcome, 'send-welcome-email response should be captured').toBeTruthy();
+    expect(latestWelcome?.status).toBe(200);
+    expect(latestWelcome?.body && typeof latestWelcome.body === 'object').toBe(true);
+    const welcomeBody = latestWelcome?.body as WelcomeResponseBody;
+    expect(welcomeBody.ok).toBe(true);
+    expect(['sent', 'already_sent']).toContain(welcomeBody.status);
   });
 
   test('confirmed teen account can send parent invite email', async ({ page }) => {
