@@ -98,6 +98,15 @@ test('unit and browser runners emit durable skip receipts', () => {
   }
 });
 
+test('GitHub unit discovery is exact-head bound and does not execute untracked workspace tests', () => {
+  const unit = read('scripts/run-unit-tests.mjs');
+  assert.match(unit, /process\.env\.GITHUB_ACTIONS === 'true'/);
+  assert.match(unit, /execFileSync\('git', \['ls-files', '-z', '--', 'test'\]/);
+  assert.match(unit, /CONTROL_ROOM_UNTRACKED_TEST_FILES/);
+  assert.match(unit, /untracked tests are non-authoritative and are not executed in GitHub Actions/);
+  assert.match(unit, /isGitHubActions \? collectTrackedTests\(\) : physicalTests/);
+});
+
 test('local Control Room warns on skip receipts and can publish each skip independently', () => {
   const local = read('scripts/control-room-local.js');
   const ingest = read('scripts/control-room-ingest-local-report.mjs');

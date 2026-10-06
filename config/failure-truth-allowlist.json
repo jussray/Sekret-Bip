@@ -1,4 +1,23 @@
 {
   "schemaVersion": 1,
-  "entries": []
+  "entries": [
+    {
+      "path": "src/services/bridgeSummaryService.ts",
+      "contains": "return summaryUnavailable();",
+      "classification": "explicit-result-failure",
+      "reason": "summaryUnavailable() returns a typed RelationshipResult with ok:false, ai_unavailable, and retryable:true when the share is saved but summary generation is unavailable."
+    },
+    {
+      "path": "src/services/bridgeSummaryService.ts",
+      "contains": "return serverError('Could not create the Bridge share.');",
+      "classification": "explicit-result-failure",
+      "reason": "serverError() returns a typed RelationshipResult with ok:false and server_error; this catch does not claim success."
+    },
+    {
+      "path": "worker/bridge-summary.ts",
+      "contains": "return json({ requestId, status: 'failed', failureCode: 'server_error' }, 500, cors);",
+      "classification": "explicit-result-failure",
+      "reason": "The Worker catch persists failed state when possible and returns HTTP 500 with status:failed; it is a truthful failure path, not a success fallback."
+    }
+  ]
 }
