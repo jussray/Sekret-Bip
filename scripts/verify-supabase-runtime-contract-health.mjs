@@ -3,11 +3,11 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 export const RUNTIME_SCHEMA_WITNESS = Object.freeze({
-  contractVersion: '20260927185000',
+  contractVersion: '20261006030000',
   authorityFloorVersion: '20260805170500',
-  expectedHistorySha256: 'f187b6741a15c51970f68ff0b6aa7de02407ada8d72af4330eeb7d210429b3a3',
-  expectedLiveMaxVersion: '20260927185000',
-  expectedHistoryCount: 32,
+  expectedHistorySha256: 'd988997da407763f9d5a02fffc57d771dc9dddbac724dc6da5d1a5033e78487a',
+  expectedLiveMaxVersion: '20261006030000',
+  expectedHistoryCount: 34,
   expectedPgjwtInstalled: true,
   expectedPgjwtVersion: '0.2.0',
 });
