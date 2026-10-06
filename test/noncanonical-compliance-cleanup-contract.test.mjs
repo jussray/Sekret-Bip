@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
-const cleanup = await readFile(
+const candidate = await readFile(
   new URL('../supabase/candidates/remove_noncanonical_compliance_foundation.sql', import.meta.url),
+  'utf8',
+);
+const cleanup = await readFile(
+  new URL('../supabase/migrations/20261006025600_remove_noncanonical_compliance_foundation.sql', import.meta.url),
   'utf8',
 );
 const recovered = await readFile(
@@ -17,6 +21,11 @@ test('recovered compliance migration preserves the exact production-history iden
   assert.match(recovered, /CREATE TABLE IF NOT EXISTS consent_log/);
   assert.match(recovered, /CREATE OR REPLACE FUNCTION request_account_deletion\(\)/);
   assert.match(recovered, /CREATE OR REPLACE FUNCTION request_data_export\(\)/);
+});
+
+test('promoted cleanup migration stays bound to the reviewed candidate', () => {
+  assert.match(cleanup, /Promote reviewed cleanup for non-canonical compliance objects/);
+  assert.ok(cleanup.endsWith(candidate), 'production migration must preserve the reviewed candidate SQL exactly');
 });
 
 test('cleanup fails closed on data and removes only the non-canonical duplicate path', () => {
