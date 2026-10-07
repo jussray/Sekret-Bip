@@ -5,9 +5,9 @@ import { pathToFileURL } from 'node:url';
 export const RUNTIME_SCHEMA_WITNESS = Object.freeze({
   contractVersion: '20260927185000',
   authorityFloorVersion: '20260805170500',
-  expectedHistorySha256: 'f187b6741a15c51970f68ff0b6aa7de02407ada8d72af4330eeb7d210429b3a3',
-  expectedLiveMaxVersion: '20260927185000',
-  expectedHistoryCount: 32,
+  expectedHistorySha256: '0b5397c36f3120d5180d9501ed73ae01b8663dbb6510a706fa3877b59aa205df',
+  expectedLiveMaxVersion: '20261006031559',
+  expectedHistoryCount: 34,
   expectedPgjwtInstalled: true,
   expectedPgjwtVersion: '0.2.0',
 });
