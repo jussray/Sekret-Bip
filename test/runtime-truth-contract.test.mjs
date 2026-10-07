@@ -76,7 +76,7 @@ test('production deploy verification checks live Supabase runtime and schema fin
   assert.match(runtimeHealth, /runtime_contract_versions/);
   assert.match(runtimeHealth, /\.rpc\('sekret_production_schema_witness'\)/);
   assert.match(runtimeHealth, /contractVersion: '20260927185000'/);
-  assert.match(runtimeHealth, /expectedHistorySha256: 'f187b6741a15c51970f68ff0b6aa7de02407ada8d72af4330eeb7d210429b3a3'/);
+  assert.match(runtimeHealth, /expectedHistorySha256: '0b5397c36f3120d5180d9501ed73ae01b8663dbb6510a706fa3877b59aa205df'/);
   assert.match(runtimeHealth, /healthy = missing\.length === 0 && schemaVerified/);
   assert.match(runtimeSchemaVerifier, /SUPABASE_RUNTIME_SCHEMA_WITNESS_DRIFT/);
   assert.match(runtimeSchemaVerifier, /expectedHistorySha256/);
