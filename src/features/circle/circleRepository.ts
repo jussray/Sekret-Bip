@@ -188,6 +188,21 @@ export async function reportPublicCirclePost(postId: number): Promise<void> {
   if (!reported) throw new Error('The report could not be submitted. Try again.');
 }
 
+export async function blockPublicCircleAuthor(postId: number): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) throw new Error('Blocking is unavailable while Circle is offline.');
+
+  const user = await currentPermanentUser();
+  if (!user) throw new Error('Create a permanent Bip account before blocking an account.');
+
+  const { data, error } = await supabase.rpc('block_public_circle_author_from_post', {
+    p_post_id: postId,
+  });
+
+  if (error) throw error;
+  if (data !== true) throw new Error('Circle did not confirm the block.');
+}
+
 export function isHeavyCircleText(text: string): boolean {
   const value = text.toLowerCase();
   return [
