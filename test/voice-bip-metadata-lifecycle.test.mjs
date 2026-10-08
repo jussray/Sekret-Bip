@@ -30,10 +30,19 @@ test('VoiceBipScreen unloads the reply Audio.Sound instead of leaking playback i
   // playReplyAudio unloads any prior sound before creating a new one.
   assert.match(
     source,
-    /const playReplyAudio = async \(\) => \{[\s\S]*?replySoundRef\.current\.unloadAsync\(\)[\s\S]*?Audio\.Sound\.createAsync/,
+    /const playReplyAudio = async \(\) => \{[\s\S]*?prior\.unloadAsync\(\)[\s\S]*?Audio\.Sound\.createAsync/,
   );
   // ...and unloads itself once playback finishes.
   assert.match(source, /didJustFinish[\s\S]*?sound\.unloadAsync\(\)/);
+
+  // Two overlapping taps can both pass the "no prior sound" check before
+  // either finishes createAsync (it decodes a data URI, which isn't instant).
+  // Whichever call's Sound loses the race for the ref must unload itself
+  // instead of leaking.
+  assert.match(
+    source,
+    /const \{ sound \} = await Audio\.Sound\.createAsync\(\{ uri: replyAudioUri \}\);\s*\n\s*if \(replySoundRef\.current\) \{[\s\S]*?sound\.unloadAsync\(\)[\s\S]*?return;\s*\n\s*\}/,
+  );
 
   // Unmount cleanup also unloads any sound left playing.
   assert.match(

@@ -460,10 +460,18 @@ export function VoiceBipScreen({
   const playReplyAudio = async () => {
     if (!replyAudioUri) return;
     if (replySoundRef.current) {
-      await replySoundRef.current.unloadAsync().catch(() => null);
+      const prior = replySoundRef.current;
       replySoundRef.current = null;
+      await prior.unloadAsync().catch(() => null);
     }
     const { sound } = await Audio.Sound.createAsync({ uri: replyAudioUri });
+    if (replySoundRef.current) {
+      // A later overlapping tap already claimed the ref while this one was
+      // still loading (createAsync decodes a data URI and can take a beat) —
+      // discard this redundant instance instead of leaking or stomping it.
+      await sound.unloadAsync().catch(() => null);
+      return;
+    }
     replySoundRef.current = sound;
     sound.setOnPlaybackStatusUpdate(status => {
       if ('didJustFinish' in status && status.didJustFinish) {
