@@ -260,3 +260,11 @@ test('practice locks on every focus until the selected child is confirmed', () =
   assert.ok(focus.indexOf('setProgressReady(false)') < focus.indexOf('loadActiveStudyChild()'));
   assert.match(screen, /if \(!progressReady \|\| !selectedChoice/);
 });
+
+test('a failed progress read never unlocks practice, and the lesson stays hidden until loaded', () => {
+  const screen = fs.readFileSync(new URL('../app/(parent)/bip-jr-study.tsx', import.meta.url), 'utf8');
+  const hydrate = screen.slice(screen.indexOf('if (!childResolved) return;'), screen.indexOf('reloadToken]);'));
+  assert.doesNotMatch(hydrate, /\.finally\(/);
+  assert.match(hydrate, /\.catch\(\(\) => \{ if \(active\) setLoadError\(true\); \}\)/);
+  assert.ok(screen.indexOf('{!progressReady ? (') < screen.indexOf('testID="study-mission"'));
+});

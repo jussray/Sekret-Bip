@@ -44,6 +44,8 @@ export default function BipJrStudyRoute() {
   const [showHint, setShowHint] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [saveError, setSaveError] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const band = AGE_BANDS.find(item => item.value === ageBand) ?? AGE_BANDS[0];
   const missions = useMemo(() => getStudyMissions(ageBand, subject), [ageBand, subject]);
@@ -85,6 +87,7 @@ export default function BipJrStudyRoute() {
     // A different child never inherits the previous child's subject or age range.
     setSubject('math');
     setAgeBand(child?.ageBand ?? '5-7');
+    setLoadError(false);
     void loadStudyProgress(scope)
       .then(stored => {
         if (!active) return;
@@ -92,15 +95,13 @@ export default function BipJrStudyRoute() {
         if (stored.lastSubject) setSubject(stored.lastSubject);
         // A profile fixes the age range; shared device practice resumes the last one used.
         if (!child && stored.lastAgeBand) setAgeBand(stored.lastAgeBand);
-      })
-      .catch(() => { if (active) setSaveError('Saved practice could not be read on this device. Practice still works.'); })
-      .finally(() => {
-        if (!active) return;
         loadedChild.current = { scope, ageBand: child?.ageBand ?? null };
         setProgressReady(true);
-      });
+      })
+      // Practice stays locked: answering on an empty snapshot would overwrite saved progress.
+      .catch(() => { if (active) setLoadError(true); });
     return () => { active = false; };
-  }, [childResolved, scope, child?.ageBand]);
+  }, [childResolved, scope, child?.ageBand, reloadToken]);
 
   useEffect(() => {
     if (!progressReady) return;
@@ -197,6 +198,31 @@ export default function BipJrStudyRoute() {
           ))}
         </View>
 
+        {!progressReady ? (
+          <View testID="study-loading" style={styles.mission}>
+            {loadError ? (
+              <>
+                <Text style={styles.offlineTitle} accessibilityRole="alert">
+                  Saved practice could not be loaded on this device.
+                </Text>
+                <Text style={styles.offlineBody}>
+                  Practice is paused so nothing already saved is overwritten.
+                </Text>
+                <TouchableOpacity
+                  testID="study-retry-button"
+                  accessibilityRole="button"
+                  onPress={() => setReloadToken(value => value + 1)}
+                  style={[styles.primaryButton, { backgroundColor: band.accent }]}
+                >
+                  <Text style={styles.primaryButtonText}>Try again</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={styles.offlineBody}>Loading this practice…</Text>
+            )}
+          </View>
+        ) : (
+        <>
         <View testID="study-progress" style={styles.progressRow}>
           <Text style={styles.progressLabel}>{completion.completed} of {completion.total} finished</Text>
           <View style={styles.dots}>
@@ -283,6 +309,8 @@ export default function BipJrStudyRoute() {
             </>
           )}
         </View>
+        </>
+        )}
 
         <Text style={styles.sectionTitle}>How study modes work</Text>
         {STUDY_MODE_POLICIES.map(policy => (

@@ -163,4 +163,27 @@ test.describe('Bip Jr Study Buddy (parent-supervised)', () => {
       expect(new URL(url).pathname.startsWith('/bip-jr-study') ? new URL(url).search : '').toBe('');
     }
   });
+
+  test('a failed progress read keeps practice locked and hidden until a retry succeeds', async ({ page }) => {
+    await page.addInitScript(() => {
+      const original = Storage.prototype.getItem;
+      Storage.prototype.getItem = function (key: string) {
+        if ((window as unknown as { __failStudyRead?: boolean }).__failStudyRead !== false && key.startsWith('jr_study_progress_v1')) {
+          throw new Error('simulated storage read failure');
+        }
+        return original.call(this, key);
+      };
+    });
+
+    await page.goto('/bip-jr-study');
+    await expect(page.getByTestId('study-loading')).toContainText('could not be loaded', { timeout: 30_000 });
+    await expect(page.getByTestId('study-mission')).toHaveCount(0);
+    await expect(page.getByTestId('study-progress')).toHaveCount(0);
+    await expect(page.getByTestId('study-check-button')).toHaveCount(0);
+
+    await page.evaluate(() => { (window as unknown as { __failStudyRead?: boolean }).__failStudyRead = false; });
+    await page.getByTestId('study-retry-button').click();
+    await expect(page.getByTestId('study-mission')).toContainText('Count and add', { timeout: 30_000 });
+    await expect(page.getByTestId('study-loading')).toHaveCount(0);
+  });
 });
