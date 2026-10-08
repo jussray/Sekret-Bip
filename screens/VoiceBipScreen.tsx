@@ -33,7 +33,7 @@ import { SyncBadge, type SyncStatus } from '../components/SyncBadge';
 import type { VoiceNote } from '../types/bridge';
 import { Audio } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
-import { fetchSekretReply, fetchSekretVoice, fetchSekretTranscribe } from '../utils/api';
+import { fetchSekretReply, fetchSekretVoice, fetchSekretTranscribe, type SekretVoiceResponse } from '../utils/api';
 import { useVoiceBipIntelligence } from '../hooks/useVoiceBipIntelligence';
 import { useReducedMotion } from '../hooks/useReducedMotion';
 import type { OracleJournalEntry } from '../types/voiceIntelligence';
@@ -134,6 +134,7 @@ export function VoiceBipScreen({
   const [recorded,         setRecorded]          = useState(false);
   const [sekretReply,      setSekretReply]       = useState('');
   const [replyAudioUri,    setReplyAudioUri]     = useState('');
+  const [replyVoiceMeta,   setReplyVoiceMeta]    = useState<Omit<SekretVoiceResponse, 'audioBase64' | 'contentType' | 'characterId'> | null>(null);
   const [isVoiceLoading,   setIsVoiceLoading]    = useState(false);
   const [isThinking,       setIsThinking]        = useState(false);
   const [recordingTime,    setRecordingTime]     = useState(0);
@@ -142,6 +143,7 @@ export function VoiceBipScreen({
 
   const recordingRef    = useRef<Audio.Recording | null>(null);
   const stopRecordingRef = useRef<() => Promise<void>>(async () => {});
+  const replySoundRef   = useRef<Audio.Sound | null>(null);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -250,6 +252,7 @@ export function VoiceBipScreen({
     setRecorded(false);
     setSekretReply('');
     setReplyAudioUri('');
+    setReplyVoiceMeta(null);
     setRecordingTime(0);
     setTranscriptFailed(false);
     setShowBipMenu(false);
@@ -384,7 +387,16 @@ export function VoiceBipScreen({
     setSekretReply(reply);
     setIsVoiceLoading(true);
     const audio = await fetchSekretVoice({ reply, characterId: avatar.personality });
-    if (audio) setReplyAudioUri(`data:${audio.contentType};base64,${audio.audioBase64}`);
+    if (audio) {
+      setReplyAudioUri(`data:${audio.contentType};base64,${audio.audioBase64}`);
+      const { audioBase64, contentType, characterId, ...meta } = audio;
+      setReplyVoiceMeta(meta);
+      if (__DEV__) {
+        console.log('[VoiceBipScreen] voice metadata', meta);
+      }
+    } else {
+      setReplyVoiceMeta(null);
+    }
     setIsVoiceLoading(false);
     setIsThinking(false);
     presence.markResponseReady();
@@ -440,13 +452,25 @@ export function VoiceBipScreen({
       waveLoop.current?.stop();
       if (timerRef.current) clearInterval(timerRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => null);
+      replySoundRef.current?.unloadAsync().catch(() => null);
     };
   }, []);
 
 
   const playReplyAudio = async () => {
     if (!replyAudioUri) return;
+    if (replySoundRef.current) {
+      await replySoundRef.current.unloadAsync().catch(() => null);
+      replySoundRef.current = null;
+    }
     const { sound } = await Audio.Sound.createAsync({ uri: replyAudioUri });
+    replySoundRef.current = sound;
+    sound.setOnPlaybackStatusUpdate(status => {
+      if ('didJustFinish' in status && status.didJustFinish) {
+        sound.unloadAsync().catch(() => null);
+        if (replySoundRef.current === sound) replySoundRef.current = null;
+      }
+    });
     await sound.playAsync();
   };
 
@@ -456,6 +480,7 @@ export function VoiceBipScreen({
     setVoicePromptIdx(0);
     setSekretReply('');
     setRecorded(false);
+    setReplyVoiceMeta(null);
     voiceHistoryRef.current = [];
     onSelectAvatar?.(nextAvatarKey);
   };

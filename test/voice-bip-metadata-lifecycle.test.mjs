@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import test from 'node:test';
+
+const root = process.cwd();
+const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
+
+// Regression guard for issue #667: VoiceBipScreen already called the canonical
+// fetchSekretVoice() route, but dropped the provider/model/timing metadata it
+// returns and never unloaded the Audio.Sound it created for playback.
+
+test('VoiceBipScreen stores voice provider/timing metadata separately from the audio URI', () => {
+  const source = read('screens/VoiceBipScreen.tsx');
+
+  assert.match(source, /const \[replyVoiceMeta,\s*setReplyVoiceMeta\]\s*=\s*useState/);
+  assert.match(source, /const audio = await fetchSekretVoice\(/);
+  assert.match(source, /const \{ audioBase64, contentType, characterId, \.\.\.meta \} = audio/);
+  assert.match(source, /setReplyVoiceMeta\(meta\)/);
+
+  // Reset points: a stale reply's metadata must not leak into the next one.
+  assert.match(source, /setReplyAudioUri\(''\);\s*\n\s*setReplyVoiceMeta\(null\);/);
+});
+
+test('VoiceBipScreen unloads the reply Audio.Sound instead of leaking playback instances', () => {
+  const source = read('screens/VoiceBipScreen.tsx');
+
+  assert.match(source, /const replySoundRef\s*=\s*useRef<Audio\.Sound \| null>\(null\)/);
+
+  // playReplyAudio unloads any prior sound before creating a new one.
+  assert.match(
+    source,
+    /const playReplyAudio = async \(\) => \{[\s\S]*?replySoundRef\.current\.unloadAsync\(\)[\s\S]*?Audio\.Sound\.createAsync/,
+  );
+  // ...and unloads itself once playback finishes.
+  assert.match(source, /didJustFinish[\s\S]*?sound\.unloadAsync\(\)/);
+
+  // Unmount cleanup also unloads any sound left playing.
+  assert.match(
+    source,
+    /recordingRef\.current\?\.stopAndUnloadAsync\(\)\.catch\(\(\) => null\);\s*\n\s*replySoundRef\.current\?\.unloadAsync\(\)\.catch\(\(\) => null\);/,
+  );
+});
+
+test('the canonical voice contract already carries provider, model, and timing metadata (residual-zero check)', () => {
+  const contract = read('src/contracts/sekretApi.ts');
+  const api = read('src/utils/api.ts');
+
+  assert.match(contract, /requiresPreciseLipSync\?:\s*boolean/);
+  assert.match(contract, /includeTiming\?:\s*boolean/);
+  assert.match(contract, /timing\?:\s*CharacterAlignment/);
+
+  assert.match(api, /voiceProvider: result\.data\.voiceProvider/);
+  assert.match(api, /timing: result\.data\.timing/);
+});
