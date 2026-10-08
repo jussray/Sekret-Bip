@@ -80,4 +80,34 @@ test.describe('Bip Jr Study Buddy (parent-supervised)', () => {
 
     expect(external, 'Study Buddy must not reach any external service').toEqual([]);
   });
+
+  test('practice opened from a child profile keeps that child\'s progress separate', async ({ page }) => {
+    const childA = '2f1c6c1e-1111-4a2b-9c3d-00000000000a';
+    const childB = '2f1c6c1e-1111-4a2b-9c3d-00000000000b';
+
+    await page.goto(`/bip-jr-study?child=${childA}&band=8-10`);
+    await expect(page.getByTestId('study-scope')).toContainText('Progress is kept for this child only', { timeout: 30_000 });
+    await expect(page.getByTestId('study-age-8-10')).toHaveCount(0);
+    const mission = page.getByTestId('study-mission');
+    await expect(mission).toContainText('TRY IT, THEN EXPLAIN IT');
+
+    const choices = ['a', 'b', 'c', 'd'];
+    for (const choice of choices) {
+      if (await page.getByTestId('study-feedback-correct').count()) break;
+      if (!(await page.getByTestId(`study-choice-${choice}`).count())) continue;
+      await page.getByTestId(`study-choice-${choice}`).click();
+      await page.getByTestId('study-check-button').click();
+    }
+    await expect(page.getByTestId('study-feedback-correct')).toBeVisible();
+    await expect(page.getByTestId('study-progress')).toContainText('1 of 2 finished');
+
+    await page.goto(`/bip-jr-study?child=${childB}&band=8-10`);
+    await expect(page.getByTestId('study-progress')).toContainText('0 of 2 finished', { timeout: 30_000 });
+
+    await page.goto(`/bip-jr-study?child=${childA}&band=8-10`);
+    await expect(page.getByTestId('study-progress')).toContainText('1 of 2 finished', { timeout: 30_000 });
+
+    await page.goto('/bip-jr-study?child=../escape&band=8-10');
+    await expect(page.getByTestId('study-scope')).toContainText('Not linked to a child profile', { timeout: 30_000 });
+  });
 });

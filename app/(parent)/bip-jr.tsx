@@ -165,6 +165,14 @@ export default function BipJrParentRoute() {
                 <Text style={styles.profileMeta}>Bip Jr · ages {profile.age_band}</Text>
               </View>
               <TouchableOpacity
+                style={styles.practiceButton}
+                onPress={() => router.push(`${PARENT_ROUTES.bipJrStudy}?child=${encodeURIComponent(profile.id)}&band=${encodeURIComponent(profile.age_band)}` as never)}
+                accessibilityRole="button"
+                accessibilityLabel={`Practice Study Buddy with ${profile.display_alias}`}
+              >
+                <Text style={styles.practiceText}>Practice</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={styles.archiveButton}
                 disabled={saving}
                 onPress={() => void archiveProfile(profile)}
@@ -253,6 +261,8 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 38, lineHeight: 43, fontWeight: '900', marginBottom: 14 },
   body: { color: '#b7c9bf', fontSize: 15, lineHeight: 23, marginBottom: 18 },
   truthCard: { borderRadius: 20, borderWidth: 1, borderColor: '#a7f3d033', backgroundColor: 'rgba(17,37,28,0.90)', padding: 17, marginBottom: 24 },
+  practiceButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, marginRight: 8 },
+  practiceText: { color: '#c4b5fd', fontSize: 13, fontWeight: '900' },
   studyCard: { borderRadius: 20, borderWidth: 1, borderColor: '#bca7ff55', backgroundColor: 'rgba(28,20,52,0.90)', padding: 17, marginBottom: 24 },
   studyTitle: { color: '#ede9fe', fontSize: 15, fontWeight: '900', marginBottom: 6 },
   truthTitle: { color: '#d1fae5', fontSize: 15, fontWeight: '900', marginBottom: 6 },

@@ -5,6 +5,22 @@
 import type { StudyProgressSnapshot, StudySubject } from './types';
 
 export const STUDY_PROGRESS_KEY = 'jr_study_progress_v1';
+export const DEVICE_STUDY_SCOPE = 'device';
+
+const STUDY_SCOPE_PATTERN = /^[A-Za-z0-9-]{1,64}$/;
+
+export function isValidStudyScope(scope: unknown): scope is string {
+  return typeof scope === 'string' && STUDY_SCOPE_PATTERN.test(scope);
+}
+
+// One key per child profile, so children sharing a device never share mastery.
+export function studyProgressKey(scope: string): string {
+  return `${STUDY_PROGRESS_KEY}:${isValidStudyScope(scope) ? scope : DEVICE_STUDY_SCOPE}`;
+}
+
+export function isStudyProgressKey(key: string): boolean {
+  return key === STUDY_PROGRESS_KEY || key.startsWith(`${STUDY_PROGRESS_KEY}:`);
+}
 
 export const EMPTY_STUDY_PROGRESS: StudyProgressSnapshot = {
   completedMissionIds: [],

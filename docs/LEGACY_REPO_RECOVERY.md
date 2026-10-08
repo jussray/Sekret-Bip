@@ -55,8 +55,10 @@ Rollback: revert the commit; nothing else depends on `src/bipJr/`.
 Source `jussray/bip-jr@cf773ff14c677b706e600437de6c779c3e9c37f2:app/(child)/study.tsx` → `app/(parent)/bip-jr-study.tsx`.
 
 - Reached from the Study Buddy card on `app/(parent)/bip-jr.tsx`. Registered with `href: null` in `app/(parent)/_layout.tsx`, so it adds no tab. Route constant `PARENT_ROUTES.bipJrStudy`.
-- Adult-operated on the parent's device: the adult picks the age range. No child account is created, and no data leaves the device. Progress is shared by every child practicing on that device.
+- Adult-operated on the parent's device. No child account is created, and no data leaves the device.
+- Opened from a profile row (`?child=<profile id>&band=<age band>`), progress is stored under that child's own key (`jr_study_progress_v1:<id>`). Opened from the general card, it uses a device key, and the screen says that progress is shared.
+- Every study progress key is cleared on sign-out (`clearPrivateAccountCache` → `clearAllStudyProgress`).
 - A failed progress save is shown on screen, never hidden.
-- Proof: `e2e-founder-preview/bip-jr-study-buddy.spec.ts` (Playwright, 390 px). Covers the entry card, a wrong-then-right answer, the hint, progress surviving a reload, age and subject switching, locked modes, no horizontal overflow, and zero requests to any non-local host.
+- Proof: `e2e-founder-preview/bip-jr-study-buddy.spec.ts` (Playwright, 390 px). Covers the entry card, per-child progress separation, a wrong-then-right answer, the hint, progress surviving a reload, age and subject switching, locked modes, no horizontal overflow, and zero requests to any non-local host.
 
 Pre-existing, not fixed here: the Parent tab bar shows stray `bip-jr`, `circle/feed` and `teen-verification` tabs, because those routes are not registered in `app/(parent)/_layout.tsx`.

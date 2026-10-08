@@ -11,8 +11,11 @@ import {
 import { STUDY_MODE_POLICIES, STUDY_SUBJECTS } from '../src/bipJr/study/modes.ts';
 import {
   EMPTY_STUDY_PROGRESS,
+  STUDY_PROGRESS_KEY,
   applyStudyAttempt,
+  isStudyProgressKey,
   normalizeStudyProgress,
+  studyProgressKey,
 } from '../src/bipJr/study/progress.ts';
 import { CHILD_SAFETY_CONTRACT } from '../src/bipJr/safetyContract.ts';
 
@@ -134,4 +137,26 @@ test('recovered study modules make no network, Supabase, or AI calls', () => {
     const source = fs.readFileSync(new URL(`../src/bipJr/study/${file}`, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /\bfetch\(|getSupabase|\.rpc\(|openai|anthropic/i, file);
   }
+});
+
+test('progress keys are scoped per child profile and reject unsafe scopes', () => {
+  const a = studyProgressKey('2f1c6c1e-1111-4a2b-9c3d-000000000001');
+  const b = studyProgressKey('2f1c6c1e-1111-4a2b-9c3d-000000000002');
+  assert.notEqual(a, b);
+  assert.equal(a, `${STUDY_PROGRESS_KEY}:2f1c6c1e-1111-4a2b-9c3d-000000000001`);
+  for (const unsafe of ['', '../other', 'a:b', 'x'.repeat(65), 'with space']) {
+    assert.equal(studyProgressKey(unsafe), `${STUDY_PROGRESS_KEY}:device`, JSON.stringify(unsafe));
+  }
+  assert.equal(isStudyProgressKey(a), true);
+  assert.equal(isStudyProgressKey(STUDY_PROGRESS_KEY), true);
+  assert.equal(isStudyProgressKey('jr_study_progress_v10'), false);
+  assert.equal(isStudyProgressKey('mood'), false);
+});
+
+test('signing out clears every Bip Jr study progress key', () => {
+  const storage = fs.readFileSync(new URL('../src/utils/storage.ts', import.meta.url), 'utf8');
+  const clear = storage.slice(storage.indexOf('export async function clearPrivateAccountCache'));
+  assert.match(clear, /await clearAllStudyProgress\(\);/);
+  const store = fs.readFileSync(new URL('../src/bipJr/study/progressStore.ts', import.meta.url), 'utf8');
+  assert.match(store, /getAllKeys\(\)[\s\S]*filter\(isStudyProgressKey\)[\s\S]*multiRemove\(studyKeys\)/);
 });

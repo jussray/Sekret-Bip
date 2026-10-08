@@ -1,12 +1,13 @@
 // app/(parent)/bip-jr-study.tsx
 // Bip Jr Study Buddy, adult-supervised practice. Ported from
 // jussray/bip-jr@cf773ff14c677b706e600437de6c779c3e9c37f2:app/(child)/study.tsx.
-// Runs under the Parent account on the parent's device: no child account,
-// no network call, and progress stays on this device.
+// Runs under the Parent account on the parent's device: no child account and
+// no network call. Opened from a profile, progress is kept per child profile.
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useLocalSearchParams } from 'expo-router';
 
 import {
   getNextStudyMission,
@@ -15,7 +16,7 @@ import {
   isCorrectStudyChoice,
 } from '@/bipJr/study/curriculum';
 import { STUDY_MODE_POLICIES, STUDY_SUBJECTS } from '@/bipJr/study/modes';
-import { EMPTY_STUDY_PROGRESS, applyStudyAttempt } from '@/bipJr/study/progress';
+import { DEVICE_STUDY_SCOPE, EMPTY_STUDY_PROGRESS, applyStudyAttempt, isValidStudyScope } from '@/bipJr/study/progress';
 import { loadStudyProgress, saveStudyProgress } from '@/bipJr/study/progressStore';
 import type { ChildAgeBand, StudyMission, StudyProgressSnapshot, StudySubject } from '@/bipJr/study/types';
 
@@ -27,8 +28,15 @@ const AGE_BANDS: Array<{ value: ChildAgeBand; label: string; accent: string; ste
   { value: '11-12', label: 'Ages 11–12', accent: '#a7f3d0', step: 'Reason it through' },
 ];
 
+function isChildAgeBand(value: unknown): value is ChildAgeBand {
+  return AGE_BANDS.some(option => option.value === value);
+}
+
 export default function BipJrStudyRoute() {
-  const [ageBand, setAgeBand] = useState<ChildAgeBand>('5-7');
+  const params = useLocalSearchParams<{ child?: string; band?: string }>();
+  const linkedChild = isValidStudyScope(params.child) && isChildAgeBand(params.band);
+  const scope = linkedChild ? params.child as string : DEVICE_STUDY_SCOPE;
+  const [ageBand, setAgeBand] = useState<ChildAgeBand>(linkedChild ? params.band as ChildAgeBand : '5-7');
   const [subject, setSubject] = useState<StudySubject>('math');
   const [progress, setProgress] = useState<StudyProgressSnapshot>(EMPTY_STUDY_PROGRESS);
   const [progressReady, setProgressReady] = useState(false);
@@ -43,12 +51,15 @@ export default function BipJrStudyRoute() {
 
   useEffect(() => {
     let active = true;
-    void loadStudyProgress()
+    setProgressReady(false);
+    setProgress(EMPTY_STUDY_PROGRESS);
+    if (linkedChild) setAgeBand(params.band as ChildAgeBand);
+    void loadStudyProgress(scope)
       .then(stored => { if (active) setProgress(stored); })
       .catch(() => { if (active) setSaveError('Saved practice could not be read on this device. Practice still works.'); })
       .finally(() => { if (active) setProgressReady(true); });
     return () => { active = false; };
-  }, []);
+  }, [scope, linkedChild, params.band]);
 
   useEffect(() => {
     if (!progressReady) return;
@@ -79,7 +90,7 @@ export default function BipJrStudyRoute() {
       setFeedback({ kind: 'try_again', text: 'Not yet. Use the hint, then choose again.' });
     }
     try {
-      await saveStudyProgress(next);
+      await saveStudyProgress(scope, next);
       setSaveError('');
     } catch {
       setSaveError('This answer was checked, but progress could not be saved on this device.');
@@ -101,12 +112,18 @@ export default function BipJrStudyRoute() {
         <View testID="study-safety-banner" style={[styles.notice, { borderColor: `${band.accent}55`, backgroundColor: `${band.accent}20` }]}>
           <Text style={styles.noticeTitle}>Private scripted practice with you beside them.</Text>
           <Text style={styles.noticeBody}>
-            Study Buddy is a computer helper with reviewed lessons. It sends nothing to an AI service and has no classmates, profiles, followers, DMs, or public posts. Progress is saved on this device only.
+            Study Buddy is a computer helper with reviewed lessons. It sends nothing to an AI service and has no classmates, profiles, followers, DMs, or public posts. Progress is saved on this device only and cleared when you sign out.
           </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Age range</Text>
-        <View style={styles.ageRow}>
+        <Text testID="study-scope" style={styles.scopeNote}>
+          {linkedChild
+            ? `Practicing for a Bip Jr profile · ${band.label}. Progress is kept for this child only.`
+            : 'Not linked to a child profile. Progress here is shared by anyone practicing on this device; open Study Buddy from a profile to keep it separate.'}
+        </Text>
+
+        {linkedChild ? null : <Text style={styles.sectionTitle}>Age range</Text>}
+        {linkedChild ? null : <View style={styles.ageRow}>
           {AGE_BANDS.map(option => (
             <TouchableOpacity
               key={option.value}
@@ -119,7 +136,7 @@ export default function BipJrStudyRoute() {
               <Text style={[styles.ageText, ageBand === option.value && { color: option.accent }]}>{option.label}</Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </View>}
 
         <Text style={styles.sectionTitle}>Choose a subject</Text>
         <View style={styles.subjectGrid}>
@@ -247,6 +264,7 @@ const styles = StyleSheet.create({
   notice: { borderRadius: 24, padding: 18, borderWidth: 1 },
   noticeTitle: { color: '#fff', fontSize: 16, fontWeight: '900', marginBottom: 6 },
   noticeBody: { color: '#c9c0dd', fontSize: 14, lineHeight: 21 },
+  scopeNote: { color: '#c9c0dd', fontSize: 13, lineHeight: 19 },
   sectionTitle: { color: '#fff', fontSize: 18, fontWeight: '900', marginTop: 8 },
   ageRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   ageChip: { minHeight: 44, justifyContent: 'center', borderRadius: 999, paddingHorizontal: 16, backgroundColor: '#ffffff0a', borderWidth: 1.5, borderColor: '#ffffff18' },

@@ -3,11 +3,11 @@
 // Device-only storage: mastery IDs, attempt counts, and last subject. Nothing is synced.
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { EMPTY_STUDY_PROGRESS, STUDY_PROGRESS_KEY, normalizeStudyProgress } from './progress';
+import { EMPTY_STUDY_PROGRESS, isStudyProgressKey, normalizeStudyProgress, studyProgressKey } from './progress';
 import type { StudyProgressSnapshot } from './types';
 
-export async function loadStudyProgress(): Promise<StudyProgressSnapshot> {
-  const raw = await AsyncStorage.getItem(STUDY_PROGRESS_KEY);
+export async function loadStudyProgress(scope: string): Promise<StudyProgressSnapshot> {
+  const raw = await AsyncStorage.getItem(studyProgressKey(scope));
   if (!raw) return { ...EMPTY_STUDY_PROGRESS };
   try {
     return normalizeStudyProgress(JSON.parse(raw));
@@ -18,6 +18,13 @@ export async function loadStudyProgress(): Promise<StudyProgressSnapshot> {
   }
 }
 
-export async function saveStudyProgress(progress: StudyProgressSnapshot): Promise<void> {
-  await AsyncStorage.setItem(STUDY_PROGRESS_KEY, JSON.stringify(normalizeStudyProgress(progress)));
+export async function saveStudyProgress(scope: string, progress: StudyProgressSnapshot): Promise<void> {
+  await AsyncStorage.setItem(studyProgressKey(scope), JSON.stringify(normalizeStudyProgress(progress)));
+}
+
+// Called on sign-out so the next account on this device starts clean.
+export async function clearAllStudyProgress(): Promise<void> {
+  const keys = await AsyncStorage.getAllKeys();
+  const studyKeys = keys.filter(isStudyProgressKey);
+  if (studyKeys.length > 0) await AsyncStorage.multiRemove(studyKeys);
 }
