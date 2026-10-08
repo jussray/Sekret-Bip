@@ -33,6 +33,10 @@ test.describe('Bip Jr Study Buddy (parent-supervised)', () => {
     await entry.click();
     await expect(page).toHaveURL(/\/bip-jr-study(?:\?.*)?$/);
     await expect(page.getByTestId('study-safety-banner')).toContainText('sends nothing to an AI service');
+
+    await page.getByRole('button', { name: 'Back within parent side' }).click();
+    await expect(page).toHaveURL(/\/bip-jr(?:\?.*)?$/);
+    await expect(entry).toBeVisible();
   });
 
   test('a supervised practice round checks answers, keeps progress on the device, and calls no service', async ({ page }, testInfo) => {
