@@ -30,7 +30,12 @@ test('active Calm controls have real handlers instead of null or empty actions',
   const source = await read('screens/CalmScreen.tsx');
   assert.doesNotMatch(source, /action: null/);
   assert.match(source, /reset plan ↺/);
-  assert.match(source, /Calm Picks for You[\s\S]*onOpenBreathe/);
   assert.match(source, /MORE_BREATHING[\s\S]*TouchableOpacity/);
   assert.match(source, /CALM_PLAYLIST[\s\S]*TouchableOpacity/);
+  // "Calm Picks for You" (CALM_PICKS) was removed per #1008: it rendered fake
+  // inline play/pause/progress controls for tracks that never had real audio
+  // (empty uri, "Coming soon" fallback) rather than real playback. Assert the
+  // dead affordance stays gone rather than regressing to a fake player.
+  assert.doesNotMatch(source, /CALM_PICKS/);
+  assert.doesNotMatch(source, /Calm Picks for You/);
 });
