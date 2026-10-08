@@ -2,7 +2,7 @@
 // Recovered from jussray/bip-jr@cf773ff14c677b706e600437de6c779c3e9c37f2:src/child/services/studyProgress.ts (blob 2726822c).
 // Pure progress rules; device persistence lives in progressStore.ts.
 
-import type { StudyProgressSnapshot, StudySubject } from './types';
+import type { ChildAgeBand, StudyProgressSnapshot, StudySubject } from './types';
 
 export const STUDY_PROGRESS_KEY = 'jr_study_progress_v1';
 export const DEVICE_STUDY_SCOPE = 'device';
@@ -16,6 +16,22 @@ export function isValidStudyScope(scope: unknown): scope is string {
 // One key per child profile, so children sharing a device never share mastery.
 export function studyProgressKey(scope: string): string {
   return `${STUDY_PROGRESS_KEY}:${isValidStudyScope(scope) ? scope : DEVICE_STUDY_SCOPE}`;
+}
+
+const CHILD_AGE_BANDS = new Set<ChildAgeBand>(['5-7', '8-10', '11-12']);
+
+export function isChildAgeBand(value: unknown): value is ChildAgeBand {
+  return typeof value === 'string' && CHILD_AGE_BANDS.has(value as ChildAgeBand);
+}
+
+export type ActiveStudyChild = { id: string; ageBand: ChildAgeBand };
+
+export function normalizeActiveStudyChild(value: unknown): ActiveStudyChild | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as Partial<ActiveStudyChild>;
+  return isValidStudyScope(candidate.id) && isChildAgeBand(candidate.ageBand)
+    ? { id: candidate.id, ageBand: candidate.ageBand }
+    : null;
 }
 
 export function isStudyProgressKey(key: string): boolean {

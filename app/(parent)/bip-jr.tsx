@@ -21,6 +21,8 @@ import {
   type BipJrChildProfile,
 } from '@/services/bipJr';
 import { PARENT_ROUTES } from '@/parent/routes';
+import type { ActiveStudyChild } from '@/bipJr/study/progress';
+import { setActiveStudyChild } from '@/bipJr/study/progressStore';
 
 const AGE_BANDS: Array<{ value: BipJrAgeBand; label: string }> = [
   { value: '5-7', label: 'Ages 5–7' },
@@ -89,6 +91,17 @@ export default function BipJrParentRoute() {
     }
   }
 
+  async function openStudyBuddy(child: ActiveStudyChild | null) {
+    setError('');
+    try {
+      await setActiveStudyChild(child);
+    } catch {
+      setError('Study Buddy could not be opened for this child on this device. Please try again.');
+      return;
+    }
+    router.push(PARENT_ROUTES.bipJrStudy as never);
+  }
+
   async function archiveProfile(profile: BipJrChildProfile) {
     const doArchive = async () => {
       setSaving(true);
@@ -139,7 +152,7 @@ export default function BipJrParentRoute() {
 
         <TouchableOpacity
           style={styles.studyCard}
-          onPress={() => router.push(PARENT_ROUTES.bipJrStudy as never)}
+          onPress={() => void openStudyBuddy(null)}
           accessibilityRole="button"
           accessibilityLabel="Open Study Buddy practice"
         >
@@ -166,7 +179,7 @@ export default function BipJrParentRoute() {
               </View>
               <TouchableOpacity
                 style={styles.practiceButton}
-                onPress={() => router.push(`${PARENT_ROUTES.bipJrStudy}?child=${encodeURIComponent(profile.id)}&band=${encodeURIComponent(profile.age_band)}` as never)}
+                onPress={() => void openStudyBuddy({ id: profile.id, ageBand: profile.age_band })}
                 accessibilityRole="button"
                 accessibilityLabel={`Practice Study Buddy with ${profile.display_alias}`}
               >

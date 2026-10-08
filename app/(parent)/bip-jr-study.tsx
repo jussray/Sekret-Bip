@@ -2,12 +2,13 @@
 // Bip Jr Study Buddy, adult-supervised practice. Ported from
 // jussray/bip-jr@cf773ff14c677b706e600437de6c779c3e9c37f2:app/(child)/study.tsx.
 // Runs under the Parent account on the parent's device: no child account and
-// no network call. Opened from a profile, progress is kept per child profile.
+// no network call. Opened from a profile, progress is kept per child profile;
+// the selected child is handed over on the device, never in the URL.
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 
 import {
   getMissionAfter,
@@ -17,8 +18,8 @@ import {
   isCorrectStudyChoice,
 } from '@/bipJr/study/curriculum';
 import { STUDY_MODE_POLICIES, STUDY_SUBJECTS } from '@/bipJr/study/modes';
-import { DEVICE_STUDY_SCOPE, EMPTY_STUDY_PROGRESS, applyStudyAttempt, isValidStudyScope } from '@/bipJr/study/progress';
-import { loadStudyProgress, saveStudyProgress } from '@/bipJr/study/progressStore';
+import { DEVICE_STUDY_SCOPE, EMPTY_STUDY_PROGRESS, applyStudyAttempt, type ActiveStudyChild } from '@/bipJr/study/progress';
+import { loadActiveStudyChild, loadStudyProgress, saveStudyProgress } from '@/bipJr/study/progressStore';
 import type { ChildAgeBand, StudyMission, StudyProgressSnapshot, StudySubject } from '@/bipJr/study/types';
 
 type Feedback = { kind: 'correct' | 'try_again'; text: string } | null;
@@ -29,15 +30,12 @@ const AGE_BANDS: Array<{ value: ChildAgeBand; label: string; accent: string; ste
   { value: '11-12', label: 'Ages 11–12', accent: '#a7f3d0', step: 'Reason it through' },
 ];
 
-function isChildAgeBand(value: unknown): value is ChildAgeBand {
-  return AGE_BANDS.some(option => option.value === value);
-}
-
 export default function BipJrStudyRoute() {
-  const params = useLocalSearchParams<{ child?: string; band?: string }>();
-  const linkedChild = isValidStudyScope(params.child) && isChildAgeBand(params.band);
-  const scope = linkedChild ? params.child as string : DEVICE_STUDY_SCOPE;
-  const [ageBand, setAgeBand] = useState<ChildAgeBand>(linkedChild ? params.band as ChildAgeBand : '5-7');
+  const [child, setChild] = useState<ActiveStudyChild | null>(null);
+  const [childResolved, setChildResolved] = useState(false);
+  const linkedChild = child !== null;
+  const scope = child?.id ?? DEVICE_STUDY_SCOPE;
+  const [ageBand, setAgeBand] = useState<ChildAgeBand>('5-7');
   const [subject, setSubject] = useState<StudySubject>('math');
   const [progress, setProgress] = useState<StudyProgressSnapshot>(EMPTY_STUDY_PROGRESS);
   const [progressReady, setProgressReady] = useState(false);
@@ -50,11 +48,31 @@ export default function BipJrStudyRoute() {
   const band = AGE_BANDS.find(item => item.value === ageBand) ?? AGE_BANDS[0];
   const missions = useMemo(() => getStudyMissions(ageBand, subject), [ageBand, subject]);
 
+  // Tabs keep this screen mounted, so the selected child is re-read on every focus.
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void loadActiveStudyChild()
+      .then(next => {
+        if (!active) return;
+        setChild(prev => (prev?.id === next?.id && prev?.ageBand === next?.ageBand ? prev : next));
+      })
+      .catch(() => {
+        if (!active) return;
+        setChild(null);
+        setSaveError('The selected child could not be read on this device. Practice is not linked to a profile.');
+      })
+      .finally(() => { if (active) setChildResolved(true); });
+    return () => { active = false; };
+  }, []));
+
   useEffect(() => {
+    if (!childResolved) return;
     let active = true;
     setProgressReady(false);
     setProgress(EMPTY_STUDY_PROGRESS);
-    if (linkedChild) setAgeBand(params.band as ChildAgeBand);
+    // A different child never inherits the previous child's subject or age range.
+    setSubject('math');
+    setAgeBand(child?.ageBand ?? '5-7');
     void loadStudyProgress(scope)
       .then(stored => {
         if (!active) return;
@@ -64,7 +82,7 @@ export default function BipJrStudyRoute() {
       .catch(() => { if (active) setSaveError('Saved practice could not be read on this device. Practice still works.'); })
       .finally(() => { if (active) setProgressReady(true); });
     return () => { active = false; };
-  }, [scope, linkedChild, params.band]);
+  }, [childResolved, scope, child?.ageBand]);
 
   useEffect(() => {
     if (!progressReady) return;

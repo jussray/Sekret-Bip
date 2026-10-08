@@ -15,6 +15,7 @@ import {
   STUDY_PROGRESS_KEY,
   applyStudyAttempt,
   isStudyProgressKey,
+  normalizeActiveStudyChild,
   normalizeStudyProgress,
   studyProgressKey,
 } from '../src/bipJr/study/progress.ts';
@@ -191,7 +192,7 @@ test('signing out clears every Bip Jr study progress key', () => {
   const clear = storage.slice(storage.indexOf('export async function clearPrivateAccountCache'));
   assert.match(clear, /await clearAllStudyProgress\(\);/);
   const store = fs.readFileSync(new URL('../src/bipJr/study/progressStore.ts', import.meta.url), 'utf8');
-  assert.match(store, /getAllKeys\(\)[\s\S]*filter\(isStudyProgressKey\)[\s\S]*multiRemove\(studyKeys\)/);
+  assert.match(store, /getAllKeys\(\)[\s\S]*filter\(key => isStudyProgressKey\(key\)[\s\S]*multiRemove\(studyKeys\)/);
 });
 
 test('after a subject is finished, Next moves through every mission instead of repeating the warm-up', () => {
@@ -214,4 +215,30 @@ test('persisted mission IDs stay stable (stored progress depends on them)', () =
   // Changing this list re-points saved mastery to different lessons. Add new
   // missions at the end of a subject, and migrate stored IDs if one must change.
   assert.deepEqual(ids, STABLE_MISSION_IDS);
+});
+
+test('the device handoff accepts only a valid child id and age band', () => {
+  const id = '2f1c6c1e-1111-4a2b-9c3d-000000000001';
+  assert.deepEqual(normalizeActiveStudyChild({ id, ageBand: '8-10', extra: 'dropped' }), { id, ageBand: '8-10' });
+  for (const bad of [null, 'text', { id }, { id, ageBand: '13-17' }, { id: '../x', ageBand: '5-7' }, { id: '', ageBand: '5-7' }]) {
+    assert.equal(normalizeActiveStudyChild(bad), null, JSON.stringify(bad));
+  }
+});
+
+test('the selected child never travels in the Study Buddy URL and is cleared on sign-out', () => {
+  const page = fs.readFileSync(new URL('../app/(parent)/bip-jr.tsx', import.meta.url), 'utf8');
+  const screen = fs.readFileSync(new URL('../app/(parent)/bip-jr-study.tsx', import.meta.url), 'utf8');
+  const store = fs.readFileSync(new URL('../src/bipJr/study/progressStore.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(page, /bipJrStudy\}\?|bip-jr-study\?/);
+  assert.doesNotMatch(screen, /useLocalSearchParams/);
+  assert.match(store, /isStudyProgressKey\(key\) \|\| key === ACTIVE_STUDY_CHILD_KEY/);
+});
+
+test('switching child resets subject and age range before that child\'s progress loads', () => {
+  const screen = fs.readFileSync(new URL('../app/(parent)/bip-jr-study.tsx', import.meta.url), 'utf8');
+  const hydrate = screen.slice(screen.indexOf('if (!childResolved) return;'));
+  const load = hydrate.indexOf('loadStudyProgress(scope)');
+  assert.ok(hydrate.indexOf("setSubject('math')") > -1 && hydrate.indexOf("setSubject('math')") < load);
+  assert.ok(hydrate.indexOf("setAgeBand(child?.ageBand ?? '5-7')") > -1 && hydrate.indexOf("setAgeBand(child?.ageBand ?? '5-7')") < load);
+  assert.match(screen, /useFocusEffect\(useCallback\(/);
 });
