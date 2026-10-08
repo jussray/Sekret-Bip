@@ -391,20 +391,6 @@ export function VoiceBipScreen({
       setReplyAudioUri(`data:${audio.contentType};base64,${audio.audioBase64}`);
       const { audioBase64, contentType, characterId, ...meta } = audio;
       setReplyVoiceMeta(meta);
-      if (__DEV__) {
-        // Never log `meta.timing` here: timing.characters carries the literal
-        // spoken reply text once a caller requests includeTiming, and that is
-        // private user content per AGENTS.md's logging boundary.
-        console.log('[VoiceBipScreen] voice metadata', {
-          voiceProvider: meta.voiceProvider,
-          primaryVoiceProvider: meta.primaryVoiceProvider,
-          model: meta.model,
-          voiceId: meta.voiceId,
-          usedFallback: meta.usedFallback,
-          hasTiming: Boolean(meta.timing),
-          traceId: meta.traceId,
-        });
-      }
     } else {
       setReplyVoiceMeta(null);
     }
@@ -490,7 +476,12 @@ export function VoiceBipScreen({
         if (replySoundRef.current === sound) replySoundRef.current = null;
       }
     });
-    await sound.playAsync();
+    // A newer overlapping tap can unload this exact sound while playAsync()
+    // is still in flight (e.g. it was mid-start when the next tap's teardown
+    // ran) — that rejects the promise. Swallow it the same way every other
+    // op in this function does: the newer tap's sound is what should end up
+    // playing, not an unhandled rejection from the one it replaced.
+    await sound.playAsync().catch(() => null);
   };
 
   const prompts = avatar.prompts;

@@ -22,14 +22,16 @@ test('VoiceBipScreen stores voice provider/timing metadata separately from the a
   assert.match(source, /setReplyAudioUri\(''\);\s*\n\s*setReplyVoiceMeta\(null\);/);
 });
 
-test('VoiceBipScreen never logs timing content, only whether it is present', () => {
+test('VoiceBipScreen never logs voice metadata, timing or otherwise', () => {
   const source = read('screens/VoiceBipScreen.tsx');
 
   // timing.characters carries the literal spoken reply text once a caller
   // requests includeTiming (AGENTS.md: no private user content in logs).
-  // The dev log must reduce it to a boolean, never pass `meta`/`timing` whole.
-  assert.doesNotMatch(source, /console\.log\('\[VoiceBipScreen\] voice metadata',\s*meta\)/);
-  assert.match(source, /hasTiming:\s*Boolean\(meta\.timing\)/);
+  // A Bearer + Codex review finding both flagged a __DEV__ console.log of
+  // this metadata (even after reducing it to non-content fields, Bearer kept
+  // flagging the call site) — removed entirely rather than re-redacted again,
+  // since logging it was never required by #667, only storing it in state.
+  assert.doesNotMatch(source, /console\.log\('\[VoiceBipScreen\] voice metadata'/);
 });
 
 test('VoiceBipScreen unloads the reply Audio.Sound instead of leaking playback instances', () => {
@@ -59,6 +61,12 @@ test('VoiceBipScreen unloads the reply Audio.Sound instead of leaking playback i
     source,
     /recordingRef\.current\?\.stopAndUnloadAsync\(\)\.catch\(\(\) => null\);\s*\n\s*replySoundRef\.current\?\.unloadAsync\(\)\.catch\(\(\) => null\);/,
   );
+
+  // A newer tap's teardown can unload this exact sound while its own
+  // playAsync() is still in flight, rejecting that promise. Nothing catches
+  // the awaited call in the async press handler, so an uncaught rejection
+  // must not be possible here.
+  assert.match(source, /await sound\.playAsync\(\)\.catch\(\(\) => null\);/);
 });
 
 test('the canonical voice contract already carries provider, model, and timing metadata (residual-zero check)', () => {
