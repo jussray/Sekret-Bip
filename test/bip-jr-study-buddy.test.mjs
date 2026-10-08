@@ -136,8 +136,9 @@ test('stored progress is normalized to the minimal allow-listed shape', () => {
     completedMissionIds: ['5-7-math-1'],
     attemptsByMission: { ok: 3 },
     lastSubject: null,
+    lastAgeBand: null,
   });
-  assert.deepEqual(Object.keys(normalized).sort(), ['attemptsByMission', 'completedMissionIds', 'lastSubject']);
+  assert.deepEqual(Object.keys(normalized).sort(), ['attemptsByMission', 'completedMissionIds', 'lastAgeBand', 'lastSubject']);
 
   const many = normalizeStudyProgress({ completedMissionIds: Array.from({ length: 150 }, (_, i) => `m${i}`) });
   assert.equal(many.completedMissionIds.length, 100);
@@ -241,4 +242,21 @@ test('switching child resets subject and age range before that child\'s progress
   assert.ok(hydrate.indexOf("setSubject('math')") > -1 && hydrate.indexOf("setSubject('math')") < load);
   assert.ok(hydrate.indexOf("setAgeBand(child?.ageBand ?? '5-7')") > -1 && hydrate.indexOf("setAgeBand(child?.ageBand ?? '5-7')") < load);
   assert.match(screen, /useFocusEffect\(useCallback\(/);
+});
+
+test('progress remembers the last age range and rejects invalid ones', () => {
+  const after = applyStudyAttempt(EMPTY_STUDY_PROGRESS, '11-12-math-1', 'math', true, '11-12');
+  assert.equal(after.lastAgeBand, '11-12');
+  assert.equal(applyStudyAttempt(after, '11-12-math-2', 'math', false).lastAgeBand, '11-12');
+  assert.equal(normalizeStudyProgress({ lastAgeBand: '11-12' }).lastAgeBand, '11-12');
+  assert.equal(normalizeStudyProgress({ lastAgeBand: '13-17' }).lastAgeBand, null);
+  assert.equal(normalizeStudyProgress({ lastSubject: 'math' }).lastAgeBand, null, 'older saved progress still loads');
+});
+
+test('practice locks on every focus until the selected child is confirmed', () => {
+  const screen = fs.readFileSync(new URL('../app/(parent)/bip-jr-study.tsx', import.meta.url), 'utf8');
+  const focus = screen.slice(screen.indexOf('useFocusEffect(useCallback('));
+  assert.ok(focus.indexOf('setProgressReady(false)') > -1);
+  assert.ok(focus.indexOf('setProgressReady(false)') < focus.indexOf('loadActiveStudyChild()'));
+  assert.match(screen, /if \(!progressReady \|\| !selectedChoice/);
 });

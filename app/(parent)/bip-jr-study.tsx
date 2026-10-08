@@ -5,7 +5,7 @@
 // no network call. Opened from a profile, progress is kept per child profile;
 // the selected child is handed over on the device, never in the URL.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from 'expo-router';
@@ -48,20 +48,31 @@ export default function BipJrStudyRoute() {
   const band = AGE_BANDS.find(item => item.value === ageBand) ?? AGE_BANDS[0];
   const missions = useMemo(() => getStudyMissions(ageBand, subject), [ageBand, subject]);
 
+  // The child whose progress is loaded right now; null scope means none is loaded yet.
+  const loadedChild = useRef<{ scope: string | null; ageBand: ChildAgeBand | null }>({ scope: null, ageBand: null });
+
   // Tabs keep this screen mounted, so the selected child is re-read on every focus.
+  // Practice stays locked until that read confirms whose progress is on screen.
   useFocusEffect(useCallback(() => {
     let active = true;
+    setProgressReady(false);
+    const settle = (next: ActiveStudyChild | null) => {
+      const nextScope = next?.id ?? DEVICE_STUDY_SCOPE;
+      const loaded = loadedChild.current;
+      if (loaded.scope === nextScope && loaded.ageBand === (next?.ageBand ?? null)) {
+        setProgressReady(true);
+        return;
+      }
+      setChild(prev => (prev?.id === next?.id && prev?.ageBand === next?.ageBand ? prev : next));
+      setChildResolved(true);
+    };
     void loadActiveStudyChild()
-      .then(next => {
-        if (!active) return;
-        setChild(prev => (prev?.id === next?.id && prev?.ageBand === next?.ageBand ? prev : next));
-      })
+      .then(next => { if (active) settle(next); })
       .catch(() => {
         if (!active) return;
-        setChild(null);
         setSaveError('The selected child could not be read on this device. Practice is not linked to a profile.');
-      })
-      .finally(() => { if (active) setChildResolved(true); });
+        settle(null);
+      });
     return () => { active = false; };
   }, []));
 
@@ -69,6 +80,7 @@ export default function BipJrStudyRoute() {
     if (!childResolved) return;
     let active = true;
     setProgressReady(false);
+    loadedChild.current = { scope: null, ageBand: null };
     setProgress(EMPTY_STUDY_PROGRESS);
     // A different child never inherits the previous child's subject or age range.
     setSubject('math');
@@ -78,9 +90,15 @@ export default function BipJrStudyRoute() {
         if (!active) return;
         setProgress(stored);
         if (stored.lastSubject) setSubject(stored.lastSubject);
+        // A profile fixes the age range; shared device practice resumes the last one used.
+        if (!child && stored.lastAgeBand) setAgeBand(stored.lastAgeBand);
       })
       .catch(() => { if (active) setSaveError('Saved practice could not be read on this device. Practice still works.'); })
-      .finally(() => { if (active) setProgressReady(true); });
+      .finally(() => {
+        if (!active) return;
+        loadedChild.current = { scope, ageBand: child?.ageBand ?? null };
+        setProgressReady(true);
+      });
     return () => { active = false; };
   }, [childResolved, scope, child?.ageBand]);
 
@@ -105,7 +123,7 @@ export default function BipJrStudyRoute() {
     // Answering before saved progress loads would overwrite it with an empty snapshot.
     if (!progressReady || !selectedChoice || feedback?.kind === 'correct') return;
     const correct = isCorrectStudyChoice(mission, selectedChoice);
-    const next = applyStudyAttempt(progress, mission.id, subject, correct);
+    const next = applyStudyAttempt(progress, mission.id, subject, correct, ageBand);
     setProgress(next);
     if (correct) {
       setFeedback({ kind: 'correct', text: mission.explanation });

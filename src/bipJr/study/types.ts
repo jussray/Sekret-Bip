@@ -35,6 +35,7 @@ export type StudyProgressSnapshot = {
   completedMissionIds: string[];
   attemptsByMission: Record<string, number>;
   lastSubject: StudySubject | null;
+  lastAgeBand: ChildAgeBand | null;
 };
 
 export type StudyModePolicy = {

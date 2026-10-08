@@ -93,6 +93,15 @@ test.describe('Bip Jr Study Buddy (parent-supervised)', () => {
     await expectNoHorizontalOverflow(page);
     await capture(page, testInfo, 'study-11-12-language');
 
+    // Shared device practice comes back on the age range and subject it last used.
+    await expect(mission).toContainText('Useful conversation');
+    await page.getByTestId('study-choice-a').click();
+    await page.getByTestId('study-check-button').click();
+    await expect(page.getByTestId('study-feedback-correct')).toBeVisible();
+    await page.reload();
+    await expect(mission).toContainText('REASON IT THROUGH', { timeout: 30_000 });
+    await expect(mission).toContainText('Choose the response');
+
     expect(external, 'Study Buddy must not reach any external service').toEqual([]);
   });
 

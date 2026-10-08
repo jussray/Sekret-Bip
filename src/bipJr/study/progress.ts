@@ -42,6 +42,7 @@ export const EMPTY_STUDY_PROGRESS: StudyProgressSnapshot = {
   completedMissionIds: [],
   attemptsByMission: {},
   lastSubject: null,
+  lastAgeBand: null,
 };
 
 const STUDY_SUBJECTS = new Set<StudySubject>(['reading', 'math', 'science', 'language', 'study_skills']);
@@ -61,6 +62,7 @@ export function normalizeStudyProgress(value: unknown): StudyProgressSnapshot {
       ? Object.fromEntries(Object.entries(candidate.attemptsByMission).filter(([key, count]) => key.length < 80 && Number.isInteger(count) && Number(count) >= 0).slice(0, 100))
       : {},
     lastSubject: isStudySubject(candidate.lastSubject) ? candidate.lastSubject : null,
+    lastAgeBand: isChildAgeBand(candidate.lastAgeBand) ? candidate.lastAgeBand : null,
   };
 }
 
@@ -69,6 +71,7 @@ export function applyStudyAttempt(
   missionId: string,
   subject: StudySubject,
   correct: boolean,
+  ageBand?: ChildAgeBand,
 ): StudyProgressSnapshot {
   const attempts = Math.min((progress.attemptsByMission[missionId] ?? 0) + 1, 99);
   const completed = correct && !progress.completedMissionIds.includes(missionId)
@@ -78,5 +81,6 @@ export function applyStudyAttempt(
     completedMissionIds: completed,
     attemptsByMission: { ...progress.attemptsByMission, [missionId]: attempts },
     lastSubject: subject,
+    lastAgeBand: ageBand ?? progress.lastAgeBand,
   };
 }
