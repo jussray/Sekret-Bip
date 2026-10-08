@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
 
 import {
+  getMissionAfter,
   getNextStudyMission,
   getStudyMissions,
   getSubjectCompletion,
@@ -55,7 +56,11 @@ export default function BipJrStudyRoute() {
     setProgress(EMPTY_STUDY_PROGRESS);
     if (linkedChild) setAgeBand(params.band as ChildAgeBand);
     void loadStudyProgress(scope)
-      .then(stored => { if (active) setProgress(stored); })
+      .then(stored => {
+        if (!active) return;
+        setProgress(stored);
+        if (stored.lastSubject) setSubject(stored.lastSubject);
+      })
       .catch(() => { if (active) setSaveError('Saved practice could not be read on this device. Practice still works.'); })
       .finally(() => { if (active) setProgressReady(true); });
     return () => { active = false; };
@@ -79,7 +84,8 @@ export default function BipJrStudyRoute() {
   }
 
   async function checkAnswer() {
-    if (!selectedChoice || feedback?.kind === 'correct') return;
+    // Answering before saved progress loads would overwrite it with an empty snapshot.
+    if (!progressReady || !selectedChoice || feedback?.kind === 'correct') return;
     const correct = isCorrectStudyChoice(mission, selectedChoice);
     const next = applyStudyAttempt(progress, mission.id, subject, correct);
     setProgress(next);
@@ -98,7 +104,7 @@ export default function BipJrStudyRoute() {
   }
 
   function nextMission() {
-    setActiveMissionId(getNextStudyMission(ageBand, subject, progress).id);
+    setActiveMissionId(getMissionAfter(ageBand, subject, progress, mission.id).id);
     resetAnswer();
   }
 
@@ -184,8 +190,9 @@ export default function BipJrStudyRoute() {
                   testID={`study-choice-${choice.id}`}
                   accessibilityRole="button"
                   accessibilityState={{ selected }}
+                  disabled={!progressReady}
                   onPress={() => {
-                    if (feedback?.kind === 'correct') return;
+                    if (!progressReady || feedback?.kind === 'correct') return;
                     setSelectedChoice(choice.id);
                     setFeedback(null);
                   }}
@@ -228,9 +235,9 @@ export default function BipJrStudyRoute() {
               <TouchableOpacity
                 testID="study-check-button"
                 accessibilityRole="button"
-                disabled={!selectedChoice}
+                disabled={!progressReady || !selectedChoice}
                 onPress={() => void checkAnswer()}
-                style={[styles.primaryButton, { backgroundColor: band.accent }, !selectedChoice && styles.disabled]}
+                style={[styles.primaryButton, { backgroundColor: band.accent }, (!progressReady || !selectedChoice) && styles.disabled]}
               >
                 <Text style={styles.primaryButtonText}>Check my thinking</Text>
               </TouchableOpacity>

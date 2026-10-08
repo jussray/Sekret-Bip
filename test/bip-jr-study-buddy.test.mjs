@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 import {
+  getMissionAfter,
   getNextStudyMission,
   getStudyMissions,
   getSubjectCompletion,
@@ -21,6 +22,38 @@ import { CHILD_SAFETY_CONTRACT } from '../src/bipJr/safetyContract.ts';
 
 const AGE_BANDS = ['5-7', '8-10', '11-12'];
 const SUBJECTS = STUDY_SUBJECTS.map((subject) => subject.id);
+const STABLE_MISSION_IDS = [
+  '5-7-reading-1=Sound detective',
+  '5-7-reading-2=Letter match',
+  '5-7-math-1=Count and add',
+  '5-7-math-2=Which has more?',
+  '5-7-science-1=Living or not?',
+  '5-7-science-2=Weather watcher',
+  '5-7-language-1=Hello around the world',
+  '5-7-language-2=Count in Spanish',
+  '5-7-study_skills-1=Ready-to-learn check',
+  '5-7-study_skills-2=One thing first',
+  '8-10-reading-1=Main idea finder',
+  '8-10-reading-2=Context clue search',
+  '8-10-math-1=Build twelve',
+  '8-10-math-2=Equal groups',
+  '8-10-science-1=Plant power',
+  '8-10-science-2=State of matter',
+  '8-10-language-1=Introduce yourself',
+  '8-10-language-2=Polite words',
+  '8-10-study_skills-1=Break it into three',
+  '8-10-study_skills-2=Distraction plan',
+  '11-12-reading-1=Claim and evidence',
+  '11-12-reading-2=Author’s purpose',
+  '11-12-math-1=Explain the operation',
+  '11-12-math-2=Percent sense',
+  '11-12-science-1=Testable question',
+  '11-12-science-2=Energy transfer',
+  '11-12-language-1=Useful conversation',
+  '11-12-language-2=Choose the response',
+  '11-12-study_skills-1=Focus sprint',
+  '11-12-study_skills-2=Check your source',
+];
 
 test('every age band has a warm-up then practice mission for every subject (30 total)', () => {
   let total = 0;
@@ -159,4 +192,26 @@ test('signing out clears every Bip Jr study progress key', () => {
   assert.match(clear, /await clearAllStudyProgress\(\);/);
   const store = fs.readFileSync(new URL('../src/bipJr/study/progressStore.ts', import.meta.url), 'utf8');
   assert.match(store, /getAllKeys\(\)[\s\S]*filter\(isStudyProgressKey\)[\s\S]*multiRemove\(studyKeys\)/);
+});
+
+test('after a subject is finished, Next moves through every mission instead of repeating the warm-up', () => {
+  const [first, second] = getStudyMissions('11-12', 'science');
+  let progress = applyStudyAttempt(EMPTY_STUDY_PROGRESS, first.id, 'science', true);
+  progress = applyStudyAttempt(progress, second.id, 'science', true);
+  assert.equal(getMissionAfter('11-12', 'science', progress, first.id).id, second.id);
+  assert.equal(getMissionAfter('11-12', 'science', progress, second.id).id, first.id);
+
+  const halfDone = applyStudyAttempt(EMPTY_STUDY_PROGRESS, second.id, 'science', true);
+  assert.equal(getMissionAfter('11-12', 'science', halfDone, second.id).id, first.id);
+  assert.equal(getMissionAfter('11-12', 'science', halfDone, 'unknown').id, first.id);
+});
+
+test('persisted mission IDs stay stable (stored progress depends on them)', () => {
+  const ids = [];
+  for (const band of AGE_BANDS) for (const subject of SUBJECTS) {
+    for (const mission of getStudyMissions(band, subject)) ids.push(`${mission.id}=${mission.title}`);
+  }
+  // Changing this list re-points saved mastery to different lessons. Add new
+  // missions at the end of a subject, and migrate stored IDs if one must change.
+  assert.deepEqual(ids, STABLE_MISSION_IDS);
 });

@@ -483,6 +483,24 @@ export function getNextStudyMission(
   return missions.find(mission => !progress.completedMissionIds.includes(mission.id)) ?? missions[0];
 }
 
+// Moves forward from the current mission: the next unfinished one, or simply the
+// next one once the whole subject is finished, so every mission can be replayed.
+export function getMissionAfter(
+  ageBand: ChildAgeBand,
+  subject: StudySubject,
+  progress: StudyProgressSnapshot,
+  currentMissionId: string,
+): StudyMission {
+  const missions = getStudyMissions(ageBand, subject);
+  const current = missions.findIndex(mission => mission.id === currentMissionId);
+  if (current === -1) return getNextStudyMission(ageBand, subject, progress);
+  for (let step = 1; step <= missions.length; step += 1) {
+    const candidate = missions[(current + step) % missions.length];
+    if (!progress.completedMissionIds.includes(candidate.id)) return candidate;
+  }
+  return missions[(current + 1) % missions.length];
+}
+
 export function getSubjectCompletion(
   ageBand: ChildAgeBand,
   subject: StudySubject,

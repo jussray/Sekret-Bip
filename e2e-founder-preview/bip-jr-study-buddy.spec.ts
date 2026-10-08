@@ -70,6 +70,17 @@ test.describe('Bip Jr Study Buddy (parent-supervised)', () => {
     await expect(page.getByTestId('study-progress')).toContainText('1 of 2 finished', { timeout: 30_000 });
     await expect(mission).toContainText('Which has more?');
 
+    // Finishing the subject must not trap Next on the warm-up.
+    await page.getByTestId('study-choice-a').click();
+    await page.getByTestId('study-check-button').click();
+    await expect(page.getByTestId('study-progress')).toContainText('2 of 2 finished');
+    await page.getByTestId('study-next-button').click();
+    await expect(mission).toContainText('Count and add');
+    await page.getByTestId('study-choice-b').click();
+    await page.getByTestId('study-check-button').click();
+    await page.getByTestId('study-next-button').click();
+    await expect(mission).toContainText('Which has more?');
+
     await page.getByTestId('study-age-11-12').click();
     await page.getByTestId('study-subject-language').click();
     await expect(page.getByTestId('study-progress')).toContainText('0 of 2 finished');
@@ -103,6 +114,15 @@ test.describe('Bip Jr Study Buddy (parent-supervised)', () => {
 
     await page.goto(`/bip-jr-study?child=${childB}&band=8-10`);
     await expect(page.getByTestId('study-progress')).toContainText('0 of 2 finished', { timeout: 30_000 });
+
+    // The last subject a child practiced is restored when they come back.
+    await page.getByTestId('study-subject-reading').click();
+    await expect(mission).toContainText('Main idea finder');
+    await page.getByTestId('study-choice-a').click();
+    await page.getByTestId('study-check-button').click();
+    await expect(page.getByTestId('study-feedback-correct')).toBeVisible();
+    await page.reload();
+    await expect(mission).toContainText('Context clue search', { timeout: 30_000 });
 
     await page.goto(`/bip-jr-study?child=${childA}&band=8-10`);
     await expect(page.getByTestId('study-progress')).toContainText('1 of 2 finished', { timeout: 30_000 });
