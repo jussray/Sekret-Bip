@@ -22,6 +22,16 @@ test('VoiceBipScreen stores voice provider/timing metadata separately from the a
   assert.match(source, /setReplyAudioUri\(''\);\s*\n\s*setReplyVoiceMeta\(null\);/);
 });
 
+test('VoiceBipScreen never logs timing content, only whether it is present', () => {
+  const source = read('screens/VoiceBipScreen.tsx');
+
+  // timing.characters carries the literal spoken reply text once a caller
+  // requests includeTiming (AGENTS.md: no private user content in logs).
+  // The dev log must reduce it to a boolean, never pass `meta`/`timing` whole.
+  assert.doesNotMatch(source, /console\.log\('\[VoiceBipScreen\] voice metadata',\s*meta\)/);
+  assert.match(source, /hasTiming:\s*Boolean\(meta\.timing\)/);
+});
+
 test('VoiceBipScreen unloads the reply Audio.Sound instead of leaking playback instances', () => {
   const source = read('screens/VoiceBipScreen.tsx');
 

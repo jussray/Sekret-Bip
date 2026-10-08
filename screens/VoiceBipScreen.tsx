@@ -392,7 +392,18 @@ export function VoiceBipScreen({
       const { audioBase64, contentType, characterId, ...meta } = audio;
       setReplyVoiceMeta(meta);
       if (__DEV__) {
-        console.log('[VoiceBipScreen] voice metadata', meta);
+        // Never log `meta.timing` here: timing.characters carries the literal
+        // spoken reply text once a caller requests includeTiming, and that is
+        // private user content per AGENTS.md's logging boundary.
+        console.log('[VoiceBipScreen] voice metadata', {
+          voiceProvider: meta.voiceProvider,
+          primaryVoiceProvider: meta.primaryVoiceProvider,
+          model: meta.model,
+          voiceId: meta.voiceId,
+          usedFallback: meta.usedFallback,
+          hasTiming: Boolean(meta.timing),
+          traceId: meta.traceId,
+        });
       }
     } else {
       setReplyVoiceMeta(null);
