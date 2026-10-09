@@ -49,6 +49,7 @@ function ParentTabs() {
         <Tabs.Screen name="growth" options={{ href: null }} />
         <Tabs.Screen name="resources" options={{ href: null }} />
         <Tabs.Screen name="approvals" options={{ href: null }} />
+        <Tabs.Screen name="bip-jr-study" options={{ href: null }} />
       </Tabs>
       <SideSafeBackButton side="parent" />
     </View>
