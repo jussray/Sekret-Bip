@@ -28,7 +28,9 @@
 | Bip Jr Study screen | bip-jr `app/(child)/study.tsx` | **Recovered here (Transfer 2)** as an adult-supervised Parent route | Founder approval 2026-10-08. Runs under the Parent account; no child account or login. |
 | Other Bip Jr child routes (`room`, `pages`, `calm`, `bridge`, onboarding) | bip-jr `app/(child)/*` | Pending | A child-operated surface needs the authority model below plus COPPA and child-welfare review. |
 | Bip Jr authority model (migrations + `jr-authority-service`) | bip-jr `supabase/**` | Blocked | Database migration and Edge Function deploy; bip-jr's own Phase 2C gate (disposable database proof, advisors, legal and child-welfare review) is unmet. |
-| Founder Control Room, Chief AI and JBH material inside canonical | `control-room/`, `CHIEF_AI_PROMPT_MACHINE_LICENSE.md`, PR #1134 | Out of scope here | Rightful owners (`founder-control-room`, `chief-ai-machine`) are separate repositories not attached to this recovery. |
+| Chief AI Prompt Machine license template | `CHIEF_AI_PROMPT_MACHINE_LICENSE.md` | **Exported (Transfer 3)** | Now `jussray/chief-ai-machine:docs/legal/CHIEF_AI_PROMPT_MACHINE_LICENSE.md`. |
+| JBH Messenger message and payment policy | `lib/juss-beautiful-hair/*`, its tests, `docs/integrations/juss-beautiful-hair-messenger.md` | **Exported (Transfer 4)** | Now `jussray/jbh-private:automation/messenger/`. Removal from this repository is PR #1134. |
+| Founder Control Room material inside canonical | `control-room/` | Out of scope here | Rightful owner `founder-control-room` is not attached to this recovery. |
 
 ## Transfer 1 — Bip Jr Study Buddy domain
 
@@ -61,4 +63,15 @@ Source `jussray/bip-jr@cf773ff14c677b706e600437de6c779c3e9c37f2:app/(child)/stud
 - A failed progress save is shown on screen, never hidden.
 - Proof: `e2e-founder-preview/bip-jr-study-buddy.spec.ts` (Playwright, 390 px). Covers the entry card, per-child progress separation, a wrong-then-right answer, the hint, progress surviving a reload, age and subject switching, locked modes, no horizontal overflow, and zero requests to any non-local host.
 
-Pre-existing, not fixed here: the Parent tab bar shows stray `bip-jr`, `circle/feed` and `teen-verification` tabs, because those routes are not registered in `app/(parent)/_layout.tsx`.
+Fixed separately in PR #1148: the Parent tab bar no longer shows stray `bip-jr`, `circle/feed` and `teen-verification` tabs.
+
+## Transfer 3 — Chief AI Prompt Machine license template (outbound)
+
+- Destination: `jussray/chief-ai-machine` PR #213, merged as `a92495c` on 2026-10-09. Body byte-identical to this repository's copy (blob `a6ec2dc0`), with a header marking it a draft template.
+- Removed here after that merge. `docs/legal/LICENSE_AUDIT_2026.md` keeps its dated finding and points to the new location.
+- Rollback: revert the removal commit; the destination copy is unaffected.
+
+## Transfer 4 — JBH Messenger policy (outbound)
+
+- Destination: `jussray/jbh-private` PR #84, merged as `0b0f093` on 2026-10-09. `automation/messenger/message-policy.mjs` and `payment-policy.mjs` are byte-identical to `Sekret-Bip@1d494ec` plus a provenance header; the tests run in jbh-private's `messenger-policy.yml` workflow.
+- Removal here is PR #1134, which predates the export and is now safe to merge.
