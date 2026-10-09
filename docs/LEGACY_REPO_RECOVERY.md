@@ -68,10 +68,11 @@ Fixed separately in PR #1148: the Parent tab bar no longer shows stray `bip-jr`,
 ## Transfer 3 — Chief AI Prompt Machine license template (outbound)
 
 - Destination: `jussray/chief-ai-machine` PR #213, merged as `a92495c` on 2026-10-09. Body byte-identical to this repository's copy (blob `a6ec2dc0`), with a header marking it a draft template.
-- Removed here after that merge. `docs/legal/LICENSE_AUDIT_2026.md` keeps its dated finding and points to the new location.
+- The removal from this repository is a separate gate. `AGENTS.md` requires explicit founder approval before deleting Ray/Juss material, so the removal takes effect only when Juss explicitly approves this deletion together with the exact-head merge. Until then the source copy stays.
+- `docs/legal/LICENSE_AUDIT_2026.md` keeps its dated finding and points to the new location.
 - Rollback: revert the removal commit; the destination copy is unaffected.
 
 ## Transfer 4 — JBH Messenger policy (outbound)
 
 - Destination: `jussray/jbh-private` PR #84, merged as `0b0f093` on 2026-10-09. `automation/messenger/message-policy.mjs` and `payment-policy.mjs` are byte-identical to `Sekret-Bip@1d494ec` plus a provenance header; the tests run in jbh-private's `messenger-policy.yml` workflow.
-- Removal here is PR #1134, which predates the export and is now safe to merge.
+- Removal here is PR #1134, which predates the export. The export it was missing has now landed; that is one prerequisite, not a merge verdict. Merging #1134 still needs its own exact-head checks and Juss's explicit approval of the deletion.
