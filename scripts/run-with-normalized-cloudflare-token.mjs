@@ -25,6 +25,18 @@ export function normalizeCloudflareTokenTransport(value) {
   } while (token !== previous);
 
   token = token.replace(/[\p{White_Space}\p{Cf}]+/gu, '');
+  // Production evidence proved that the stored token passed through a Unicode
+  // lookalike transformation. Cloudflare tokens are ASCII-only, so normalize
+  // only unambiguous visual transport confusables and fail closed on everything
+  // else. This never invents missing characters or removes arbitrary symbols.
+  const asciiConfusables = new Map([
+    ['А', 'A'], ['В', 'B'], ['С', 'C'], ['Е', 'E'], ['Н', 'H'], ['К', 'K'],
+    ['М', 'M'], ['О', 'O'], ['Р', 'P'], ['Т', 'T'], ['Х', 'X'],
+    ['а', 'a'], ['в', 'b'], ['с', 'c'], ['е', 'e'], ['н', 'h'], ['к', 'k'],
+    ['м', 'm'], ['о', 'o'], ['р', 'p'], ['т', 't'], ['х', 'x'], ['у', 'y'],
+    ['‐', '-'], ['‑', '-'], ['‒', '-'], ['–', '-'], ['—', '-'], ['−', '-'],
+  ]);
+  token = Array.from(token, (character) => asciiConfusables.get(character) ?? character).join('');
   return {
     token,
     changed: token !== raw,
