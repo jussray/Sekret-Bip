@@ -1,6 +1,72 @@
 # Se'kret Bip crawler policy
 # Public discovery is explicit. Application, auth, onboarding, and member routes
 # remain outside compliant crawler scope unless deliberately added here later.
+# Search and user-directed retrieval may use only the exact public paths below.
+# Model-training crawlers are denied entirely.
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: OAI-SearchBot
+Disallow: /
+Allow: /$
+Allow: /auth.md$
+Allow: /what-is-sekret-bip/
+Allow: /how-it-works/
+Allow: /privacy-and-safety/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /crawlers.json$
+
+User-agent: ChatGPT-User
+Disallow: /
+Allow: /$
+Allow: /auth.md$
+Allow: /what-is-sekret-bip/
+Allow: /how-it-works/
+Allow: /privacy-and-safety/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /crawlers.json$
+
+User-agent: Claude-SearchBot
+Disallow: /
+Allow: /$
+Allow: /auth.md$
+Allow: /what-is-sekret-bip/
+Allow: /how-it-works/
+Allow: /privacy-and-safety/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /crawlers.json$
+
+User-agent: Claude-User
+Disallow: /
+Allow: /$
+Allow: /auth.md$
+Allow: /what-is-sekret-bip/
+Allow: /how-it-works/
+Allow: /privacy-and-safety/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /crawlers.json$
+
+User-agent: Googlebot
+Disallow: /
+Allow: /$
+Allow: /auth.md$
+Allow: /what-is-sekret-bip/
+Allow: /how-it-works/
+Allow: /privacy-and-safety/
+Allow: /robots.txt$
+Allow: /sitemap.xml$
+Allow: /crawlers.json$
 
 User-agent: *
 Disallow: /
@@ -11,5 +77,6 @@ Allow: /how-it-works/
 Allow: /privacy-and-safety/
 Allow: /robots.txt$
 Allow: /sitemap.xml$
+Allow: /crawlers.json$
 
 Sitemap: https://sekretbip.net/sitemap.xml
