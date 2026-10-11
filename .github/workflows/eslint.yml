@@ -30,22 +30,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install ESLint
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install SARIF formatter
         run: |
-          npm install eslint@8.10.0
-          npm install @microsoft/eslint-formatter-sarif@3.1.0
+          npm install --prefix "$RUNNER_TEMP/eslint-sarif" \
+            --no-save --package-lock=false --ignore-scripts \
+            @microsoft/eslint-formatter-sarif@3.1.0
 
       - name: Run ESLint
         env:
           SARIF_ESLINT_IGNORE_SUPPRESSED: "true"
-        run: npx eslint .
-          --config .eslintrc.js
-          --ext .js,.jsx,.ts,.tsx
-          --format @microsoft/eslint-formatter-sarif
-          --output-file eslint-results.sarif
-        continue-on-error: true
+        run: |
+          ./node_modules/.bin/eslint . \
+            --format "$RUNNER_TEMP/eslint-sarif/node_modules/@microsoft/eslint-formatter-sarif/sarif.js" \
+            --output-file eslint-results.sarif
 
       - name: Upload analysis results to GitHub
+        if: ${{ always() && hashFiles('eslint-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: eslint-results.sarif
