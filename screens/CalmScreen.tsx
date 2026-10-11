@@ -110,12 +110,6 @@ const MORE_BREATHING = [
   { label: 'Deep Belly Breath',sub: 'release tension',           duration: '3 min' },
 ];
 
-const CALM_PLAYLIST = [
-  { emoji: '🔥', label: 'night rain',  sub: 'soothing rain sounds', duration: '20:00' },
-  { emoji: '🎵', label: 'soft lo-fi',  sub: 'focus + unwind',       duration: '30:00' },
-  { emoji: '🌊', label: 'ocean waves', sub: 'reset your mind',      duration: '25:00' },
-];
-
 // ── Props ──────────────────────────────────────────────────────────────────
 interface CalmScreenProps {
   t:               Record<string, any>;
@@ -299,24 +293,6 @@ export function CalmScreen({
             onPress={() => onOpenBreathe ? onOpenBreathe() : Alert.alert('Breathing exercises', 'Open the full breathing screen to choose this exercise.')}
           >
             <Image source={CLOUD_HEADPHONES} style={styles.listRowIcon} resizeMode="contain" />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.listRowTitle, { color: '#fff' }]}>{item.label}</Text>
-              <Text style={[styles.listRowSub, { color: t.soft }]}>{item.sub}</Text>
-            </View>
-            <Text style={[styles.listRowDur, { color: t.soft }]}>{item.duration}</Text>
-            <Text style={{ color: t.soft }}>›</Text>
-          </TouchableOpacity>
-        ))}
-
-        <Text style={[styles.sectionTitle, { color: '#fff' }]}>Calm Playlist ✦</Text>
-        <Text style={[styles.sectionSub, { color: t.soft }]}>music + sounds to relax</Text>
-        {CALM_PLAYLIST.map(item => (
-          <TouchableOpacity
-            key={item.label}
-            style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}
-            onPress={() => onOpenBreathe ? onOpenBreathe() : Alert.alert('Audio library', 'Open the full breathing screen to use available calm tools.')}
-          >
-            <Text style={styles.playlistEmoji}>{item.emoji}</Text>
             <View style={{ flex: 1 }}>
               <Text style={[styles.listRowTitle, { color: '#fff' }]}>{item.label}</Text>
               <Text style={[styles.listRowSub, { color: t.soft }]}>{item.sub}</Text>
@@ -665,7 +641,6 @@ const styles = StyleSheet.create({
   listRowTitle:      { fontSize: 14, fontWeight: '700' },
   listRowSub:        { fontSize: 11, marginTop: 2 },
   listRowDur:        { fontSize: 12, marginRight: 6 },
-  playlistEmoji:     { fontSize: 32, width: 40, textAlign: 'center' },
   reminderCard:      { margin: 16, borderRadius: 18, borderWidth: 1, padding: 18 },
   reminderTitle:     { fontSize: 16, fontWeight: '800', marginBottom: 4 },
   reminderSub:       { fontSize: 12, marginBottom: 14 },

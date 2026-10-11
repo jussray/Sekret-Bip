@@ -31,7 +31,10 @@ test('active Calm controls have real handlers instead of null or empty actions',
   assert.doesNotMatch(source, /action: null/);
   assert.match(source, /reset plan ↺/);
   assert.match(source, /MORE_BREATHING[\s\S]*TouchableOpacity/);
-  assert.match(source, /CALM_PLAYLIST[\s\S]*TouchableOpacity/);
+  // The Calm landing playlist (CALM_PLAYLIST) was removed: its rows opened the
+  // breathing screen, which has no audio, so they were dead affordances.
+  assert.doesNotMatch(source, /CALM_PLAYLIST/);
+  assert.doesNotMatch(source, /Calm Playlist/);
   // "Calm Picks for You" (CALM_PICKS) was removed per #1008: it rendered fake
   // inline play/pause/progress controls for tracks that never had real audio
   // (empty uri, "Coming soon" fallback) rather than real playback. Assert the
