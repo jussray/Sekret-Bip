@@ -27,7 +27,7 @@ test('frontend build exports Expo and writes the release marker', () => {
 test('direct Expo exports bootstrap marker sources before public files are copied', () => {
   assert.match(appConfig, /process\.env\.CF_PAGES !== '1'/);
   assert.match(appConfig, /bootstrap-release-metadata-source\.mjs/);
-  assert.match(appConfig, /execFileSync\(process\.execPath, \[scriptPath\]/);
+  assert.match(appConfig, /execFileSync\(process\.execPath, \[scriptPath, \.\.\.args\]/);
   assert.match(appConfig, /prepareCloudflareReleaseSource\(\);/);
   assert.match(releaseBootstrap, /writeReleaseMetadata\('public'/);
   assert.match(releaseBootstrap, /requires CF_PAGES=1/);

@@ -11,12 +11,14 @@ const watcher = read('.github/workflows/control-room-github-failures.yml');
 const exactGate = read('.github/workflows/github-failure-routing-exact-head.yml');
 const packageJson = JSON.parse(read('package.json'));
 
-test('GitHub failures route through Founder Control Room first', () => {
+test('GitHub failures and skipped proof witnesses route through Founder Control Room first', () => {
   assert.match(scanner, /Founder Control Room is the first escalation surface whenever GitHub fails/);
   assert.match(scanner, /github_actions_/);
   assert.match(scanner, /upsert_control_room_issue/);
   assert.match(scanner, /audit_events/);
-  assert.match(docs, /Every GitHub failure must be checked against Founder Control Room first/);
+  assert.match(docs, /Every GitHub failure/);
+  assert.match(docs, /every skipped proof witness/i);
+  assert.match(docs, /must be checked against Founder Control Room first/);
 });
 
 test('runner-startup failures are not mislabeled as code regressions', () => {

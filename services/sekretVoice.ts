@@ -223,8 +223,6 @@ const BLOCKED_REPLY_LANGUAGE = [
   /\bwhat(?:'s| is) (?:wrong|bothering you|on your mind)\b/i,
   /\bwould you like to (?:talk|share|tell me)\b/i,
   /\bi(?:'m| am) here (?:for you|to listen|to help|to support)\b/i,
-  /[—–]/,
-  / -- /,
   /\bgreat question\b/i,
   /\bof course[!,]/i,
   /\bcertainly[!,]/i,
@@ -259,11 +257,41 @@ const BLOCKED_REPLY_LANGUAGE = [
   /\bit is important to note that\b/i,
 ];
 
-export function keepSekretReply(reply: unknown, fallback: string): string {
-  if (typeof reply !== 'string') return fallback;
+// Em/en dashes and spaced double hyphens read as an AI tell in a text, but
+// they are punctuation, not content. Rewrite them instead of discarding the
+// whole reply: numeric ranges keep a plain hyphen, clause breaks become commas.
+const DASH_RANGE = /(\d)\s*[—–]\s*(\d)/g;
+const DASH_SEPARATOR = /\s*[—–]\s*|\s+--\s+/g;
+
+export function normalizeSekretDashes(text: string): string {
+  return text
+    .replace(DASH_RANGE, '$1-$2')
+    .replace(DASH_SEPARATOR, ', ')
+    .replace(/,\s*([.!?,])/g, '$1')
+    .replace(/^[\s,]+|[\s,]+$/g, '')
+    .replace(/[ \t]{2,}/g, ' ');
+}
+
+export interface SekretReplyGuardResult {
+  reply: string;
+  blocked: boolean;
+}
+
+export function guardSekretReply(reply: unknown, fallback: string): SekretReplyGuardResult {
+  if (typeof reply !== 'string') return { reply: fallback, blocked: true };
   const trimmed = reply.trim();
-  if (!trimmed || BLOCKED_REPLY_LANGUAGE.some(pattern => pattern.test(trimmed))) return fallback;
-  return trimmed;
+  if (!trimmed) return { reply: fallback, blocked: true };
+  // Evaluate with dashes collapsed to spaces so a blocked phrase split by a
+  // dash (e.g. "I'm here — to support you") stays contiguous and is caught.
+  const evaluated = trimmed.replace(DASH_RANGE, '$1-$2').replace(DASH_SEPARATOR, ' ');
+  if (BLOCKED_REPLY_LANGUAGE.some(pattern => pattern.test(evaluated))) {
+    return { reply: fallback, blocked: true };
+  }
+  return { reply: normalizeSekretDashes(trimmed), blocked: false };
+}
+
+export function keepSekretReply(reply: unknown, fallback: string): string {
+  return guardSekretReply(reply, fallback).reply;
 }
 
 export function getSekretFallback(personality?: string, userText = ''): string {

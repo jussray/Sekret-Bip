@@ -72,7 +72,7 @@ test('normalizes an exact-head ledger into a sanitized juss-proof/v1 receipt', (
   });
   assert.equal(receipt.operation, 'exact_head_test_ledger');
   assert.equal(receipt.state, 'verified');
-  assert.equal(receipt.nextAuthority, 'runtime-provider-mcp');
+  assert.equal(receipt.nextAuthority, 'founder-control-room');
   assert.equal(receipt.evidence.length, 2);
   assert.equal(receipt.evidence[0].type, 'control_room_test_ledger');
   assert.match(receipt.evidence[0].sha256, /^[0-9a-f]{64}$/);
