@@ -1,0 +1,75 @@
+name: Front Door Probe (temporary, PR #1154)
+
+# Temporary read-only diagnostic for #925 / PR #1154. Anonymous GETs and the
+# existing production Playwright specs only; no secrets, no provider mutation.
+# Remove before merging PR #1154.
+
+on:
+  push:
+    branches:
+      - claude/sekret-bip-signup-trace-g8t6pc
+    paths:
+      - .github/workflows/front-door-probe-temp.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: front-door-probe-temp
+  cancel-in-progress: true
+
+jobs:
+  probe:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Anonymous HTTP readback (who answers each front-door path)
+        shell: bash
+        run: |
+          set -uo pipefail
+          for url in \
+            https://app.sekretbip.net/ \
+            https://app.sekretbip.net/signup?side=teen \
+            https://app.sekretbip.net/login \
+            https://sekretbip.net/ \
+            https://www.sekretbip.net/ \
+            https://api.sekretbip.net/health; do
+            echo "::group::$url"
+            curl -sS -o body.txt -D headers.txt --max-time 20 "$url" || echo "curl failed: $?"
+            grep -iE '^(HTTP/|location:|content-type:|server:|cf-ray:|cf-access|x-sekret|cache-control:)' headers.txt || true
+            echo "--- body (first 300 bytes)"
+            head -c 300 body.txt | tr -d '\r' || true
+            echo
+            echo "::endgroup::"
+          done
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
+
+      - name: Anonymous production Playwright (front door, auth reachability, signup transport)
+        run: >-
+          ./node_modules/.bin/playwright test --config=playwright.production.config.ts
+          production-public-front-door.spec.ts
+          production-auth-reachability.spec.ts
+          production-signup-transport.spec.ts
+
+      - name: Retain Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: front-door-probe-playwright
+          path: |
+            playwright-report-production
+            test-results
+          retention-days: 14
+          if-no-files-found: ignore
