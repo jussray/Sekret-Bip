@@ -135,7 +135,7 @@ test('safety_crisis intent returns crisis reply before any OpenAI call', () => {
 
 test('isCrisisText() is also called as a guard independent of detectIntent', () => {
   // Belt-and-suspenders: raw text is re-tested after intent detection.
-  assert.match(worker, /CRISIS_RE\.test\(userText\)/);
+  assert.match(worker, /isCrisisText\(userText\)/);
 });
 
 // ─── normalizeCharacter for characters ───────────────────────────────────────
