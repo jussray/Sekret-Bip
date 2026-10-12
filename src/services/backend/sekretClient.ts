@@ -160,9 +160,15 @@ export interface WorkerHealthResult {
   traceId?: string;
 }
 
+function stripClientGuardianAuthority(input: CompanionReplyRequest): CompanionReplyRequest {
+  const sanitized = { ...input };
+  delete sanitized.parentSharingEnabled;
+  return sanitized;
+}
+
 export const sekretClient = {
   sendReply(input: CompanionReplyRequest): Promise<WorkerResult<CompanionReplyData>> {
-    return postJson<CompanionReplyData>('/api/sekret/reply', input);
+    return postJson<CompanionReplyData>('/api/sekret/reply', stripClientGuardianAuthority(input));
   },
 
   synthesizeVoice(input: VoiceSynthesisRequest): Promise<WorkerResult<VoiceSynthesisData>> {
