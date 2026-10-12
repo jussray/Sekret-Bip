@@ -106,8 +106,9 @@ test('worker/index.ts forwards the authenticated principal to sekret-reply.ts', 
     'index.ts previously dropped `principal` on this call — this is the regression guard for that exact bug');
 });
 
-test('sekret-reply.ts accepts a principal and threads it into preflight', () => {
-  assert.match(reply, /async function handleReply\(request: Request, env: Env, principal: PreflightPrincipal \| null/);
+test('sekret-reply.ts accepts an authenticated guardian-aware principal and threads it into preflight', () => {
+  assert.match(reply, /type GuardianAwarePrincipal = PreflightPrincipal & \{ guardianSharingEnabled\?: boolean \}/);
+  assert.match(reply, /async function handleReply\(request: Request, env: Env, principal: GuardianAwarePrincipal \| null/);
   assert.match(reply, /runPreflight\(rawHistory, body\.memory, principal\)/);
-  assert.match(reply, /async fetch\(request: Request, env: Env, principal: PreflightPrincipal \| null[^)]*\): Promise<Response>/);
+  assert.match(reply, /async fetch\(request: Request, env: Env, principal: GuardianAwarePrincipal \| null[^)]*\): Promise<Response>/);
 });
