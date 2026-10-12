@@ -1,4 +1,4 @@
-const CRISIS_INPUT_RE = /\b(kill myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm|hurt myself|cut myself|disappear forever|run away|abuse|abused|assault|unsafe|not safe|danger|emergency)\b/i;
+const CRISIS_INPUT_RE = /\b(kill myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm|hurt myself|cut myself|kill(?:ing)? myself|killing myself|end (?:it all|my life)|want to live|don.?t want to be alive|not want to be alive|better off dead|cutting myself|overdose|disappear forever|run away|abuse|abused|assault|unsafe|not safe|danger|emergency)\b/i;
 
 const CRISIS_RESOURCE_RE = /(?:\b(?:call|text|dial)\s+(?:or\s+text\s+)?988\b|\b988\b[^.\n]{0,48}\b(?:lifeline|crisis)\b|\b(?:lifeline|crisis)\b[^.\n]{0,48}\b988\b|\b(?:text|message)\s+(?:home\s+to\s+)?741741\b|\b741741\b|\b(?:call|dial|contact)\s+911\b|\b911\b[^.\n]{0,32}\b(?:emergency|immediate(?:ly)?|danger)\b)/i;
 

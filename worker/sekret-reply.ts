@@ -1227,7 +1227,7 @@ const VOICE_INSTRUCTIONS: Record<CharacterId, string> = {
   parentCoach: "Speak as a warm, grounded coaching presence for a parent. Sound calm, real, and quietly knowing — like a trusted person sitting across the table, not a wellness app.",
 };
 
-const CRISIS_RE = /\b(kill myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm|hurt myself|cut myself|disappear forever|run away|abuse|abused|assault|unsafe|not safe|danger|emergency)\b/i;
+const CRISIS_RE = /\b(kill myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm|hurt myself|cut myself|kill(?:ing)? myself|killing myself|end (?:it all|my life)|want to live|don.?t want to be alive|not want to be alive|better off dead|cutting myself|overdose|disappear forever|run away|abuse|abused|assault|unsafe|not safe|danger|emergency)\b/i;
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
