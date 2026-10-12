@@ -21,9 +21,9 @@ test('Bip provider runtime forbids teen or sensitive context by construction', (
   assert.match(runtime, /OPENAI_API_KEY/);
   assert.match(runtime, /ANTHROPIC_API_KEY/);
   assert.match(runtime, /MODEL_API_KEY/);
-  assert.match(runtime, /https:\/\/api\.openai\.com\/v1\/responses/);
-  assert.match(runtime, /https:\/\/api\.anthropic\.com\/v1\/messages/);
-  assert.match(runtime, /https:\/\/api\.meta\.ai\/v1\/responses/);
+  assert.ok(runtime.includes('https://api.openai.com/v1/responses'), 'runtime must call https://api.openai.com/v1/responses');
+  assert.ok(runtime.includes('https://api.anthropic.com/v1/messages'), 'runtime must call https://api.anthropic.com/v1/messages');
+  assert.ok(runtime.includes('https://api.meta.ai/v1/responses'), 'runtime must call https://api.meta.ai/v1/responses');
   assert.match(runtime, /sensitive_context_not_authorized/);
   assert.match(runtime, /user_content_not_authorized/);
   assert.match(runtime, /\['founder', 'repository', 'system'\]/);
