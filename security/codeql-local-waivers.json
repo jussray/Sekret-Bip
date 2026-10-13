@@ -142,56 +142,6 @@
       "rationale": "These two expressions inspect repository-owned Playwright source text to verify the public apex URL and hostname assertions survived the Access fail-closed repair. They do not validate or authorize an untrusted runtime URL."
     },
     {
-      "id": "control-room-advisor-report-http-to-file",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/control-room-ingest-supabase-advisors.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The script writes Supabase advisor API responses to a local evidence artifact (supabase-advisors-report.json). This is an intentional CI reporting pattern: provider findings are persisted to disk for audit trail purposes only, not for security decisions at runtime. The file path is a hard-coded artifacts/ directory constant; no network response content influences the path."
-    },
-    {
-      "id": "configure-auth-email-file-to-http",
-      "language": "javascript-typescript",
-      "ruleId": "js/file-access-to-http",
-      "path": "scripts/configure-supabase-auth-email.mjs",
-      "messageIncludes": "Outbound network request depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The script reads Supabase target identifiers from config/supabase-targets.json (a committed, repository-owned registry) and uses them to construct Supabase Management API requests. The file data is version-controlled configuration read at CI time, not user-supplied or externally controlled input."
-    },
-    {
-      "id": "control-room-advisor-ingest-file-to-http",
-      "language": "javascript-typescript",
-      "ruleId": "js/file-access-to-http",
-      "path": "scripts/control-room-ingest-supabase-advisors.mjs",
-      "messageIncludes": "Outbound network request depends on",
-      "maxMatches": 2,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "Both outbound requests use URLs derived from config/supabase-targets.json (a repository-owned identity registry) and the hard-coded api.supabase.com Management API base. Both callers are CI automation operating against a repository-registered project only; no external or user-controlled content influences the destination."
-    },
-    {
-      "id": "supabase-target-identity-file-to-http",
-      "language": "javascript-typescript",
-      "ruleId": "js/file-access-to-http",
-      "path": "scripts/supabase-target-identity.mjs",
-      "messageIncludes": "Outbound network request depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The script reads target identifiers from config/supabase-targets.json and verifies them against the Supabase Management API. The file data is the project registry that authorizes which Supabase project can be targeted; the HTTP call enforces that the registry matches the live provider, not the reverse. The URL is constructed as a template against the hard-coded api.supabase.com base."
-    },
-    {
-      "id": "email-routing-plan-log-masked",
-      "language": "javascript-typescript",
-      "ruleId": "js/clear-text-logging",
-      "path": "scripts/reconcile-cloudflare-email-routing.mjs",
-      "messageIncludes": "logs sensitive data",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The plan log prints only zone name, worker name, a maskEmail()-masked destination, and static aliases. config also carries CLOUDFLARE_API_TOKEN, which taints the object for CodeQL, but the token field is never logged."
-    },
-    {
       "id": "provider-contract-test-url-anchor",
       "language": "javascript-typescript",
       "ruleId": "js/regex/missing-regexp-anchor",
@@ -202,16 +152,6 @@
       "rationale": "Static source assertions that worker/provider-runtime.ts contains the fixed provider endpoint literals. They do not validate or authorize any runtime URL. Replacing them with String.includes trips js/incomplete-url-substring-sanitization instead."
     },
     {
-      "id": "public-apex-access-cloudflare-api",
-      "language": "javascript-typescript",
-      "ruleId": "js/file-access-to-http",
-      "path": "scripts/reconcile-cloudflare-public-apex-access.mjs",
-      "messageIncludes": "Outbound network request depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "Requests go to the hard-coded https://api.cloudflare.com/client/v4 base. Path segments come from repository-owned config or a prior evidence receipt and app ids are encodeURIComponent-escaped, so file data cannot change the destination host."
-    },
-    {
       "id": "live-signup-mailbox-evidence-and-env",
       "language": "javascript-typescript",
       "ruleId": "js/http-to-file-access",
@@ -220,106 +160,6 @@
       "maxMatches": 2,
       "expiresAt": "2027-01-10T00:00:00Z",
       "rationale": "Writes mailbox-provider values to $GITHUB_ENV and to fixed artifacts/ receipt names. Every GITHUB_ENV write goes through scripts/github-env-line.mjs, which refuses CR/LF values and non-identifier names (test/github-env-line.test.mjs), so a provider response cannot inject variables; artifact file names are string literals."
-    },
-    {
-      "id": "supabase-password-security-receipt",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/configure-supabase-password-security.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Supabase Management API auth-config readback serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "workers-build-trigger-evidence",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/reconcile-cloudflare-workers-build-trigger.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Cloudflare Workers Builds trigger readback serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "app-domain-reconcile-receipt",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/run-cloudflare-app-domain-reconcile-with-receipt.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Cloudflare app-domain reconcile result serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "native-deploy-evidence",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/verify-cloudflare-native-deploy.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Cloudflare native deployment verification result serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "pages-branch-authority-receipt",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/verify-cloudflare-pages-branch-authority.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Cloudflare Pages branch-authority readback serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "worker-branch-authority-receipt",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/verify-cloudflare-worker-branch-authority.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Cloudflare Worker branch-authority readback serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "supabase-runtime-health-evidence",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/verify-supabase-runtime-contract-health.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Supabase runtime contract health readback serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "supabase-production-schema-evidence",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/verify-supabase-production-schema.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Supabase production schema readback serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "supabase-production-schema-core-evidence",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/verify-supabase-production-schema-core.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "CI evidence writer: Supabase production schema core readback serialized with JSON.stringify to a fixed evidence path. Provider data only becomes file content, never the path, and the receipt drives no runtime security decision."
-    },
-    {
-      "id": "zapier-lockfile-sync",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "tools/zapier/scripts/sync-lockfile.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "Developer tool that downloads the pinned canonical package-lock.json from a hard-coded URL (CANONICAL_LOCK_URL) and writes it to the fixed tools/zapier/package-lock.json path. Response data only becomes file content, and the resulting lockfile is reviewed in version control before use."
     }
   ]
 }
