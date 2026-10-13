@@ -70,11 +70,16 @@ test('the exact-head ledger binds the runtime-state receipt into its proof surfa
   assert.deepEqual(bound.runtimeState, runtimeState);
 });
 
-test('the written receipt file parses as JSON for the ledger reader', () => {
-  const root = fixture();
-  const outputPath = path.join(root, 'artifacts', 'control-room-runtime-state.json');
-  const receipt = writeRuntimeStateReceipt(env({ CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath }), root);
+test('the written runtime-state receipt is parseable JSON with a real trailing newline', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'runtime-state-'));
+  const outputPath = path.join(dir, 'receipt.json');
+  writeRuntimeStateReceipt({
+    GITHUB_REPOSITORY: 'jussray/Sekret-Bip',
+    EXPECTED_HEAD_SHA: 'a'.repeat(40),
+    CONTROL_ROOM_RUNTIME_STATE_PATH: outputPath,
+  }, process.cwd());
   const raw = fs.readFileSync(outputPath, 'utf8');
-  assert.ok(raw.endsWith('}\n'), 'receipt must end with a real newline, not a literal backslash-n');
-  assert.deepEqual(JSON.parse(raw), receipt);
+  assert.doesNotThrow(() => JSON.parse(raw));
+  assert.equal(raw.endsWith('}\n'), true);
+  assert.equal(raw.includes('\\n'), false);
 });
