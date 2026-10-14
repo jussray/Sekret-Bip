@@ -233,7 +233,7 @@ The Worker supports:
 
 Never set it to `enabled` merely for founder testing.
 
-As verified on July 14, 2026, neither `mcgill.raylene@gmail.com` nor `sekretbip@gmail.com` exists in this Supabase project’s `auth.users` or `public.app_profiles`. There is therefore no verified founder UUID to allowlist yet.
+As verified on July 14, 2026, neither of the two founder email addresses checked at that time was present in this Supabase project’s `auth.users` or `public.app_profiles`. There was therefore no verified founder UUID to allowlist at that time.
 
 After the real founder account exists:
 
