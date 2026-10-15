@@ -45,30 +45,36 @@ test('live onboarding email smoke separates always-run readiness from explicit l
   assert.doesNotMatch(workflow, /wrangler deploy|deploy:web:production|deploy:api:production/);
 });
 
-test('opaque 504 signup responses enter the existing ambiguous recovery path', () => {
+test('opaque 504 signup responses require durable auth evidence', () => {
   const source = readText(signupSourcePath);
 
   assert.match(source, /function authErrorStatus\(error: unknown\): number \| null/);
   assert.match(source, /if \(authErrorStatus\(error\) === 504\) return true;/);
-  assert.match(source, /const status = authErrorStatus\(error\);\s*return status !== null && status >= 400;/);
-  assert.match(source, /options: \{ emailRedirectTo: redirectTo, data: metadata \}/);
-  assert.match(source, /if \(isAmbiguousSignupError\(authErr\)\) \{[\s\S]*recoverAmbiguousSignup\(sb, e, p, metadata, redirectTo, authErr\)/);
-  assert.match(source, /The account server received your signup request, but confirmation is delayed/);
+  assert.match(source, /SIGNUP_RECOVERY_PROBE_ATTEMPTS = 7/);
+  assert.match(source, /SIGNUP_RECOVERY_PROBE_DELAY_MS = 5_000/);
+  assert.match(source, /probeAuthoritativeSignupOutcome/);
+  assert.match(source, /email confirmation is still pending/);
+  assert.match(source, /could not verify that your account was created/);
+  assert.doesNotMatch(source, /The account server received your signup request, but confirmation is delayed/);
 });
 
-test('server-reached ambiguous signup never resubmits signUp', () => {
+test('server-reached ambiguous signup never resubmits before authoritative proof', () => {
   const source = readText(signupSourcePath);
   const recoveryStart = source.indexOf('async function recoverAmbiguousSignup');
+  const probeDefinition = source.indexOf('async function probeAuthoritativeSignupOutcome', recoveryStart);
   const serverReachedGuard = source.indexOf('if (initialSignupReachedAuth) {', recoveryStart);
   const retrySignup = source.indexOf('await sb.auth.signUp({', recoveryStart);
 
   assert.ok(recoveryStart >= 0);
-  assert.ok(serverReachedGuard > recoveryStart);
+  assert.ok(probeDefinition > recoveryStart);
+  assert.ok(serverReachedGuard > probeDefinition);
   assert.ok(retrySignup > serverReachedGuard);
+
+  const serverReachedBlock = source.slice(serverReachedGuard, retrySignup);
+  assert.match(serverReachedBlock, /setError\(/);
+  assert.doesNotMatch(serverReachedBlock, /showConfirmationSuccess\(/);
   assert.match(source, /Only a transport failure with no Auth response may retry signup once/);
   assert.match(source, /let retryThrown: unknown = null/);
-  assert.match(source, /catch \(retryError\) \{\s*retryThrown = retryError;\s*console\.warn\('\[signup\] retry failed after ambiguous transport response'\);\s*\}/);
-  assert.doesNotMatch(source, /initialSignupReachedAuth \|\| retryReachedAuth/);
 });
 
 test('readiness mode reaches final Teen signup submit without creating an account', () => {
@@ -122,6 +128,10 @@ test('live onboarding email smoke proves returning-user authentication with boun
   assert.match(source, /authenticated_returning_user/);
   assert.match(source, /expect\(signedIn,[\s\S]*Returning teen sign-in never completed/);
   assert.match(source, /not\.toHaveURL\(\/\\\/login/);
+  assert.match(source, /send-welcome-email/);
+  assert.match(source, /welcome-email-response/);
+  assert.match(source, /latestWelcome\?\.status\)\.toBe\(200\)/);
+  assert.match(source, /\['sent', 'already_sent'\]/);
 });
 
 test('live signup proof uses one dedicated exact-target Playwright config for signup and family authority proof', () => {
@@ -181,6 +191,10 @@ test('live signup proof mailbox is disposable, non-personal, single-pass decoded
   assert.match(mailbox, /\/domains\?page=1/);
   assert.match(mailbox, /\/accounts/);
   assert.match(mailbox, /\/token/);
+  assert.match(mailbox, /LIVE_MAILTM_PASSWORD/);
+  assert.match(mailbox, /issueMailboxToken/);
+  assert.match(mailbox, /mailboxApi/);
+  assert.match(mailbox, /HTTP 401/);
   assert.match(mailbox, /\/messages\?page=1/);
   assert.match(mailbox, /method: 'DELETE'/);
   assert.match(workflow, /live-signup-mailbox\.mjs create/);
