@@ -461,6 +461,7 @@ export function WebWelcomeScreen({
                       <Text style={styles.bipJrFriendSymbol}>{friend.symbol}</Text>
                     ) : (
                       <Image
+                        testID={`web-welcome-${friend.key}-portrait`}
                         source={{ uri: friend.imageUri }}
                         resizeMode="contain"
                         style={styles.bipJrFriendPortrait}
