@@ -6,6 +6,7 @@ const signup = fs.readFileSync('app/(auth)/signup.tsx', 'utf8');
 const bootstrap = fs.readFileSync('src/services/auth/postAuthBootstrap.ts', 'utf8');
 const client = fs.readFileSync('src/services/auth/welcomeEmail.ts', 'utf8');
 const edge = fs.readFileSync('supabase/functions/send-welcome-email/index.ts', 'utf8');
+const authEmailEdge = fs.readFileSync('supabase/functions/send-auth-email/index.ts', 'utf8');
 
 test('new signups are explicitly marked eligible for welcome email v1', () => {
   assert.match(signup, /welcome_email_version:\s*1/);
@@ -66,4 +67,23 @@ test('welcome email includes onboarding and public documentation links', () => {
 test('welcome delivery cannot indefinitely block onboarding', () => {
   assert.match(client, /WELCOME_EMAIL_TIMEOUT_MS = 4_000/);
   assert.match(client, /Promise\.race\(\[invocation, timeout\]\)/);
+});
+
+test('auth transactional email hook verifies Supabase webhook signatures before using Resend', () => {
+  assert.match(authEmailEdge, /standardwebhooks@1\.0\.0/);
+  assert.match(authEmailEdge, /SEND_EMAIL_HOOK_SECRET/);
+  assert.match(authEmailEdge, /new Webhook\(rawSecret\)/);
+  assert.match(authEmailEdge, /webhook\.verify\(payload, headers\)/);
+  assert.match(authEmailEdge, /RESEND_API_KEY/);
+  assert.match(authEmailEdge, /https:\/\/api\.resend\.com\/emails/);
+  assert.match(authEmailEdge, /invalid_webhook_signature/);
+});
+
+test('auth transactional email stays separate from personalized welcome delivery', () => {
+  assert.match(authEmailEdge, /case "signup":[\s\S]*Confirm your Se'kret Bip account/);
+  assert.match(authEmailEdge, /case "recovery":[\s\S]*Reset your Se'kret Bip password/);
+  assert.match(authEmailEdge, /Idempotency-Key/);
+  assert.doesNotMatch(authEmailEdge, /private_display_name/);
+  assert.doesNotMatch(authEmailEdge, /welcome_email_version/);
+  assert.doesNotMatch(authEmailEdge, /Se'kret Bip is not a diagnosis/);
 });
