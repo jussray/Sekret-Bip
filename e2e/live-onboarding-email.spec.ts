@@ -58,6 +58,62 @@ async function attachPageState(page: Page, name: string, extra: Record<string, u
   });
 }
 
+async function proveSignupPersistsAfterFreshSession(page: Page) {
+  await page.evaluate(() => {
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+  });
+  await page.context().clearCookies();
+
+  await page.goto('/login?side=teen');
+  await page.getByPlaceholder('Phone number, username or email').fill(liveEmail!);
+  await page.getByPlaceholder('Password').fill(livePassword);
+
+  const tokenResponsePromise = page.waitForResponse((response) => {
+    try {
+      const url = new URL(response.url());
+      return (
+        url.hostname.endsWith('.supabase.co')
+        && url.pathname === '/auth/v1/token'
+        && response.request().method() === 'POST'
+      );
+    } catch {
+      return false;
+    }
+  }, { timeout: 45_000 });
+
+  await page.getByRole('button', { name: /log in/i }).click();
+  const tokenResponse = await tokenResponsePromise;
+
+  let body: unknown = null;
+  try {
+    body = await tokenResponse.json();
+  } catch {
+    body = await tokenResponse.text().catch(() => null);
+  }
+
+  const serialized = JSON.stringify(body ?? {}).toLowerCase();
+  const durableState =
+    tokenResponse.status() === 200
+      ? 'authenticated'
+      : serialized.includes('email_not_confirmed') || serialized.includes('email not confirmed')
+        ? 'confirmation_pending'
+        : 'not_persisted';
+
+  await attachPageState(page, 'signup-persistence-probe', {
+    tokenStatus: tokenResponse.status(),
+    durableState,
+    tokenBody: body,
+  });
+
+  expect(
+    durableState,
+    `Signup did not persist in Auth; password probe returned HTTP ${tokenResponse.status()}: ${serialized}`,
+  ).not.toBe('not_persisted');
+
+  return durableState;
+}
+
 async function signInTeen(page: Page) {
   await page.goto('/login?side=teen');
   await page.getByPlaceholder('Phone number, username or email').fill(liveEmail!);
@@ -214,6 +270,9 @@ test.describe('live onboarding email smoke', () => {
 
     expect(authObservations.some((observation) => observation.path.endsWith('/signup'))).toBe(true);
     expect(pageErrors).toEqual([]);
+
+    const durableState = await proveSignupPersistsAfterFreshSession(page);
+    expect(['authenticated', 'confirmation_pending']).toContain(durableState);
   });
 
   test('confirmed teen account can return through sign in', async ({ page }) => {
