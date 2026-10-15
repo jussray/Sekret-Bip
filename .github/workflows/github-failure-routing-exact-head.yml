@@ -66,7 +66,7 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      SEKRET_TEST_PG_URL: postgres://postgres:bip_test_ephemeral@127.0.0.1:5432/bip_test
+      SEKRET_TEST_PG_URL: postgres://postgres:bip_test_ephemeral@127.0.0.1:5432/bip_test # DevSkim: ignore DS162092 because this endpoint is isolated to disposable CI loopback
 
     steps:
       - name: Check out exact head
@@ -124,7 +124,7 @@ jobs:
           const fs = require('node:fs');
           const report = JSON.parse(fs.readFileSync('reports/control-room/test-skips-latest.json', 'utf8'));
           if (report.skip_count !== 0 || !Array.isArray(report.observations) || report.observations.length !== 0) {
-            throw new Error('ZERO_SKIPPED_CHECKS_REQUIRED: the full unit suite cannot contain skipped or TODO tests');
+            throw new Error('ZERO_SKIPPED_CHECKS_REQUIRED: the full unit suite cannot contain skipped or pending-marker tests');
           }
           if (report.head_sha !== process.env.EXPECTED_HEAD_SHA) {
             throw new Error('Unit skip-report head is not the exact checked-out PR head');
