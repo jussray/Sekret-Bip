@@ -16,9 +16,11 @@ test('new signups are explicitly marked eligible for welcome email v1', () => {
 
 test('ambiguous signup never claims success without durable auth evidence', () => {
   assert.match(signup, /SIGNUP_RECOVERY_PROBE_ATTEMPTS = 7/);
-  assert.match(signup, /probeAuthoritativeSignupOutcome/);
+  assert.match(signup, /proveDurableSignupOutcome/);
   assert.match(signup, /email confirmation is still pending/);
   assert.match(signup, /could not verify that your account was created/);
+  assert.match(signup, /could not verify that your account was saved/);
+  assert.match(signup, /if \(signUpData\.session\)[\s\S]*proveDurableSignupOutcome\(sb, e, p, SIGNUP_RECOVERY_PROBE_ATTEMPTS\)/);
   assert.doesNotMatch(signup, /The account server received your signup request, but confirmation is delayed/);
 });
 
