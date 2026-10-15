@@ -6,6 +6,8 @@
  * or OpenAI path is unavailable, and it keeps AI identity clear when asked.
  */
 
+import { isCrisisText } from '../../../services/crisisPolicy';
+
 export type NaturalFallbackCharacterId = 'suhana' | 'sy' | 'cloud' | 'night' | 'sekret';
 export type NaturalFallbackAvatarState = 'neutral' | 'listening' | 'thinking' | 'comforting' | 'happy' | 'concerned' | 'responding';
 
@@ -37,7 +39,6 @@ export interface NaturalFallbackResponse {
 export const NATURAL_FALLBACK_PACK_VERSION = 'fallback-natural-v1.0.0';
 export const NATURAL_FALLBACK_VARIANTS_PER_COMPANION = 500;
 
-const SAFETY_PATTERN = /\b(suicidal|self[- ]?harm|not safe|abuse|danger)\b/i;
 const IDENTITY_PATTERN = /\b(are you real|are you human|you human|robot|ai|artificial|sentient|alive|real friend|real person)\b/i;
 
 const BANNED_HUMAN_CLAIMS = [
@@ -182,7 +183,7 @@ export function createNaturalFallbackResponse(input: NaturalFallbackInput): Natu
   const userText = normalizeText(input.userText);
   const style = FALLBACK_STYLES[input.characterId];
 
-  if (SAFETY_PATTERN.test(userText)) return getSafetyFallback();
+  if (isCrisisText(userText)) return getSafetyFallback();
 
   if (IDENTITY_PATTERN.test(userText)) {
     return {
