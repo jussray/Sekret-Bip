@@ -18,8 +18,6 @@ export async function resolveGuardianSharingConsent(
   const serviceKey = env.SUPABASE_SECRET_KEY?.trim() || env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!baseUrl || !serviceKey) return false;
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 1000);
   try {
     const response = await fetch(`${baseUrl}/rest/v1/rpc/guardian_summary_permitted`, {
       method: 'POST',
@@ -29,13 +27,11 @@ export async function resolveGuardianSharingConsent(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ p_teen_user_id: principal.userId }),
-      signal: controller.signal,
+      signal: AbortSignal.timeout(1000),
     });
     if (!response.ok) return false;
     return (await response.json()) === true;
   } catch {
     return false;
-  } finally {
-    clearTimeout(timeout);
   }
 }
