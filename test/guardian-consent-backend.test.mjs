@@ -27,10 +27,8 @@ const { resolveGuardianSharingConsent } = require(path.join(out, 'worker', 'guar
 const guardianConsentSource = readFileSync('worker/guardian-consent.ts', 'utf8');
 
 test('guardian-consent lookup is bounded and fail-closed on timeout', () => {
-  assert.match(guardianConsentSource, /new AbortController\(\)/);
-  assert.match(guardianConsentSource, /controller\.abort\(\)/);
-  assert.match(guardianConsentSource, /signal:\s*controller\.signal/);
-  assert.match(guardianConsentSource, /clearTimeout\(timeout\)/);
+  assert.match(guardianConsentSource, /signal:\s*AbortSignal\.timeout\(1000\)/);
+  assert.doesNotMatch(guardianConsentSource, /setTimeout\(/);
 });
 const KEY = 'test-service-key';
 const USER = '00000000-0000-4000-8000-000000000001';
