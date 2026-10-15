@@ -31,6 +31,8 @@ test('security-sensitive workflow changes trigger local CodeQL proof', () => {
   assert.match(workflow, /- '\.github\/workflows\/product-design-playwright-proof\.yml'/);
   assert.match(workflow, /- '\.github\/workflows\/codeql-pr-alert-proof\.yml'/);
   assert.match(workflow, /- '\.github\/workflows\/pr-continuity\.yml'/);
+  assert.match(workflow, /- '\.github\/workflows\/pr-continuity-rollover\.yml'/);
+  assert.match(workflow, /- '\.github\/workflows\/pr-continuity-metadata\.yml'/);
 });
 
 test('local CodeQL action is immutable and never uploads competing Code Scanning results', () => {

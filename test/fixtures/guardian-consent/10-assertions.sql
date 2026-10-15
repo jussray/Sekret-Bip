@@ -1,4 +1,18 @@
 \set ON_ERROR_STOP on
+-- Synthetic auth identities make the cascade constraints executable.
+insert into auth.users (id) values
+  ('00000000-0000-4000-8000-000000000001'),
+  ('00000000-0000-4000-8000-000000000002'),
+  ('00000000-0000-4000-8000-000000000003'),
+  ('00000000-0000-4000-8000-000000000004'),
+  ('00000000-0000-4000-8000-000000000005'),
+  ('00000000-0000-4000-8000-000000000006'),
+  ('00000000-0000-4000-8000-000000000007'),
+  ('00000000-0000-4000-8000-000000000008'),
+  ('00000000-0000-4000-8000-0000000000ff'),
+  ('00000000-0000-4000-8000-0000000000ee')
+on conflict do nothing;
+
 insert into public.parent_links (teen_user_id, parent_user_id, status, is_active, expires_at) values
   ('00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-0000000000ff', 'active', true, null),
   ('00000000-0000-4000-8000-000000000003', '00000000-0000-4000-8000-0000000000ff', 'revoked', false, null),
@@ -141,3 +155,18 @@ begin
   if not denied then raise exception 'authenticated caller wrote consent table'; end if;
 end $$;
 reset role;
+
+-- Account deletion must remove consent identifiers, including disabled rows.
+delete from auth.users where id = '00000000-0000-4000-8000-000000000001';
+select pg_temp.expect(
+  'teen account deletion cascades consent identity',
+  not exists (select 1 from public.guardian_summary_consents where teen_user_id = '00000000-0000-4000-8000-000000000001'),
+  true
+);
+
+delete from auth.users where id = '00000000-0000-4000-8000-0000000000ff';
+select pg_temp.expect(
+  'guardian account deletion cascades consent identity',
+  not exists (select 1 from public.guardian_summary_consents where guardian_user_id = '00000000-0000-4000-8000-0000000000ff'),
+  true
+);

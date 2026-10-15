@@ -167,7 +167,7 @@ function safeReply(style: CompanionFallbackStyle, baseSeed: number, recentReplie
 
 function getSafetyFallback(): NaturalFallbackResponse {
   return {
-    reply: "I'm an AI companion, not emergency help. If you are in immediate danger or not safe, contact a trusted adult or local emergency support now.",
+    reply: "I'm an AI companion, not emergency help. If you are in immediate danger, call 911 or local emergency services. In the U.S., call or text 988, or text HOME to 741741 for Crisis Text Line. Reach out to a trusted adult now.",
     tone: 'supportive-safety',
     avatarState: 'concerned',
     safetyFlag: true,

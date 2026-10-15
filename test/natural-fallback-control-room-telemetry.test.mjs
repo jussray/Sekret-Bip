@@ -32,6 +32,17 @@ test('offline fallback and immediate preflight use the shared crisis policy', ()
   assert.ok(coordinator.includes('for (const rule of PRE_FLIGHT_RULES)'));
 });
 
+test('offline safety reply includes actionable support contacts without private sharing', () => {
+  const source = read('src/features/sekret/naturalFallbacks.ts');
+  const safetyBlock = source.split('function getSafetyFallback(): NaturalFallbackResponse')[1]?.split('export function createNaturalFallbackResponse')[0];
+  assert.ok(safetyBlock, 'Safety fallback function must exist');
+  for (const contact of ['911', '988', '741741', 'trusted adult']) {
+    assert.ok(safetyBlock.includes(contact), `Missing offline support contact: ${contact}`);
+  }
+  assert.match(safetyBlock, /safetyFlag: true/);
+  assert.match(safetyBlock, /parentShareSummary: null/);
+});
+
 test('api fallback path records sanitized Control Room telemetry', () => {
   const api = read('src/utils/api.ts');
 

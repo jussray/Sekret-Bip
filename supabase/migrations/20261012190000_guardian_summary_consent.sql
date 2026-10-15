@@ -5,9 +5,9 @@
 begin;
 
 create table if not exists public.guardian_summary_consents (
-  teen_user_id uuid primary key,
+  teen_user_id uuid primary key references auth.users(id) on delete cascade,
   parent_link_id uuid references public.parent_links(id) on delete cascade,
-  guardian_user_id uuid,
+  guardian_user_id uuid references auth.users(id) on delete cascade,
   parent_link_updated_at timestamptz,
   enabled boolean not null default false,
   enabled_at timestamptz,

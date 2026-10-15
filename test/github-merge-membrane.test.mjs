@@ -149,6 +149,20 @@ test('path parser understands the current proof workflow contracts', () => {
   assert.ok(shieldPaths.includes('.github/workflows/founder-shield.yml'));
 });
 
+test('isolated HTTP/PostgREST contract is mandatory even for docs-only changes', () => {
+  const name = 'Local Postgres REST and actual Worker HTTP round-trip';
+  assert.ok(ALWAYS_REQUIRED_CHECKS.includes(name), 'isolated Worker contract must not be optional');
+  const expected = expectedChecksForChangedFiles(['docs/note.md'], {});
+  assert.ok(expected.includes(name));
+  const missing = evaluateExpectedChecks({
+    expectedChecks: expected,
+    checkRuns: expected.filter(value => value !== name).map(value => run(value)),
+    expectedSha: SHA,
+  });
+  assert.equal(missing.ready, false);
+  assert.ok(missing.missing.some(item => item.name === name));
+});
+
 test('docs-only changes require the universal machine membrane without inventing Playwright work', () => {
   const expected = expectedChecksForChangedFiles(['docs/example.md'], {
     '.github/workflows/product-design-playwright-proof.yml': ['src/**'],
