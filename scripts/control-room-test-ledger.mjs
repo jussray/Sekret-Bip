@@ -168,7 +168,8 @@ export function aggregateTestLedger(checks) {
   if (counts.total === 0) state = 'unknown';
   else if (counts.failed > 0) state = 'failed';
   else if (counts.queued > 0 || counts.running > 0) state = 'pending';
-  else if (counts.skipped > 0 || counts.unknown > 0) state = 'warning';
+  else if (counts.skipped > 0) state = 'failed';
+  else if (counts.unknown > 0) state = 'warning';
 
   return {state, counts};
 }
@@ -235,6 +236,16 @@ export function assertLedgerMergeReady(ledger, outputPath = 'artifacts/control-r
 
   if (counts.failed > 0) {
     throw new Error(`Exact-head check failures remain. Evidence: ${outputPath}`);
+  }
+
+  // A neutral or skipped check is not execution evidence. Keep it visible in
+  // the ledger and fail merge authority rather than blessing an unrun lane.
+  if (counts.skipped > 0) {
+    const names = (Array.isArray(ledger?.checks) ? ledger.checks : [])
+      .filter((check) => check.state === 'skipped')
+      .map((check) => `${check.app || 'unknown-app'}:${check.name || 'unnamed'}`)
+      .slice(0, 10);
+    throw new Error(`Skipped or neutral exact-head checks are prohibited (${counts.skipped}): ${names.join(', ') || 'see ledger'}. Evidence: ${outputPath}`);
   }
 
   if (ledger?.runner?.observerState !== 'stable') {
