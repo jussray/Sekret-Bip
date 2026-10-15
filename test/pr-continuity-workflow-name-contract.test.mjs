@@ -6,6 +6,13 @@ const audit = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
 const metadata = readFileSync('.github/workflows/pr-continuity-metadata.yml', 'utf8');
 const rollover = readFileSync('.github/workflows/pr-continuity-rollover.yml', 'utf8');
 
+test('superseded continuity jobs are cancelled rather than self-certifying stale proof', () => {
+  assert.match(audit, /concurrency:\s*\n\s*group: pr-continuity-\$\{\{ github\.event\.pull_request\.number \}\}/);
+  assert.match(audit, /cancel-in-progress: true/);
+  assert.match(audit, /Verify live base ancestry and exact head/);
+  assert.match(audit, /scripts\/pr-continuity\.mjs audit/);
+});
+
 test('PR continuity jobs run only on their matching events without skipped placeholders', () => {
   assert.match(audit, /pull_request:\s*\n/);
   assert.doesNotMatch(audit, /pull_request_target:\s*\n|workflow_dispatch:\s*\n|\n  metadata-receipt:|\n  rollover:/);
