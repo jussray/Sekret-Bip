@@ -108,6 +108,14 @@ test('Supabase fixture write/read boundary reaches Worker reply-shaped response'
     'true',
     'Live child-data or production API targets are prohibited; explicitly bind an isolated test target',
   );
+  // The opt-in flag alone is not evidence of isolation. Never let a developer
+  // accidentally run write/delete fixtures against the live child-data API.
+  for (const [label, endpoint] of [['Supabase', config.supabaseUrl], ['Worker', config.workerUrl]]) {
+    const target = new URL(endpoint);
+    assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname),
+      `${label} integration target must be loopback-only; production and shared remote projects are prohibited`);
+    assert.equal(target.protocol, 'http:', `${label} local integration target must use HTTP on loopback`);
+  }
 
   const correlationId = `contract-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const fixture = {
