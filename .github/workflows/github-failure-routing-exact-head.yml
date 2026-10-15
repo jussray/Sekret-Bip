@@ -190,59 +190,7 @@ jobs:
           run_id=""
           head_sha=""
 
-          while IFS=
-      - name: Rehearse exact skipped-run capture
-        env:
-          GH_TOKEN: ${{ github.token }}
-          CONTROL_ROOM_GITHUB_RUN_ID: ${{ steps.skipped-run.outputs.run_id }}
-          CONTROL_ROOM_GITHUB_HEAD_SHA: ${{ steps.skipped-run.outputs.head_sha }}
-        run: node scripts/control-room-ingest-github-test-skips.mjs
-
-      - name: Verify exact skipped-run report
-        env:
-          EXPECTED_RUN_ID: ${{ steps.skipped-run.outputs.run_id }}
-          EXPECTED_SKIPPED_HEAD_SHA: ${{ steps.skipped-run.outputs.head_sha }}
-        run: |
-          node <<'NODE'
-          const fs = require('node:fs');
-          const report = JSON.parse(fs.readFileSync('reports/control-room/github-test-skips-latest.json', 'utf8'));
-          if (String(report.requested_run_id) !== process.env.EXPECTED_RUN_ID) throw new Error('skipped run id mismatch');
-          if (report.head_sha !== process.env.EXPECTED_SKIPPED_HEAD_SHA) throw new Error('skipped head sha mismatch');
-          const structuralSkips = Number(report.workflow_skip_count || 0) + Number(report.job_skip_count || 0);
-          if (report.skip_count < 1 || structuralSkips < 1) throw new Error('real workflow/job skip was not captured');
-          for (const item of report.observations) {
-            if (item.authority !== false || item.proof_satisfied !== false) throw new Error('GitHub skip receipt acquired authority');
-          }
-          NODE
-
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
-
-      - name: Run focused front-door Playwright contracts
-        shell: bash
-        run: |
-          set -o pipefail
-          mkdir -p reports/control-room/github-failure-routing
-          npx playwright test e2e/smoke.spec.ts \
-            --grep "teen splash leads into onboarding welcome|web welcome|frontend entry" \
-            --trace on 2>&1 | tee reports/control-room/github-failure-routing/playwright.log
-
-      - name: Upload exact-head routing evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: github-failure-routing-evidence-${{ env.EXPECTED_HEAD_SHA }}
-          path: |
-            reports/control-room/github-failures-latest.json
-            reports/control-room/github-test-skips-latest.json
-            reports/control-room/test-skips-latest.json
-            reports/control-room/playwright-test-skips-latest.json
-            reports/control-room/github-failure-routing/
-            test-results/
-            playwright-report/
-          if-no-files-found: warn
-          retention-days: 14
-\t' read -r candidate_id candidate_head candidate_conclusion; do
+          while IFS=$'\t' read -r candidate_id candidate_head candidate_conclusion; do
             test -n "$candidate_id" || continue
             if [ "$candidate_conclusion" = "skipped" ]; then
               run_id="$candidate_id"
@@ -285,7 +233,8 @@ jobs:
           const report = JSON.parse(fs.readFileSync('reports/control-room/github-test-skips-latest.json', 'utf8'));
           if (String(report.requested_run_id) !== process.env.EXPECTED_RUN_ID) throw new Error('skipped run id mismatch');
           if (report.head_sha !== process.env.EXPECTED_SKIPPED_HEAD_SHA) throw new Error('skipped head sha mismatch');
-          if (report.skip_count < 1 || report.workflow_skip_count < 1) throw new Error('skipped workflow was not captured');
+          const structuralSkips = Number(report.workflow_skip_count || 0) + Number(report.job_skip_count || 0);
+          if (report.skip_count < 1 || structuralSkips < 1) throw new Error('real workflow/job skip was not captured');
           for (const item of report.observations) {
             if (item.authority !== false || item.proof_satisfied !== false) throw new Error('GitHub skip receipt acquired authority');
           }
