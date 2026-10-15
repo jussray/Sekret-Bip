@@ -21,14 +21,15 @@ test('natural fallback pack remains versioned, local, and companion-complete', (
 test('offline fallback and immediate preflight use the shared crisis policy', () => {
   const fallback = read('src/features/sekret/naturalFallbacks.ts');
   const coordinator = read('src/features/safety/safetyCoordinator.ts');
+  const importContract = "import { isCrisisText } from '../../../services/crisisPolicy';";
 
-  assert.match(fallback, /import \\{ isCrisisText \\} from ['"]\\.\\.\\/\\.\\.\\/\\.\\.\\/services\\/crisisPolicy['"]/);
-  assert.match(fallback, /if \\(isCrisisText\\(userText\\)\\) return getSafetyFallback\\(\\)/);
+  assert.ok(fallback.includes(importContract));
+  assert.ok(fallback.includes('if (isCrisisText(userText)) return getSafetyFallback();'));
   assert.doesNotMatch(fallback, /SAFETY_PATTERN/);
 
-  assert.match(coordinator, /import \\{ isCrisisText \\} from ['"]\\.\\.\\/\\.\\.\\/\\.\\.\\/services\\/crisisPolicy['"]/);
-  assert.match(coordinator, /if \\(isCrisisText\\(text\\)\\) return buildExperience\\('immediate_danger', companionId, false\\)/);
-  assert.match(coordinator, /for \\(const rule of PRE_FLIGHT_RULES\\)/);
+  assert.ok(coordinator.includes(importContract));
+  assert.ok(coordinator.includes("if (isCrisisText(text)) return buildExperience('immediate_danger', companionId, false);"));
+  assert.ok(coordinator.includes('for (const rule of PRE_FLIGHT_RULES)'));
 });
 
 test('api fallback path records sanitized Control Room telemetry', () => {
