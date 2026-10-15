@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { hydrateAccountProfile, type AccountProfile, type AccountSide } from '@/features/identity/accountProfile';
-import { getCurrentFounderProfileForRouting, isFounderProfile } from '@/services/founderAudit';\nimport { ensureWelcomeEmail } from '@/services/auth/welcomeEmail';
+import { getCurrentFounderProfileForRouting, isFounderProfile } from '@/services/founderAudit';
+import { ensureWelcomeEmail } from '@/services/auth/welcomeEmail';
 import { getSupabase } from '@/utils/supabase';
 import { consentService } from '../../../services/consentService';
 
