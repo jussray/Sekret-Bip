@@ -87,6 +87,11 @@ test('readiness mode reaches final Teen signup submit without creating an accoun
   assert.match(source, /exact preview reaches final Teen signup submit without an account write/);
   assert.match(source, /let accountWriteAttempted = false/);
   assert.match(source, /auth\/v1\/signup/);
+  assert.match(source, /proveSignupPersistsAfterFreshSession/);
+  assert.match(source, /signup-persistence-probe/);
+  assert.match(source, /window\.localStorage\.clear\(\)/);
+  assert.match(source, /\/auth\/v1\/token/);
+  assert.match(source, /email_not_confirmed/);
   assert.match(source, /getByPlaceholder\('Email address'\)/);
   assert.match(source, /getByPlaceholder\('username'\)/);
   assert.match(source, /getByRole\('button', \{ name: \/create account\/i \}\)/);
