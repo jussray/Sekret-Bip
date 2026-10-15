@@ -21,6 +21,16 @@ const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
 const GRID_POSITIONS = ['20%', '40%', '60%', '80%'] as const;
 
+// Approved character roles, not child accounts or invented personal names.
+// Visual character identity stays with sekret-bip-character-canon/registry.json.
+// Never replace missing approved portrait assets with generic child imagery.
+const BIP_JR_FRIENDS = [
+  { key: 'bipjr-spark', role: 'The Spark', symbol: '✦' },
+  { key: 'bipjr-giggle', role: 'The Giggle', symbol: '♡' },
+  { key: 'bipjr-dreamer', role: 'The Dreamer', symbol: '☾' },
+  { key: 'bipjr-explorer', role: 'The Explorer', symbol: '➤' },
+] as const;
+
 export type WelcomeAudience = 'teen' | 'bip-jr';
 
 type WebWelcomeScreenProps = {
@@ -408,6 +418,31 @@ export function WebWelcomeScreen({
             </Animated.View>
           </View>
 
+          {isBipJr && (
+            <View
+              testID="web-welcome-bip-jr-cast"
+              accessible
+              accessibilityLabel="Four Bip Jr friends: The Spark, The Giggle, The Dreamer, and The Explorer"
+              style={styles.bipJrCast}
+            >
+              <Text style={styles.bipJrCastHeading}>Four little friends. One cozy world.</Text>
+              <View style={styles.bipJrCastRow}>
+                {BIP_JR_FRIENDS.map(friend => (
+                  <View
+                    key={friend.key}
+                    testID={`web-welcome-${friend.key}`}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                    style={styles.bipJrFriend}
+                  >
+                    <Text style={styles.bipJrFriendSymbol}>{friend.symbol}</Text>
+                    <Text style={styles.bipJrFriendRole}>{friend.role}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
           <View
             testID="web-welcome-world-cues"
             accessible
@@ -785,6 +820,46 @@ const styles = StyleSheet.create({
     width: '100%',
     transform: [{ translateX: 0 }],
     borderRadius: RADIUS.xxl,
+  },
+  bipJrCast: {
+    marginHorizontal: SPACE[5],
+    marginBottom: SPACE[3],
+    alignItems: 'center',
+    gap: SPACE[2],
+  },
+  bipJrCastHeading: {
+    color: color.textMid,
+    fontSize: TYPE.xs,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  bipJrCastRow: {
+    width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: SPACE[2],
+  },
+  bipJrFriend: {
+    minWidth: '44%',
+    minHeight: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACE[1],
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surfaceSoft,
+  },
+  bipJrFriendSymbol: {
+    color: color.pinkLight,
+    fontSize: TYPE.base,
+  },
+  bipJrFriendRole: {
+    color: color.lilacLight,
+    fontSize: TYPE.xs,
+    fontWeight: '800',
   },
   worldCues: {
     marginHorizontal: SPACE[5],
