@@ -66,3 +66,26 @@ test('Bip Jr welcome surfaces exactly the four canon-approved friends without ch
   assert.match(welcome, /const BIP_JR_HERO = require\('\.\.\/assets\/images\/parent-space-splash\.png'\)/);
   assert.doesNotMatch(welcome, /createOwnBipJrProfile/);
 });
+
+test('Bip Jr approved portraits keep exact character-to-image mapping', () => {
+  const approvedMedia = new Map([
+    ['bipjr-spark', 'f0af6256-45c4-4364-a1f0-92797fb48c74'],
+    ['bipjr-giggle', 'dc29a783-1197-4d60-acd0-2b1ccafa4cc6'],
+    ['bipjr-dreamer', 'c9cc71f9-3a03-43e1-8fbf-648e50afea50'],
+    ['bipjr-explorer', '3c2a4339-ea97-427c-b20b-3bb538fa05b5'],
+  ]);
+  const juniorCast = characterCanon.characters.filter(character => character.age_lane === 'bip-jr');
+  assert.equal(juniorCast.length, approvedMedia.size);
+  for (const character of juniorCast) {
+    const mediaId = approvedMedia.get(character.key);
+    assert.ok(mediaId, `unexpected Bip Jr character: ${character.key}`);
+    assert.match(welcome, new RegExp(`key: '${character.key}'[\\s\\S]*?imageUri: 'https://d2ol7oe51mr4n9\\.cloudfront\\.net/[^']*/${mediaId}\\.png'`));
+  }
+  assert.match(welcome, /source=\{\{ uri: friend\.imageUri \}\}/);
+  assert.match(welcome, /onError=\{\(\) => \{/);
+  assert.match(welcome, /failedBipJrImages\.has\(friend\.key\)/);
+  assert.match(welcome, /BIP_JR_FRIENDS\.map\(friend => \(/);
+  // Only the parent-managed younger welcome is changed: no new child authentication model.
+  assert.match(welcome, /\{isBipJr && \(/);
+  assert.doesNotMatch(welcome, /createOwnBipJrProfile/);
+});
