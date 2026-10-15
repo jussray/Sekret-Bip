@@ -18,6 +18,19 @@ test('natural fallback pack remains versioned, local, and companion-complete', (
   assert.match(source, /hasBannedHumanClaim/);
 });
 
+test('offline fallback and immediate preflight use the shared crisis policy', () => {
+  const fallback = read('src/features/sekret/naturalFallbacks.ts');
+  const coordinator = read('src/features/safety/safetyCoordinator.ts');
+
+  assert.match(fallback, /import \\{ isCrisisText \\} from ['"]\\.\\.\\/\\.\\.\\/\\.\\.\\/services\\/crisisPolicy['"]/);
+  assert.match(fallback, /if \\(isCrisisText\\(userText\\)\\) return getSafetyFallback\\(\\)/);
+  assert.doesNotMatch(fallback, /SAFETY_PATTERN/);
+
+  assert.match(coordinator, /import \\{ isCrisisText \\} from ['"]\\.\\.\\/\\.\\.\\/\\.\\.\\/services\\/crisisPolicy['"]/);
+  assert.match(coordinator, /if \\(isCrisisText\\(text\\)\\) return buildExperience\\('immediate_danger', companionId, false\\)/);
+  assert.match(coordinator, /for \\(const rule of PRE_FLIGHT_RULES\\)/);
+});
+
 test('api fallback path records sanitized Control Room telemetry', () => {
   const api = read('src/utils/api.ts');
 
