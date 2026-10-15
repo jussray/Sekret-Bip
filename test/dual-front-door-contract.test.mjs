@@ -5,6 +5,7 @@ import test from 'node:test';
 const welcome = readFileSync('screens/WebWelcomeScreen.tsx', 'utf8');
 const theme = readFileSync('constants/frontDoorTheme.ts', 'utf8');
 const index = readFileSync('app/index.tsx', 'utf8');
+const characterCanon = JSON.parse(readFileSync('sekret-bip-character-canon/registry.json', 'utf8'));
 
 test('front door presents one audience world at a time', () => {
   assert.match(welcome, /type WelcomeAudience = 'teen' \| 'bip-jr'/);
@@ -48,4 +49,20 @@ test('front-door theme keeps shared Bip atmosphere and safe-area contracts', () 
   assert.match(theme, /ambientViolet/);
   assert.match(theme, /ambientPink/);
   assert.match(theme, /heroGlow/);
+});
+
+test('Bip Jr welcome surfaces exactly the four canon-approved friends without changing Teen art', () => {
+  const juniorCast = characterCanon.characters.filter(character => character.age_lane === 'bip-jr');
+  assert.equal(juniorCast.length, 4);
+  assert.match(welcome, /\{isBipJr && \(/);
+  assert.match(welcome, /testID="web-welcome-bip-jr-cast"/);
+  assert.match(welcome, /BIP_JR_FRIENDS\.map\(friend => \(/);
+  for (const character of juniorCast) {
+    assert.equal(character.status, 'approved');
+    assert.match(welcome, new RegExp(`key: '${character.key}'`));
+    assert.match(welcome, new RegExp(`role: '${character.role}'`));
+  }
+  assert.match(welcome, /const TEEN_HERO = require\('\.\.\/assets\/brand\/sekret-bip-teen-family-v1\.jpg'\)/);
+  assert.match(welcome, /const BIP_JR_HERO = require\('\.\.\/assets\/images\/parent-space-splash\.png'\)/);
+  assert.doesNotMatch(welcome, /createOwnBipJrProfile/);
 });
