@@ -287,7 +287,7 @@ export default function SignupScreen() {
     }
 
     if (isAmbiguousSignupError(retryThrown) && hasAuthServerResponse(retryThrown)) {
-      if (await proveDurableSignupOutcome(SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
+      if (await proveDurableSignupOutcome(sb, signupEmail, signupPassword, SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
         return true;
       }
       setError(
