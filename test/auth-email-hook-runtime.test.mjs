@@ -42,10 +42,11 @@ function harness(provider = async () => new Response('{}', { status: 200 })) {
     URL,
     Request,
     Response,
+    AbortSignal,
     fetch: async (url, options) => {
       assert.equal(url, 'https://api.resend.com/emails');
       sent.push({ ...JSON.parse(options.body), headers: options.headers });
-      return provider(sent.length);
+      return provider(sent.length, options);
     },
   };
   vm.runInNewContext(executable, context, { timeout: 1000 });
@@ -153,4 +154,35 @@ test('provider rejection on second email returns retryable failure', async () =>
   }));
   assert.equal(response.status, 502);
   assert.equal(h.sent.length, 2);
+});
+
+test('provider requests include a bounded cancellation signal', async () => {
+  let checked = 0;
+  const h = harness(async (_index, options) => {
+    assert.equal(typeof options.signal?.throwIfAborted, 'function');
+    assert.equal(options.signal.aborted, false);
+    checked += 1;
+    return new Response('{}', { status: 200 });
+  });
+  const response = await h.invoke(payload('signup'));
+  assert.equal(response.status, 200);
+  assert.equal(checked, 1);
+});
+
+test('secure email change dispatches to both addresses concurrently', async () => {
+  let finishFirst;
+  const first = new Promise((resolve) => { finishFirst = resolve; });
+  const h = harness(async (index) => index === 1 ? first : new Response('{}', { status: 200 }));
+  const pending = h.invoke(payload('email_change', {
+    user: { new_email: 'new@example.org' },
+    email_data: { token_hash_new: 'old-hash', token_hash: 'new-hash' },
+  }));
+  try {
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(h.sent.length, 2);
+  } finally {
+    finishFirst(new Response('{}', { status: 200 }));
+  }
+  assert.equal((await pending).status, 200);
 });
