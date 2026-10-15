@@ -328,7 +328,7 @@ test('structural non-applicable PR jobs remain visible without impersonating pro
 
 test('main-only public edge skip is structural only when GitHub actually skips it', () => {
   const workflow = readFileSync('.github/workflows/founder-shield.yml', 'utf8');
-  assert.match(workflow, /name: Verify anonymous live edge on main\\n\\s+if: github\\.event_name == 'push'/);
+  assert.ok(workflow.includes(['name: Verify anonymous live edge on main', "    if: github.event_name == 'push'"].join('\n')));
   const neutral = selectLatestChecks([
     check({name: 'Verify anonymous live edge on main', conclusion: 'neutral'}),
     check({id: 2, name: 'Repository Truth Gate'}),
