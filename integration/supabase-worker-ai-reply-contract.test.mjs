@@ -53,7 +53,11 @@ function missingEnv() {
 }
 
 async function supabaseRequest(baseUrl, serviceRoleKey, pathname, init = {}) {
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}${pathname}`, {
+  // Supabase's hosted API gateway adds /rest/v1. The isolated local
+  // PostgREST service exposes the same table operations at its root; keep
+  // this explicit so the test never claims to verify the hosted gateway.
+  const localPostgrestPath = pathname.replace(/^\/rest\/v1(?=\/)/, '');
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}${localPostgrestPath}`, {
     ...init,
     headers: {
       apikey: serviceRoleKey,
