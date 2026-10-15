@@ -94,6 +94,15 @@ jobs:
           test/cloudflare-token-verification-fallback.test.mjs
           test/founder-preview-unlock.test.mjs
 
+      - name: Install mandatory disposable unit-test prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
       - name: Run complete unit suite
         run: npm test
 
