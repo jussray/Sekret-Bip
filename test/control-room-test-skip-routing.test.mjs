@@ -6,6 +6,7 @@ import {
   TEST_SKIP_MARKER,
   buildSkipObservation,
   parseNodeTapSkip,
+  parseNodeTapTodo,
   parseSkipMarker,
 } from '../scripts/control-room-test-skips.mjs';
 
@@ -79,12 +80,22 @@ test('Node TAP skips are parsed without turning the skipped test into a passing 
   assert.equal(parseNodeTapSkip('ok 8 - ordinary passing test'), null);
 });
 
+test('Node TAP TODO is treated as an unexecuted check, not a pass', () => {
+  assert.deepEqual(
+    parseNodeTapTodo('ok 12 - complete authorization probe # TODO future provider test'),
+    {testId: 'complete authorization probe', reason: 'TODO: future provider test'},
+  );
+  assert.equal(parseNodeTapTodo('ok 13 - ordinary passing test'), null);
+});
+
 test('unit and browser runners emit durable skip receipts', () => {
   const unit = read('scripts/run-unit-tests.mjs');
   const reporter = read('scripts/control-room-playwright-skip-reporter.mjs');
   assert.match(unit, /--test-reporter=tap/);
   assert.match(unit, /test-skips-latest\.json/);
   assert.match(unit, /CONTROL_ROOM_TEST_SKIPS_REQUIRE_INVESTIGATION/);
+  assert.match(unit, /CONTROL_ROOM_NO_SKIPS_GATE_FAILED/);
+  assert.match(unit, /parseNodeTapTodo/);
   assert.match(reporter, /result\.status !== 'skipped'/);
   assert.match(reporter, /playwright-test-skips-latest\.json/);
 
