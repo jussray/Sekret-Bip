@@ -126,7 +126,7 @@ jobs:
           }
           NODE
       - name: Execute real local REST write-read-update-delete and Worker reply
-        run: node --test test/supabase-worker-ai-reply-contract.test.mjs
+        run: node --test integration/supabase-worker-ai-reply-contract.test.mjs
       - name: Print isolated Worker startup diagnostics on failure
         if: failure()
         shell: bash
