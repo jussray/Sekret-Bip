@@ -92,19 +92,16 @@ jobs:
       - name: Run complete unit suite
         run: npm test
 
-      - name: Verify unit skips emitted non-authorizing receipts
+      - name: Require zero unit-test skip receipts
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const report = JSON.parse(fs.readFileSync('reports/control-room/test-skips-latest.json', 'utf8'));
-          if (report.skip_count < 1) throw new Error('expected the env-gated contract suite to emit at least one skip receipt');
-          for (const item of report.observations) {
-            if (item.authority !== false || item.merge_authority !== false || item.proof_satisfied !== false) {
-              throw new Error('skip receipt incorrectly carries authority or proof');
-            }
-            if (!String(item.fingerprint || '').startsWith('test_skip:')) throw new Error('skip fingerprint missing');
-            if (!String(item.proof_cookie || '').startsWith('juss/proof-cookie@v1:')) throw new Error('skip proof cookie missing');
-            if (item.head_sha !== process.env.EXPECTED_HEAD_SHA) throw new Error('skip receipt is not exact-head bound');
+          if (report.skip_count !== 0 || !Array.isArray(report.observations) || report.observations.length !== 0) {
+            throw new Error('ZERO_SKIPPED_CHECKS_REQUIRED: the full unit suite cannot contain skipped or TODO tests');
+          }
+          if (report.head_sha !== process.env.EXPECTED_HEAD_SHA) {
+            throw new Error('Unit skip-report head is not the exact checked-out PR head');
           }
           NODE
 
