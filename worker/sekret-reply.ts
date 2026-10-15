@@ -1544,14 +1544,15 @@ async function handleReply(request: Request, env: Env, principal: GuardianAwareP
   const characterId = normalizeCharacter(body.characterId ?? body.personality);
   if (!characterId) return json({ error: 'characterId must be raylene, rylane, cloud, night, sekret, or parentCoach' }, 400);
   const surface = normalizeSurface(body.surface ?? body.context);
-  const parentSharingEnabled = principal?.kind === 'user' && principal.guardianSharingEnabled === true;
+  const guardianSharingEnabled = principal?.kind === 'user' && principal.guardianSharingEnabled === true;
+  const parentSharingEnabled = surface === 'parentBridge' && guardianSharingEnabled;
   const rawHistory = normalizeHistory(body.history);
   const preflight = runPreflight(rawHistory, body.memory, principal);
   const history = preflight.sanitizedHistory;
   const userName = normalizeUserName(body);
   const intent = detectIntent(userText, history);
 
-  if (intent === 'safety_crisis' || isCrisisText(userText)) return json(crisisReply(characterId, parentSharingEnabled));
+  if (intent === 'safety_crisis' || isCrisisText(userText)) return json(crisisReply(characterId, guardianSharingEnabled));
 
   const fallbackReply = getFallbackReply(characterId, userText, history, intent, userName);
   if (!env.OPENAI_API_KEY) {
