@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
@@ -24,6 +24,14 @@ execFileSync(tsc, [
 ], { stdio: 'inherit' });
 
 const { resolveGuardianSharingConsent } = require(path.join(out, 'worker', 'guardian-consent.js'));
+const guardianConsentSource = readFileSync('worker/guardian-consent.ts', 'utf8');
+
+test('guardian-consent lookup is bounded and fail-closed on timeout', () => {
+  assert.match(guardianConsentSource, /new AbortController\(\)/);
+  assert.match(guardianConsentSource, /controller\.abort\(\)/);
+  assert.match(guardianConsentSource, /signal:\s*controller\.signal/);
+  assert.match(guardianConsentSource, /clearTimeout\(timeout\)/);
+});
 const KEY = 'test-service-key';
 const USER = '00000000-0000-4000-8000-000000000001';
 let mode = 'true';
