@@ -15,6 +15,7 @@ on:
       - 'supabase/functions/send-welcome-email/**'
       - 'supabase/functions/send-auth-email/**'
       - 'test/welcome-email-contract.test.mjs'
+      - 'test/auth-email-hook-runtime.test.mjs'
       - 'app/(auth)/parent-link-verify.tsx'
       - 'app/(onboarding)/parent-link.tsx'
       - 'app/(parent)/teen-verification.tsx'
@@ -67,6 +68,37 @@ env:
   EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.target_sha || github.event.pull_request.head.sha }}
 
 jobs:
+  auth-source-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact source head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Verify exact source identity
+        shell: bash
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify onboarding and Auth email contracts
+        run: node --test test/auth-email-hook-runtime.test.mjs test/welcome-email-contract.test.mjs test/live-onboarding-email-gate.test.mjs
+
+      - name: Check types
+        run: npm run type-check
+
+      - name: Lint transactional Auth email handler and runtime tests
+        run: npx eslint supabase/functions/send-auth-email/index.ts test/auth-email-hook-runtime.test.mjs
+
   live-signup-proof:
     runs-on: ubuntu-latest
     timeout-minutes: 30
