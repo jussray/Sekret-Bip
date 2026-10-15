@@ -8,6 +8,27 @@ const client = fs.readFileSync('src/services/auth/welcomeEmail.ts', 'utf8');
 const edge = fs.readFileSync('supabase/functions/send-welcome-email/index.ts', 'utf8');
 const authEmailEdge = fs.readFileSync('supabase/functions/send-auth-email/index.ts', 'utf8');
 
+const liveWorkflow = fs.readFileSync('.github/workflows/live-signup-proof.yml', 'utf8');
+const publicGuideGate = fs.readFileSync('scripts/verify-welcome-guide-links.mjs', 'utf8');
+
+test('welcome provider has a bounded network deadline and fails safely on transport error', () => {
+  assert.match(edge, /signal:\s*AbortSignal\.timeout\(2_500\)/);
+  assert.match(edge, /provider_unavailable/);
+  assert.match(edge, /catch\s*\{/);
+});
+
+test('live onboarding release refuses unresolved public documentation before signup writes', () => {
+  assert.match(publicGuideGate, /https:\/\/welcome\.sekretbip\.net/);
+  assert.match(publicGuideGate, /what-is-sekret-bip/);
+  assert.match(publicGuideGate, /how-it-works/);
+  assert.match(publicGuideGate, /privacy-and-safety/);
+  assert.match(publicGuideGate, /WELCOME_GUIDE_RELEASE_BLOCKED/);
+  assert.match(liveWorkflow, /scripts\/verify-welcome-guide-links\.mjs/);
+  const checks = liveWorkflow.indexOf('Verify public onboarding guide links before live signup');
+  const writes = liveWorkflow.indexOf('Prepare disposable guest identity and mailbox');
+  assert.ok(checks >= 0 && writes > checks);
+});
+
 test('new signups are explicitly marked eligible for welcome email v1', () => {
   assert.match(signup, /welcome_email_version:\s*1/);
   assert.match(signup, /options:\s*\{\s*emailRedirectTo:\s*redirectTo,\s*data:\s*metadata\s*\}/);
