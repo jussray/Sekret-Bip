@@ -21,14 +21,35 @@ const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
 const GRID_POSITIONS = ['20%', '40%', '60%', '80%'] as const;
 
-// Approved character roles, not child accounts or invented personal names.
-// Visual character identity stays with sekret-bip-character-canon/registry.json.
-// Never replace missing approved portrait assets with generic child imagery.
+// These are the four existing, approved Higgsfield Element reference images.
+// Keep each image paired with its canonical key in sekret-bip-character-canon/registry.json.
+// CDN delivery is temporary until the exact approved assets are bundled locally;
+// preserve readable roles if the provider is unavailable. No generated substitutes.
 const BIP_JR_FRIENDS = [
-  { key: 'bipjr-spark', role: 'The Spark', symbol: '✦' },
-  { key: 'bipjr-giggle', role: 'The Giggle', symbol: '♡' },
-  { key: 'bipjr-dreamer', role: 'The Dreamer', symbol: '☾' },
-  { key: 'bipjr-explorer', role: 'The Explorer', symbol: '➤' },
+  {
+    key: 'bipjr-spark',
+    role: 'The Spark',
+    symbol: '✦',
+    imageUri: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/f0af6256-45c4-4364-a1f0-92797fb48c74.png',
+  },
+  {
+    key: 'bipjr-giggle',
+    role: 'The Giggle',
+    symbol: '♡',
+    imageUri: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/dc29a783-1197-4d60-acd0-2b1ccafa4cc6.png',
+  },
+  {
+    key: 'bipjr-dreamer',
+    role: 'The Dreamer',
+    symbol: '☾',
+    imageUri: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/c9cc71f9-3a03-43e1-8fbf-648e50afea50.png',
+  },
+  {
+    key: 'bipjr-explorer',
+    role: 'The Explorer',
+    symbol: '➤',
+    imageUri: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/3c2a4339-ea97-427c-b20b-3bb538fa05b5.png',
+  },
 ] as const;
 
 export type WelcomeAudience = 'teen' | 'bip-jr';
@@ -78,6 +99,7 @@ export function WebWelcomeScreen({
 }: WebWelcomeScreenProps) {
   const { width, height } = useWindowDimensions();
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [failedBipJrImages, setFailedBipJrImages] = useState<ReadonlySet<string>>(() => new Set());
   const [reduceMotion, setReduceMotion] = useState<boolean | null>(getInitialReducedMotionPreference);
   const defaultAudience = audience ?? welcomeAudienceForAccountSide(variant);
   const [activeAudience, setActiveAudience] = useState<WelcomeAudience>(() =>
@@ -435,7 +457,19 @@ export function WebWelcomeScreen({
                     importantForAccessibility="no-hide-descendants"
                     style={styles.bipJrFriend}
                   >
-                    <Text style={styles.bipJrFriendSymbol}>{friend.symbol}</Text>
+                    {failedBipJrImages.has(friend.key) ? (
+                      <Text style={styles.bipJrFriendSymbol}>{friend.symbol}</Text>
+                    ) : (
+                      <Image
+                        source={{ uri: friend.imageUri }}
+                        resizeMode="contain"
+                        style={styles.bipJrFriendPortrait}
+                        accessibilityLabel={`Bip Jr, ${friend.role}`}
+                        onError={() => {
+                          setFailedBipJrImages(current => new Set([...current, friend.key]));
+                        }}
+                      />
+                    )}
                     <Text style={styles.bipJrFriendRole}>{friend.role}</Text>
                   </View>
                 ))}
@@ -842,8 +876,10 @@ const styles = StyleSheet.create({
   },
   bipJrFriend: {
     minWidth: '44%',
-    minHeight: 40,
-    flexDirection: 'row',
+    minHeight: 144,
+    paddingVertical: SPACE[2],
+    paddingHorizontal: SPACE[1],
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACE[1],
@@ -851,6 +887,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
     backgroundColor: color.surfaceSoft,
+  },
+  bipJrFriendPortrait: {
+    width: '100%',
+    height: 104,
+    borderRadius: RADIUS.lg,
   },
   bipJrFriendSymbol: {
     color: color.pinkLight,
