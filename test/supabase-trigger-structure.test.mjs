@@ -616,6 +616,18 @@ test('trigger behavior phase 2 proves cleanup_crew_relationship_access and recor
   }
 });
 
-test.todo(
-  'run external-effect-safe rollback-contained behavior probes for the remaining safety and auth-profile triggers listed in trigger_behavior_phase2.notCoveredThisPhase',
-);
+test('remaining safety and auth-profile triggers require rollback-contained behavior evidence', () => {
+  const phase = baseline.behaviorProbePhases.find((entry) => entry.phase === 'trigger_behavior_phase2');
+  assert.ok(phase, 'trigger_behavior_phase2 evidence must be available');
+  const outstanding = Object.keys(phase.notCoveredThisPhase ?? {});
+  const proven = new Set(baseline.behaviorProbePhases
+    .filter((entry) => entry.transactionOutcome === 'rolled_back'
+      && entry.syntheticRowsRetained === 0 && entry.failedChecks === 0 && entry.passedChecks > 0)
+    .flatMap((entry) => entry.coveredFunctions.map((signature) => signature.toLowerCase())));
+  const missingProof = outstanding.filter((signature) => {
+    const reviewed = repositoryFunctions.get(signature.toLowerCase());
+    return !proven.has(signature.toLowerCase()) || reviewed?.behaviorVerified !== true;
+  });
+  assert.deepEqual(missingProof, [],
+    'Unverified trigger behavior remains. Use an external-effect-safe isolated rollback probe; never exercise pg_net with real content');
+});
