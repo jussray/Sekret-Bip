@@ -405,7 +405,11 @@ export default {
       ).trim();
       if (!userText) return json({ error: 'userText is required' }, 400, cors);
 
-      const guardianSharingEnabled = await resolveGuardianSharingConsent(env, principal);
+      const replySurface = normalizeReplySurface(body.surface ?? body.context);
+      const needsGuardianConsent = replySurface === 'parentBridge' || isCrisisText(userText);
+      const guardianSharingEnabled = needsGuardianConsent
+        ? await resolveGuardianSharingConsent(env, principal)
+        : false;
       const companionPrincipal = principal.kind === 'user'
         ? { ...principal, guardianSharingEnabled }
         : principal;
