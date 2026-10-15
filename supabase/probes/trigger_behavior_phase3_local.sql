@@ -69,8 +69,20 @@ begin
   end if;
 
   -- Prove onboarding cannot regress in the forward-only state machine.
+  -- Signup can already create the onboarding baseline. Preserve it instead
+  -- of duplicating the primary key, then assert the correct starting state.
   insert into public.user_onboarding_state(user_id, stage, role)
-  values (v_user, 'signed_up', 'unknown');
+  select v_user, 'signed_up', 'unknown'
+  where not exists (
+    select 1 from public.user_onboarding_state where user_id = v_user
+  );
+  select exists (
+    select 1 from public.user_onboarding_state
+    where user_id = v_user and stage = 'signed_up' and role = 'unknown'
+  ) into v_found;
+  if not v_found then
+    raise exception 'synthetic signup onboarding baseline was not valid';
+  end if;
 
   update public.user_onboarding_state set stage = 'age_verified'
   where user_id = v_user;
