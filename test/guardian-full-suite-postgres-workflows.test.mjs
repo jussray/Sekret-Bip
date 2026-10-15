@@ -25,8 +25,13 @@ test('every full-suite caller provisions disposable local Postgres and verifies 
     assert.match(job, /POSTGRES_PASSWORD: bip_test_ephemeral/);
     assert.match(job, /SEKRET_TEST_PG_URL: postgres:\/\/postgres:bip_test_ephemeral@127\.0\.0\.1:5432\/bip_test/);
     assert.match(job, /psql "\$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1/);
+    assert.match(job, /sudo apt-get install -y -qq postgresql-client ffmpeg/);
+    assert.match(job, /ffmpeg -version/);
+    assert.match(job, /ffprobe -version/);
     assert.ok(job.indexOf('psql "$SEKRET_TEST_PG_URL"') < job.indexOf('npm test'),
       `Postgres must be available before the complete suite in ${path}`);
+    assert.ok(job.indexOf('ffprobe -version') < job.indexOf('npm test'),
+      `FFprobe must be available before the complete suite in ${path}`);
     assert.ok(!job.includes('SUPABASE_SERVICE_ROLE_KEY'), `Do not access production credentials in ${path}`);
   }
 });

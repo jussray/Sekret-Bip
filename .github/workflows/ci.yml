@@ -69,8 +69,10 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq
-          sudo apt-get install -y -qq postgresql-client
+          sudo apt-get install -y -qq postgresql-client ffmpeg
           psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c 'select current_database();'
+          ffmpeg -version
+          ffprobe -version
       - run: npm test
       - run: npm run test:oracle
       - run: npm run test:voice-intelligence
