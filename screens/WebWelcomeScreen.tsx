@@ -89,6 +89,9 @@ export function WebWelcomeScreen({
       : heroContract.desktopHeight;
   const worldPulse = useRef(new Animated.Value(0)).current;
   const heroDrift = useRef(new Animated.Value(0)).current;
+  const audienceCopyReveal = useRef(new Animated.Value(1)).current;
+  const audienceHeroReveal = useRef(new Animated.Value(1)).current;
+  const audienceCuesReveal = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
@@ -170,6 +173,58 @@ export function WebWelcomeScreen({
       driftLoop.stop();
     };
   }, [heroDrift, motionEnabled, worldPulse]);
+
+  // Reintroduce the same approved family art in three quiet beats on audience change.
+  // Characters remain in their composite asset; never redraw or cover Cloud.
+  useEffect(() => {
+    const values = [audienceCopyReveal, audienceHeroReveal, audienceCuesReveal];
+    values.forEach(value => value.stopAnimation());
+
+    if (!motionEnabled) {
+      values.forEach(value => value.setValue(1));
+      return;
+    }
+
+    values.forEach(value => value.setValue(0));
+    const reveal = Animated.stagger(
+      FRONT_DOOR_MOTION.audienceRevealStaggerMs,
+      values.map(value =>
+        Animated.timing(value, {
+          toValue: 1,
+          duration: FRONT_DOOR_MOTION.audienceRevealDurationMs,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ),
+    );
+
+    reveal.start();
+    return () => reveal.stop();
+  }, [activeAudience, audienceCopyReveal, audienceHeroReveal, audienceCuesReveal, motionEnabled]);
+
+  const audienceRevealStyle = (value: Animated.Value) => ({
+    opacity: motionEnabled ? value : 1,
+    transform: [{
+      translateY: motionEnabled
+        ? value.interpolate({
+            inputRange: [0, 1],
+            outputRange: FRONT_DOOR_MOTION.audienceRevealTranslateY,
+          })
+        : 0,
+    }],
+  });
+
+  const audienceHeroRevealStyle = {
+    opacity: motionEnabled ? audienceHeroReveal : 1,
+    transform: [{
+      scale: motionEnabled
+        ? audienceHeroReveal.interpolate({
+            inputRange: [0, 1],
+            outputRange: FRONT_DOOR_MOTION.audienceHeroScale,
+          })
+        : 1,
+    }],
+  };
 
   const ambientMotionStyle = motionEnabled
     ? {
@@ -372,7 +427,10 @@ export function WebWelcomeScreen({
             </View>
           )}
 
-          <View style={[styles.copy, isBipJr && styles.copyBipJr]}>
+          <Animated.View
+            testID="web-welcome-copy-reveal"
+            style={[styles.copy, isBipJr && styles.copyBipJr, audienceRevealStyle(audienceCopyReveal)]}
+          >
             <Text
               testID="web-welcome-eyebrow"
               style={[styles.eyebrow, isBipJr && styles.eyebrowBipJr]}
@@ -382,37 +440,43 @@ export function WebWelcomeScreen({
             <Text style={[styles.title, isBipJr && styles.titleBipJr]}>{copy.title}</Text>
             <Text style={[styles.lead, isBipJr && styles.leadBipJr]}>{copy.lead}</Text>
             <Text style={[styles.subtitle, isBipJr && styles.subtitleBipJr]}>{copy.subtitle}</Text>
-          </View>
+          </Animated.View>
 
           <View
             testID="web-welcome-hero-safe-area"
             style={{ paddingBottom: heroContract.bottomGap }}
           >
-            <Animated.View
-              testID="web-welcome-hero-motion"
-              style={[
-                styles.heroWrap,
-                { height: heroHeight },
-                isBipJr && styles.heroWrapBipJr,
-                heroMotionStyle,
-              ]}
-            >
-              <Animated.View style={[styles.heroGlow, ambientMotionStyle]} />
-              <Image
-                testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
-                source={copy.hero}
-                resizeMode="contain"
-                style={[styles.hero, isBipJr && styles.heroBipJr]}
-                accessibilityLabel={copy.heroLabel}
-              />
+            <Animated.View testID="web-welcome-hero-reveal" style={audienceHeroRevealStyle}>
+              <Animated.View
+                testID="web-welcome-hero-motion"
+                style={[
+                  styles.heroWrap,
+                  { height: heroHeight },
+                  isBipJr && styles.heroWrapBipJr,
+                  heroMotionStyle,
+                ]}
+              >
+                <Animated.View style={[styles.heroGlow, ambientMotionStyle]} />
+                <Image
+                  testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
+                  source={copy.hero}
+                  resizeMode="contain"
+                  style={[styles.hero, isBipJr && styles.heroBipJr]}
+                  accessibilityLabel={copy.heroLabel}
+                />
+              </Animated.View>
             </Animated.View>
           </View>
 
-          <View
+          <Animated.View
             testID="web-welcome-world-cues"
             accessible
             accessibilityLabel={copy.cueLabel}
-            style={[styles.worldCues, !isBipJr && styles.worldCuesTeen]}
+            style={[
+              styles.worldCues,
+              !isBipJr && styles.worldCuesTeen,
+              audienceRevealStyle(audienceCuesReveal),
+            ]}
           >
             {copy.cues.map(cue => (
               <View
@@ -425,7 +489,7 @@ export function WebWelcomeScreen({
                 <Text style={styles.worldCueLabel}>{cue.label}</Text>
               </View>
             ))}
-          </View>
+          </Animated.View>
 
           <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
 
