@@ -18,8 +18,10 @@ import test from 'node:test';
  *     fixture/mocked AI reply mode; the test rejects openai replies.
  *   - paid: explicitly permits a paid AI-backed Worker reply.
  *
- * Missing env vars skip the test clearly. Paid AI is never called by default:
- * the Worker request is skipped unless AI_REPLY_CONTRACT_WORKER_MODE is set.
+ * Missing integration credentials are explicit failures, never skipped tests.
+ * Use only a separately authorized isolated test target, not the live child-data
+ * project. Paid AI is never called by default; setting a paid mode requires
+ * separate authorization and cannot be used as a test shortcut.
  */
 
 const SAFE_EVENT_TYPE = 'control_room_contract_ai_reply_fixture';
@@ -97,12 +99,15 @@ function assertReplyShape(data, workerMode) {
   }
 }
 
-test('Supabase fixture write/read boundary reaches Worker reply-shaped response', async (t) => {
+test('Supabase fixture write/read boundary reaches Worker reply-shaped response', async () => {
   const config = missingEnv();
-  if (config.missing.length > 0) {
-    t.skip(`contract test skipped; missing env: ${config.missing.join(', ')}`);
-    return;
-  }
+  assert.deepEqual(config.missing, [],
+    'Isolated Supabase/Worker integration prerequisites are mandatory: ' + config.missing.join(', '));
+  assert.equal(
+    env('AI_REPLY_CONTRACT_ISOLATED_TEST_TARGET'),
+    'true',
+    'Live child-data or production API targets are prohibited; explicitly bind an isolated test target',
+  );
 
   const correlationId = `contract-${Date.now()}-${Math.random().toString(16).slice(2)}`;
   const fixture = {
