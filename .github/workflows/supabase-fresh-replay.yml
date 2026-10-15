@@ -86,7 +86,7 @@ jobs:
           set -euo pipefail
           command -v psql >/dev/null
           PGPASSWORD=postgres psql \
-            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            "$LOCAL_SUPABASE_PG_URL" \
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/agent_memories_l3_phase1.sql
 
@@ -112,6 +112,8 @@ jobs:
 
       - name: Prove auth-profile, onboarding, first-mood, and safe scan guard triggers
         shell: bash
+        env:
+          LOCAL_SUPABASE_PG_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres # DevSkim: ignore DS162092 because this endpoint is the disposable local Supabase stack
         run: |
           set -euo pipefail
           # The local Supabase stack above is disposable. Never target a remote DB.
