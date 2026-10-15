@@ -52,7 +52,7 @@ test('opaque 504 signup responses require durable auth evidence', () => {
   assert.match(source, /if \(authErrorStatus\(error\) === 504\) return true;/);
   assert.match(source, /SIGNUP_RECOVERY_PROBE_ATTEMPTS = 7/);
   assert.match(source, /SIGNUP_RECOVERY_PROBE_DELAY_MS = 5_000/);
-  assert.match(source, /probeAuthoritativeSignupOutcome/);
+  assert.match(source, /proveDurableSignupOutcome/);
   assert.match(source, /email confirmation is still pending/);
   assert.match(source, /could not verify that your account was created/);
   assert.doesNotMatch(source, /The account server received your signup request, but confirmation is delayed/);
@@ -61,7 +61,7 @@ test('opaque 504 signup responses require durable auth evidence', () => {
 test('server-reached ambiguous signup never resubmits before authoritative proof', () => {
   const source = readText(signupSourcePath);
   const recoveryStart = source.indexOf('async function recoverAmbiguousSignup');
-  const probeDefinition = source.indexOf('async function probeAuthoritativeSignupOutcome', recoveryStart);
+  const probeDefinition = source.indexOf('async function proveDurableSignupOutcome', recoveryStart);
   const serverReachedGuard = source.indexOf('if (initialSignupReachedAuth) {', recoveryStart);
   const retrySignup = source.indexOf('await sb.auth.signUp({', recoveryStart);
 
