@@ -283,7 +283,7 @@ Deno.serve(async (req: Request) => {
       ...(message.code ? ["", `Verification code: ${message.code}`] : []),
       "",
       "If you did not request this, review your account security.",
-    ].join("\\n");
+    ].join("\n");
     const html = [
       `<p>${escapeHtml(message.intro)}</p>`,
       ...(verifyUrl
@@ -301,7 +301,7 @@ Deno.serve(async (req: Request) => {
         headers: {
           authorization: `Bearer ${resendApiKey}`,
           "content-type": "application/json",
-          "Idempotency-Key": `sekret-bip-auth:${action}:${userId}:${(message.hash || "notice").slice(0, 24)}`,
+          ...(message.hash ? { "Idempotency-Key": `sekret-bip-auth:${action}:${userId}:${message.hash.slice(0, 24)}` } : {}),
         },
         body: JSON.stringify({
           from,
