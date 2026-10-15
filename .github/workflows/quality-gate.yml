@@ -37,6 +37,21 @@ jobs:
   unit-tests:
     name: "Unit Tests"
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: bip_test
+          POSTGRES_PASSWORD: bip_test_ephemeral
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bip_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SEKRET_TEST_PG_URL: postgres://postgres:bip_test_ephemeral@127.0.0.1:5432/bip_test # DevSkim: ignore DS162092 because this is an isolated disposable CI loopback database
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -44,6 +59,13 @@ jobs:
           node-version: '24'
           cache: 'npm'
       - run: npm ci
+      - name: Verify disposable Postgres for guardian authorization suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+          psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c 'select current_database();'
       - name: Run unit tests with concise failure evidence
         shell: bash
         run: |
