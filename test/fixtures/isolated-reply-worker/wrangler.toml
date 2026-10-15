@@ -1,6 +1,7 @@
 name = "sekret-bip-reply-contract-local"
 main = "../../../worker/index.ts"
-compatibility_date = "2026-10-01"
+compatibility_date = "2026-06-13"
+compatibility_flags = ["nodejs_compat"]
 
 # NO production routes, durable bindings, account IDs, or remote authority.
 # Used only by the isolated exact-head CI contract runner.
