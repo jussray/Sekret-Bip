@@ -351,6 +351,10 @@ function buildEffectiveState(inputMigrations) {
 }
 
 const state = buildEffectiveState(migrations);
+const reviewedFunctions = new Map(
+  [...baseline.functions, ...candidateReview.functions]
+    .map((item) => [item.signature.toLowerCase(), item]),
+);
 const repositoryFunctions = new Map(
   [...baseline.functions, ...candidateReview.functions]
     .filter((item) => item.repositoryExpected !== false)
@@ -625,7 +629,7 @@ test('remaining trigger behavior is tracked without falsely claiming verificatio
       && entry.syntheticRowsRetained === 0 && entry.failedChecks === 0 && entry.passedChecks > 0)
     .flatMap((entry) => entry.coveredFunctions.map((signature) => signature.toLowerCase())));
   const missingProof = outstanding.filter((signature) => {
-    const reviewed = repositoryFunctions.get(signature.toLowerCase());
+    const reviewed = reviewedFunctions.get(signature.toLowerCase());
     return !proven.has(signature.toLowerCase()) || reviewed?.behaviorVerified !== true;
   });
   assert.ok(missingProof.length > 0,
@@ -635,7 +639,16 @@ test('remaining trigger behavior is tracked without falsely claiming verificatio
   assert.ok(missingProof.includes('public.award_points_for_app_activity()'),
     'Live-only legacy points drift must remain unresolved until reconciled by an authorized migration');
   for (const signature of missingProof) {
-    assert.equal(repositoryFunctions.get(signature.toLowerCase())?.behaviorVerified, false,
+    const reviewed = reviewedFunctions.get(signature.toLowerCase());
+    assert.ok(reviewed, `${signature} must exist in the reviewed trigger inventory`);
+    assert.equal(reviewed.behaviorVerified, false,
       `${signature} cannot claim verified behavior without approved probe evidence`);
+    if (reviewed.repositoryExpected === false) {
+      assert.ok(
+        baseline.catalogDrift.some((entry) =>
+          entry.status === 'open' && entry.function.toLowerCase() === signature.toLowerCase()),
+        `${signature} live-only drift must remain explicitly cataloged as open`,
+      );
+    }
   }
 });
