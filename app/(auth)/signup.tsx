@@ -91,6 +91,7 @@ type SignupMetadata = Readonly<{
   account_side: AccountSide;
   username: string;
   signup_source: 'sekret-bip';
+  welcome_email_version: 1;
 }>;
 
 function buildSignupMetadata(side: AccountSide, username: string): SignupMetadata {
@@ -98,6 +99,7 @@ function buildSignupMetadata(side: AccountSide, username: string): SignupMetadat
     account_side: side,
     username: username.trim(),
     signup_source: 'sekret-bip',
+    welcome_email_version: 1,
   };
 }
 
@@ -110,6 +112,8 @@ function delay(ms: number): Promise<void> {
 }
 
 const SIGNUP_RECOVERY_DELAY_MS = 750;
+const SIGNUP_RECOVERY_PROBE_ATTEMPTS = 7;
+const SIGNUP_RECOVERY_PROBE_DELAY_MS = 5_000;
 const STEPS = 3; // 0: email+pw  1: username  2: review
 
 export default function SignupScreen() {
@@ -182,29 +186,52 @@ export default function SignupScreen() {
   ): Promise<boolean> {
     await delay(SIGNUP_RECOVERY_DELAY_MS);
     const initialSignupReachedAuth = hasAuthServerResponse(initialError);
-    try {
-      const { data: signInData, error: signInError } =
-        await sb.auth.signInWithPassword({ email: signupEmail, password: signupPassword });
-      if (signInData.session?.user) {
-        await finishAuthenticatedSignup(signInData.session.user.id);
-        return true;
+
+    async function probeAuthoritativeSignupOutcome(maxAttempts: number): Promise<boolean> {
+      const attempts = Math.max(maxAttempts, 1);
+      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+          const { data: signInData, error: signInError } =
+            await sb.auth.signInWithPassword({ email: signupEmail, password: signupPassword });
+
+          if (signInData.session?.user) {
+            await finishAuthenticatedSignup(signInData.session.user.id);
+            return true;
+          }
+
+          if (isConfirmationPendingError(signInError)) {
+            showConfirmationSuccess(
+              `Your account was created, but email confirmation is still pending for ${signupEmail}.\nCheck your inbox, then come back and sign in.`,
+            );
+            return true;
+          }
+        } catch {
+          // A timed-out signup can keep processing after the client receives a
+          // 504. Only durable auth evidence may turn this into a success state.
+        }
+
+        if (attempt < attempts) {
+          await delay(SIGNUP_RECOVERY_PROBE_DELAY_MS);
+        }
       }
-      if (isConfirmationPendingError(signInError)) {
-        showConfirmationSuccess(
-          `Your account was created, but email confirmation is still pending for ${signupEmail}.\nCheck your inbox, then come back and sign in.`,
-        );
-        return true;
-      }
-    } catch (probeError) {
-      if (!isAmbiguousSignupError(probeError)) return false;
+
+      return false;
     }
 
-    // A real HTTP response means Auth received the first signup. Never submit
-    // signUp again here: duplicate submissions can emit duplicate confirmation
-    // emails and consume the project-wide email-send quota.
+    if (
+      await probeAuthoritativeSignupOutcome(
+        initialSignupReachedAuth ? SIGNUP_RECOVERY_PROBE_ATTEMPTS : 1,
+      )
+    ) {
+      return true;
+    }
+
+    // A server response proves only that Auth received the request, not that a
+    // durable user exists. Never duplicate-submit here, and never claim success
+    // until sign-in proves either an authenticated account or confirmation-pending.
     if (initialSignupReachedAuth) {
-      showConfirmationSuccess(
-        `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
+      setError(
+        `The account server timed out, and we could not verify that your account was created for ${signupEmail}. Check your inbox for a confirmation link. If none arrives, try again.`,
       );
       return true;
     }
@@ -232,8 +259,11 @@ export default function SignupScreen() {
         return true;
       }
       if (isAmbiguousSignupError(retryError) && hasAuthServerResponse(retryError)) {
-        showConfirmationSuccess(
-          `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
+        if (await probeAuthoritativeSignupOutcome(SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
+          return true;
+        }
+        setError(
+          `The account server timed out, and we could not verify that your account was created for ${signupEmail}. Check your inbox for a confirmation link. If none arrives, try again.`,
         );
         return true;
       }
@@ -243,8 +273,11 @@ export default function SignupScreen() {
     }
 
     if (isAmbiguousSignupError(retryThrown) && hasAuthServerResponse(retryThrown)) {
-      showConfirmationSuccess(
-        `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
+      if (await probeAuthoritativeSignupOutcome(SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
+        return true;
+      }
+      setError(
+        `The account server timed out, and we could not verify that your account was created for ${signupEmail}. Check your inbox for a confirmation link. If none arrives, try again.`,
       );
       return true;
     }
