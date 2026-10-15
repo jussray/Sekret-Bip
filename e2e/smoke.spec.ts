@@ -91,6 +91,18 @@ test('web welcome hero safe area keeps the primary action below teen artwork', a
   expect(enterBox!.y).toBeGreaterThanOrEqual(heroBox!.y + heroBox!.height);
 });
 
+test('public Bip Jr welcome does not initialize private account caches before guardian setup', async ({ page }) => {
+  await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('web-welcome-enter')).toBeVisible({ timeout: 30_000 });
+  // Give the app's asynchronous initial cache hydration a chance to finish.
+  await page.waitForTimeout(1000);
+  const privateKeys = await page.evaluate(() =>
+    ['voiceNotes', 'parentVoiceNotes', 'moodHistory', 'entries', 'parentCirclePosts', 'roomMemory']
+      .filter(key => window.localStorage.getItem(key) !== null),
+  );
+  expect(privateKeys).toEqual([]);
+});
+
 test('web welcome Bip Jr renders the four approved portraits on mobile', async ({ page }) => {
   test.setTimeout(90_000);
   await page.setViewportSize({ width: 390, height: 844 });

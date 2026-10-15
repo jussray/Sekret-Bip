@@ -92,3 +92,10 @@ test('Bip Jr approved portraits stay bundled, byte-pinned, and correctly mapped'
   assert.match(welcome, /\{isBipJr && \(/);
   assert.doesNotMatch(welcome, /createOwnBipJrProfile/);
 });
+
+test('public welcome does not persist private state before account verification', () => {
+  const hook = readFileSync('src/hooks/useSekretState.ts', 'utf8');
+  assert.match(hook, /if \(isLoading \|\| !authenticatedUserId\) return;/);
+  assert.match(hook, /isLoading, authenticatedUserId,/);
+  assert.match(hook, /void saveState\(\{/);
+});

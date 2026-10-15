@@ -184,9 +184,11 @@ export function useSekretState(authenticatedUserId: string | null = null) {
     return () => { cancelled = true; };
   }, [authenticatedUserId, isLoading]);
 
-  // Persist the merged state as the offline cache.
+  // The public welcome and guardian setup must not write private app data.
+  // Persist the offline cache only for a verified permanent account. This
+  // preserves existing storage without clearing it during public browsing.
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !authenticatedUserId) return;
 
     void saveState({
       theme,
@@ -227,7 +229,7 @@ export function useSekretState(authenticatedUserId: string | null = null) {
     parentPagesEntries, parentCirclePosts, parentCirclePostText,
     parentVoiceNotes, parentOracleProfile, parentOracleSessions,
     crewMembers, crewCheckIns, parentCrewMembers, parentCrewCheckIns,
-    isLoading,
+    isLoading, authenticatedUserId,
   ]);
 
   function resetAllState() {
