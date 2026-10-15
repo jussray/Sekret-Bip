@@ -7,6 +7,7 @@ import {
   buildSkipObservation,
   parseNodeTapSkip,
   parseNodeTapTodo,
+  parseNodeTapTotals,
   parseSkipMarker,
 } from '../scripts/control-room-test-skips.mjs';
 
@@ -86,6 +87,15 @@ test('Node TAP TODO is treated as an unexecuted check, not a pass', () => {
     {testId: 'complete authorization probe', reason: 'TODO: future provider test'},
   );
   assert.equal(parseNodeTapTodo('ok 13 - ordinary passing test'), null);
+});
+
+test('TAP execution totals expose skips, TODO, failures and missing summary', () => {
+  assert.deepEqual(parseNodeTapTotals('# tests 4'), {field: 'tests', count: 4});
+  assert.deepEqual(parseNodeTapTotals('# pass 2'), {field: 'pass', count: 2});
+  assert.deepEqual(parseNodeTapTotals('# fail 0'), {field: 'fail', count: 0});
+  assert.deepEqual(parseNodeTapTotals('# skipped 1'), {field: 'skipped', count: 1});
+  assert.deepEqual(parseNodeTapTotals('# todo 1'), {field: 'todo', count: 1});
+  assert.equal(parseNodeTapTotals('ok 4 - a passing test'), null);
 });
 
 test('unit and browser runners emit durable skip receipts', () => {
