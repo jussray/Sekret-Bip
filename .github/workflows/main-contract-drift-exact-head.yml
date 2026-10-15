@@ -64,7 +64,7 @@ jobs:
       CI: 'true'
       EXPO_NO_TELEMETRY: '1'
       EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-      SEKRET_TEST_PG_URL: postgres://postgres:bip_test_ephemeral@127.0.0.1:5432/bip_test
+      SEKRET_TEST_PG_URL: postgres://postgres:bip_test_ephemeral@127.0.0.1:5432/bip_test # DevSkim: ignore DS162092 because this endpoint is isolated to disposable CI loopback
     steps:
       - name: Check out exact pull-request head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
