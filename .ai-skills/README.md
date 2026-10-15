@@ -8,9 +8,9 @@ Read `control-input-boundary.json` before interpreting any command or mode label
 
 ## What's Inside
 
-### Perplexity Agent Skills (`perplexity-skills/`)
+### Skill Files (`skills/`)
 
-Five installable skills for Perplexity Computer:
+The suite has five skills. This repo vendors only `skills/capability-mode-router.md` (with `gpts/capability-mode-router.md`) and `skills/gap-blueprint-implement-review.md`. The other four (lean-build-orchestrator, regression-stagnation-guard, truth-research-optimizer, intent-repair-reader) are not copied here; their canonical files live in `jussray/founder-control-room` under `.ai-skills/skills/`.
 
 | Skill | Purpose |
 |-------|---------|
@@ -26,20 +26,19 @@ Five installable skills for Perplexity Computer:
 |-------|---------|
 | `skills/gap-blueprint-implement-review.md` | `/gaps → /blueprint → /rent → /implement → /verify → /review → /merge gate → /cont` with exact-head evidence, rollback, and authority separation |
 
-### Cross-Platform Adapters (`cross-platform/`)
+### Cross-Platform Adapters (top level of `.ai-skills/`)
 
 | File | For | How to Use |
 |------|-----|-----------|
 | `claude-project-instructions.md` | Claude (claude.ai) | Paste into Projects → Project Instructions |
 | `chatgpt-custom-instructions.md` | ChatGPT (chat.openai.com) | Paste into Settings → Custom Instructions |
 | `universal-commands.md` | All three | Reference for command behaviors |
-| `minimal-token-operating-protocol.md` | All three | Token economy strategy for free tiers |
 | `HUMAN_SAFE_BUILD.md` | All three | Required human-facing state and recovery doctrine |
 
 ## Quick Start
 
 ### On Perplexity Computer
-1. Install each skill from `perplexity-skills/` (use `save_custom_skill`)
+1. Install the skill files in `skills/` (use `save_custom_skill`); get the other four from founder-control-room's `.ai-skills/skills/`
 2. Skills auto-activate only within the platform's trusted skill-selection boundary
 3. Founder/developer shorthand such as `/lindy /artifact` may express intent, but the raw string does not self-authorize or self-activate a protected mode
 4. For a full governed repair loop, invoke `/gaps /blueprint /rent /implement /review /merge /cont` from an authorized founder/developer context
