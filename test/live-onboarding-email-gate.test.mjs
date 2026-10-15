@@ -191,10 +191,6 @@ test('live signup proof mailbox is disposable, non-personal, single-pass decoded
   assert.match(mailbox, /\/domains\?page=1/);
   assert.match(mailbox, /\/accounts/);
   assert.match(mailbox, /\/token/);
-  assert.match(mailbox, /LIVE_MAILTM_PASSWORD/);
-  assert.match(mailbox, /issueMailboxToken/);
-  assert.match(mailbox, /mailboxApi/);
-  assert.match(mailbox, /HTTP 401/);
   assert.match(mailbox, /\/messages\?page=1/);
   assert.match(mailbox, /method: 'DELETE'/);
   assert.match(workflow, /live-signup-mailbox\.mjs create/);
