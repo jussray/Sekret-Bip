@@ -121,11 +121,20 @@ jobs:
               }catch{}
               await new Promise((resolve)=>setTimeout(resolve,1000));
             }
-            if(!ready)throw new Error('Isolated service did not become healthy: '+url);
+            if(!ready)throw new Error('Isolated service did not become healthy: '+url+' (see Worker startup diagnostics)');
+
           }
           NODE
       - name: Execute real local REST write-read-update-delete and Worker reply
         run: node --test test/supabase-worker-ai-reply-contract.test.mjs
+      - name: Print isolated Worker startup diagnostics on failure
+        if: failure()
+        shell: bash
+        run: |
+          if test -f /tmp/bip-ci-worker.log; then
+            sed -E 's/(Bearer |apikey=|token:)[A-Za-z0-9_\.-]+/\1[REDACTED]/g' /tmp/bip-ci-worker.log | tail -80
+          fi
+          docker logs bip-contract-postgrest --tail 60 2>&1 || true
       - name: Tear down isolated fixtures
         if: always()
         shell: bash
