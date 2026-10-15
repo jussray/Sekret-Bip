@@ -176,6 +176,42 @@ export default function SignupScreen() {
     setSuccess(true);
   }
 
+  async function proveDurableSignupOutcome(
+    sb: NonNullable<ReturnType<typeof getSupabase>>,
+    signupEmail: string,
+    signupPassword: string,
+    maxAttempts: number,
+  ): Promise<boolean> {
+    const attempts = Math.max(maxAttempts, 1);
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const { data: signInData, error: signInError } =
+          await sb.auth.signInWithPassword({ email: signupEmail, password: signupPassword });
+
+        if (signInData.session?.user) {
+          await finishAuthenticatedSignup(signInData.session.user.id);
+          return true;
+        }
+
+        if (isConfirmationPendingError(signInError)) {
+          showConfirmationSuccess(
+            `Your account was created, but email confirmation is still pending for ${signupEmail}.\nCheck your inbox, then come back and sign in.`,
+          );
+          return true;
+        }
+      } catch {
+        // A signup response is not durable proof. Keep polling Auth for either
+        // an authenticated session or its explicit confirmation-pending state.
+      }
+
+      if (attempt < attempts) {
+        await delay(SIGNUP_RECOVERY_PROBE_DELAY_MS);
+      }
+    }
+
+    return false;
+  }
+
   async function recoverAmbiguousSignup(
     sb: NonNullable<ReturnType<typeof getSupabase>>,
     signupEmail: string,
@@ -187,39 +223,12 @@ export default function SignupScreen() {
     await delay(SIGNUP_RECOVERY_DELAY_MS);
     const initialSignupReachedAuth = hasAuthServerResponse(initialError);
 
-    async function probeAuthoritativeSignupOutcome(maxAttempts: number): Promise<boolean> {
-      const attempts = Math.max(maxAttempts, 1);
-      for (let attempt = 1; attempt <= attempts; attempt += 1) {
-        try {
-          const { data: signInData, error: signInError } =
-            await sb.auth.signInWithPassword({ email: signupEmail, password: signupPassword });
-
-          if (signInData.session?.user) {
-            await finishAuthenticatedSignup(signInData.session.user.id);
-            return true;
-          }
-
-          if (isConfirmationPendingError(signInError)) {
-            showConfirmationSuccess(
-              `Your account was created, but email confirmation is still pending for ${signupEmail}.\nCheck your inbox, then come back and sign in.`,
-            );
-            return true;
-          }
-        } catch {
-          // A timed-out signup can keep processing after the client receives a
-          // 504. Only durable auth evidence may turn this into a success state.
-        }
-
-        if (attempt < attempts) {
-          await delay(SIGNUP_RECOVERY_PROBE_DELAY_MS);
-        }
-      }
-
-      return false;
-    }
 
     if (
-      await probeAuthoritativeSignupOutcome(
+      await proveDurableSignupOutcome(
+        sb,
+        signupEmail,
+        signupPassword,
         initialSignupReachedAuth ? SIGNUP_RECOVERY_PROBE_ATTEMPTS : 1,
       )
     ) {
@@ -247,9 +256,14 @@ export default function SignupScreen() {
       if (!retryError) {
         if (retryData.session?.user) {
           await finishAuthenticatedSignup(retryData.session.user.id);
-        } else {
-          showConfirmationSuccess();
+          return true;
         }
+        if (await proveDurableSignupOutcome(sb, signupEmail, signupPassword, SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
+          return true;
+        }
+        setError(
+          `The account server answered, but we could not verify that your account was saved for ${signupEmail}. Please try again.`,
+        );
         return true;
       }
       if (isConfirmationPendingError(retryError)) {
@@ -259,7 +273,7 @@ export default function SignupScreen() {
         return true;
       }
       if (isAmbiguousSignupError(retryError) && hasAuthServerResponse(retryError)) {
-        if (await probeAuthoritativeSignupOutcome(SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
+        if (await proveDurableSignupOutcome(sb, signupEmail, signupPassword, SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
           return true;
         }
         setError(
@@ -273,7 +287,7 @@ export default function SignupScreen() {
     }
 
     if (isAmbiguousSignupError(retryThrown) && hasAuthServerResponse(retryThrown)) {
-      if (await probeAuthoritativeSignupOutcome(SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
+      if (await proveDurableSignupOutcome(SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
         return true;
       }
       setError(
@@ -373,9 +387,14 @@ export default function SignupScreen() {
             && Boolean(refreshed.session.user.email_confirmed_at)
           ) {
             await finishAuthenticatedSignup(refreshed.session.user.id);
-          } else {
-            showConfirmationSuccess();
+            return;
           }
+          if (await proveDurableSignupOutcome(sb, e, p, SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
+            return;
+          }
+          setError(
+            `The account server answered, but we could not verify that your account was saved for ${e}. Please try again.`,
+          );
           return;
         }
       }
@@ -397,9 +416,14 @@ export default function SignupScreen() {
 
       if (signUpData.session) {
         await finishAuthenticatedSignup(signUpData.session.user.id);
-      } else {
-        showConfirmationSuccess();
+        return;
       }
+      if (await proveDurableSignupOutcome(sb, e, p, SIGNUP_RECOVERY_PROBE_ATTEMPTS)) {
+        return;
+      }
+      setError(
+        `The account server answered, but we could not verify that your account was saved for ${e}. Please try again.`,
+      );
     } catch (caught) {
       if (isAmbiguousSignupError(caught)) {
         const sb2 = getSupabase();
