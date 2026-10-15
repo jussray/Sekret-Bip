@@ -8,13 +8,34 @@ insert into public.parent_links (teen_user_id, parent_user_id, status, is_active
   ('00000000-0000-4000-8000-000000000007', '00000000-0000-4000-8000-0000000000ff', 'active', true, null),
   ('00000000-0000-4000-8000-000000000008', '00000000-0000-4000-8000-0000000000ff', 'active', true, null);
 
-insert into public.guardian_summary_consents (teen_user_id, enabled, enabled_at) values
-  ('00000000-0000-4000-8000-000000000001', true, now()),
-  ('00000000-0000-4000-8000-000000000002', true, now()),
-  ('00000000-0000-4000-8000-000000000003', true, now()),
-  ('00000000-0000-4000-8000-000000000004', true, now()),
-  ('00000000-0000-4000-8000-000000000005', true, now()),
-  ('00000000-0000-4000-8000-000000000007', false, now());
+insert into public.guardian_summary_consents (
+  teen_user_id, parent_link_id, guardian_user_id, parent_link_updated_at, enabled, enabled_at
+)
+select teen_user_id, id, parent_user_id, updated_at, true, now()
+from public.parent_links
+where teen_user_id in (
+  '00000000-0000-4000-8000-000000000001',
+  '00000000-0000-4000-8000-000000000003',
+  '00000000-0000-4000-8000-000000000004',
+  '00000000-0000-4000-8000-000000000005'
+);
+
+-- A consent row bound to some other relationship is not authority for this teen.
+insert into public.guardian_summary_consents (
+  teen_user_id, parent_link_id, guardian_user_id, parent_link_updated_at, enabled, enabled_at
+)
+select
+  '00000000-0000-4000-8000-000000000002',
+  id,
+  parent_user_id,
+  updated_at,
+  true,
+  now()
+from public.parent_links
+where teen_user_id = '00000000-0000-4000-8000-000000000001';
+
+insert into public.guardian_summary_consents (teen_user_id, enabled, enabled_at)
+values ('00000000-0000-4000-8000-000000000007', false, now());
 
 create or replace function pg_temp.expect(label text, actual boolean, expected boolean)
 returns void language plpgsql as $$
@@ -44,12 +65,45 @@ set role service_role;
 select pg_temp.expect('after teen opt in', public.guardian_summary_permitted('00000000-0000-4000-8000-000000000008'), true);
 reset role;
 
+-- Changing the active relationship version invalidates the earlier consent,
+-- even if the same teen stays linked.
+update public.parent_links
+set parent_user_id = '00000000-0000-4000-8000-0000000000ee',
+    updated_at = updated_at + interval '1 second'
+where teen_user_id = '00000000-0000-4000-8000-000000000008';
+
+set role service_role;
+select pg_temp.expect('relationship change requires fresh consent', public.guardian_summary_permitted('00000000-0000-4000-8000-000000000008'), false);
+reset role;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000008', false);
+set role authenticated;
+select public.set_guardian_summary_consent(true);
+reset role;
+set role service_role;
+select pg_temp.expect('fresh consent binds current relationship', public.guardian_summary_permitted('00000000-0000-4000-8000-000000000008'), true);
+reset role;
+
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000008', false);
 set role authenticated;
 select public.set_guardian_summary_consent(false);
 reset role;
 set role service_role;
 select pg_temp.expect('after withdrawal', public.guardian_summary_permitted('00000000-0000-4000-8000-000000000008'), false);
+reset role;
+
+select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', false);
+set role authenticated;
+do $
+declare denied boolean := false;
+begin
+  begin
+    perform public.set_guardian_summary_consent(true);
+  exception when sqlstate '42501' then
+    denied := true;
+  end;
+  if not denied then raise exception 'caller without an active guardian link enabled sharing'; end if;
+end $;
 reset role;
 
 select set_config('request.jwt.claim.sub', '', false);
