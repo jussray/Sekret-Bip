@@ -65,3 +65,18 @@ test('reduced motion fails safe before decorative or arrival motion starts', () 
   assert.match(arrival, /setArrivalState\('reduced'\)/);
   assert.match(arrival, /styles\.primerReduced/);
 });
+
+test('Teen and Bip Jr artwork reveal in sequence without replacing character art or running reduced motion', () => {
+  assert.match(screen, /web-welcome-copy-reveal/);
+  assert.match(screen, /web-welcome-hero-reveal/);
+  assert.match(screen, /web-welcome-world-cues/);
+  assert.match(screen, /Animated\\.stagger\\(/);
+  assert.match(screen, /activeAudience, audienceCopyReveal, audienceHeroReveal, audienceCuesReveal, motionEnabled/);
+  assert.match(screen, /if \\(!motionEnabled\\) \\{[\\s\\S]*?values\\.forEach\\(value => value\\.setValue\\(1\\)\\)/);
+  assert.match(screen, /const BIP_JR_HERO = require\\('\.\.\\/assets\\/images\\/parent-space-splash\\.png'\\)/);
+  assert.match(screen, /const TEEN_HERO = require\\('\.\.\\/assets\\/brand\\/sekret-bip-teen-family-v1\\.jpg'\\)/);
+  assert.match(contract, /audienceRevealDurationMs: 640/);
+  assert.match(contract, /audienceRevealStaggerMs: 130/);
+  assert.match(contract, /audienceRevealTranslateY: \\[12, 0\\]/);
+  assert.match(contract, /audienceHeroScale: \\[0\\.985, 1\\]/);
+});
