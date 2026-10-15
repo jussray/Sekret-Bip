@@ -23,6 +23,8 @@ const DEFAULT_GITHUB_RETRY_MAX_DELAY_MS = 60_000;
 const STRUCTURAL_NON_APPLICABLE_GITHUB_CHECKS = new Set([
   "github.event_name == 'pull_request' && 'PR Continuity Exact-Head Gate' || 'PR Continuity Exact-Head Gate (not applicable)'",
   'Roll Current Main Through Open PR Graph',
+  // Runs only on main pushes; visible as skipped on PRs, never a PR proof witness.
+  'Verify anonymous live edge on main',
 ]);
 const SUPABASE_REPLAY_CHECK = 'Replay migrations from empty local database';
 
@@ -163,6 +165,7 @@ export function classifyProofDisposition(check, allChecks = []) {
 
   if (
     check?.app === 'github-actions'
+    && check?.conclusion === 'skipped'
     && STRUCTURAL_NON_APPLICABLE_GITHUB_CHECKS.has(check?.name)
   ) {
     return 'structural-not-applicable';

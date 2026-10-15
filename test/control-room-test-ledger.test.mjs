@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import {
   aggregateTestLedger,
   assertLedgerMergeReady,
@@ -309,19 +310,36 @@ test('structural non-applicable PR jobs remain visible without impersonating pro
     check({name: "github.event_name == 'pull_request' && 'PR Continuity Exact-Head Gate' || 'PR Continuity Exact-Head Gate (not applicable)'", conclusion: 'skipped'}),
     check({id: 2, name: 'Roll Current Main Through Open PR Graph', conclusion: 'skipped'}),
     check({id: 3, name: 'Repository Truth Gate'}),
+    check({id: 4, name: 'Verify anonymous live edge on main', conclusion: 'skipped'}),
   ], SHA);
   const ledger = buildTestLedger({
     repository: 'jussray/Sekret-Bip', sha: SHA, checks, observerState: 'stable',
   });
 
   assert.equal(ledger.aggregate.counts.skipped, 0);
-  assert.equal(ledger.aggregate.counts.notApplicable, 2);
+  assert.equal(ledger.aggregate.counts.notApplicable, 3);
   assert.equal(ledger.aggregate.state, 'passed');
   assert.equal(
     ledger.checks.filter((item) => item.state === 'skipped').every((item) => item.proofDisposition === 'structural-not-applicable'),
     true,
   );
   assert.equal(assertLedgerMergeReady(ledger), ledger);
+});
+
+test('main-only public edge skip is structural only when GitHub actually skips it', () => {
+  const workflow = readFileSync('.github/workflows/founder-shield.yml', 'utf8');
+  assert.match(workflow, /name: Verify anonymous live edge on main\\n\\s+if: github\\.event_name == 'push'/);
+  const neutral = selectLatestChecks([
+    check({name: 'Verify anonymous live edge on main', conclusion: 'neutral'}),
+    check({id: 2, name: 'Repository Truth Gate'}),
+  ], SHA);
+  const neutralLedger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks: neutral, observerState: 'stable',
+  });
+  assert.equal(neutralLedger.checks.find(item => item.name === 'Verify anonymous live edge on main')?.proofDisposition, 'blocking-skip');
+  assert.equal(neutralLedger.aggregate.counts.skipped, 1);
+  assert.equal(neutralLedger.aggregate.state, 'failed');
+  assert.throws(() => assertLedgerMergeReady(neutralLedger), /Skipped or neutral exact-head checks/);
 });
 
 test('canonical skipped Supabase provider preview requires successful exact-head replay proof', () => {
