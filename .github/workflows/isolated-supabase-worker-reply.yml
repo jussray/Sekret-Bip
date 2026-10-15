@@ -1,0 +1,134 @@
+name: Isolated Supabase-Worker Reply Contract
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: isolated-reply-contract-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  CI: "true"
+  SUPABASE_URL: http://127.0.0.1:3000
+  AI_REPLY_CONTRACT_WORKER_URL: http://127.0.0.1:8794
+  AI_REPLY_CONTRACT_WORKER_TOKEN: ci-local-synthetic-reply-token
+  AI_REPLY_CONTRACT_WORKER_MODE: fallback
+  AI_REPLY_CONTRACT_ISOLATED_TEST_TARGET: "true"
+  SEKRET_TEST_PG_URL: postgres://postgres:bip_ci_disposable@127.0.0.1:5432/bip_contract
+  PGRST_JWT_SECRET: ci-only-postgrest-secret-length-greater-than-32
+
+jobs:
+  real-local-integration:
+    name: Local Postgres REST and actual Worker HTTP round-trip
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: bip_contract
+          POSTGRES_PASSWORD: bip_ci_disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bip_contract"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Reject stale test subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Use Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install locked dependencies and local psql client
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+      - name: Provision disposable non-teen REST fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          create table public.app_events (
+            id uuid primary key default gen_random_uuid(),
+            user_id uuid,
+            event_type text not null,
+            metadata jsonb not null default '{}'::jsonb,
+            created_at timestamptz not null default now()
+          );
+          SQL
+      - name: Start pinned local PostgREST with synthetic credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run -d --rm --name bip-contract-postgrest --network host \
+            -e PGRST_DB_URI="$SEKRET_TEST_PG_URL" \
+            -e PGRST_DB_SCHEMAS=public \
+            -e PGRST_DB_ANON_ROLE=postgres \
+            -e PGRST_JWT_SECRET="$PGRST_JWT_SECRET" \
+            postgrest/postgrest@sha256:5f4ce744539bbba786b4e24dbbd95bdb2a956dcf568c5374995a0ff4a68f5bd2
+          node --input-type=module <<'NODE'
+          import {createHmac} from 'node:crypto';
+          import {appendFileSync} from 'node:fs';
+          const encode = (obj) => Buffer.from(JSON.stringify(obj)).toString('base64url');
+          const header = encode({alg:'HS256',typ:'JWT'});
+          const body = encode({role:'postgres',exp:Math.floor(Date.now()/1000)+1200});
+          const data = header + '.' + body;
+          const signature = createHmac('sha256', process.env.PGRST_JWT_SECRET).update(data).digest('base64url');
+          appendFileSync(process.env.GITHUB_ENV,'SUPABASE_SERVICE_ROLE_KEY=' + data + '.' + signature + '\n');
+          NODE
+      - name: Start actual Bip Worker in local fallback mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          nohup ./node_modules/.bin/wrangler dev \
+            --config test/fixtures/isolated-reply-worker/wrangler.toml \
+            --local --ip 127.0.0.1 --port 8794 \
+            --var SEKRET_CLIENT_TOKEN:ci-local-synthetic-reply-token \
+            --log-level error > /tmp/bip-ci-worker.log 2>&1 &
+          echo "$!" > /tmp/bip-ci-worker.pid
+      - name: Verify both local HTTP services respond
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const urls=['http://127.0.0.1:3000/','http://127.0.0.1:8794/health'];
+          for (const url of urls) {
+            let ready=false;
+            for(let i=0;i<60;i++){
+              try {
+                const result=await fetch(url);
+                if(result.ok){ready=true;break;}
+              }catch{}
+              await new Promise((resolve)=>setTimeout(resolve,1000));
+            }
+            if(!ready)throw new Error('Isolated service did not become healthy: '+url);
+          }
+          NODE
+      - name: Execute real local REST write-read-update-delete and Worker reply
+        run: node --test test/supabase-worker-ai-reply-contract.test.mjs
+      - name: Tear down isolated fixtures
+        if: always()
+        shell: bash
+        run: |
+          if test -f /tmp/bip-ci-worker.pid; then kill "$(cat /tmp/bip-ci-worker.pid)" 2>/dev/null || true; fi
+          docker rm -f bip-contract-postgrest 2>/dev/null || true
