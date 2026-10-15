@@ -292,7 +292,7 @@ async function cleanupMailbox() {
   const mode = mailboxMode();
   if (mode === 'bip_routed') {
     writeJson('live-signup-mailbox-cleanup.json', {
-      mailboxProvider: 'Se\\'kret Bip Cloudflare Email Routing',
+      mailboxProvider: "Se'kret Bip Cloudflare Email Routing",
       mailboxMode: mode,
       status: 'persistent_owned_alias_not_deleted',
       cleanedAt: new Date().toISOString(),
