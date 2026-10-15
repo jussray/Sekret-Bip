@@ -1,0 +1,75 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import test from 'node:test';
+
+const signup = fs.readFileSync('app/(auth)/signup.tsx', 'utf8');
+const bootstrap = fs.readFileSync('src/services/auth/postAuthBootstrap.ts', 'utf8');
+const client = fs.readFileSync('src/services/auth/welcomeEmail.ts', 'utf8');
+const edge = fs.readFileSync('supabase/functions/send-welcome-email/index.ts', 'utf8');
+const mailbox = fs.readFileSync('scripts/live-signup-mailbox.mjs', 'utf8');
+
+test('new signups are explicitly marked eligible for welcome email v1', () => {
+  assert.match(signup, /welcome_email_version:\s*1/);
+  assert.match(signup, /options:\s*\{\s*emailRedirectTo:\s*redirectTo,\s*data:\s*metadata\s*\}/);
+  assert.match(signup, /auth\.updateUser\([\s\S]*data:\s*metadata/);
+});
+
+test('ambiguous signup never claims success without durable auth evidence', () => {
+  assert.match(signup, /SIGNUP_RECOVERY_PROBE_ATTEMPTS = 7/);
+  assert.match(signup, /probeAuthoritativeSignupOutcome/);
+  assert.match(signup, /email confirmation is still pending/);
+  assert.match(signup, /could not verify that your account was created/);
+  assert.doesNotMatch(signup, /The account server received your signup request, but confirmation is delayed/);
+});
+
+test('post-auth bootstrap invokes welcome delivery only after founder routing is excluded', () => {
+  assert.match(bootstrap, /ensureWelcomeEmail/);
+  const founderIndex = bootstrap.indexOf('if (isFounderProfile(founderProfile))');
+  const welcomeIndex = bootstrap.indexOf('await ensureWelcomeEmail()');
+  assert.ok(founderIndex >= 0);
+  assert.ok(welcomeIndex > founderIndex);
+});
+
+test('client never supplies recipient identity or personalization fields', () => {
+  assert.match(client, /functions\.invoke\('send-welcome-email',\s*\{\s*body:\s*\{\},?\s*\}\)/);
+  assert.doesNotMatch(client, /email\s*:/);
+  assert.doesNotMatch(client, /displayName\s*:/);
+  assert.doesNotMatch(client, /accountSide\s*:/);
+});
+
+test('server requires confirmed permanent auth and derives recipient from authenticated user', () => {
+  assert.match(edge, /authClient\.auth\.getUser\(\)/);
+  assert.match(edge, /user\.is_anonymous/);
+  assert.match(edge, /user\.email_confirmed_at/);
+  assert.match(edge, /to:\s*user\.email/);
+  assert.match(edge, /user\.user_metadata\?\.welcome_email_version/);
+});
+
+test('welcome delivery is durable and duplicate-resistant', () => {
+  assert.match(edge, /user\.app_metadata\?\.welcome_email/);
+  assert.match(edge, /Idempotency-Key/);
+  assert.match(edge, /sekret-bip-welcome-v\$\{WELCOME_EMAIL_VERSION\}:\$\{user\.id\}/);
+  assert.match(edge, /admin\.auth\.admin\.updateUserById/);
+  assert.match(edge, /status:\s*"already_sent"/);
+});
+
+test('welcome email includes onboarding and public documentation links', () => {
+  assert.match(edge, /what-is-sekret-bip/);
+  assert.match(edge, /how-it-works/);
+  assert.match(edge, /privacy-and-safety/);
+  assert.match(edge, /WELCOME_PUBLIC_ORIGIN/);
+  assert.match(edge, /WELCOME_APP_ORIGIN/);
+  assert.match(edge, /Se'kret Bip is not a diagnosis/);
+});
+
+test('welcome delivery cannot indefinitely block onboarding', () => {
+  assert.match(client, /WELCOME_EMAIL_TIMEOUT_MS = 4_000/);
+  assert.match(client, /Promise\.race\(\[invocation, timeout\]\)/);
+});
+
+test('live proof can refresh disposable mailbox authentication', () => {
+  assert.match(mailbox, /LIVE_MAILTM_PASSWORD/);
+  assert.match(mailbox, /issueMailboxToken/);
+  assert.match(mailbox, /mailboxApi/);
+  assert.match(mailbox, /HTTP 401/);
+});
