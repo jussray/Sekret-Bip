@@ -38,6 +38,22 @@ jobs:
     name: Canon, recovery, bundle, and authorization proof
     runs-on: ubuntu-24.04
     timeout-minutes: 25
+    # Each job gets its own disposable PostgreSQL instance, never a live data store.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: bip_test
+          POSTGRES_PASSWORD: bip_test_ephemeral
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bip_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SEKRET_TEST_PG_URL: postgres://postgres:bip_test_ephemeral@127.0.0.1:5432/bip_test
 
     steps:
       - name: Check out exact pull-request head
@@ -87,6 +103,16 @@ jobs:
         run: |
           set -o pipefail
           npm run lint 2>&1 | tee gate-evidence/lint.log
+
+      - name: Install mandatory real-test tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client ffmpeg
+          psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c 'select version();'
+          ffmpeg -version
+          ffprobe -version
 
       - name: Run complete unit suite
         shell: bash
