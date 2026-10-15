@@ -69,6 +69,31 @@ function randomSecret() {
   return `${crypto.randomBytes(24).toString('base64url')}Aa9!`;
 }
 
+async function issueMailboxToken(address, password) {
+  const { body } = await api('/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ address, password }),
+  });
+  if (!body?.token) throw new Error('Mail.tm token creation returned no token');
+  mask(body.token);
+  return body.token;
+}
+
+async function mailboxApi(path, authState) {
+  try {
+    return await api(path, {
+      headers: { authorization: `Bearer ${authState.token}` },
+    });
+  } catch (error) {
+    if (!String(error).includes('HTTP 401')) throw error;
+    authState.token = await issueMailboxToken(authState.address, authState.password);
+    return api(path, {
+      headers: { authorization: `Bearer ${authState.token}` },
+    });
+  }
+}
+
 function decodeUrlSeparatorsOnce(value) {
   return value.replace(/&(amp|#38);/g, '&');
 }
@@ -151,16 +176,11 @@ async function createMailbox() {
   });
   if (!account?.id) throw new Error('Mail.tm account creation returned no account id');
 
-  const { body: tokenBody } = await api('/token', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: accountPayload,
-  });
-  if (!tokenBody?.token) throw new Error('Mail.tm token creation returned no token');
-  mask(tokenBody.token);
+  const mailboxToken = await issueMailboxToken(address, mailboxPassword);
 
   appendGithubEnv('LIVE_ONBOARDING_EMAIL', address);
-  appendGithubEnv('LIVE_MAILTM_TOKEN', tokenBody.token);
+  appendGithubEnv('LIVE_MAILTM_PASSWORD', mailboxPassword);
+  appendGithubEnv('LIVE_MAILTM_TOKEN', mailboxToken);
   appendGithubEnv('LIVE_MAILTM_ACCOUNT_ID', account.id);
 
   writeJson('live-signup-proof-account.json', {
@@ -187,22 +207,25 @@ async function confirmMailbox() {
     return;
   }
 
-  const token = required('LIVE_MAILTM_TOKEN');
+  const authState = {
+    address,
+    password: required('LIVE_MAILTM_PASSWORD'),
+    token: required('LIVE_MAILTM_TOKEN'),
+  };
   const timeoutMs = Number.parseInt(process.env.LIVE_MAILBOX_TIMEOUT_MS || '120000', 10);
   const pollMs = Number.parseInt(process.env.LIVE_MAILBOX_POLL_MS || '3000', 10);
   const deadline = Date.now() + Math.max(timeoutMs, 30_000);
-  const headers = { authorization: `Bearer ${token}` };
 
   let message = null;
   let confirmationUrl = null;
 
   while (Date.now() < deadline) {
-    const { body: messagesBody } = await api('/messages?page=1', { headers });
+    const { body: messagesBody } = await mailboxApi('/messages?page=1', authState);
     const messages = collectionMembers(messagesBody);
 
     for (const summary of messages) {
       if (!summary?.id) continue;
-      const { body: detail } = await api(`/messages/${encodeURIComponent(summary.id)}`, { headers });
+      const { body: detail } = await mailboxApi(`/messages/${encodeURIComponent(summary.id)}`, authState);
       const url = extractConfirmationUrl(detail);
       if (url) {
         message = detail;
@@ -269,7 +292,7 @@ async function cleanupMailbox() {
   const mode = mailboxMode();
   if (mode === 'bip_routed') {
     writeJson('live-signup-mailbox-cleanup.json', {
-      mailboxProvider: 'Se\'kret Bip Cloudflare Email Routing',
+      mailboxProvider: 'Se\\'kret Bip Cloudflare Email Routing',
       mailboxMode: mode,
       status: 'persistent_owned_alias_not_deleted',
       cleanedAt: new Date().toISOString(),
@@ -278,20 +301,30 @@ async function cleanupMailbox() {
     return;
   }
 
-  const token = process.env.LIVE_MAILTM_TOKEN?.trim();
   const accountId = process.env.LIVE_MAILTM_ACCOUNT_ID?.trim();
-  if (!token || !accountId) {
+  const address = process.env.LIVE_ONBOARDING_EMAIL?.trim();
+  const password = process.env.LIVE_MAILTM_PASSWORD?.trim();
+  let token = process.env.LIVE_MAILTM_TOKEN?.trim();
+  if (!accountId || !address || !password || !token) {
     console.log('No disposable Mail.tm mailbox to clean up.');
     return;
   }
 
-  const response = await fetch(`${API_BASE}/accounts/${encodeURIComponent(accountId)}`, {
-    method: 'DELETE',
-    headers: {
-      authorization: `Bearer ${token}`,
-      'user-agent': 'Sekret-Bip-live-signup-proof/1.0',
-    },
-  });
+  async function remove(currentToken) {
+    return fetch(`${API_BASE}/accounts/${encodeURIComponent(accountId)}`, {
+      method: 'DELETE',
+      headers: {
+        authorization: `Bearer ${currentToken}`,
+        'user-agent': 'Sekret-Bip-live-signup-proof/1.0',
+      },
+    });
+  }
+
+  let response = await remove(token);
+  if (response.status === 401) {
+    token = await issueMailboxToken(address, password);
+    response = await remove(token);
+  }
 
   if (response.status !== 204 && response.status !== 404) {
     throw new Error(`Mail.tm cleanup failed with HTTP ${response.status}`);
