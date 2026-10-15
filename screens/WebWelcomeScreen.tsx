@@ -89,9 +89,11 @@ export function WebWelcomeScreen({
       : heroContract.desktopHeight;
   const worldPulse = useRef(new Animated.Value(0)).current;
   const heroDrift = useRef(new Animated.Value(0)).current;
-  const audienceCopyReveal = useRef(new Animated.Value(1)).current;
-  const audienceHeroReveal = useRef(new Animated.Value(1)).current;
-  const audienceCuesReveal = useRef(new Animated.Value(1)).current;
+  // A first paint at full opacity would flash before the reveal effect starts.
+  const firstFrameReveal = motionEnabled ? 0 : 1;
+  const audienceCopyReveal = useRef(new Animated.Value(firstFrameReveal)).current;
+  const audienceHeroReveal = useRef(new Animated.Value(firstFrameReveal)).current;
+  const audienceCuesReveal = useRef(new Animated.Value(firstFrameReveal)).current;
 
   useEffect(() => {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
