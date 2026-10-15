@@ -21,7 +21,7 @@ export async function resolveGuardianSharingConsent(
   // Modern sb_secret keys are opaque API credentials, not bearer JWTs.
   // Keep legacy service-role JWT support without sending an opaque secret as a JWT.
   const opaqueSecret = serviceKey.startsWith('sb_secret_');
-  const legacyServiceJwt = /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/.test(serviceKey);
+  const legacyServiceJwt = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(serviceKey);
   if (!opaqueSecret && !legacyServiceJwt) return false;
   const headers: Record<string, string> = {
     apikey: serviceKey,

@@ -28,7 +28,7 @@ test('every full-suite caller provisions disposable local Postgres and verifies 
     assert.match(job, /sudo apt-get install -y -qq postgresql-client ffmpeg/);
     assert.match(job, /ffmpeg -version/);
     assert.match(job, /ffprobe -version/);
-    assert.match(job, /CREATE TABLE public\\.guardian_fixture_disposable_sentinel/);
+    assert.match(job, /CREATE TABLE public\.guardian_fixture_disposable_sentinel/);
     assert.match(job, /guardian-consent-disposable-v1/);
     assert.ok(job.indexOf('psql "$SEKRET_TEST_PG_URL"') < job.indexOf('npm test'),
       `Postgres must be available before the complete suite in ${path}`);
