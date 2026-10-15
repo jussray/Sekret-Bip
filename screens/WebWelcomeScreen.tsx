@@ -21,34 +21,34 @@ const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
 const GRID_POSITIONS = ['20%', '40%', '60%', '80%'] as const;
 
-// These are the four existing, approved Higgsfield Element reference images.
-// Keep each image paired with its canonical key in sekret-bip-character-canon/registry.json.
-// CDN delivery is temporary until the exact approved assets are bundled locally;
-// preserve readable roles if the provider is unavailable. No generated substitutes.
+// Approved original character portraits, bundled locally for reliable, private loading.
+// Identity and role authority: sekret-bip-character-canon/registry.json.
+// File-byte fingerprints are enforced by test/dual-front-door-contract.test.mjs.
+// Never substitute generically generated character art.
 const BIP_JR_FRIENDS = [
   {
     key: 'bipjr-spark',
     role: 'The Spark',
     symbol: '✦',
-    imageUri: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/f0af6256-45c4-4364-a1f0-92797fb48c74.png',
+    imageSource: require('../assets/brand/bip-jr/the-spark.png'),
   },
   {
     key: 'bipjr-giggle',
     role: 'The Giggle',
     symbol: '♡',
-    imageUri: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/dc29a783-1197-4d60-acd0-2b1ccafa4cc6.png',
+    imageSource: require('../assets/brand/bip-jr/the-giggle.png'),
   },
   {
     key: 'bipjr-dreamer',
     role: 'The Dreamer',
     symbol: '☾',
-    imageUri: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/c9cc71f9-3a03-43e1-8fbf-648e50afea50.png',
+    imageSource: require('../assets/brand/bip-jr/the-dreamer.png'),
   },
   {
     key: 'bipjr-explorer',
     role: 'The Explorer',
     symbol: '➤',
-    imageUri: 'https://d2ol7oe51mr4n9.cloudfront.net/user_3IxeW2mjocxEfjgv8ruzYWLYsaB/3c2a4339-ea97-427c-b20b-3bb538fa05b5.png',
+    imageSource: require('../assets/brand/bip-jr/the-explorer.png'),
   },
 ] as const;
 
@@ -462,7 +462,7 @@ export function WebWelcomeScreen({
                     ) : (
                       <Image
                         testID={`web-welcome-${friend.key}-portrait`}
-                        source={{ uri: friend.imageUri }}
+                        source={friend.imageSource}
                         resizeMode="contain"
                         style={styles.bipJrFriendPortrait}
                         accessibilityLabel={`Bip Jr, ${friend.role}`}

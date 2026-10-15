@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 
 const welcome = readFileSync('screens/WebWelcomeScreen.tsx', 'utf8');
@@ -67,25 +68,27 @@ test('Bip Jr welcome surfaces exactly the four canon-approved friends without ch
   assert.doesNotMatch(welcome, /createOwnBipJrProfile/);
 });
 
-test('Bip Jr approved portraits keep exact character-to-image mapping', () => {
+test('Bip Jr approved portraits stay bundled, byte-pinned, and correctly mapped', () => {
   const approvedMedia = new Map([
-    ['bipjr-spark', 'f0af6256-45c4-4364-a1f0-92797fb48c74'],
-    ['bipjr-giggle', 'dc29a783-1197-4d60-acd0-2b1ccafa4cc6'],
-    ['bipjr-dreamer', 'c9cc71f9-3a03-43e1-8fbf-648e50afea50'],
-    ['bipjr-explorer', '3c2a4339-ea97-427c-b20b-3bb538fa05b5'],
+    ['bipjr-spark', { path: 'assets/brand/bip-jr/the-spark.png', sha256: '9534c226097e0eaf7ab9b4ad49feddabfcd78417e63583e0714a61aa9f1f0c3b', mediaId: 'f0af6256-45c4-4364-a1f0-92797fb48c74' }],
+    ['bipjr-giggle', { path: 'assets/brand/bip-jr/the-giggle.png', sha256: 'f87a23cf7831932d018f004e58cd10d3172a65b417cdea7bd1d807642984c0e7', mediaId: 'dc29a783-1197-4d60-acd0-2b1ccafa4cc6' }],
+    ['bipjr-dreamer', { path: 'assets/brand/bip-jr/the-dreamer.png', sha256: '034bbd94df748739b4e9be34cae515d8f12d5d249e7fce8231057d20350e203e', mediaId: 'c9cc71f9-3a03-43e1-8fbf-648e50afea50' }],
+    ['bipjr-explorer', { path: 'assets/brand/bip-jr/the-explorer.png', sha256: '7ba97c488741a3448b423a7b7137bf464b845d6aac19ed1b62064af2bfb12959', mediaId: '3c2a4339-ea97-427c-b20b-3bb538fa05b5' }],
   ]);
   const juniorCast = characterCanon.characters.filter(character => character.age_lane === 'bip-jr');
   assert.equal(juniorCast.length, approvedMedia.size);
   for (const character of juniorCast) {
-    const mediaId = approvedMedia.get(character.key);
-    assert.ok(mediaId, `unexpected Bip Jr character: ${character.key}`);
-    assert.match(welcome, new RegExp(`key: '${character.key}'[\\s\\S]*?imageUri: 'https://d2ol7oe51mr4n9\\.cloudfront\\.net/[^']*/${mediaId}\\.png'`));
+    const entry = approvedMedia.get(character.key);
+    assert.ok(entry, `unexpected Bip Jr character: ${character.key}`);
+    assert.match(welcome, new RegExp(`key: '${character.key}'[\\s\\S]*?imageSource: require\\('\\.\\./assets/brand/bip-jr/${entry.path.split('/').at(-1).replace('.', '\\.')}\\'\\)`));
+    const actual = createHash('sha256').update(readFileSync(entry.path)).digest('hex');
+    assert.equal(actual, entry.sha256, `approved original portrait bytes changed: ${character.key}`);
   }
-  assert.match(welcome, /source=\{\{ uri: friend\.imageUri \}\}/);
+  assert.match(welcome, /source=\{friend\.imageSource\}/);
   assert.match(welcome, /onError=\{\(\) => \{/);
   assert.match(welcome, /failedBipJrImages\.has\(friend\.key\)/);
   assert.match(welcome, /BIP_JR_FRIENDS\.map\(friend => \(/);
-  // Only the parent-managed younger welcome is changed: no new child authentication model.
+  assert.doesNotMatch(welcome, /cloudfront\.net/);
   assert.match(welcome, /\{isBipJr && \(/);
   assert.doesNotMatch(welcome, /createOwnBipJrProfile/);
 });
