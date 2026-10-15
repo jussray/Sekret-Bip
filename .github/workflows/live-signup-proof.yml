@@ -29,6 +29,7 @@ on:
       - 'supabase/migrations/20260919190500_parent_link_relationship_only.sql'
       - 'supabase/migrations/20260919190800_teen_age_assurance_authority.sql'
       - 'supabase/migrations/20260919191000_bip_jr_managed_child_profiles.sql'
+      - 'scripts/verify-welcome-guide-links.mjs'
       - 'scripts/live-signup-mailbox.mjs'
       - 'test/live-onboarding-email-gate.test.mjs'
       - 'test/family-account-authority.test.mjs'
@@ -414,6 +415,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Verify public onboarding guide links before live signup
+        run: node scripts/verify-welcome-guide-links.mjs
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
