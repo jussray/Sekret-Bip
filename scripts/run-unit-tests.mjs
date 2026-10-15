@@ -5,6 +5,7 @@ import {
   buildSkipObservation,
   emitSkipObservation,
   parseNodeTapSkip,
+  parseNodeTapTodo,
   resolveHeadSha,
   writeSkipReport,
 } from './control-room-test-skips.mjs';
@@ -51,12 +52,13 @@ function consumeStdout(chunk) {
   const lines = bufferedStdout.split(/\r?\n/);
   bufferedStdout = lines.pop() || '';
   for (const line of lines) {
-    const parsed = parseNodeTapSkip(line);
+    const parsed = parseNodeTapSkip(line) ?? parseNodeTapTodo(line);
     if (!parsed) continue;
     const key = `${parsed.testId}\u0000${parsed.reason}`;
     if (seenTap.has(key)) continue;
     seenTap.add(key);
     observations.push(buildSkipObservation({
+      classification: /#\s*TODO\b/i.test(line) ? 'todo_unexecuted' : null,
       runner: 'node_test',
       command,
       testId: parsed.testId,
@@ -95,7 +97,9 @@ child.on('close', (status) => {
   });
   console.log(`CONTROL_ROOM_TEST_SKIP_SUMMARY count=${observations.length} report=${path.relative(root, reportPath)}`);
   if (observations.length > 0) {
-    console.warn('CONTROL_ROOM_TEST_SKIPS_REQUIRE_INVESTIGATION: skipped tests do not satisfy complete proof.');
+    console.error('CONTROL_ROOM_TEST_SKIPS_REQUIRE_INVESTIGATION: skipped and TODO tests block complete proof.');
+    console.error('CONTROL_ROOM_NO_SKIPS_GATE_FAILED: all discovered tests must execute and pass.');
   }
-  process.exit(typeof status === 'number' ? status : 1);
+  // A passing Node process with skipped/TODO tests is not a passing CI check.
+  process.exit(typeof status === 'number' && status !== 0 ? status : observations.length > 0 ? 1 : (status ?? 1));
 });
