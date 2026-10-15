@@ -3,6 +3,13 @@ on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
 permissions: {}
+
+# A newer PR head supersedes older continuity runs. Cancel superseded work;
+# never reinterpret HEAD_MOVED as successful proof.
+concurrency:
+  group: pr-continuity-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   exact-head-audit:
     name: PR Continuity Exact-Head Gate
