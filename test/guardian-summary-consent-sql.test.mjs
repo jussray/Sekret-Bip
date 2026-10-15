@@ -18,6 +18,15 @@ test('guardian consent migration satisfies the authorization matrix on Postgres'
     const target = new URL(url);
     assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname),
       'Guardian test SQL is destructive to its target: a local isolated Postgres instance is mandatory');
+    assert.equal(target.pathname, '/bip_test', 'Guardian test SQL requires the dedicated bip_test database');
+    // The fixture drops tables. Confirm that this is an explicitly provisioned,
+    // disposable test database before any reset SQL can run.
+    const probe = spawnSync('psql', [
+      url, '-At', '-v', 'ON_ERROR_STOP=1', '-c',
+      "select count(*) from public.guardian_fixture_disposable_sentinel where marker = 'guardian-consent-disposable-v1'",
+    ], { encoding: 'utf8' });
+    assert.equal(probe.status, 0, 'Missing disposable-database sentinel; refusing destructive guardian fixture');
+    assert.equal(probe.stdout.trim(), '1', 'Disposable-database sentinel must match before reset');
     for (const file of files) {
       const run = spawnSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-f', file], { encoding: 'utf8' });
       assert.equal(run.status, 0, `${path.basename(file)} failed:\n${run.stderr || run.stdout}`);

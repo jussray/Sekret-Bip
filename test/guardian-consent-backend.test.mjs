@@ -30,7 +30,8 @@ test('guardian-consent lookup is bounded and fail-closed on timeout', () => {
   assert.match(guardianConsentSource, /signal:\s*AbortSignal\.timeout\(1000\)/);
   assert.doesNotMatch(guardianConsentSource, /setTimeout\(/);
 });
-const KEY = 'test-service-key';
+const KEY = 'synthetic.jwt.signature';
+const OPAQUE_KEY = 'sb_secret_synthetic_ci_only';
 const USER = '00000000-0000-4000-8000-000000000001';
 let mode = 'true';
 const calls = [];
@@ -70,6 +71,30 @@ test('verified user id is the only value sent to the server-only RPC', async () 
   assert.equal(calls[0].apikey, KEY);
   assert.equal(calls[0].auth, `Bearer ${KEY}`);
   assert.deepEqual(calls[0].body, { p_teen_user_id: USER });
+});
+
+test('opaque sb_secret credential is never sent in a bearer Authorization header', async () => {
+  calls.length = 0;
+  const allowed = await resolveGuardianSharingConsent(
+    { SUPABASE_URL: url, SUPABASE_SECRET_KEY: OPAQUE_KEY, SUPABASE_SERVICE_ROLE_KEY: KEY },
+    { kind: 'user', userId: USER },
+  );
+  assert.equal(allowed, true);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].apikey, OPAQUE_KEY);
+  assert.equal(calls[0].auth, undefined);
+  assert.deepEqual(calls[0].body, { p_teen_user_id: USER });
+});
+
+test('unrecognized or publishable credentials fail closed without sending any request', async () => {
+  calls.length = 0;
+  for (const bad of ['invalid-key', 'sb_publishable_not_a_secret']) {
+    assert.equal(await resolveGuardianSharingConsent(
+      { SUPABASE_URL: url, SUPABASE_SECRET_KEY: bad },
+      { kind: 'user', userId: USER },
+    ), false);
+  }
+  assert.equal(calls.length, 0);
 });
 
 test('shared-token and missing configuration fail closed without a request', async () => {

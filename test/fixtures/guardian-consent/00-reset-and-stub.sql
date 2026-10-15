@@ -1,4 +1,19 @@
 \set ON_ERROR_STOP on
+-- Fail closed even if this destructive fixture is invoked directly through psql.
+do $fixture_sentinel$
+begin
+  if current_database() <> 'bip_test'
+     or to_regclass('public.guardian_fixture_disposable_sentinel') is null then
+    raise exception 'guardian consent fixtures require a dedicated disposable database';
+  end if;
+  if not exists (
+    select 1 from public.guardian_fixture_disposable_sentinel
+    where marker = 'guardian-consent-disposable-v1'
+  ) then
+    raise exception 'guardian consent fixture sentinel mismatch';
+  end if;
+end
+$fixture_sentinel$;
 drop table if exists public.guardian_summary_consents cascade;
 drop table if exists public.parent_links cascade;
 drop function if exists public.set_guardian_summary_consent(boolean);

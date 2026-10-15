@@ -68,6 +68,7 @@ jobs:
           psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c 'select current_database();'
           ffmpeg -version
           ffprobe -version
+          psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c "CREATE TABLE public.guardian_fixture_disposable_sentinel (marker text primary key); INSERT INTO public.guardian_fixture_disposable_sentinel (marker) VALUES ('guardian-consent-disposable-v1');"
       - name: Run unit tests with concise failure evidence
         shell: bash
         run: |

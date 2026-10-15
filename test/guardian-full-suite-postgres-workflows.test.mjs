@@ -28,8 +28,12 @@ test('every full-suite caller provisions disposable local Postgres and verifies 
     assert.match(job, /sudo apt-get install -y -qq postgresql-client ffmpeg/);
     assert.match(job, /ffmpeg -version/);
     assert.match(job, /ffprobe -version/);
+    assert.match(job, /CREATE TABLE public\\.guardian_fixture_disposable_sentinel/);
+    assert.match(job, /guardian-consent-disposable-v1/);
     assert.ok(job.indexOf('psql "$SEKRET_TEST_PG_URL"') < job.indexOf('npm test'),
       `Postgres must be available before the complete suite in ${path}`);
+    assert.ok(job.indexOf('guardian_fixture_disposable_sentinel') < job.indexOf('npm test'),
+      `Disposable-database sentinel must exist before the complete suite in ${path}`);
     assert.ok(job.indexOf('ffprobe -version') < job.indexOf('npm test'),
       `FFprobe must be available before the complete suite in ${path}`);
     assert.ok(!job.includes('SUPABASE_SERVICE_ROLE_KEY'), `Do not access production credentials in ${path}`);
