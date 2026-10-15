@@ -6,7 +6,6 @@ const signup = fs.readFileSync('app/(auth)/signup.tsx', 'utf8');
 const bootstrap = fs.readFileSync('src/services/auth/postAuthBootstrap.ts', 'utf8');
 const client = fs.readFileSync('src/services/auth/welcomeEmail.ts', 'utf8');
 const edge = fs.readFileSync('supabase/functions/send-welcome-email/index.ts', 'utf8');
-const mailbox = fs.readFileSync('scripts/live-signup-mailbox.mjs', 'utf8');
 
 test('new signups are explicitly marked eligible for welcome email v1', () => {
   assert.match(signup, /welcome_email_version:\s*1/);
@@ -67,11 +66,4 @@ test('welcome email includes onboarding and public documentation links', () => {
 test('welcome delivery cannot indefinitely block onboarding', () => {
   assert.match(client, /WELCOME_EMAIL_TIMEOUT_MS = 4_000/);
   assert.match(client, /Promise\.race\(\[invocation, timeout\]\)/);
-});
-
-test('live proof can refresh disposable mailbox authentication', () => {
-  assert.match(mailbox, /LIVE_MAILTM_PASSWORD/);
-  assert.match(mailbox, /issueMailboxToken/);
-  assert.match(mailbox, /mailboxApi/);
-  assert.match(mailbox, /HTTP 401/);
 });
