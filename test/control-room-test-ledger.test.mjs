@@ -281,7 +281,10 @@ test('fails closed when a stable terminal exact-head check failed', () => {
 test('blocks skipped exact-head checks even when every other check passed', () => {
   const checks = selectLatestChecks([
     check({name: 'Repository Truth Gate'}),
-    check({id: 2, name: 'Supabase Preview', conclusion: 'skipped'}),
+    check({id: 2, name: 'Supabase Preview', conclusion: 'skipped',
+      app: {slug: 'supabase', name: 'Supabase'},
+      details_url: `https://supabase.com/dashboard/project/${BIP_SUPABASE}/branches`,
+    }),
   ], SHA);
   const ledger = buildTestLedger({
     repository: 'jussray/Sekret-Bip',
