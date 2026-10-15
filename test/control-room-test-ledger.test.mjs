@@ -345,6 +345,27 @@ test('canonical skipped Supabase provider preview requires successful exact-head
   assert.equal(assertLedgerMergeReady(ledger), ledger);
 });
 
+test('neutral canonical Supabase preview cannot inherit a skipped preview waiver', () => {
+  const checks = selectLatestChecks([
+    check({
+      name: 'Supabase Preview',
+      conclusion: 'neutral',
+      app: {slug: 'supabase', name: 'Supabase'},
+      details_url: `https://supabase.com/dashboard/project/${BIP_SUPABASE}/branches`,
+    }),
+    check({id: 2, name: 'Replay migrations from empty local database'}),
+  ], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks, observerState: 'stable',
+  });
+
+  const preview = ledger.checks.find((item) => item.name === 'Supabase Preview');
+  assert.equal(preview?.conclusion, 'neutral');
+  assert.equal(preview?.proofDisposition, 'blocking-skip');
+  assert.equal(ledger.aggregate.state, 'failed');
+  assert.throws(() => assertLedgerMergeReady(ledger), /Skipped or neutral exact-head checks/);
+});
+
 test('skipped Supabase preview remains blocking when exact-head replay did not pass', () => {
   const checks = selectLatestChecks([
     check({
