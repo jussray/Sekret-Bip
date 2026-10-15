@@ -223,6 +223,36 @@ async function rewriteStyledJsonResponse(
   }
 }
 
+async function enforceServerOwnedSafetySharing(
+  response: Response,
+  env: Env,
+  principal: Principal,
+  consentWasChecked: boolean,
+  guardianSharingEnabled: boolean,
+  cors: Record<string, string>,
+): Promise<Response> {
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return response;
+  let data: Record<string, unknown>;
+  try {
+    data = await response.clone().json() as Record<string, unknown>;
+  } catch {
+    return response;
+  }
+  // A model flag alone never authorizes disclosure. The only allowed safety
+  // summary is the fixed, non-verbatim message after server-verified consent.
+  if (data.safetyFlag !== true) return response;
+  const permitted = principal.kind === 'user'
+    && (consentWasChecked
+      ? guardianSharingEnabled
+      : await resolveGuardianSharingConsent(env, principal));
+  return json({
+    ...data,
+    parentShareSummary: permitted
+      ? 'Safety concern: teen may need trusted adult or emergency support.'
+      : null,
+  }, response.status, cors);
+}
+
 function prepareStyledReply(
   request: Request,
   body: Record<string, unknown>,
@@ -450,7 +480,10 @@ export default {
         env as { OPENAI_API_KEY: string },
         companionPrincipal,
       );
-      return rewriteStyledJsonResponse(delegated, prepared.style, cors);
+      const styled = await rewriteStyledJsonResponse(delegated, prepared.style, cors);
+      return enforceServerOwnedSafetySharing(
+        styled, env, principal, needsGuardianConsent, guardianSharingEnabled, cors,
+      );
     }
 
     const fallback = await worker.fetch(request, env as { OPENAI_API_KEY: string }, principal);

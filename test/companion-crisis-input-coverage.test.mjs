@@ -99,6 +99,36 @@ test('client safety delegates to the shared policy', () => {
   assert.equal(safety.isCrisisInput(42), false);
 });
 
+test('contextual danger wording does not escalate benign educational or fictional uses', () => {
+  const safe = [
+    'The game says run away from the monster',
+    'We learned about abuse in class',
+    'I am no longer in danger',
+    'I am not in danger',
+    'This chapter describes an emergency response',
+    'A fictional character ran away',
+  ];
+  for (const text of safe) {
+    assert.equal(policy.isCrisisText(text), false, text);
+    assert.equal(safety.isCrisisInput(text), false, text);
+  }
+});
+
+test('contextual current danger wording still activates shared safety rules', () => {
+  const relevant = [
+    'i am in danger',
+    'i feel in danger',
+    'i am being abused',
+    'there was an assault',
+    'this is an emergency',
+    'i want to run away from home',
+  ];
+  for (const text of relevant) {
+    assert.equal(policy.isCrisisText(text), true, text);
+    assert.equal(safety.isCrisisInput(text), true, text);
+  }
+});
+
 test('client and companion import the shared policy and keep no local regex copy', () => {
   const worker = readFileSync('worker/sekret-reply.ts', 'utf8');
   const client = readFileSync('services/sekretSafety.ts', 'utf8');

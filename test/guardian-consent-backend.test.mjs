@@ -26,6 +26,17 @@ execFileSync(tsc, [
 const { resolveGuardianSharingConsent } = require(path.join(out, 'worker', 'guardian-consent.js'));
 const guardianConsentSource = readFileSync('worker/guardian-consent.ts', 'utf8');
 
+test('late model safety flags trigger server-owned permission checks with generic summaries', () => {
+  const workerSource = readFileSync('worker/index.ts', 'utf8');
+  assert.match(workerSource, /async function enforceServerOwnedSafetySharing/);
+  assert.match(workerSource, /data\\.safetyFlag !== true/);
+  assert.match(workerSource, /await resolveGuardianSharingConsent\\(env, principal\\)/);
+  assert.match(workerSource, /parentShareSummary: permitted/);
+  assert.match(workerSource, /Safety concern: teen may need trusted adult or emergency support\\./);
+  assert.match(workerSource, /return enforceServerOwnedSafetySharing\\(/);
+  assert.doesNotMatch(workerSource, /parentShareSummary: (?:userText|body\\.userText)/);
+});
+
 test('guardian-consent lookup is bounded and fail-closed on timeout', () => {
   assert.match(guardianConsentSource, /signal:\s*AbortSignal\.timeout\(1000\)/);
   assert.doesNotMatch(guardianConsentSource, /setTimeout\(/);
