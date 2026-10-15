@@ -131,7 +131,7 @@ test('selected foreign Supabase check records explicit blocked authority evidenc
 test('aggregates failed, pending, warning, unknown, and passed distinctly', () => {
   assert.equal(aggregateTestLedger([]).state, 'unknown');
   assert.equal(aggregateTestLedger([{state: 'passed'}]).state, 'passed');
-  assert.equal(aggregateTestLedger([{state: 'passed'}, {state: 'skipped'}]).state, 'warning');
+  assert.equal(aggregateTestLedger([{state: 'passed'}, {state: 'skipped'}]).state, 'failed');
   assert.equal(aggregateTestLedger([{state: 'running'}]).state, 'pending');
   assert.equal(aggregateTestLedger([{state: 'failed'}, {state: 'passed'}]).state, 'failed');
 });
@@ -278,7 +278,7 @@ test('fails closed when a stable terminal exact-head check failed', () => {
   );
 });
 
-test('allows stable terminal success with intentionally skipped checks', () => {
+test('blocks skipped exact-head checks even when every other check passed', () => {
   const checks = selectLatestChecks([
     check({name: 'Repository Truth Gate'}),
     check({id: 2, name: 'Supabase Preview', conclusion: 'skipped'}),
@@ -292,8 +292,30 @@ test('allows stable terminal success with intentionally skipped checks', () => {
     observerState: 'stable',
   });
 
-  assert.equal(ledger.aggregate.state, 'warning');
-  assert.equal(assertLedgerMergeReady(ledger), ledger);
+  assert.equal(ledger.aggregate.counts.skipped, 1);
+  assert.equal(ledger.aggregate.state, 'failed');
+  assert.throws(
+    () => assertLedgerMergeReady(ledger),
+    /Skipped or neutral exact-head checks are prohibited \(1\): supabase:Supabase Preview/,
+  );
+});
+
+test('neutral checks also block merge, while an all-passed ledger remains eligible', () => {
+  const neutralChecks = selectLatestChecks([
+    check({name: 'Security Scan', conclusion: 'neutral'}),
+  ], SHA);
+  const blocked = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks: neutralChecks, observerState: 'stable',
+  });
+  assert.equal(blocked.aggregate.state, 'failed');
+  assert.throws(() => assertLedgerMergeReady(blocked), /Skipped or neutral exact-head checks/);
+
+  const passed = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA,
+    checks: selectLatestChecks([check()], SHA), observerState: 'stable',
+  });
+  assert.equal(passed.aggregate.counts.skipped, 0);
+  assert.equal(assertLedgerMergeReady(passed), passed);
 });
 
 test('classifies only evidenced 403 rate limits as retryable', () => {
