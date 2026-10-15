@@ -225,8 +225,11 @@ Deno.serve(async (req: Request) => {
   );
   const copy = buildWelcomeCopy({ displayName, side, publicOrigin, appOrigin });
 
-  const providerResponse = await fetch("https://api.resend.com/emails", {
+  let providerResponse: Response;
+  try {
+    providerResponse = await fetch("https://api.resend.com/emails", {
     method: "POST",
+    signal: AbortSignal.timeout(2_500),
     headers: {
       authorization: `Bearer ${resendApiKey}`,
       "content-type": "application/json",
@@ -245,6 +248,10 @@ Deno.serve(async (req: Request) => {
       ],
     }),
   });
+  } catch {
+    console.error("[send-welcome-email] provider request failed");
+    return json({ error: "provider_unavailable" }, 502);
+  }
 
   const providerPayload = await providerResponse.json().catch(() => null);
   if (!providerResponse.ok) {
