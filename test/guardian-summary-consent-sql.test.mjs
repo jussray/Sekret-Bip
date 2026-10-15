@@ -12,8 +12,12 @@ const files = [
 ];
 
 test('guardian consent migration satisfies the authorization matrix on Postgres',
-  { skip: url ? false : 'SEKRET_TEST_PG_URL not set: disposable Postgres required' },
+  {},
   () => {
+    assert.ok(url, 'SEKRET_TEST_PG_URL is required; provision a disposable LOCAL Postgres instance');
+    const target = new URL(url);
+    assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname),
+      'Guardian test SQL is destructive to its target: a local isolated Postgres instance is mandatory');
     for (const file of files) {
       const run = spawnSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-f', file], { encoding: 'utf8' });
       assert.equal(run.status, 0, `${path.basename(file)} failed:\n${run.stderr || run.stdout}`);
