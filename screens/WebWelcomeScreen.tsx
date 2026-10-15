@@ -440,43 +440,6 @@ export function WebWelcomeScreen({
             </Animated.View>
           </View>
 
-          {isBipJr && (
-            <View
-              testID="web-welcome-bip-jr-cast"
-              accessible
-              accessibilityLabel="Four Bip Jr friends: The Spark, The Giggle, The Dreamer, and The Explorer"
-              style={styles.bipJrCast}
-            >
-              <Text style={styles.bipJrCastHeading}>Four little friends. One cozy world.</Text>
-              <View style={styles.bipJrCastRow}>
-                {BIP_JR_FRIENDS.map(friend => (
-                  <View
-                    key={friend.key}
-                    testID={`web-welcome-${friend.key}`}
-                    accessible={false}
-                    importantForAccessibility="no-hide-descendants"
-                    style={styles.bipJrFriend}
-                  >
-                    {failedBipJrImages.has(friend.key) ? (
-                      <Text style={styles.bipJrFriendSymbol}>{friend.symbol}</Text>
-                    ) : (
-                      <Image
-                        testID={`web-welcome-${friend.key}-portrait`}
-                        source={friend.imageSource}
-                        resizeMode="contain"
-                        style={styles.bipJrFriendPortrait}
-                        accessibilityLabel={`Bip Jr, ${friend.role}`}
-                        onError={() => {
-                          setFailedBipJrImages(current => new Set([...current, friend.key]));
-                        }}
-                      />
-                    )}
-                    <Text style={styles.bipJrFriendRole}>{friend.role}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
 
           <View
             testID="web-welcome-world-cues"
@@ -539,6 +502,45 @@ export function WebWelcomeScreen({
           >
             <Text style={styles.audienceSwitchText}>{copy.switchText}</Text>
           </Pressable>
+
+          {/* Keep entry, sign-in, and audience switching before the cast gallery on phones. */}
+          {isBipJr && (
+            <View
+              testID="web-welcome-bip-jr-cast"
+              accessible
+              accessibilityLabel="Four Bip Jr friends: The Spark, The Giggle, The Dreamer, and The Explorer"
+              style={styles.bipJrCast}
+            >
+              <Text style={styles.bipJrCastHeading}>Four little friends. One cozy world.</Text>
+              <View style={styles.bipJrCastRow}>
+                {BIP_JR_FRIENDS.map(friend => (
+                  <View
+                    key={friend.key}
+                    testID={`web-welcome-${friend.key}`}
+                    accessible={false}
+                    importantForAccessibility="no-hide-descendants"
+                    style={styles.bipJrFriend}
+                  >
+                    {failedBipJrImages.has(friend.key) ? (
+                      <Text style={styles.bipJrFriendSymbol}>{friend.symbol}</Text>
+                    ) : (
+                      <Image
+                        testID={`web-welcome-${friend.key}-portrait`}
+                        source={friend.imageSource}
+                        resizeMode="contain"
+                        style={styles.bipJrFriendPortrait}
+                        accessibilityLabel={`Bip Jr, ${friend.role}`}
+                        onError={() => {
+                          setFailedBipJrImages(current => new Set([...current, friend.key]));
+                        }}
+                      />
+                    )}
+                    <Text style={styles.bipJrFriendRole}>{friend.role}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
         </ScrollView>
       </View>
     </View>

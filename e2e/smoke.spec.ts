@@ -112,6 +112,41 @@ test('web welcome Bip Jr renders the four approved portraits on mobile', async (
   await page.screenshot({ path: 'test-results/front-door-bip-jr-four-portraits.png', fullPage: true, animations: 'disabled' });
 });
 
+test('web welcome Bip Jr keeps the entry action above the character gallery on a 390px phone', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'domcontentloaded' });
+  const enter = page.getByTestId('web-welcome-enter');
+  const gallery = page.getByTestId('web-welcome-bip-jr-cast');
+  await expect(enter).toBeVisible({ timeout: 30_000 });
+  await expect(gallery).toBeAttached();
+  const entryBox = await enter.boundingBox();
+  const galleryBox = await gallery.boundingBox();
+  expect(entryBox).not.toBeNull();
+  expect(galleryBox).not.toBeNull();
+  expect(entryBox!.y + entryBox!.height).toBeLessThanOrEqual(844);
+  expect(galleryBox!.y).toBeGreaterThanOrEqual(entryBox!.y + entryBox!.height);
+});
+
+test('web welcome Bip Jr keeps approved role text when one bundled portrait fails', async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const blocked: string[] = [];
+  await page.route(/the-spark[^/]*\.png(?:\?.*)?$/, async route => {
+    blocked.push(route.request().url());
+    await route.abort('failed');
+  });
+  await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'domcontentloaded' });
+  const spark = page.getByTestId('web-welcome-bipjr-spark');
+  await expect(spark).toBeAttached({ timeout: 30_000 });
+  await expect(spark.getByText('✦', { exact: true })).toBeVisible({ timeout: 25_000 });
+  await expect(spark.getByText('The Spark', { exact: true })).toBeVisible();
+  expect(blocked.length).toBeGreaterThan(0);
+  for (const key of ['giggle', 'dreamer', 'explorer']) {
+    await expect(page.getByTestId(`web-welcome-bipjr-${key}-portrait`)).toBeAttached();
+  }
+});
+
 test('web welcome hero safe area keeps the primary action below Bip Jr artwork', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?bipDevAudience=bip-jr');
