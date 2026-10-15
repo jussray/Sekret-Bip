@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const transport = readFileSync('src/services/backend/sekretClient.ts', 'utf8');
 const legacyApi = readFileSync('src/utils/api.ts', 'utf8');
 const worker = readFileSync('worker/sekret-reply.ts', 'utf8');
+const router = readFileSync('worker/index.ts', 'utf8');
 
 test('typed transport strips client guardian-sharing authority before network send', () => {
   assert.match(transport, /delete sanitized\.parentSharingEnabled/);
@@ -18,4 +19,13 @@ test('legacy profile-side helper no longer derives guardian-sharing authority', 
 test('companion Worker authorizes guardian sharing only from the server principal', () => {
   assert.match(worker, /principal\?\.kind === ['"]user['"] && principal\.guardianSharingEnabled === true/);
   assert.doesNotMatch(worker, /body\.parentSharingEnabled\s*===\s*true/);
+});
+
+test('ordinary guardian summaries stay confined to the Bridge surface', () => {
+  assert.match(worker, /parentSharingEnabled = surface === ['"]parentBridge['"] && guardianSharingEnabled/);
+});
+
+test('privileged consent lookup runs only for Bridge or high-risk safety routing', () => {
+  assert.match(router, /needsGuardianConsent = replySurface === ['"]parentBridge['"] \|\| isCrisisText\(userText\)/);
+  assert.match(router, /needsGuardianConsent[\s\S]*resolveGuardianSharingConsent\(env, principal\)[\s\S]*:\s*false/);
 });
