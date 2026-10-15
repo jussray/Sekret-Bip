@@ -14,6 +14,7 @@ type HookPayload = {
   user: {
     id: string;
     email?: string | null;
+    new_email?: string | null;
   };
   email_data: {
     token?: string | null;
@@ -169,69 +170,162 @@ Deno.serve(async (req: Request) => {
     return hookError(401, "invalid_webhook_signature");
   }
 
-  const recipient = hook.user?.email?.trim();
-  const action = hook.email_data?.email_action_type?.trim() || "verification";
-  const tokenHash =
-    hook.email_data?.token_hash?.trim()
-    || hook.email_data?.token_hash_new?.trim()
-    || null;
-  const token =
-    hook.email_data?.token?.trim()
-    || hook.email_data?.token_new?.trim()
-    || null;
-  const redirectTo = hook.email_data?.redirect_to?.trim() || null;
+  const action = hook.email_data?.email_action_type?.trim() || "";
+  const userId = hook.user?.id?.trim();
+  const currentEmail = hook.user?.email?.trim() || null;
+  const newEmail = hook.user?.new_email?.trim() || null;
+  const data = hook.email_data;
+  const redirectTo = data?.redirect_to?.trim() || null;
+  const tokenHash = data?.token_hash?.trim() || null;
+  const tokenHashNew = data?.token_hash_new?.trim() || null;
+  const token = data?.token?.trim() || null;
+  const tokenNew = data?.token_new?.trim() || null;
 
-  if (!recipient || !hook.user?.id || !tokenHash) {
+  // Supabase's field names are intentionally counterintuitive:
+  // token_hash_new + token belong to the CURRENT email address;
+  // token_hash + token_new belong to the NEW email address.
+  // Keep recipients and tokens paired to avoid leaking either confirmation.
+  const notifications: Record<string, { subject: string; intro: string }> = {
+    password_changed_notification: {
+      subject: "Your Se'kret Bip password was changed",
+      intro: "Your Se'kret Bip account password was changed.",
+    },
+    email_changed_notification: {
+      subject: "Your Se'kret Bip email was changed",
+      intro: "Your Se'kret Bip account email address was changed.",
+    },
+    phone_changed_notification: {
+      subject: "Your Se'kret Bip phone was changed",
+      intro: "Your Se'kret Bip account phone number was changed.",
+    },
+    identity_linked_notification: {
+      subject: "A sign-in method was linked to Se'kret Bip",
+      intro: "A sign-in method was linked to your Se'kret Bip account.",
+    },
+    identity_unlinked_notification: {
+      subject: "A sign-in method was removed from Se'kret Bip",
+      intro: "A sign-in method was removed from your Se'kret Bip account.",
+    },
+    mfa_factor_enrolled_notification: {
+      subject: "A verification method was added to Se'kret Bip",
+      intro: "A verification method was added to your Se'kret Bip account.",
+    },
+    mfa_factor_unenrolled_notification: {
+      subject: "A verification method was removed from Se'kret Bip",
+      intro: "A verification method was removed from your Se'kret Bip account.",
+    },
+  };
+  const verificationActions = new Set([
+    "signup", "recovery", "invite", "magiclink", "email",
+    "email_change", "reauthentication",
+  ]);
+
+  if (!userId || !action || (!verificationActions.has(action) && !notifications[action])) {
     return hookError(400, "invalid_hook_payload");
   }
 
-  const verifyUrl = buildVerifyUrl(supabaseUrl, tokenHash, action, redirectTo);
-  const subject = subjectFor(action);
-  const intro = introFor(action);
-  const safeUrl = escapeHtml(verifyUrl);
-  const safeToken = token ? escapeHtml(token) : null;
+  type OutboundEmail = {
+    recipient: string;
+    code: string | null;
+    hash: string | null;
+    subject: string;
+    intro: string;
+  };
+  const planned: OutboundEmail[] = [];
 
-  const text = [
-    intro,
-    "",
-    verifyUrl,
-    ...(token ? ["", `Verification code: ${token}`] : []),
-    "",
-    "If you did not request this, you can ignore this email.",
-  ].join("\n");
-
-  const html = [
-    `<p>${escapeHtml(intro)}</p>`,
-    `<p><a href="${safeUrl}">Continue securely</a></p>`,
-    ...(safeToken ? [`<p>Verification code: <strong>${safeToken}</strong></p>`] : []),
-    "<p>If you did not request this, you can ignore this email.</p>",
-  ].join("");
-
-  const providerResponse = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${resendApiKey}`,
-      "content-type": "application/json",
-      "Idempotency-Key": `sekret-bip-auth:${action}:${hook.user.id}:${tokenHash.slice(0, 24)}`,
-    },
-    body: JSON.stringify({
-      from,
-      to: recipient,
-      subject,
-      text,
-      html,
-      tags: [
-        { name: "kind", value: "auth" },
-        { name: "action", value: action.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) },
-      ],
-    }),
-  });
-
-  if (!providerResponse.ok) {
-    console.error("[send-auth-email] provider rejected request", {
-      status: providerResponse.status,
+  if (action === "email_change") {
+    if (!newEmail || !tokenHash || (tokenHashNew && !currentEmail)) {
+      return hookError(400, "invalid_email_change_payload");
+    }
+    if (tokenHashNew && currentEmail) {
+      planned.push({
+        recipient: currentEmail,
+        code: token,
+        hash: tokenHashNew,
+        subject: subjectFor(action),
+        intro: introFor(action),
+      });
+    }
+    planned.push({
+      recipient: newEmail,
+      code: tokenHashNew ? tokenNew : (tokenNew || token),
+      hash: tokenHash,
+      subject: subjectFor(action),
+      intro: introFor(action),
     });
-    return hookError(502, "provider_rejected");
+  } else if (notifications[action]) {
+    if (!currentEmail) return hookError(400, "invalid_hook_payload");
+    planned.push({
+      recipient: currentEmail,
+      code: null,
+      hash: null,
+      ...notifications[action],
+    });
+  } else {
+    if (!currentEmail || !tokenHash) return hookError(400, "invalid_hook_payload");
+    planned.push({
+      recipient: currentEmail,
+      code: token,
+      hash: tokenHash,
+      subject: subjectFor(action),
+      intro: introFor(action),
+    });
+  }
+
+  // Resend idempotency keys make partial two-email retries safe.
+  for (const message of planned) {
+    const verifyUrl = message.hash
+      ? buildVerifyUrl(supabaseUrl, message.hash, action, redirectTo)
+      : null;
+    const text = [
+      message.intro,
+      ...(verifyUrl ? ["", verifyUrl] : []),
+      ...(message.code ? ["", `Verification code: ${message.code}`] : []),
+      "",
+      "If you did not request this, review your account security.",
+    ].join("\\n");
+    const html = [
+      `<p>${escapeHtml(message.intro)}</p>`,
+      ...(verifyUrl
+        ? [`<p><a href="${escapeHtml(verifyUrl)}">Continue securely</a></p>`]
+        : []),
+      ...(message.code
+        ? [`<p>Verification code: <strong>${escapeHtml(message.code)}</strong></p>`]
+        : []),
+      "<p>If you did not request this, review your account security.</p>",
+    ].join("");
+    let providerResponse: Response;
+    try {
+      providerResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${resendApiKey}`,
+          "content-type": "application/json",
+          "Idempotency-Key": `sekret-bip-auth:${action}:${userId}:${(message.hash || "notice").slice(0, 24)}`,
+        },
+        body: JSON.stringify({
+          from,
+          to: message.recipient,
+          subject: message.subject,
+          text,
+          html,
+          tags: [
+            { name: "kind", value: "auth" },
+            { name: "action", value: action.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 64) },
+          ],
+        }),
+      });
+    } catch {
+      console.error("[send-auth-email] provider request failed");
+      return hookError(502, "provider_unavailable");
+    }
+
+    if (!providerResponse.ok) {
+      console.error("[send-auth-email] provider rejected request", {
+        status: providerResponse.status,
+      });
+      return hookError(502, "provider_rejected");
+    }
   }
 
   return json({});
