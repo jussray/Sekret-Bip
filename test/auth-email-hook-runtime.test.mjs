@@ -171,14 +171,25 @@ test('provider requests include a bounded cancellation signal', async () => {
 
 test('secure email change dispatches to both addresses concurrently', async () => {
   let finishFirst;
+  let markFirstStarted;
   const first = new Promise((resolve) => { finishFirst = resolve; });
-  const h = harness(async (index) => index === 1 ? first : new Response('{}', { status: 200 }));
+  const firstStarted = new Promise((resolve) => { markFirstStarted = resolve; });
+  const h = harness(async (index) => {
+    if (index === 1) {
+      markFirstStarted();
+      return first;
+    }
+    return new Response('{}', { status: 200 });
+  });
   const pending = h.invoke(payload('email_change', {
     user: { new_email: 'new@example.org' },
     email_data: { token_hash_new: 'old-hash', token_hash: 'new-hash' },
   }));
   try {
-    await Promise.resolve();
+    await Promise.race([
+      firstStarted,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('provider request never started')), 1000)),
+    ]);
     await Promise.resolve();
     assert.equal(h.sent.length, 2);
   } finally {
