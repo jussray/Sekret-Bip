@@ -171,6 +171,7 @@ export function classifyProofDisposition(check, allChecks = []) {
   if (
     check?.app === 'supabase'
     && check?.name === 'Supabase Preview'
+    && check?.conclusion === 'skipped'
     && check?.providerAuthority === 'canonical-target'
     && allChecks.some((candidate) =>
       candidate?.app === 'github-actions'
