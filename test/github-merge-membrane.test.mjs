@@ -160,7 +160,7 @@ test('isolated HTTP/PostgREST contract is mandatory even for docs-only changes',
     expectedSha: SHA,
   });
   assert.equal(missing.ready, false);
-  assert.ok(missing.missing.some(item => item.name === name));
+  assert.ok(missing.missing.includes(name));
 });
 
 test('docs-only changes require the universal machine membrane without inventing Playwright work', () => {
