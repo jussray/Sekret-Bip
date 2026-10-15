@@ -60,14 +60,16 @@ test('opaque 504 signup responses require durable auth evidence', () => {
 
 test('server-reached ambiguous signup never resubmits before authoritative proof', () => {
   const source = readText(signupSourcePath);
+  const probeDefinition = source.indexOf('async function proveDurableSignupOutcome');
   const recoveryStart = source.indexOf('async function recoverAmbiguousSignup');
-  const probeDefinition = source.indexOf('async function proveDurableSignupOutcome', recoveryStart);
+  const probeCall = source.indexOf('await proveDurableSignupOutcome(', recoveryStart);
   const serverReachedGuard = source.indexOf('if (initialSignupReachedAuth) {', recoveryStart);
   const retrySignup = source.indexOf('await sb.auth.signUp({', recoveryStart);
 
-  assert.ok(recoveryStart >= 0);
-  assert.ok(probeDefinition > recoveryStart);
-  assert.ok(serverReachedGuard > probeDefinition);
+  assert.ok(probeDefinition >= 0);
+  assert.ok(recoveryStart > probeDefinition);
+  assert.ok(probeCall > recoveryStart);
+  assert.ok(serverReachedGuard > probeCall);
   assert.ok(retrySignup > serverReachedGuard);
 
   const serverReachedBlock = source.slice(serverReachedGuard, retrySignup);
