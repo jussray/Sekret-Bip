@@ -94,7 +94,7 @@ reset role;
 
 select set_config('request.jwt.claim.sub', '00000000-0000-4000-8000-000000000002', false);
 set role authenticated;
-do $
+do $$
 declare denied boolean := false;
 begin
   begin
@@ -103,7 +103,7 @@ begin
     denied := true;
   end;
   if not denied then raise exception 'caller without an active guardian link enabled sharing'; end if;
-end $;
+end $$;
 reset role;
 
 select set_config('request.jwt.claim.sub', '', false);
