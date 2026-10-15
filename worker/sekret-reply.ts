@@ -1235,8 +1235,9 @@ function json(data: unknown, status = 200): Response {
 function normalizeCharacter(value: unknown): CharacterId | null {
   const raw = typeof value === 'string' ? value.trim().toLowerCase().replace(/['']/g, '') : '';
   if (raw === 'parentcoach' || raw === 'parent_coach' || raw === 'parent-coach' || raw.includes('parentcoach')) return 'parentCoach';
-  if (raw === 'raylene' || raw.includes('raylene')) return 'raylene';
-  if (raw === 'rylane' || raw.includes('rylane')) return 'rylane';
+  // Canonical companion IDs are normalized by the outer Worker before delegation.
+  if (raw === 'suhana' || raw === 'raylene' || raw.includes('raylene')) return 'raylene';
+  if (raw === 'sy' || raw === 'rylane' || raw.includes('rylane')) return 'rylane';
   if (raw === 'cloud' || raw.includes('cloud')) return 'cloud';
   if (raw === 'night' || raw.includes('night')) return 'night';
   if (raw === 'sekret' || raw === 'secret' || raw === 'oracle' || raw.includes('sekret')) return 'sekret';
