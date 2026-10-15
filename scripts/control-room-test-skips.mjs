@@ -138,6 +138,12 @@ export function parseNodeTapSkip(line) {
   return { testId: clean(match[1], 500), reason: clean(match[2] || 'Node test marked skipped.', 600) };
 }
 
+export function parseNodeTapTodo(line) {
+  const match = String(line || '').match(/^\s*ok\s+\d+\s+-\s+(.+?)\s+#\s+TODO(?:\s+(.*))?\s*$/i);
+  if (!match) return null;
+  return {testId: clean(match[1], 500), reason: clean(`TODO: ${match[2] || 'Node test not implemented.'}`, 600)};
+}
+
 export function writeSkipReport(observations, {
   root = process.cwd(),
   filename = 'test-skips-latest.json',
