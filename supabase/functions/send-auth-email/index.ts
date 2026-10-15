@@ -272,8 +272,9 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  // Resend idempotency keys make partial two-email retries safe.
-  for (const message of planned) {
+  // Send both sides of a secure email change concurrently, inside the Auth Hook deadline.
+  // Resend idempotency keys make partial retries safe for token-bearing messages.
+  const outcomes = await Promise.all(planned.map(async (message) => {
     const verifyUrl = message.hash
       ? buildVerifyUrl(supabaseUrl, message.hash, action, redirectTo)
       : null;
@@ -298,6 +299,7 @@ Deno.serve(async (req: Request) => {
     try {
       providerResponse = await fetch("https://api.resend.com/emails", {
         method: "POST",
+        signal: AbortSignal.timeout(2_500),
         headers: {
           authorization: `Bearer ${resendApiKey}`,
           "content-type": "application/json",
@@ -317,16 +319,20 @@ Deno.serve(async (req: Request) => {
       });
     } catch {
       console.error("[send-auth-email] provider request failed");
-      return hookError(502, "provider_unavailable");
+      return "provider_unavailable";
     }
 
     if (!providerResponse.ok) {
       console.error("[send-auth-email] provider rejected request", {
         status: providerResponse.status,
       });
-      return hookError(502, "provider_rejected");
+      return "provider_rejected";
     }
-  }
+    return null;
+  }));
+
+  const rejected = outcomes.find((outcome) => outcome !== null);
+  if (rejected) return hookError(502, rejected);
 
   return json({});
 });
