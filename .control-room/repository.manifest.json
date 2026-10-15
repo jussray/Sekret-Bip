@@ -153,7 +153,7 @@
         "src/services/backend/sekretClient.ts",
         "worker/config/policy.ts",
         "app/(teen)/pages/[id].tsx",
-        "test/supabase-worker-ai-reply-contract.test.mjs"
+        "integration/supabase-worker-ai-reply-contract.test.mjs"
       ],
       "requiredSignals": ["typecheck", "unit-tests"],
       "usageAssertions": [
