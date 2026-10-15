@@ -111,6 +111,7 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y -qq postgresql-client ffmpeg
           psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c 'select version();'
+          psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c "CREATE TABLE public.guardian_fixture_disposable_sentinel (marker text primary key); INSERT INTO public.guardian_fixture_disposable_sentinel (marker) VALUES ('guardian-consent-disposable-v1');"
           ffmpeg -version
           ffprobe -version
 

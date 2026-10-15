@@ -10,6 +10,26 @@ const callers = [
   ['.github/workflows/settings-companion-canon.yml', 'verify-settings-companion-canon'],
 ];
 
+const existingPostgresCallers = [
+  '.github/workflows/github-failure-routing-exact-head.yml',
+  '.github/workflows/comfort-mode-gate.yml',
+  '.github/workflows/cloud-thoughts-gate.yml',
+  '.github/workflows/onboarding-type-gate.yml',
+  '.github/workflows/main-contract-drift-exact-head.yml',
+];
+
+test('all existing Postgres full-suite lanes create the destructive-test sentinel before npm test', () => {
+  for (const path of existingPostgresCallers) {
+    const workflow = readFileSync(path, 'utf8');
+    const marker = workflow.indexOf('CREATE TABLE public.guardian_fixture_disposable_sentinel');
+    const suite = workflow.indexOf('npm test');
+    assert.ok(marker > 0, `Missing disposable sentinel provisioning in ${path}`);
+    assert.ok(suite > marker, `Disposable sentinel must be provisioned before npm test in ${path}`);
+    assert.match(workflow, /guardian-consent-disposable-v1/);
+    assert.match(workflow, /SEKRET_TEST_PG_URL: postgres:\/\/postgres:bip_test_ephemeral@127\.0\.0\.1:5432\/bip_test/);
+  }
+});
+
 test('every full-suite caller provisions disposable local Postgres and verifies it before npm test', () => {
   for (const [path, jobName] of callers) {
     const source = readFileSync(path, 'utf8');
