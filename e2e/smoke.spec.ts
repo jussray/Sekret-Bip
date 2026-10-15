@@ -91,6 +91,27 @@ test('web welcome hero safe area keeps the primary action below teen artwork', a
   expect(enterBox!.y).toBeGreaterThanOrEqual(heroBox!.y + heroBox!.height);
 });
 
+test('web welcome Bip Jr renders the four approved portraits on mobile', async ({ page }) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'domcontentloaded' });
+  const cast = page.getByTestId('web-welcome-bip-jr-cast');
+  await expect(cast).toBeAttached({ timeout: 30_000 });
+  for (const key of ['bipjr-spark', 'bipjr-giggle', 'bipjr-dreamer', 'bipjr-explorer']) {
+    const portrait = page.getByTestId(`web-welcome-${key}-portrait`);
+    await expect(portrait).toBeAttached({ timeout: 30_000 });
+    await expect.poll(
+      () => portrait.evaluate(element => {
+        const image = element instanceof HTMLImageElement ? element : element.querySelector('img');
+        return Boolean(image && image.complete && image.naturalWidth > 0);
+      }),
+      { timeout: 20_000, message: `Approved Bip Jr portrait did not load: ${key}` },
+    ).toBe(true);
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth)).toBe(false);
+  await page.screenshot({ path: 'test-results/front-door-bip-jr-four-portraits.png', fullPage: true, animations: 'disabled' });
+});
+
 test('web welcome hero safe area keeps the primary action below Bip Jr artwork', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?bipDevAudience=bip-jr');
