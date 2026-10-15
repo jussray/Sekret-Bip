@@ -365,10 +365,7 @@ test('merge-membrane never evaluates or accepts checks while mergeability is unk
 
 test('PR continuity evaluates the live head with trusted base code', () => {
   const source = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
-  const exactHeadJob = source.slice(
-    source.indexOf('  exact-head-audit:'),
-    source.indexOf('  metadata-receipt:'),
-  );
+  const exactHeadJob = source.slice(source.indexOf('  exact-head-audit:'));
 
   assert.match(exactHeadJob, /Check out trusted PR base evaluator/);
   assert.match(
