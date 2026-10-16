@@ -67,6 +67,21 @@ test('Attack 2000 observes independent production planes before long release con
   assert.match(exactPlaywright, /--grep "production exposes the exact expected Pages and Worker release commit"/);
 });
 
+test('security disclosure cannot run before release convergence', () => {
+  const releaseTest = "test('production exposes the exact expected Pages and Worker release commit'";
+  const firstTest = productionSmoke.indexOf("test(");
+  assert.equal(firstTest, productionSmoke.indexOf(releaseTest), 'release identity test must own the disclosure proof');
+  assert.equal((productionSmoke.match(/\.well-known\/security\.txt/g) ?? []).length, 1);
+  assert.doesNotMatch(productionSmoke, /test\('public vulnerability disclosure/);
+  const releaseStart = productionSmoke.indexOf(releaseTest);
+  const releaseEnd = productionSmoke.indexOf("\ntest(", releaseStart + releaseTest.length);
+  const releaseScope = productionSmoke.slice(releaseStart, releaseEnd < 0 ? undefined : releaseEnd);
+  const identityIndex = releaseScope.indexOf('releaseSha: expectedReleaseSha');
+  const disclosureIndex = releaseScope.indexOf("/.well-known/security.txt");
+  assert.ok(identityIndex >= 0 && disclosureIndex > identityIndex, 'disclosure must run after the exact backend release proof');
+  assert.match(workflowStep('Verify exact deployed release identity with Playwright'), /steps\.cloudflare_release\.outcome == 'success'/);
+});
+
 test('production release proof targets the application frontend and preserves backend authority', () => {
   assert.match(workflow, /PRODUCTION_BASE_URL: https:\/\/app\.sekretbip\.net/);
   assert.match(workflow, /FRONTEND_RELEASE_URL: https:\/\/app\.sekretbip\.net\/\.well-known\/sekret-release\.json/);
