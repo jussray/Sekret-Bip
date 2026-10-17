@@ -32,6 +32,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getSupabase } from '@/utils/supabase';
 import type { CompanionId } from '@/features/sekret/companionEngine';
+import { isCrisisText } from '../../../services/crisisPolicy';
 
 // ── Tier definitions ───────────────────────────────────────────────────────────
 
@@ -203,6 +204,8 @@ export function checkTextBeforePost(
   text:        string,
   companionId: CompanionId = 'suhana',
 ): SafetyExperience | null {
+  // Shared Worker/client policy takes precedence over narrower historical tiers.
+  if (isCrisisText(text)) return buildExperience('immediate_danger', companionId, false);
   for (const rule of PRE_FLIGHT_RULES) {
     if (rule.re.test(text)) {
       return buildExperience(rule.tier, companionId, false);

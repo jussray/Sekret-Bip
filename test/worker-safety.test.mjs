@@ -8,17 +8,39 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 const worker = fs.readFileSync(new URL('../worker/sekret-reply.ts', import.meta.url), 'utf8');
 
-// ─── Extract live CRISIS_RE from source ──────────────────────────────────────
-// The regex literal lives on a single line; grab it and reconstruct.
-const crisisLine = worker.split('\n').find(l => l.includes('const CRISIS_RE ='));
-assert.ok(crisisLine, 'CRISIS_RE must be defined in sekret-reply.ts');
+// ─── Load the shared crisis policy used by both client + Worker ──────────────
+const require = createRequire(import.meta.url);
+const localTsc = path.resolve('node_modules/.bin/tsc');
+const tsc = existsSync(localTsc) ? localTsc : 'tsc';
+const out = mkdtempSync(path.join(tmpdir(), 'worker-safety-'));
+test.after(() => rmSync(out, { recursive: true, force: true }));
 
-// Reconstruct the regex so behavioral tests run against the real pattern.
-const rawRegex = crisisLine.replace(/^.*const CRISIS_RE = /, '').replace(/;.*$/, '').trim();
-const CRISIS_RE = new Function(`return ${rawRegex}`)();
+execFileSync(tsc, [
+  path.resolve('services/crisisPolicy.ts'),
+  '--rootDir', path.resolve('.'),
+  '--outDir', out,
+  '--target', 'ES2020',
+  '--module', 'commonjs',
+  '--skipLibCheck',
+  '--strict',
+], { stdio: 'inherit' });
+
+const { isCrisisText } = require(path.join(out, 'services', 'crisisPolicy.js'));
+
+assert.match(
+  worker,
+  /import \{ isCrisisText \} from ['"]\.\.\/services\/crisisPolicy['"]/,
+  'sekret-reply.ts must import the shared crisis policy',
+);
+assert.doesNotMatch(worker, /const CRISIS_RE\s*=/, 'Worker must not keep a local crisis regex copy');
 
 // ─── Extract crisisReply lead strings ────────────────────────────────────────
 const hasHotline988    = /988/.test(worker);
@@ -26,38 +48,38 @@ const hasHotline741741 = /741741/.test(worker);
 const hasHotline911    = /911/.test(worker);
 
 // ─── Crisis regex: must match all variants ───────────────────────────────────
-test('CRISIS_RE matches direct self-harm phrases', () => {
-  assert.ok(CRISIS_RE.test('I want to kill myself'),       'kill myself');
-  assert.ok(CRISIS_RE.test('I want to end my life'),       'end my life');
-  assert.ok(CRISIS_RE.test('I want to die'),               'want to die');
-  assert.ok(CRISIS_RE.test('I am suicidal'),               'suicidal');
-  assert.ok(CRISIS_RE.test('thinking about suicide'),      'suicide');
-  assert.ok(CRISIS_RE.test('I want to hurt myself'),       'hurt myself');
-  assert.ok(CRISIS_RE.test('I cut myself'),                'cut myself');
-  assert.ok(CRISIS_RE.test('self-harm is on my mind'),     'self-harm hyphenated');
-  assert.ok(CRISIS_RE.test('self harm is on my mind'),     'self harm spaced');
+test('shared crisis policy matches direct self-harm phrases', () => {
+  assert.ok(isCrisisText('I want to kill myself'),       'kill myself');
+  assert.ok(isCrisisText('I want to end my life'),       'end my life');
+  assert.ok(isCrisisText('I want to die'),               'want to die');
+  assert.ok(isCrisisText('I am suicidal'),               'suicidal');
+  assert.ok(isCrisisText('thinking about suicide'),      'suicide');
+  assert.ok(isCrisisText('I want to hurt myself'),       'hurt myself');
+  assert.ok(isCrisisText('I cut myself'),                'cut myself');
+  assert.ok(isCrisisText('self-harm is on my mind'),     'self-harm hyphenated');
+  assert.ok(isCrisisText('self harm is on my mind'),     'self harm spaced');
 });
 
-test('CRISIS_RE matches abuse and danger phrases', () => {
-  assert.ok(CRISIS_RE.test('I am being abused'),     'abused');
-  assert.ok(CRISIS_RE.test('there was an assault'),  'assault');
-  assert.ok(CRISIS_RE.test('I am not safe here'),    'not safe');
-  assert.ok(CRISIS_RE.test('this is an emergency'),  'emergency');
-  assert.ok(CRISIS_RE.test('I feel unsafe'),         'unsafe');
+test('shared crisis policy matches abuse and danger phrases', () => {
+  assert.ok(isCrisisText('I am being abused'),     'abused');
+  assert.ok(isCrisisText('there was an assault'),  'assault');
+  assert.ok(isCrisisText('I am not safe here'),    'not safe');
+  assert.ok(isCrisisText('this is an emergency'),  'emergency');
+  assert.ok(isCrisisText('I feel unsafe'),         'unsafe');
 });
 
-test('CRISIS_RE matches case-insensitively', () => {
-  assert.ok(CRISIS_RE.test('KILL MYSELF'));
-  assert.ok(CRISIS_RE.test('Want To Die'));
-  assert.ok(CRISIS_RE.test('SUICIDE'));
+test('shared crisis policy matches case-insensitively', () => {
+  assert.ok(isCrisisText('KILL MYSELF'));
+  assert.ok(isCrisisText('Want To Die'));
+  assert.ok(isCrisisText('SUICIDE'));
 });
 
-test('CRISIS_RE does not false-positive on safe phrases', () => {
-  assert.ok(!CRISIS_RE.test('hey what are you up to'));
-  assert.ok(!CRISIS_RE.test('I had a rough day'));
-  assert.ok(!CRISIS_RE.test('I am so bored'));
-  assert.ok(!CRISIS_RE.test('this movie made me sad'));
-  assert.ok(!CRISIS_RE.test('I feel like dancing'));
+test('shared crisis policy does not false-positive on safe phrases', () => {
+  assert.ok(!isCrisisText('hey what are you up to'));
+  assert.ok(!isCrisisText('I had a rough day'));
+  assert.ok(!isCrisisText('I am so bored'));
+  assert.ok(!isCrisisText('this movie made me sad'));
+  assert.ok(!isCrisisText('I feel like dancing'));
 });
 
 // ─── crisisReply contract ────────────────────────────────────────────────────
@@ -111,9 +133,9 @@ test('safety_crisis intent returns crisis reply before any OpenAI call', () => {
   assert.ok(crisisGuardIdx < openAiCallIdx, 'Crisis guard must come before OpenAI call');
 });
 
-test('CRISIS_RE.test() is also called as a guard independent of detectIntent', () => {
+test('isCrisisText() is also called as a guard independent of detectIntent', () => {
   // Belt-and-suspenders: raw text is re-tested after intent detection.
-  assert.match(worker, /CRISIS_RE\.test\(userText\)/);
+  assert.match(worker, /isCrisisText\(userText\)/);
 });
 
 // ─── normalizeCharacter for characters ───────────────────────────────────────
@@ -131,12 +153,11 @@ test('normalizeCharacter returns null for unknown input', () => {
 });
 
 // ─── detectIntent intent ordering ────────────────────────────────────────────
-test('detectIntent checks CRISIS_RE first before any other intent', () => {
-  // Crisis check must be the very first conditional inside detectIntent.
+test('detectIntent checks the shared crisis policy before any other intent', () => {
   const fnStart = worker.indexOf('function detectIntent(');
-  const crisisCheck = worker.indexOf('if (CRISIS_RE.test(text)) return \'safety_crisis\'');
-  const greetingCheck = worker.indexOf('return \'greeting\'');
-  assert.ok(fnStart > 0,        'detectIntent must be defined');
+  const crisisCheck = worker.indexOf("if (isCrisisText(text)) return 'safety_crisis'");
+  const greetingCheck = worker.indexOf("return 'greeting'");
+  assert.ok(fnStart > 0, 'detectIntent must be defined');
   assert.ok(crisisCheck > fnStart, 'Crisis check must be inside detectIntent');
   assert.ok(crisisCheck < greetingCheck, 'Crisis check must precede greeting check');
 });

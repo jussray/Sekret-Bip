@@ -20,6 +20,14 @@ const DEFAULT_GITHUB_RETRY_ATTEMPTS = 4;
 const DEFAULT_GITHUB_RETRY_DELAY_MS = 250;
 const DEFAULT_GITHUB_RETRY_MAX_DELAY_MS = 60_000;
 
+const STRUCTURAL_NON_APPLICABLE_GITHUB_CHECKS = new Set([
+  "github.event_name == 'pull_request' && 'PR Continuity Exact-Head Gate' || 'PR Continuity Exact-Head Gate (not applicable)'",
+  'Roll Current Main Through Open PR Graph',
+  // Runs only on main pushes; visible as skipped on PRs, never a PR proof witness.
+  'Verify anonymous live edge on main',
+]);
+const SUPABASE_REPLAY_CHECK = 'Replay migrations from empty local database';
+
 function clean(value) {
   return typeof value === 'string' ? value.trim() : '';
 }
@@ -152,15 +160,44 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
     .sort((left, right) => left.name.localeCompare(right.name) || left.app.localeCompare(right.app));
 }
 
+export function classifyProofDisposition(check, allChecks = []) {
+  if (check?.state !== 'skipped') return 'required';
+
+  if (
+    check?.app === 'github-actions'
+    && check?.conclusion === 'skipped'
+    && STRUCTURAL_NON_APPLICABLE_GITHUB_CHECKS.has(check?.name)
+  ) {
+    return 'structural-not-applicable';
+  }
+
+  if (
+    check?.app === 'supabase'
+    && check?.name === 'Supabase Preview'
+    && check?.conclusion === 'skipped'
+    && check?.providerAuthority === 'canonical-target'
+    && allChecks.some((candidate) =>
+      candidate?.app === 'github-actions'
+      && candidate?.name === SUPABASE_REPLAY_CHECK
+      && candidate?.state === 'passed')
+  ) {
+    return 'superseded-by-exact-head-replay';
+  }
+
+  return 'blocking-skip';
+}
+
 export function aggregateTestLedger(checks) {
   const list = Array.isArray(checks) ? checks : [];
+  const disposition = (check) => classifyProofDisposition(check, list);
   const counts = {
     total: list.length,
     passed: list.filter((check) => check.state === 'passed').length,
     failed: list.filter((check) => check.state === 'failed').length,
     queued: list.filter((check) => check.state === 'queued').length,
     running: list.filter((check) => check.state === 'running').length,
-    skipped: list.filter((check) => check.state === 'skipped').length,
+    skipped: list.filter((check) => check.state === 'skipped' && disposition(check) === 'blocking-skip').length,
+    notApplicable: list.filter((check) => check.state === 'skipped' && disposition(check) !== 'blocking-skip').length,
     unknown: list.filter((check) => check.state === 'unknown').length,
   };
 
@@ -168,7 +205,8 @@ export function aggregateTestLedger(checks) {
   if (counts.total === 0) state = 'unknown';
   else if (counts.failed > 0) state = 'failed';
   else if (counts.queued > 0 || counts.running > 0) state = 'pending';
-  else if (counts.skipped > 0 || counts.unknown > 0) state = 'warning';
+  else if (counts.skipped > 0) state = 'failed';
+  else if (counts.unknown > 0) state = 'warning';
 
   return {state, counts};
 }
@@ -214,7 +252,10 @@ export function buildTestLedger({runtimeState = null,
       authoritativeForMerge: false,
     },
     aggregate,
-    checks,
+    checks: (Array.isArray(checks) ? checks : []).map((check) => ({
+      ...check,
+      proofDisposition: classifyProofDisposition(check, checks),
+    })),
   };
 }
 
@@ -235,6 +276,18 @@ export function assertLedgerMergeReady(ledger, outputPath = 'artifacts/control-r
 
   if (counts.failed > 0) {
     throw new Error(`Exact-head check failures remain. Evidence: ${outputPath}`);
+  }
+
+  // A neutral or skipped proof lane is not execution evidence. Structural
+  // non-applicable jobs remain visible but cannot satisfy proof. The canonical
+  // Supabase provider skip is tolerated only when the repository-owned exact-
+  // head migration replay succeeded for this same SHA.
+  if (counts.skipped > 0) {
+    const names = (Array.isArray(ledger?.checks) ? ledger.checks : [])
+      .filter((check) => check.state === 'skipped' && check.proofDisposition === 'blocking-skip')
+      .map((check) => `${check.app || 'unknown-app'}:${check.name || 'unnamed'}`)
+      .slice(0, 10);
+    throw new Error(`Skipped or neutral exact-head checks are prohibited (${counts.skipped}): ${names.join(', ') || 'see ledger'}. Evidence: ${outputPath}`);
   }
 
   if (ledger?.runner?.observerState !== 'stable') {

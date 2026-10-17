@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 import {
   aggregateTestLedger,
   assertLedgerMergeReady,
   buildTestLedger,
   classifyObservation,
+  classifyProofDisposition,
   classifyProviderAuthority,
   githubJson,
   isRetryableGithubResponse,
@@ -131,7 +133,7 @@ test('selected foreign Supabase check records explicit blocked authority evidenc
 test('aggregates failed, pending, warning, unknown, and passed distinctly', () => {
   assert.equal(aggregateTestLedger([]).state, 'unknown');
   assert.equal(aggregateTestLedger([{state: 'passed'}]).state, 'passed');
-  assert.equal(aggregateTestLedger([{state: 'passed'}, {state: 'skipped'}]).state, 'warning');
+  assert.equal(aggregateTestLedger([{state: 'passed'}, {state: 'skipped'}]).state, 'failed');
   assert.equal(aggregateTestLedger([{state: 'running'}]).state, 'pending');
   assert.equal(aggregateTestLedger([{state: 'failed'}, {state: 'passed'}]).state, 'failed');
 });
@@ -278,10 +280,13 @@ test('fails closed when a stable terminal exact-head check failed', () => {
   );
 });
 
-test('allows stable terminal success with intentionally skipped checks', () => {
+test('blocks skipped exact-head checks even when every other check passed', () => {
   const checks = selectLatestChecks([
     check({name: 'Repository Truth Gate'}),
-    check({id: 2, name: 'Supabase Preview', conclusion: 'skipped'}),
+    check({id: 2, name: 'Supabase Preview', conclusion: 'skipped',
+      app: {slug: 'supabase', name: 'Supabase'},
+      details_url: `https://supabase.com/dashboard/project/${BIP_SUPABASE}/branches`,
+    }),
   ], SHA);
   const ledger = buildTestLedger({
     repository: 'jussray/Sekret-Bip',
@@ -292,8 +297,128 @@ test('allows stable terminal success with intentionally skipped checks', () => {
     observerState: 'stable',
   });
 
-  assert.equal(ledger.aggregate.state, 'warning');
+  assert.equal(ledger.aggregate.counts.skipped, 1);
+  assert.equal(ledger.aggregate.state, 'failed');
+  assert.throws(
+    () => assertLedgerMergeReady(ledger),
+    /Skipped or neutral exact-head checks are prohibited \(1\): supabase:Supabase Preview/,
+  );
+});
+
+test('structural non-applicable PR jobs remain visible without impersonating proof', () => {
+  const checks = selectLatestChecks([
+    check({name: "github.event_name == 'pull_request' && 'PR Continuity Exact-Head Gate' || 'PR Continuity Exact-Head Gate (not applicable)'", conclusion: 'skipped'}),
+    check({id: 2, name: 'Roll Current Main Through Open PR Graph', conclusion: 'skipped'}),
+    check({id: 3, name: 'Repository Truth Gate'}),
+    check({id: 4, name: 'Verify anonymous live edge on main', conclusion: 'skipped'}),
+  ], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks, observerState: 'stable',
+  });
+
+  assert.equal(ledger.aggregate.counts.skipped, 0);
+  assert.equal(ledger.aggregate.counts.notApplicable, 3);
+  assert.equal(ledger.aggregate.state, 'passed');
+  assert.equal(
+    ledger.checks.filter((item) => item.state === 'skipped').every((item) => item.proofDisposition === 'structural-not-applicable'),
+    true,
+  );
   assert.equal(assertLedgerMergeReady(ledger), ledger);
+});
+
+test('main-only public edge skip is structural only when GitHub actually skips it', () => {
+  const workflow = readFileSync('.github/workflows/founder-shield.yml', 'utf8');
+  assert.ok(workflow.includes(['name: Verify anonymous live edge on main', "    if: github.event_name == 'push'"].join('\n')));
+  const neutral = selectLatestChecks([
+    check({name: 'Verify anonymous live edge on main', conclusion: 'neutral'}),
+    check({id: 2, name: 'Repository Truth Gate'}),
+  ], SHA);
+  const neutralLedger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks: neutral, observerState: 'stable',
+  });
+  assert.equal(neutralLedger.checks.find(item => item.name === 'Verify anonymous live edge on main')?.proofDisposition, 'blocking-skip');
+  assert.equal(neutralLedger.aggregate.counts.skipped, 1);
+  assert.equal(neutralLedger.aggregate.state, 'failed');
+  assert.throws(() => assertLedgerMergeReady(neutralLedger), /Skipped or neutral exact-head checks/);
+});
+
+test('canonical skipped Supabase provider preview requires successful exact-head replay proof', () => {
+  const supabaseSkip = check({
+    name: 'Supabase Preview',
+    conclusion: 'skipped',
+    app: {slug: 'supabase', name: 'Supabase'},
+    details_url: `https://supabase.com/dashboard/project/${BIP_SUPABASE}/branches`,
+  });
+  const replay = check({id: 2, name: 'Replay migrations from empty local database'});
+  const checks = selectLatestChecks([supabaseSkip, replay], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks, observerState: 'stable',
+  });
+
+  const provider = ledger.checks.find((item) => item.name === 'Supabase Preview');
+  assert.equal(classifyProofDisposition(provider, ledger.checks), 'superseded-by-exact-head-replay');
+  assert.equal(provider.proofDisposition, 'superseded-by-exact-head-replay');
+  assert.equal(ledger.aggregate.counts.skipped, 0);
+  assert.equal(ledger.aggregate.counts.notApplicable, 1);
+  assert.equal(assertLedgerMergeReady(ledger), ledger);
+});
+
+test('neutral canonical Supabase preview cannot inherit a skipped preview waiver', () => {
+  const checks = selectLatestChecks([
+    check({
+      name: 'Supabase Preview',
+      conclusion: 'neutral',
+      app: {slug: 'supabase', name: 'Supabase'},
+      details_url: `https://supabase.com/dashboard/project/${BIP_SUPABASE}/branches`,
+    }),
+    check({id: 2, name: 'Replay migrations from empty local database'}),
+  ], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks, observerState: 'stable',
+  });
+
+  const preview = ledger.checks.find((item) => item.name === 'Supabase Preview');
+  assert.equal(preview?.conclusion, 'neutral');
+  assert.equal(preview?.proofDisposition, 'blocking-skip');
+  assert.equal(ledger.aggregate.state, 'failed');
+  assert.throws(() => assertLedgerMergeReady(ledger), /Skipped or neutral exact-head checks/);
+});
+
+test('skipped Supabase preview remains blocking when exact-head replay did not pass', () => {
+  const checks = selectLatestChecks([
+    check({
+      name: 'Supabase Preview',
+      conclusion: 'skipped',
+      app: {slug: 'supabase', name: 'Supabase'},
+      details_url: `https://supabase.com/dashboard/project/${BIP_SUPABASE}/branches`,
+    }),
+    check({id: 2, name: 'Replay migrations from empty local database', conclusion: 'failure'}),
+  ], SHA);
+  const ledger = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks, observerState: 'stable',
+  });
+
+  assert.equal(ledger.checks.find((item) => item.name === 'Supabase Preview')?.proofDisposition, 'blocking-skip');
+  assert.equal(ledger.aggregate.counts.skipped, 1);
+  assert.throws(() => assertLedgerMergeReady(ledger), /Exact-head check failures remain/);
+});
+
+test('neutral checks also block merge, while an all-passed ledger remains eligible', () => {
+  const neutralChecks = selectLatestChecks([
+    check({name: 'Security Scan', conclusion: 'neutral'}),
+  ], SHA);
+  const blocked = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA, checks: neutralChecks, observerState: 'stable',
+  });
+  assert.equal(blocked.aggregate.state, 'failed');
+  assert.throws(() => assertLedgerMergeReady(blocked), /Skipped or neutral exact-head checks/);
+
+  const passed = buildTestLedger({
+    repository: 'jussray/Sekret-Bip', sha: SHA,
+    checks: selectLatestChecks([check()], SHA), observerState: 'stable',
+  });
+  assert.equal(passed.aggregate.counts.skipped, 0);
+  assert.equal(assertLedgerMergeReady(passed), passed);
 });
 
 test('classifies only evidenced 403 rate limits as retryable', () => {

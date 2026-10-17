@@ -16,6 +16,8 @@ jobs:
     name: Replay migrations from empty local database
     runs-on: ubuntu-22.04
     timeout-minutes: 30
+    env:
+      LOCAL_SUPABASE_PG_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres # DevSkim: ignore DS162092 because this endpoint is the disposable local Supabase stack
 
     steps:
       - name: Check out exact head
@@ -86,7 +88,7 @@ jobs:
           set -euo pipefail
           command -v psql >/dev/null
           PGPASSWORD=postgres psql \
-            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            "$LOCAL_SUPABASE_PG_URL" \
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/agent_memories_l3_phase1.sql
 
@@ -96,7 +98,7 @@ jobs:
           set -euo pipefail
           command -v psql >/dev/null
           PGPASSWORD=postgres psql \
-            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            "$LOCAL_SUPABASE_PG_URL" \
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/family_account_authority_phase1.sql
 
@@ -106,9 +108,20 @@ jobs:
           set -euo pipefail
           command -v psql >/dev/null
           PGPASSWORD=postgres psql \
-            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+            "$LOCAL_SUPABASE_PG_URL" \
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/parent_link_receiver_authority_phase1.sql
+
+      - name: Prove auth-profile, onboarding, first-mood, and safe scan guard triggers
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The local Supabase stack above is disposable. Never target a remote DB.
+          test -f supabase/probes/trigger_behavior_phase3_local.sql
+          PGPASSWORD=postgres psql \
+            "$LOCAL_SUPABASE_PG_URL" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/probes/trigger_behavior_phase3_local.sql
 
       - name: Stop ephemeral Supabase
         if: always()

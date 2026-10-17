@@ -18,6 +18,31 @@ test('natural fallback pack remains versioned, local, and companion-complete', (
   assert.match(source, /hasBannedHumanClaim/);
 });
 
+test('offline fallback and immediate preflight use the shared crisis policy', () => {
+  const fallback = read('src/features/sekret/naturalFallbacks.ts');
+  const coordinator = read('src/features/safety/safetyCoordinator.ts');
+  const importContract = "import { isCrisisText } from '../../../services/crisisPolicy';";
+
+  assert.ok(fallback.includes(importContract));
+  assert.ok(fallback.includes('if (isCrisisText(userText)) return getSafetyFallback();'));
+  assert.doesNotMatch(fallback, /SAFETY_PATTERN/);
+
+  assert.ok(coordinator.includes(importContract));
+  assert.ok(coordinator.includes("if (isCrisisText(text)) return buildExperience('immediate_danger', companionId, false);"));
+  assert.ok(coordinator.includes('for (const rule of PRE_FLIGHT_RULES)'));
+});
+
+test('offline safety reply includes actionable support contacts without private sharing', () => {
+  const source = read('src/features/sekret/naturalFallbacks.ts');
+  const safetyBlock = source.split('function getSafetyFallback(): NaturalFallbackResponse')[1]?.split('export function createNaturalFallbackResponse')[0];
+  assert.ok(safetyBlock, 'Safety fallback function must exist');
+  for (const contact of ['911', '988', '741741', 'trusted adult']) {
+    assert.ok(safetyBlock.includes(contact), `Missing offline support contact: ${contact}`);
+  }
+  assert.match(safetyBlock, /safetyFlag: true/);
+  assert.match(safetyBlock, /parentShareSummary: null/);
+});
+
 test('api fallback path records sanitized Control Room telemetry', () => {
   const api = read('src/utils/api.ts');
 

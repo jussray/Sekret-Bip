@@ -1,6 +1,8 @@
 import worker from './sekret-reply';
 import { synthesizeWithPiper, type PiperTtsEnv, type PiperCharacterId } from './piper-tts';
 import { authenticate, type AuthEnv, type Principal } from './auth';
+import { resolveGuardianSharingConsent } from './guardian-consent';
+import { isCrisisText } from '../services/crisisPolicy';
 import { handleBridgeSummaryGenerate } from './bridge-summary';
 import { getModels } from './config/models';
 import {
@@ -27,6 +29,7 @@ interface Env extends PiperTtsEnv, AuthEnv {
   OPENAI_CHAT_MODEL?: string;
   OPENAI_TTS_MODEL?: string;
   OPENAI_STT_MODEL?: string;
+  SUPABASE_SECRET_KEY?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
   SUHANA_VOICE_ID?: string;
   SY_VOICE_ID?: string;
@@ -220,6 +223,36 @@ async function rewriteStyledJsonResponse(
   }
 }
 
+async function enforceServerOwnedSafetySharing(
+  response: Response,
+  env: Env,
+  principal: Principal,
+  consentWasChecked: boolean,
+  guardianSharingEnabled: boolean,
+  cors: Record<string, string>,
+): Promise<Response> {
+  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) return response;
+  let data: Record<string, unknown>;
+  try {
+    data = await response.clone().json() as Record<string, unknown>;
+  } catch {
+    return response;
+  }
+  // A model flag alone never authorizes disclosure. The only allowed safety
+  // summary is the fixed, non-verbatim message after server-verified consent.
+  if (data.safetyFlag !== true) return response;
+  const permitted = principal.kind === 'user'
+    && (consentWasChecked
+      ? guardianSharingEnabled
+      : await resolveGuardianSharingConsent(env, principal));
+  return json({
+    ...data,
+    parentShareSummary: permitted
+      ? 'Safety concern: teen may need trusted adult or emergency support.'
+      : null,
+  }, response.status, cors);
+}
+
 function prepareStyledReply(
   request: Request,
   body: Record<string, unknown>,
@@ -402,6 +435,25 @@ export default {
       ).trim();
       if (!userText) return json({ error: 'userText is required' }, 400, cors);
 
+      const replySurface = normalizeReplySurface(body.surface ?? body.context);
+      const needsGuardianConsent = replySurface === 'parentBridge' || isCrisisText(userText);
+      const guardianSharingEnabled = needsGuardianConsent
+        ? await resolveGuardianSharingConsent(env, principal)
+        : false;
+      const companionPrincipal = principal.kind === 'user'
+        ? { ...principal, guardianSharingEnabled }
+        : principal;
+
+      // Safety must not disappear when the model provider is unavailable.
+      if (!env.OPENAI_API_KEY && isCrisisText(userText)) {
+        const delegated = await worker.fetch(
+          prepared.request,
+          env as { OPENAI_API_KEY: string },
+          companionPrincipal,
+        );
+        return rewriteStyledJsonResponse(delegated, prepared.style, cors);
+      }
+
       if (!env.OPENAI_API_KEY) {
         const options = CHARACTER_FALLBACKS[prepared.style.actorId];
         const start = stableHash(`${prepared.style.actorId}:${userText.toLowerCase()}`) % options.length;
@@ -426,9 +478,12 @@ export default {
       const delegated = await worker.fetch(
         prepared.request,
         env as { OPENAI_API_KEY: string },
-        principal,
+        companionPrincipal,
       );
-      return rewriteStyledJsonResponse(delegated, prepared.style, cors);
+      const styled = await rewriteStyledJsonResponse(delegated, prepared.style, cors);
+      return enforceServerOwnedSafetySharing(
+        styled, env, principal, needsGuardianConsent, guardianSharingEnabled, cors,
+      );
     }
 
     const fallback = await worker.fetch(request, env as { OPENAI_API_KEY: string }, principal);

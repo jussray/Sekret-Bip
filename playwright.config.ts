@@ -55,6 +55,9 @@ export default defineConfig({
     env: {
       EXPO_PUBLIC_SUPABASE_URL: '',
       EXPO_PUBLIC_SUPABASE_ANON_KEY: '',
+      // Route companion calls through the local Playwright server so tests can
+      // exercise the request/response boundary without touching production.
+      EXPO_PUBLIC_BACKEND_URL: BASE_URL,
     },
   },
 });

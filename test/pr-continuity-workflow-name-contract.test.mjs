@@ -2,18 +2,30 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const source = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
-const exactHeadJob = source.slice(
-  source.indexOf('  exact-head-audit:'),
-  source.indexOf('  metadata-receipt:'),
-);
+const audit = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
+const metadata = readFileSync('.github/workflows/pr-continuity-metadata.yml', 'utf8');
+const rollover = readFileSync('.github/workflows/pr-continuity-rollover.yml', 'utf8');
 
-test('non-pull-request continuity events cannot shadow the exact-head check name', () => {
-  assert.ok(
-    exactHeadJob.includes(
-      "name: ${{ github.event_name == 'pull_request' && 'PR Continuity Exact-Head Gate' || 'PR Continuity Exact-Head Gate (not applicable)' }}",
-    ),
-  );
-  assert.ok(exactHeadJob.includes("if: github.event_name == 'pull_request'"));
-  assert.equal(/^\s{4}name: PR Continuity Exact-Head Gate$/mu.test(exactHeadJob), false);
+test('superseded continuity jobs are cancelled rather than self-certifying stale proof', () => {
+  assert.match(audit, /concurrency:\s*\n\s*group: pr-continuity-\$\{\{ github\.event\.pull_request\.number \}\}/);
+  assert.match(audit, /cancel-in-progress: true/);
+  assert.match(audit, /Verify live base ancestry and exact head/);
+  assert.match(audit, /scripts\/pr-continuity\.mjs audit/);
+});
+
+test('PR continuity jobs run only on their matching events without skipped placeholders', () => {
+  assert.match(audit, /pull_request:\s*\n/);
+  assert.doesNotMatch(audit, /pull_request_target:\s*\n|workflow_dispatch:\s*\n|\n  metadata-receipt:|\n  rollover:/);
+  assert.match(audit, /^    name: PR Continuity Exact-Head Gate$/m);
+  assert.doesNotMatch(audit, /\n    if:/);
+
+  assert.match(metadata, /pull_request_target:\s*\n/);
+  assert.doesNotMatch(metadata, /\n  pull_request:\s*\n|workflow_dispatch:\s*\n|\n  exact-head-audit:|\n  rollover:/);
+  assert.match(metadata, /^    name: PR Continuity Metadata Receipt$/m);
+  assert.doesNotMatch(metadata, /\n    if:/);
+
+  assert.match(rollover, /workflow_dispatch:\s*\n/);
+  assert.doesNotMatch(rollover, /\n  pull_request:\s*\n|pull_request_target:\s*\n|\n  exact-head-audit:|\n  metadata-receipt:/);
+  assert.match(rollover, /test "\$GITHUB_REF" = "refs\/heads\/main"/);
+  assert.doesNotMatch(rollover, /\n    if:/);
 });

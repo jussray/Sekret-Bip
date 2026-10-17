@@ -25,8 +25,22 @@ permissions:
 jobs:
   verify-calm-controls:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: bip_test
+          POSTGRES_PASSWORD: bip_test_ephemeral
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d bip_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     timeout-minutes: 30
     env:
+      SEKRET_TEST_PG_URL: postgres://postgres:bip_test_ephemeral@127.0.0.1:5432/bip_test # DevSkim: ignore DS162092 because this is an isolated disposable CI loopback database
       CI: 'true'
       EXPO_NO_TELEMETRY: '1'
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
@@ -54,6 +68,16 @@ jobs:
 
       - name: Install repository dependencies
         run: npm ci
+      - name: Verify disposable Postgres for guardian authorization suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client ffmpeg
+          psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c 'select current_database();'
+          ffmpeg -version
+          ffprobe -version
+          psql "$SEKRET_TEST_PG_URL" -v ON_ERROR_STOP=1 -c "CREATE TABLE public.guardian_fixture_disposable_sentinel (marker text primary key); INSERT INTO public.guardian_fixture_disposable_sentinel (marker) VALUES ('guardian-consent-disposable-v1');"
 
       - name: Run focused Calm contracts
         run: node --test test/calm-plan-controls.test.mjs

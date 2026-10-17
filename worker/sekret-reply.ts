@@ -1,5 +1,6 @@
 /** Se'kret Brain + Voice Worker */
 import { ORACLE_HIDDEN_GUIDANCE } from './companion-curriculum';
+import { isCrisisText } from '../services/crisisPolicy';
 import { COMPANION_REPLY_POOLS } from './companion-replies';
 import { getModels } from './config/models';
 import { PROMPT_VERSION, POLICY_VERSION } from './config/policy';
@@ -1227,8 +1228,6 @@ const VOICE_INSTRUCTIONS: Record<CharacterId, string> = {
   parentCoach: "Speak as a warm, grounded coaching presence for a parent. Sound calm, real, and quietly knowing — like a trusted person sitting across the table, not a wellness app.",
 };
 
-const CRISIS_RE = /\b(kill myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm|hurt myself|cut myself|disappear forever|run away|abuse|abused|assault|unsafe|not safe|danger|emergency)\b/i;
-
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
 }
@@ -1236,8 +1235,9 @@ function json(data: unknown, status = 200): Response {
 function normalizeCharacter(value: unknown): CharacterId | null {
   const raw = typeof value === 'string' ? value.trim().toLowerCase().replace(/['']/g, '') : '';
   if (raw === 'parentcoach' || raw === 'parent_coach' || raw === 'parent-coach' || raw.includes('parentcoach')) return 'parentCoach';
-  if (raw === 'raylene' || raw.includes('raylene')) return 'raylene';
-  if (raw === 'rylane' || raw.includes('rylane')) return 'rylane';
+  // Canonical companion IDs are normalized by the outer Worker before delegation.
+  if (raw === 'suhana' || raw === 'raylene' || raw.includes('raylene')) return 'raylene';
+  if (raw === 'sy' || raw === 'rylane' || raw.includes('rylane')) return 'rylane';
   if (raw === 'cloud' || raw.includes('cloud')) return 'cloud';
   if (raw === 'night' || raw.includes('night')) return 'night';
   if (raw === 'sekret' || raw === 'secret' || raw === 'oracle' || raw.includes('sekret')) return 'sekret';
@@ -1297,7 +1297,7 @@ function stableHash(value: string): number {
 function detectIntent(text: string, history: ConversationTurn[]): ConversationIntent {
   const t = text.trim().toLowerCase();
 
-  if (CRISIS_RE.test(text)) return 'safety_crisis';
+  if (isCrisisText(text)) return 'safety_crisis';
 
   // Pure greeting openers
   if (/^(hey+|hi+|hello|heyy+|hiii+|sup|wassup|wyd|what'?s? ?up|what you on|yo+|ayo|heyyy)\s*[!?.😭😂🙂]*$/i.test(t)) return 'greeting';
@@ -1532,7 +1532,9 @@ function buildBrainPrompt(
   return sections.join('\n');
 }
 
-async function handleReply(request: Request, env: Env, principal: PreflightPrincipal | null = null): Promise<Response> {
+type GuardianAwarePrincipal = PreflightPrincipal & { guardianSharingEnabled?: boolean };
+
+async function handleReply(request: Request, env: Env, principal: GuardianAwarePrincipal | null = null): Promise<Response> {
   const startedAt = Date.now();
   const models = getModels(env);
   const traceId = crypto.randomUUID();
@@ -1543,14 +1545,15 @@ async function handleReply(request: Request, env: Env, principal: PreflightPrinc
   const characterId = normalizeCharacter(body.characterId ?? body.personality);
   if (!characterId) return json({ error: 'characterId must be raylene, rylane, cloud, night, sekret, or parentCoach' }, 400);
   const surface = normalizeSurface(body.surface ?? body.context);
-  const parentSharingEnabled = body.parentSharingEnabled === true;
+  const guardianSharingEnabled = principal?.kind === 'user' && principal.guardianSharingEnabled === true;
+  const parentSharingEnabled = surface === 'parentBridge' && guardianSharingEnabled;
   const rawHistory = normalizeHistory(body.history);
   const preflight = runPreflight(rawHistory, body.memory, principal);
   const history = preflight.sanitizedHistory;
   const userName = normalizeUserName(body);
   const intent = detectIntent(userText, history);
 
-  if (intent === 'safety_crisis' || CRISIS_RE.test(userText)) return json(crisisReply(characterId, parentSharingEnabled));
+  if (intent === 'safety_crisis' || isCrisisText(userText)) return json(crisisReply(characterId, guardianSharingEnabled));
 
   const fallbackReply = getFallbackReply(characterId, userText, history, intent, userName);
   if (!env.OPENAI_API_KEY) {
@@ -1772,7 +1775,7 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
 }
 
 export default {
-  async fetch(request: Request, env: Env, principal: PreflightPrincipal | null = null): Promise<Response> {
+  async fetch(request: Request, env: Env, principal: GuardianAwarePrincipal | null = null): Promise<Response> {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS_HEADERS });
     if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
     const path = new URL(request.url).pathname;

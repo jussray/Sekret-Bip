@@ -351,6 +351,10 @@ function buildEffectiveState(inputMigrations) {
 }
 
 const state = buildEffectiveState(migrations);
+const reviewedFunctions = new Map(
+  [...baseline.functions, ...candidateReview.functions]
+    .map((item) => [item.signature.toLowerCase(), item]),
+);
 const repositoryFunctions = new Map(
   [...baseline.functions, ...candidateReview.functions]
     .filter((item) => item.repositoryExpected !== false)
@@ -616,6 +620,35 @@ test('trigger behavior phase 2 proves cleanup_crew_relationship_access and recor
   }
 });
 
-test.todo(
-  'run external-effect-safe rollback-contained behavior probes for the remaining safety and auth-profile triggers listed in trigger_behavior_phase2.notCoveredThisPhase',
-);
+test('remaining trigger behavior is tracked without falsely claiming verification', () => {
+  const phase = baseline.behaviorProbePhases.find((entry) => entry.phase === 'trigger_behavior_phase2');
+  assert.ok(phase, 'trigger_behavior_phase2 evidence must be available');
+  const outstanding = Object.keys(phase.notCoveredThisPhase ?? {});
+  const proven = new Set(baseline.behaviorProbePhases
+    .filter((entry) => entry.transactionOutcome === 'rolled_back'
+      && entry.syntheticRowsRetained === 0 && entry.failedChecks === 0 && entry.passedChecks > 0)
+    .flatMap((entry) => entry.coveredFunctions.map((signature) => signature.toLowerCase())));
+  const missingProof = outstanding.filter((signature) => {
+    const reviewed = reviewedFunctions.get(signature.toLowerCase());
+    return !proven.has(signature.toLowerCase()) || reviewed?.behaviorVerified !== true;
+  });
+  assert.ok(missingProof.length > 0,
+    'Unverified trigger inventory unexpectedly empty; review and update evidence before clearing it');
+  assert.ok(missingProof.includes('public.trigger_safety_scan()'),
+    'External safety scanner must remain unverified until its network path is safely stubbed and tested');
+  assert.ok(missingProof.includes('public.award_points_for_app_activity()'),
+    'Live-only legacy points drift must remain unresolved until reconciled by an authorized migration');
+  for (const signature of missingProof) {
+    const reviewed = reviewedFunctions.get(signature.toLowerCase());
+    assert.ok(reviewed, `${signature} must exist in the reviewed trigger inventory`);
+    assert.equal(reviewed.behaviorVerified, false,
+      `${signature} cannot claim verified behavior without approved probe evidence`);
+    if (reviewed.repositoryExpected === false) {
+      assert.ok(
+        baseline.catalogDrift.some((entry) =>
+          entry.status === 'open' && entry.function.toLowerCase() === signature.toLowerCase()),
+        `${signature} live-only drift must remain explicitly cataloged as open`,
+      );
+    }
+  }
+});
