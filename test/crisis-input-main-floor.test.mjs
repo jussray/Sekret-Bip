@@ -13,7 +13,6 @@ const CONTRACTION_AND_BARE_CASES = [
   "there's an emergency",
   'this is an emergency',
   'I was abused',
-  'he assaulted me',
   'I want to run away',
   'I feel unsafe',
   'it is not safe here',
