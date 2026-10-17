@@ -94,7 +94,10 @@ export async function fetchPostAuthBootstrap(
   // Welcome delivery is deliberately non-authoritative for routing: the helper
   // swallows provider failures so onboarding can continue, while the server
   // owns recipient identity, personalization, and duplicate prevention.
-  await ensureWelcomeEmail();
+  // Fire-and-forget: awaiting it would hold every non-founder routing step for
+  // up to the helper's 4s timeout. The helper never rejects (its body is wrapped
+  // in try/catch), so there is no unhandled rejection path.
+  void ensureWelcomeEmail();
 
   const requestedSide = await resolvePreferredSide(preferredSide);
   const profile = prehydratedProfile === undefined

@@ -16,9 +16,13 @@ test('new signups are explicitly marked eligible for welcome email v1', () => {
 test('post-auth bootstrap invokes welcome delivery only after founder routing is excluded', () => {
   assert.match(bootstrap, /ensureWelcomeEmail/);
   const founderIndex = bootstrap.indexOf('if (isFounderProfile(founderProfile))');
-  const welcomeIndex = bootstrap.indexOf('await ensureWelcomeEmail()');
+  const welcomeIndex = bootstrap.indexOf('void ensureWelcomeEmail()');
   assert.ok(founderIndex >= 0);
   assert.ok(welcomeIndex > founderIndex);
+});
+
+test('welcome delivery never blocks post-auth routing', () => {
+  assert.doesNotMatch(bootstrap, /await\s+ensureWelcomeEmail\(/);
 });
 
 test('client never supplies recipient identity or personalization fields', () => {
