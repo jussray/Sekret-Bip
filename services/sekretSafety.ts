@@ -1,6 +1,6 @@
 import { isCrisisText } from './crisisPolicy';
 
-const CRISIS_RESOURCE_RE = /(?:\b(?:call|text|dial)\s+(?:or\s+text\s+)?988\b|\b988\b[^.\n]{0,48}\b(?:lifeline|crisis)\b|\b(?:lifeline|crisis)\b[^.\n]{0,48}\b988\b|\b(?:text|message)\s+(?:home\s+to\s+)?741741\b|\b741741\b|\b(?:call|dial|contact)\s+911\b|\b911\b[^.\n]{0,32}\b(?:emergency|immediate(?:ly)?|danger)\b)/i;
+const CRISIS_RESOURCE_RE = /(?:\b(?:call|text|dial)\s+(?:or\s+text\s+)?988\b|\b988\b[^.\n]{0,48}\b(?:lifeline|crisis)\b|\b(?:lifeline|crisis)\b[^.\n]{0,48}\b988\b|\b(?:text|message)\s+(?:home\s+to\s+)?741741\b|\b741741\b|\b(?:call|dial|contact)\s+(?:or\s+text\s+)?911\b|\b911\b[^.\n]{0,32}\b(?:emergency|immediate(?:ly)?|danger)\b|\b9-1-1\b)/i;
 
 export const LOCAL_SAFETY_FALLBACK = "Your safety comes first. Tell a trusted adult now. If there is immediate danger, call 911. In the U.S., call or text 988, or text HOME to 741741.";
 
