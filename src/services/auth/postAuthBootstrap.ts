@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { hydrateAccountProfile, type AccountProfile, type AccountSide } from '@/features/identity/accountProfile';
 import { getCurrentFounderProfileForRouting, isFounderProfile } from '@/services/founderAudit';
+import { ensureWelcomeEmail } from '@/services/auth/welcomeEmail';
 import { getSupabase } from '@/utils/supabase';
 import { consentService } from '../../../services/consentService';
 
@@ -89,6 +90,14 @@ export async function fetchPostAuthBootstrap(
       nextRoute: '/(dev)/control-room',
     };
   }
+
+  // Welcome delivery is deliberately non-authoritative for routing: the helper
+  // swallows provider failures so onboarding can continue, while the server
+  // owns recipient identity, personalization, and duplicate prevention.
+  // Fire-and-forget: awaiting it would hold every non-founder routing step for
+  // up to the helper's 4s timeout. The helper never rejects (its body is wrapped
+  // in try/catch), so there is no unhandled rejection path.
+  void ensureWelcomeEmail();
 
   const requestedSide = await resolvePreferredSide(preferredSide);
   const profile = prehydratedProfile === undefined

@@ -124,6 +124,19 @@ test('live onboarding email smoke proves returning-user authentication with boun
   assert.match(source, /not\.toHaveURL\(\/\\\/login/);
 });
 
+test('returning-user Playwright proof requires welcome email provider acceptance', () => {
+  const source = readText(specPath);
+  const workflow = readText(workflowPath);
+
+  assert.match(source, /send-welcome-email/);
+  assert.match(source, /welcome-email-response/);
+  assert.match(source, /latestWelcome\?\.status\)\.toBe\(200\)/);
+  assert.match(source, /\['sent', 'already_sent'\]/);
+  assert.match(workflow, /src\/services\/auth\/welcomeEmail\.ts/);
+  assert.match(workflow, /supabase\/functions\/send-welcome-email\/\*\*/);
+  assert.match(workflow, /test\/welcome-email-contract\.test\.mjs/);
+});
+
 test('live signup proof uses one dedicated exact-target Playwright config for signup and family authority proof', () => {
   const config = readText(liveConfigPath);
   const workflow = readText(workflowPath);
