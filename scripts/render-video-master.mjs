@@ -85,16 +85,20 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
   if (!isAbsolute(String(outputPath || '')) || extname(String(outputPath)).toLowerCase() !== '.mp4') fail('OUTPUT_PATH_MUST_BE_ABSOLUTE_MP4');
   if (audioPath && (!isAbsolute(String(audioPath)) || !existsSync(String(audioPath)))) fail('AUDIO_PATH_INVALID');
 
-  const capability = probeBipVideoRenderer();
-  if (!capability.available) {
-    return { kind: 'CAPABILITY_UNAVAILABLE', reason: 'ffmpeg and ffprobe binaries are required on PATH' };
-  }
-
   const requiredShots = manifest.sourcePolicy.requiredShots.map(Number);
   if (sources.length !== requiredShots.length) fail('SOURCE_COUNT_MUST_MATCH_REQUIRED_SHOTS');
   const sourceByShot = new Map(sources.map((source) => [Number(source?.shot), source]));
   if (sourceByShot.size !== requiredShots.length || [...sourceByShot.keys()].some((shot) => !requiredShots.includes(shot))) {
     fail('SOURCE_SET_MUST_MATCH_REQUIRED_SHOTS');
+  }
+
+  for (const shot of requiredShots) {
+    assertSourceDescriptor(sourceByShot.get(shot), shot);
+  }
+
+  const capability = probeBipVideoRenderer();
+  if (!capability.available) {
+    return { kind: 'CAPABILITY_UNAVAILABLE', reason: 'ffmpeg and ffprobe binaries are required on PATH' };
   }
 
   const verifiedSources = [];
