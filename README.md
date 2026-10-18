@@ -5,7 +5,7 @@
 
 🌐 **Official site:** https://sekretbip.net
 
-Se’kret Bip is built for teens and the families who support them. It combines private reflection, journaling, voice, comfort tools, companions, relationship-aware family experiences, and expressive social spaces without turning parent access into surveillance.
+Se’kret Bip is built for teens and the families who support them. It combines private reflection, journaling, voice, comfort tools, companions, relationship-aware family experiences, and expressive social spaces without turning parent access into surveillance. The product centers privacy-first emotional growth and self-expression while preserving clear family and safety boundaries.
 
 > **Boundary:** Se’kret Bip is not a medical, therapy, crisis, or emergency service. It does not diagnose users or replace professional or emergency care.
 
@@ -41,6 +41,8 @@ Bip Jr experiences are part of the broader family product direction and remain s
 ## Character world
 
 Se’kret Bip’s visual world is part of the experience, but character art is **not** the product architecture.
+
+Cosmic and character art is visual DNA and atmosphere, not product architecture.
 
 The approved canonical character family currently includes:
 
@@ -81,9 +83,11 @@ A preferred future topology delegates companion requests from `sekret-backend` t
 
 Privileged secrets such as `SUPABASE_SERVICE_ROLE_KEY` must not be duplicated into the companion Worker merely for convenience.
 
-## Truth boundary
+## Live truth boundary
 
 This README documents **durable product and architecture contracts**, not a live deployment verdict.
+
+This README does **not** declare the live release SHA.
 
 Do not use README prose alone to claim the current production SHA, Cloudflare routing, Supabase runtime state, open/closed issue state, or launch readiness. Resolve current truth from fresh evidence:
 
