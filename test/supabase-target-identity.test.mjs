@@ -171,6 +171,25 @@ test('auth email mutation verifies target and emits only bounded log summaries',
   assert.match(authEmail, /AUTH_EMAIL_PROVIDER_FAILED/);
 });
 
+test('email-confirmation provider verification is read-only, project-bound, and fail-closed', () => {
+  const start = authEmail.indexOf('  if (verifyOnly) {');
+  const end = authEmail.indexOf('  if (!apply) {', start);
+  assert.ok(start >= 0 && end > start);
+  const verifyBlock = authEmail.slice(start, end);
+  assert.match(verifyBlock, /await verifySupabaseManagementIdentity/);
+  assert.match(verifyBlock, /await request\(projectRef, accessToken\)/);
+  assert.match(verifyBlock, /mailer_autoconfirm: false/);
+  assert.match(verifyBlock, /mailer_allow_unverified_email_sign_ins: false/);
+  assert.match(verifyBlock, /external_email_enabled: true/);
+  assert.match(verifyBlock, /providerSettingsVerified: verified/);
+  assert.match(verifyBlock, /browserCookie: false/);
+  assert.match(verifyBlock, /mutationPerformed: false/);
+  assert.match(verifyBlock, /AUTH_EMAIL_PROVIDER_CONFIRMATION_NOT_ENFORCED/);
+  assert.match(verifyBlock, /AUTH_EMAIL_PROVIDER_CONFIRMED/);
+  assert.doesNotMatch(verifyBlock, /method: 'PATCH'|smtp_pass:|RESEND_API_KEY/);
+  assert.match(authEmail, /if \(apply && verifyOnly\) throw new Error\('AUTH_EMAIL_MODE_CONFLICT'\)/);
+});
+
 test('identity-only changes trigger and execute the production identity contract gate', () => {
   for (const filePath of [
     'config/supabase-targets.json',
