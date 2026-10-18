@@ -10,6 +10,7 @@ export const AUTH_EMAIL_SOURCE_FILES = Object.freeze([
   'app/(auth)/login.tsx',
   'app/(auth)/signup.tsx',
   'app/index.tsx',
+  'src/components/shared/NotificationBootstrap.tsx',
   'src/context/VerificationContext.tsx',
   'src/services/auth/postAuthBootstrap.ts',
   'scripts/configure-supabase-auth-email.mjs',
@@ -30,6 +31,7 @@ function requireSourceTruth(contents) {
   const login = contents['app/(auth)/login.tsx'].toString();
   const signup = contents['app/(auth)/signup.tsx'].toString();
   const entry = contents['app/index.tsx'].toString();
+  const notifications = contents['src/components/shared/NotificationBootstrap.tsx'].toString();
 
   const remote = bootstrap.indexOf('await supabase.auth.getUser()');
   const confirmed = bootstrap.indexOf('if (!authoritativeAuth.user.email_confirmed_at)');
@@ -51,6 +53,10 @@ function requireSourceTruth(contents) {
   if (!entry.includes('await bootstrapModule.fetchPostAuthBootstrap(buildSide)') ||
       entry.includes("import('@/features/identity/accountProfile')")) {
     throw new Error('AUTH_EMAIL_ROOT_PROFILE_HYDRATION_PRECEDED_GATE');
+  }
+  if (!notifications.includes('await supabase.auth.getUser()') ||
+      !notifications.includes('!identity.user.email_confirmed_at')) {
+    throw new Error('AUTH_EMAIL_PUSH_REGISTRATION_GATE_MISSING');
   }
   if (!login.includes('await fetchPostAuthBootstrap(preferredSide)') ||
       !signup.includes('await fetchPostAuthBootstrap(preferredSide)')) {
