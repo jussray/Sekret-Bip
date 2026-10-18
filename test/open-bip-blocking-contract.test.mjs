@@ -4,7 +4,7 @@ import fs from 'node:fs';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-const migration = read('supabase/migrations/20260925070000_block_open_bip_author.sql');
+const migration = read('supabase/migrations/20261018012500_block_open_bip_author.sql');
 const repository = read('src/features/circle/circleRepository.ts');
 const screen = read('app/(teen)/circle/feed-v2.tsx');
 const support = read('public/support/index.html');
