@@ -9,6 +9,7 @@ export const AUTH_EMAIL_PROOF_SCHEMA = 'juss/bip-email-access-proof-cookie@v1';
 export const AUTH_EMAIL_SOURCE_FILES = Object.freeze([
   'app/(auth)/login.tsx',
   'app/(auth)/signup.tsx',
+  'app/index.tsx',
   'src/context/VerificationContext.tsx',
   'src/services/auth/postAuthBootstrap.ts',
   'scripts/configure-supabase-auth-email.mjs',
@@ -28,6 +29,7 @@ function requireSourceTruth(contents) {
   const config = contents['scripts/configure-supabase-auth-email.mjs'].toString();
   const login = contents['app/(auth)/login.tsx'].toString();
   const signup = contents['app/(auth)/signup.tsx'].toString();
+  const entry = contents['app/index.tsx'].toString();
 
   const remote = bootstrap.indexOf('await supabase.auth.getUser()');
   const confirmed = bootstrap.indexOf('if (!authoritativeAuth.user.email_confirmed_at)');
@@ -45,6 +47,10 @@ function requireSourceTruth(contents) {
   }
   if (!config.includes('mailer_autoconfirm: false')) {
     throw new Error('AUTH_EMAIL_PROVIDER_DESIRED_CONFIRMATION_MISSING');
+  }
+  if (!entry.includes('await bootstrapModule.fetchPostAuthBootstrap(buildSide)') ||
+      entry.includes("import('@/features/identity/accountProfile')")) {
+    throw new Error('AUTH_EMAIL_ROOT_PROFILE_HYDRATION_PRECEDED_GATE');
   }
   if (!login.includes('await fetchPostAuthBootstrap(preferredSide)') ||
       !signup.includes('await fetchPostAuthBootstrap(preferredSide)')) {
