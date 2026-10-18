@@ -7,6 +7,7 @@ const bootstrap = read('src/services/auth/postAuthBootstrap.ts');
 const context = read('src/context/VerificationContext.tsx');
 const signup = read('app/(auth)/signup.tsx');
 const login = read('app/(auth)/login.tsx');
+const entry = read('app/index.tsx');
 
 test('post-auth routing requires authoritative Supabase email confirmation first', () => {
   const sessionCheck = bootstrap.indexOf('const user = data.session?.user');
@@ -30,4 +31,10 @@ test('restored and auth-event sessions remain locked until email confirmation', 
 test('signup and login cannot navigate past canonical guarded bootstrap', () => {
   assert.match(signup, /const bootstrap = await fetchPostAuthBootstrap\(preferredSide\);[\s\S]*?router\.replace\(bootstrap\.nextRoute/);
   assert.match(login, /const bootstrap = await fetchPostAuthBootstrap\(preferredSide\);[\s\S]*?router\.replace\(bootstrap\.nextRoute/);
+});
+
+test('session restoration runs server-verified bootstrap before private profile hydration', () => {
+  assert.match(entry, /await bootstrapModule\.fetchPostAuthBootstrap\(buildSide\)/);
+  assert.doesNotMatch(entry, /profileModule\.hydrateAccountProfile/);
+  assert.doesNotMatch(entry, /import\('@\/features\/identity\/accountProfile'\)/);
 });
