@@ -147,6 +147,13 @@ async function main() {
   const desiredPublic = desiredConfig({ smtpPass: '[redacted]' });
 
   if (verifyOnly) {
+    // Management credentials must never be handled by untrusted PR workflows.
+    if (env('GITHUB_EVENT_NAME') === 'pull_request' || env('GITHUB_EVENT_NAME') === 'pull_request_target') {
+      throw new Error('AUTH_EMAIL_VERIFY_UNTRUSTED_EVENT');
+    }
+    if (env('GITHUB_REF_NAME') && env('GITHUB_REF_NAME') !== 'main') {
+      throw new Error('AUTH_EMAIL_VERIFY_NON_MAIN');
+    }
     // Read-only provider gate. Run only in a trusted environment with a
     // tightly scoped Supabase Management API credential, never in untrusted
     // pull-request head code. Do not return raw provider config or secrets.
