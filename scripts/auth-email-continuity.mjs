@@ -11,6 +11,8 @@ export const AUTH_EMAIL_SOURCE_FILES = Object.freeze([
   'app/(auth)/signup.tsx',
   'app/index.tsx',
   'src/components/shared/NotificationBootstrap.tsx',
+  'e2e/live-onboarding-email.spec.ts',
+  '.github/workflows/live-signup-proof.yml',
   'src/context/VerificationContext.tsx',
   'src/services/auth/postAuthBootstrap.ts',
   'scripts/configure-supabase-auth-email.mjs',
@@ -32,6 +34,8 @@ function requireSourceTruth(contents) {
   const signup = contents['app/(auth)/signup.tsx'].toString();
   const entry = contents['app/index.tsx'].toString();
   const notifications = contents['src/components/shared/NotificationBootstrap.tsx'].toString();
+  const liveSpec = contents['e2e/live-onboarding-email.spec.ts'].toString();
+  const liveWorkflow = contents['.github/workflows/live-signup-proof.yml'].toString();
 
   const remote = bootstrap.indexOf('await supabase.auth.getUser()');
   const confirmed = bootstrap.indexOf('if (!authoritativeAuth.user.email_confirmed_at)');
@@ -58,6 +62,14 @@ function requireSourceTruth(contents) {
   if (!notifications.includes('await supabase.auth.getUser()') ||
       !notifications.includes('!identity.user.email_confirmed_at')) {
     throw new Error('AUTH_EMAIL_PUSH_REGISTRATION_GATE_MISSING');
+  }
+  const signupProof = liveWorkflow.indexOf('Create disposable account through exact preview UI');
+  const deniedProof = liveWorkflow.indexOf('Prove unverified signup cannot sign in');
+  const confirmationProof = liveWorkflow.indexOf('Confirm disposable signup email');
+  if (!(signupProof >= 0 && deniedProof > signupProof && confirmationProof > deniedProof)
+      || !liveSpec.includes("phase === 'unverified'")
+      || !liveSpec.includes('email_not_confirmed')) {
+    throw new Error('AUTH_EMAIL_NEGATIVE_PROVIDER_PROOF_ORDER_MISSING');
   }
   if (!login.includes('await fetchPostAuthBootstrap(preferredSide)') ||
       !signup.includes('await fetchPostAuthBootstrap(preferredSide)')) {
