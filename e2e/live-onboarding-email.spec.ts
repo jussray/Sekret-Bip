@@ -306,6 +306,14 @@ test.describe('live onboarding email smoke', () => {
 
     expect(signedIn, `Returning teen sign-in never completed: ${lastFailure}`).toBe(true);
 
+    // Welcome delivery is intentionally non-blocking. The response listener
+    // may settle after the login route has already changed.
+    await expect.poll(() => welcomeResponses.length, {
+      message: 'send-welcome-email should complete after successful sign-in',
+      timeout: 15_000,
+      intervals: [200, 500, 1_000],
+    }).toBeGreaterThan(0);
+
     const latestWelcome = welcomeResponses.at(-1);
     await attachPageState(page, 'welcome-email-response', {
       response: latestWelcome ?? { error: 'no send-welcome-email response captured' },
