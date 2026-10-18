@@ -48,6 +48,8 @@ on:
       - test/trigger-function-hardening.test.mjs
       - e2e/smoke.spec.ts
       - src/context/VerificationContext.tsx
+      - app/index.tsx
+      - test/mobile-entry-performance-contract.test.mjs
       - src/services/auth/postAuthBootstrap.ts
       - scripts/configure-supabase-auth-email.mjs
       - scripts/auth-email-continuity.mjs
