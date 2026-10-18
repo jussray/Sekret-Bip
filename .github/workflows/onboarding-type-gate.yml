@@ -55,6 +55,8 @@ on:
       - scripts/configure-supabase-auth-email.mjs
       - scripts/auth-email-continuity.mjs
       - test/auth-email-continuity.test.mjs
+      - e2e/live-onboarding-email.spec.ts
+      - .github/workflows/live-signup-proof.yml
       - test/email-confirmation-access-gate.test.mjs
       - config/supabase-targets.json
       - package.json
