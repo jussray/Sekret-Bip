@@ -35,8 +35,8 @@ jobs:
     name: Plan or apply production Auth email
     runs-on: ubuntu-latest
     # Founder-owned provider credentials (RESEND_API_KEY, SUPABASE_ACCESS_TOKEN)
-    # live in the `login` Actions environment; repo-level secrets still apply.
-    environment: login
+    # live in the `Production` Actions environment; repo-level secrets still apply.
+    environment: Production
     timeout-minutes: 10
     steps:
       - name: Normalize and validate dispatch contract
