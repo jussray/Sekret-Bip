@@ -56,6 +56,12 @@ test('changing confirmation policy invalidates the cookie instead of claiming su
       buildAuthEmailProofCookie({ root: dir, headSha: sha }),
       /AUTH_EMAIL_PROVIDER_DESIRED_CONFIRMATION_MISSING/,
     );
+    assert.ok(before.includes('mailer_allow_unverified_email_sign_ins: false'));
+    await writeFile(configPath, before.replace('mailer_allow_unverified_email_sign_ins: false', 'mailer_allow_unverified_email_sign_ins: true'));
+    await assert.rejects(
+      buildAuthEmailProofCookie({ root: dir, headSha: sha }),
+      /AUTH_EMAIL_PROVIDER_DESIRED_CONFIRMATION_MISSING/,
+    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
