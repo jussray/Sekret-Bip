@@ -2,7 +2,6 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
 import { buildStaticSupabaseIdentityMarker, resolveSupabaseTarget } from './supabase-target-identity.mjs';
 
