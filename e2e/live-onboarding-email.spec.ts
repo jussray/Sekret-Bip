@@ -13,6 +13,7 @@ const signInRetryMs = Number.parseInt(process.env.LIVE_SIGNIN_RETRY_MS?.trim() |
 
 const shouldRunReadiness = phase === 'readiness' || phase === 'all';
 const shouldRunSignup = phase === 'signup' || phase === 'all';
+const shouldRunUnverified = phase === 'unverified';
 const shouldRunSignIn = phase === 'signin' || phase === 'all';
 const shouldRunInvite = phase === 'invite' || phase === 'all';
 
@@ -214,6 +215,54 @@ test.describe('live onboarding email smoke', () => {
 
     expect(authObservations.some((observation) => observation.path.endsWith('/signup'))).toBe(true);
     expect(pageErrors).toEqual([]);
+  });
+
+  test('unconfirmed teen account is rejected by Supabase Auth before email confirmation', async ({ page }) => {
+    test.setTimeout(90_000);
+    test.skip(!shouldRunUnverified, 'Run only before the disposable signup email is confirmed.');
+    test.skip(!liveEmail, 'A disposable LIVE_ONBOARDING_EMAIL is required for this live-write proof.');
+
+    await page.goto('/login?side=teen');
+    await page.getByPlaceholder('Phone number, username or email').fill(liveEmail!);
+    await page.getByPlaceholder('Password').fill(livePassword);
+
+    // An inaccessible server or a client-side redirect cannot prove the
+    // provider rejected unverified credentials. Inspect the actual Auth result.
+    const authResponse = page.waitForResponse((response) => {
+      try {
+        const url = new URL(response.url());
+        return url.hostname.endsWith('.supabase.co')
+          && url.pathname === '/auth/v1/token'
+          && url.searchParams.get('grant_type') === 'password';
+      } catch {
+        return false;
+      }
+    }, { timeout: 45_000 });
+
+    await page.getByRole('button', { name: /log in/i }).click();
+    const response = await authResponse;
+    let providerError: { error_code?: string; code?: string; error_description?: string; msg?: string; message?: string } = {};
+    try {
+      providerError = await response.json();
+    } catch {
+      throw new Error('Unconfirmed-account test requires a parseable Supabase Auth denial.');
+    }
+
+    const classification = String(providerError.error_code || providerError.code || '');
+    const explanation = String(providerError.msg || providerError.error_description || providerError.message || '');
+    expect(response.status(), 'Unconfirmed email must be rejected by Supabase Auth').toBeGreaterThanOrEqual(400);
+    expect(
+      classification === 'email_not_confirmed' || /email.*(not confirmed|unverified)|confirm.*email/i.test(explanation),
+      'The server must specifically deny unconfirmed email, not report a generic error',
+    ).toBe(true);
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+
+    await attachPageState(page, 'unverified-email-login-denied', {
+      phase,
+      authStatus: response.status(),
+      authErrorCode: classification || null,
+      checkpoint: 'server_rejected_unconfirmed_email',
+    });
   });
 
   test('confirmed teen account can return through sign in', async ({ page }) => {
