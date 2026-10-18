@@ -47,6 +47,13 @@ on:
       - test/supabase-bridge-rls-authorization.test.mjs
       - test/trigger-function-hardening.test.mjs
       - e2e/smoke.spec.ts
+      - src/context/VerificationContext.tsx
+      - src/services/auth/postAuthBootstrap.ts
+      - scripts/configure-supabase-auth-email.mjs
+      - scripts/auth-email-continuity.mjs
+      - test/auth-email-continuity.test.mjs
+      - test/email-confirmation-access-gate.test.mjs
+      - config/supabase-targets.json
       - package.json
       - package-lock.json
       - .github/workflows/onboarding-type-gate.yml
@@ -119,6 +126,14 @@ jobs:
             test/bridge-learning-teaching-contract.test.mjs \
             test/journal-avatar-presentation.test.mjs \
             2>&1 | tee gate-evidence/focused-tests.log
+
+      - name: Record exact-head email verification proof cookie
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test test/email-confirmation-access-gate.test.mjs test/auth-email-continuity.test.mjs \
+            2>&1 | tee gate-evidence/email-confirmation-contracts.log
+          node scripts/auth-email-continuity.mjs
 
       - name: Run complete unit suite
         shell: bash
