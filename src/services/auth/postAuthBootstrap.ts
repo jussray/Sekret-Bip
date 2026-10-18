@@ -75,6 +75,18 @@ export async function fetchPostAuthBootstrap(
   const user = data.session?.user;
   if (!user || user.is_anonymous) throw new Error('A permanent signed-in account is required.');
 
+  // A cached session is not proof that the email was confirmed. Revalidate
+  // against Supabase Auth before founder lookup, welcome delivery, or onboarding.
+  const { data: authoritativeAuth, error: authError } = await supabase.auth.getUser();
+  if (
+    authError || !authoritativeAuth.user
+    || authoritativeAuth.user.id !== user.id
+    || authoritativeAuth.user.is_anonymous
+  ) throw new Error('Unable to verify your account. Please sign in again.');
+  if (!authoritativeAuth.user.email_confirmed_at) {
+    throw new Error('Confirm your email before signing in. Check your inbox for the verification link.');
+  }
+
   // Authentication and founder authorization are separate facts. The strict
   // routing lookup throws on provider/read failure so a successful token exchange
   // can never be mistaken for a verified non-founder result.
