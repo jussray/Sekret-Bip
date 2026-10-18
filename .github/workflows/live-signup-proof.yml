@@ -400,6 +400,12 @@ jobs:
           LIVE_ONBOARDING_PHASE: signup
         run: npx playwright test --config=playwright.live-onboarding.config.ts
 
+      - name: Prove unverified signup cannot sign in
+        if: steps.opt_in.outputs.enabled == 'true'
+        env:
+          LIVE_ONBOARDING_PHASE: unverified
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
       - name: Confirm disposable signup email
         if: steps.opt_in.outputs.enabled == 'true'
         env:
