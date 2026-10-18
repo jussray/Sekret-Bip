@@ -27,8 +27,9 @@ test('signed-in web profile bootstrap waits until the welcome has been entered',
   const bootstrapImportAt = entry.indexOf("import('@/services/auth/postAuthBootstrap')");
 
   assert.ok(deferAt >= 0, 'missing public-front-door defer gate');
-  assert.ok(profileImportAt > deferAt, 'profile hydration must stay behind the enter gate');
+  assert.equal(profileImportAt, -1, 'entry must not hydrate private profiles before the provider-confirmed-email gate');
   assert.ok(bootstrapImportAt > deferAt, 'post-auth bootstrap must stay behind the enter gate');
+  assert.match(entry, /await bootstrapModule\.fetchPostAuthBootstrap\(buildSide\)/);
   assert.doesNotMatch(entry, /import \{\s*hydrateAccountProfile/);
   assert.doesNotMatch(entry, /import \{ fetchPostAuthBootstrap \}/);
 });
