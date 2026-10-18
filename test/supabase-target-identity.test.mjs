@@ -188,6 +188,8 @@ test('email-confirmation provider verification is read-only, project-bound, and 
   assert.match(verifyBlock, /AUTH_EMAIL_PROVIDER_CONFIRMED/);
   assert.doesNotMatch(verifyBlock, /method: 'PATCH'|smtp_pass:|RESEND_API_KEY/);
   assert.match(authEmail, /if \(apply && verifyOnly\) throw new Error\('AUTH_EMAIL_MODE_CONFLICT'\)/);
+  assert.match(verifyBlock, /AUTH_EMAIL_VERIFY_UNTRUSTED_EVENT/);
+  assert.match(verifyBlock, /AUTH_EMAIL_VERIFY_NON_MAIN/);
 });
 
 test('identity-only changes trigger and execute the production identity contract gate', () => {
