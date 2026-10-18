@@ -48,6 +48,7 @@ on:
       - test/trigger-function-hardening.test.mjs
       - e2e/smoke.spec.ts
       - src/context/VerificationContext.tsx
+      - src/components/shared/NotificationBootstrap.tsx
       - app/index.tsx
       - test/mobile-entry-performance-contract.test.mjs
       - src/services/auth/postAuthBootstrap.ts
