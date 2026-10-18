@@ -47,7 +47,8 @@ function requireSourceTruth(contents) {
   if ((context.match(sessionGate) || []).length !== 3) {
     throw new Error('AUTH_EMAIL_SESSION_RESTORATION_GATE_MISSING');
   }
-  if (!config.includes('mailer_autoconfirm: false')) {
+  if (!config.includes('mailer_autoconfirm: false') ||
+      !config.includes('mailer_allow_unverified_email_sign_ins: false')) {
     throw new Error('AUTH_EMAIL_PROVIDER_DESIRED_CONFIRMATION_MISSING');
   }
   if (!entry.includes('await bootstrapModule.fetchPostAuthBootstrap(buildSide)') ||
