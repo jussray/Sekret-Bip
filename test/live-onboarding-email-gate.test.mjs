@@ -131,6 +131,7 @@ test('returning-user Playwright proof requires welcome email provider acceptance
 
   assert.match(source, /send-welcome-email/);
   assert.match(source, /welcome-email-response/);
+  assert.match(source, /await expect\.poll\(\(\) => welcomeResponses\.length/);
   assert.match(source, /latestWelcome\?\.status\)\.toBe\(200\)/);
   assert.match(source, /\['sent', 'already_sent'\]/);
   assert.match(workflow, /src\/services\/auth\/welcomeEmail\.ts/);
