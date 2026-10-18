@@ -25,12 +25,13 @@ export async function ensureWelcomeEmail(): Promise<WelcomeEmailResult> {
   const supabase = getSupabase();
   if (!supabase) return { ok: false, status: 'unavailable' };
 
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   try {
     const invocation = supabase.functions.invoke('send-welcome-email', {
       body: {},
     });
     const timeout = new Promise<{ data: null; error: Error }>((resolve) => {
-      setTimeout(() => resolve({
+      timeoutId = setTimeout(() => resolve({
         data: null,
         error: new Error('welcome_email_timeout'),
       }), WELCOME_EMAIL_TIMEOUT_MS);
@@ -58,5 +59,7 @@ export async function ensureWelcomeEmail(): Promise<WelcomeEmailResult> {
   } catch {
     console.warn('[welcome-email] delivery function failed');
     return { ok: false, status: 'failed' };
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
   }
 }
