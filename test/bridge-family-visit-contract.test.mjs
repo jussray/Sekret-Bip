@@ -6,10 +6,10 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migrationsDir = path.join(root, 'supabase', 'migrations');
-const contractPath = path.join(migrationsDir, '20260925200000_bridge_family_visit_mode.sql');
-const hardeningPath = path.join(migrationsDir, '20260925200100_harden_bridge_family_visit_mode.sql');
-const idempotencyPath = path.join(migrationsDir, '20260925200200_idempotent_bridge_family_visit_start.sql');
-const optimizationPath = path.join(migrationsDir, '20260925200300_optimize_bridge_family_visit_policies.sql');
+const contractPath = path.join(migrationsDir, '20261020200000_bridge_family_visit_mode.sql');
+const hardeningPath = path.join(migrationsDir, '20261020200100_harden_bridge_family_visit_mode.sql');
+const idempotencyPath = path.join(migrationsDir, '20261020200200_idempotent_bridge_family_visit_start.sql');
+const optimizationPath = path.join(migrationsDir, '20261020200300_optimize_bridge_family_visit_policies.sql');
 
 const contract = fs.readFileSync(contractPath, 'utf8');
 const hardening = fs.readFileSync(hardeningPath, 'utf8');
