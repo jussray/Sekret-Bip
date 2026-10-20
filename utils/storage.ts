@@ -34,8 +34,8 @@ const STORAGE_KEYS = {
 };
 
 const JSON_KEYS = new Set([
-  'entries', 'parentPagesEntries', 'moodHistory', 'circlePosts', 'parentCirclePosts', 'voiceNotes', 'parentVoiceNotes', 'comfortSessions',
-  'entries', 'parentPagesEntries', 'oracleProfile', 'parentOracleProfile', 'oracleSessions', 'parentOracleSessions', 'moodHistory', 'circlePosts', 'parentCirclePosts', 'voiceNotes', 'parentVoiceNotes', 'comfortSessions',
+  'entries', 'parentPagesEntries', 'oracleProfile', 'parentOracleProfile', 'oracleSessions', 'parentOracleSessions',
+  'moodHistory', 'circlePosts', 'parentCirclePosts', 'voiceNotes', 'parentVoiceNotes', 'comfortSessions',
   'crewMembers', 'crewCheckIns', 'roomMemory', 'periodDays',
 ]);
 
