@@ -7,6 +7,7 @@ const read = path => readFileSync(path, 'utf8');
 const component = read('components/rooms/ScrapbookCompanionScene.tsx');
 const route = read('app/(teen)/scrapbook-check-in.tsx');
 const room = read('app/(teen)/room.tsx');
+const pages = read('app/(teen)/pages/index.tsx');
 const layout = read('app/(teen)/_layout.tsx');
 const routes = read('src/teen/routes.ts');
 const canon = read('docs/SCRAPBOOK_UI_CANON.md');
@@ -36,6 +37,10 @@ test('scene handoff preserves the requested companion and existing Pages destina
   assert.match(route, /requestedCompanion \?\? selectedSekret/);
   assert.match(route, /normalizeScrapbookCompanion/);
   assert.match(route, /setSelectedSekret\(companionKey\)/);
+  assert.match(pages, /useLocalSearchParams/);
+  assert.match(pages, /requestedCompanion/);
+  assert.match(pages, /setActiveTab\(nextCompanion\)/);
+  assert.match(pages, /setSelectedSekret\(nextCompanion\)/);
   assert.match(route, /pathname:\s*TEEN_ROUTES\.pages/);
   assert.match(route, /params:\s*\{ companion: companionKey \}/);
   assert.doesNotMatch(route, /companion-chat/);
@@ -48,6 +53,14 @@ test('Rain continuity and time phase refresh remain live while the scene is moun
   assert.match(component, /useScrapbookPhase\(rainOverride\)/);
   assert.match(route, /rainOverride=\{theme === 'rain'\}/);
   assert.match(room, /rainOverride=\{vibe === 'rain'\}/);
+  assert.match(component, /useWindowDimensions\(\)/);
+  assert.match(component, /const compact = viewportHeight < 700/);
+  assert.match(component, /photoWellCompact/);
+
+  const overlayIndex = room.indexOf('<BipReturnOverlay');
+  const footerIndex = room.indexOf('testID="scrapbook-check-in-footer"');
+  assert.ok(overlayIndex > 0 && footerIndex > 0 && overlayIndex < footerIndex,
+    'BipReturnOverlay must remain inside the Room canvas before the scrapbook footer');
 });
 
 test('visible peer companion canon stays Suhana, Sy, Cloud, and Night while Ja remains distinct', () => {
@@ -90,6 +103,8 @@ test('Product Design proof captures the actual Sy evening route and proves the P
   assert.match(e2e, /EVENING CHECK-IN/);
   assert.match(e2e, /you made it through today\./);
   assert.match(e2e, /sy-evening-390x844\.png/);
+  assert.match(e2e, /width:\s*320,\s*height:\s*568/);
+  assert.match(e2e, /sy-evening-320x568\.png/);
   assert.match(e2e, /toHaveAccessibleName\('Bip with Sy'\)/);
   assert.match(e2e, /SE'KRET PAGES/);
   assert.match(e2e, /getByText\('Sy'/);
