@@ -4,7 +4,7 @@ begin;
 -- A historical Crew migration already revoked anonymous EXECUTE, but production
 -- had regained that grant. The private RLS helper is used by authenticated
 -- Crew recipients and must remain executable by that role.
--- Source-only until applied through the production migration authority.
+-- Applied to the Se’kret Bip production database at version 20261020075835.\n-- This checked-in migration preserves the verified provider change for replay.
 
 do $guard$
 begin
