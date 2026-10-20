@@ -20,7 +20,6 @@ import {
   selectSessionQuestions,
 } from '../services/oracleProfile';
 import type { OracleQuestion, OracleRecord } from '../types/oracle';
-import type { JournalEntry } from '../types';
 import { OracleDiscoveryPanel } from '../components/OracleDiscoveryPanel';
 import type { OracleProfile, OracleSessionSummary } from '../services/oracleDiscovery';
 

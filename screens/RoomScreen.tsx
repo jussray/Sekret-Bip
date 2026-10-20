@@ -925,9 +925,9 @@ export function RoomScreen({
           accessibilityLabel={isSekretVisible ? "Hide Se\u2019kret" : "Call Se\u2019kret"}
         >
           <Text style={styles.greetingChar}>
-            {character === ‘raylene’ ? ‘💜 Raylene’ :
-             character === ‘rylane’  ? ‘⚡ Rylane’  :
-             character === ‘cloud’   ? "☁️ Cloud Se’kret" :
+            {character === "raylene" ? "💜 Raylene" :
+             character === "rylane"  ? "⚡ Rylane"  :
+             character === "cloud"   ? "☁️ Cloud Se’kret" :
                                        "🌙 Night Se’kret"}
           </Text>
           <Text style={styles.roomCopy}>{getRoomCopy(character, timeOfDay)}</Text>

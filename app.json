@@ -3,6 +3,7 @@
     "name": "Se'kret Bip",
     "slug": "sekret-bip",
     "version": "1.0.0",
+    "platforms": ["ios", "android", "web"],
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "scheme": "sekret",

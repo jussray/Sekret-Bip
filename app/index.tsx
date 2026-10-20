@@ -159,8 +159,6 @@ export default function App() {
   // ─── Circle ────────────────────────────────────────────────────────────
   const [circlePosts, setCirclePosts]                   = useState<CirclePost[]>([]);
   const [circlePostText, setCirclePostText]             = useState('');
-  const [parentCirclePosts, setParentCirclePosts]       = useState<CirclePost[]>([]);
-  const [parentCirclePostText, setParentCirclePostText] = useState('');
 
   // ─── Circle (Parent) — fully separated state ────────────────────────────
   const [parentCirclePosts, setParentCirclePosts]       = useState<ParentCirclePost[]>([]);
