@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 
 // ── Screens ────────────────────────────────────────────────────────────────
 // NOTE: HomeScreen is imported for the 'dashboard' route (MoreScreen → Dashboard).
@@ -497,18 +497,18 @@ export default function App() {
 
   const saveParentCirclePost = () => {
     if (!parentCirclePostText.trim()) return;
-    const post: CirclePost = {
+    const post: ParentCirclePost = {
       id: Number(Date.now()), text: parentCirclePostText,
       date: new Date().toLocaleDateString(),
       time: new Date().toLocaleTimeString(),
-      reactions: { felt: 0, comfort: 0, proud: 0, stay: 0 },
+      reactions: { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
     };
     setParentCirclePosts(p => [post, ...p]);
     setParentCirclePostText('');
   };
 
   const reactToParentPost = (id: string | number, type: string) => {
-    const reactionKey = type as keyof CirclePost['reactions'];
+    const reactionKey = type as keyof ParentCirclePost['reactions'];
     setParentCirclePosts(posts => posts.map(p =>
       String(p.id) === String(id)
         ? { ...p, reactions: { ...p.reactions, [reactionKey]: (p.reactions[reactionKey] || 0) + 1 } }

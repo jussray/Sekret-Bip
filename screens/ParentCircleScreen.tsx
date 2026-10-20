@@ -282,7 +282,7 @@ export function ParentCircleScreen({
               onPress={() => setShowTagPicker(s => !s)}
               style={[styles.tagToggle, selectedTag ? styles.tagToggleActive : {}]}
             >
-              <Text style={[styles.tagToggleText, selectedTag && styles.tagToggleTextActive]}>
+              <Text style={[styles.tagToggleText, selectedTag ? styles.tagToggleTextActive : null]}>
                 {selectedTag ? `✦ ${selectedTag}` : '+ topic tag (optional)'}
               </Text>
             </TouchableOpacity>

@@ -35,7 +35,7 @@ type CirclePost = {
   time?: string;
   bipType?: string;
   mediaUri?: string;
-  mediaKind?: MediaType;
+  mediaKind?: string;
   postMood?: string;
   circleTag?: string;
   reactions?: {
@@ -54,7 +54,7 @@ type CircleScreenProps = {
   circlePosts: CirclePost[];
   circlePostText: string;
   setCirclePostText: (text: string) => void;
-  saveCirclePost: (extra?: Partial<CirclePost>) => void;
+  saveCirclePost: (extra?: { text?: string; mediaKind?: string; circleTag?: string; postMood?: string }) => void;
   reactToPost: (id: string | number, type: string) => void;
   setScreen: (screen: string) => void;
   BottomNav: React.ReactNode;

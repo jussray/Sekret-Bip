@@ -172,7 +172,7 @@ function formatEntryMeta(entry: JournalEntry) {
   return [entry.date, entry.time, entry.moodTag || entry.mood, mode].filter(Boolean).join(' · ');
 }
 
-function PagesWorkspace({ side, entries, draft, setDraft, onSave, setScreen, BottomNav, mood, oracleProfile, onCompleteOracleSession }: SharedPagesProps) {
+function PagesWorkspace({ side, entries, draft, setDraft, onSave, setScreen, BottomNav, mood, selectedSekret, parentRoomStyle, weatherMode, moodHistory, voiceNotes, streakDays, oracleProfile, onCompleteOracleSession }: SharedPagesProps) {
   const tabs = side === 'teen' ? TEEN_TABS : PARENT_TABS;
   const isRylane = selectedSekret === 'rylane';
   const parentBg = parentRoomStyle === 'dad' ? '#0c1219' : '#17110e';
@@ -348,67 +348,7 @@ function PagesWorkspace({ side, entries, draft, setDraft, onSave, setScreen, Bot
           </View>
         ) : null}
 
-        {activeTab === 'oracle' ? (
-          <View style={styles.oraclePanel}>
-            {oraclePhase === 'loading' && (
-              <Text style={styles.oracleListening}>Oracle is thinking…</Text>
-            )}
-            {oraclePhase === 'questioning' && sessionQuestions[sessionTurnIndex] && (
-              <>
-                <View style={styles.oracleQuestionBlock}>
-                  <Text style={styles.oracleQuestionNum}>
-                    {sessionTurnIndex + 1} of {sessionQuestions.length}
-                  </Text>
-                  <Text style={styles.oracleQuestionText}>
-                    {sessionQuestions[sessionTurnIndex].text}
-                  </Text>
-                </View>
-                <TextInput
-                  multiline
-                  value={oracleAnswer}
-                  onChangeText={setOracleAnswer}
-                  placeholder="Say whatever comes first…"
-                  placeholderTextColor="#736c82"
-                  style={styles.oracleInput}
-                  textAlignVertical="top"
-                />
-                <TouchableOpacity
-                  onPress={submitOracleAnswer}
-                  disabled={!oracleAnswer.trim()}
-                  style={[styles.oracleSubmit, !oracleAnswer.trim() && styles.oracleSubmitDisabled]}
-                >
-                  <Text style={styles.oracleSubmitText}>Answer</Text>
-                </TouchableOpacity>
-              </>
-            )}
-            {oraclePhase === 'ack' && (
-              <View style={styles.oracleAckBlock}>
-                <Text style={styles.oracleAckText}>{ackText}</Text>
-              </View>
-            )}
-            {oraclePhase === 'done' && (
-              <View style={styles.oracleDoneBlock}>
-                <Text style={styles.oracleDoneText}>
-                  {oracleRecord && oracleRecord.totalTurns > 0
-                    ? "Oracle has what it needs for now. Come back and it'll have more questions."
-                    : 'Oracle is here. Come back to start a conversation.'}
-                </Text>
-                {oracleRecord && oracleRecord.history.length > 0 && (
-                  <>
-                    <Text style={styles.oracleHistoryHeader}>Earlier this session</Text>
-                    {oracleRecord.history.slice(-3).map((turn, i) => (
-                      <View key={i} style={styles.oracleHistoryItem}>
-                        <Text style={styles.oracleHistoryQ}>{turn.question}</Text>
-                        <Text style={styles.oracleHistoryA}>{turn.answer}</Text>
-                      </View>
-                    ))}
-                  </>
-                )}
-              </View>
-            )}
-          </View>
-        ) : (
-          <>
+        <>
             <View style={[styles.paper, { borderColor: tab.accent + '70' }]}>
               <TextInput
                 autoFocus={activeTab === 'me'}
@@ -453,7 +393,6 @@ function PagesWorkspace({ side, entries, draft, setDraft, onSave, setScreen, Bot
               </TouchableOpacity>
             </View>
           </>
-        )}
 
         <Text style={styles.privacyLine}>
           {side === 'teen'
@@ -485,7 +424,7 @@ function PagesWorkspace({ side, entries, draft, setDraft, onSave, setScreen, Bot
   );
 }
 
-export function PagesScreen({ journalText, setJournalText, journalEntries, saveJournalEntry, mood, setScreen, BottomNav, oracleProfile, onCompleteOracleSession }: PagesScreenProps) {
+export function PagesScreen({ journalText, setJournalText, journalEntries, saveJournalEntry, mood, setScreen, BottomNav, selectedSekret, moodHistory, voiceNotes, streakDays, oracleProfile, onCompleteOracleSession }: PagesScreenProps) {
   return (
     <PagesWorkspace
       side="teen" entries={journalEntries} draft={journalText} setDraft={setJournalText}
