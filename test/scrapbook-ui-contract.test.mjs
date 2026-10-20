@@ -38,9 +38,12 @@ test('scene handoff preserves the requested companion and existing Pages destina
   assert.match(route, /normalizeScrapbookCompanion/);
   assert.match(route, /setSelectedSekret\(companionKey\)/);
   assert.match(pages, /useLocalSearchParams/);
+  assert.match(pages, /useFocusEffect\(useCallback/);
   assert.match(pages, /requestedCompanion/);
   assert.match(pages, /setActiveTab\(nextCompanion\)/);
   assert.match(pages, /setSelectedSekret\(nextCompanion\)/);
+  assert.match(pages, /router\.setParams\(\{ companion: '' \}\)/);
+  assert.doesNotMatch(pages, /\[activeTab, requestedCompanion, selectedSekret/);
   assert.match(route, /pathname:\s*TEEN_ROUTES\.pages/);
   assert.match(route, /params:\s*\{ companion: companionKey \}/);
   assert.doesNotMatch(route, /companion-chat/);
