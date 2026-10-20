@@ -18,4 +18,10 @@ export {
   normalizeVibeKey,
 } from './theme';
 
+export { TEEN_COMPANION_IMAGES } from './companionImages';
+export {
+  TEEN_COMPANION_MANIFEST,
+  getTeenCompanionAssetStatus,
+} from './companionManifest';
+
 export type { VibeKey } from './theme';

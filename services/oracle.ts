@@ -1,4 +1,4 @@
-import type { JournalEntry, MoodEntry, VoiceNote } from '../types';
+import type { JournalEntry, MoodEntry, VoiceNote } from '@/types';
 
 export interface OracleInsight {
   id: string;

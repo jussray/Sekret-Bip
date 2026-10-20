@@ -64,7 +64,7 @@ Replace generic social terms with Se'kret Bip language throughout the app:
 
 ## 5. Backend Tables
 
-Required tables to audit and verify in `db/schema.sql`:
+Required tables to audit and verify (`db/schema.sql` is retired — check `supabase/migrations/` instead):
 
 ```
 circle_profiles
@@ -102,7 +102,7 @@ RLS must be scoped per circle type. Parent Circle tables are isolated from Frien
 - [ ] Disable comments on Public Circle feed (reactions only)
 - [ ] Enable comments on Friends, Crew, and Parent
 - [ ] Add block/report controls on all four circle feeds
-- [ ] Align `db/schema.sql` with all circle tables
+- [ ] Align `supabase/migrations/` with all circle tables (`db/schema.sql` is retired)
 - [ ] Add RLS policies scoped by circle type and auth.uid()
 - [ ] Keep Parent Circle data isolated from other circle queries
 - [ ] Replace all generic social copy with Se'kret Bip terms

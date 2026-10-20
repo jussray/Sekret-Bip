@@ -1,0 +1,55 @@
+{
+  "features": [
+    {
+      "id": "founder-preview-unlock",
+      "name": "Development-only Founder Preview for every inspectable app feature",
+      "status": "integrated",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/406",
+      "acceptanceCriteria": [
+        "Expo Go and native development builds expose one catalog containing every canonical Teen and Parent route plus founder tools; web development requires explicit enablement and production always remains disabled.",
+        "Point-gated companions open through a display-only preview balance without changing point balances, transactions, Tickets, rewards, or permanent unlocks.",
+        "Implemented Crew and Bridge surfaces open in development, with local sample states when real linked-account data is absent, and sample interactions do not write to Supabase.",
+        "Age, authentication, consent, accepted relationship, RLS, privacy, moderation, device permission, and server rollout boundaries remain enforced.",
+        "OpenAI and Anthropic agents share one provider-aware handoff that distinguishes live features, setup-dependent paths, server rollouts, prototypes, and unbuilt work."
+      ],
+      "contractPaths": [
+        "docs/OPENAI_ANTHROPIC_FOUNDER_PREVIEW.md",
+        "src/constants/founderPreview.ts",
+        ".env.example"
+      ],
+      "runtimePaths": [
+        "app/(dev)/feature-preview.tsx",
+        "app/(dev)/scrapbook-preview.tsx",
+        "app/(teen)/_layout.tsx",
+        "app/(parent)/_layout.tsx",
+        "app/(teen)/more.tsx",
+        "app/(parent)/more.tsx",
+        "screens/MoreScreen.tsx",
+        "src/features/activity/ledger.ts",
+        "src/constants/relationshipFeatureFlags.ts",
+        "src/features/testing/devTestFamily.ts",
+        "src/screens/CrewAccountabilityScreen.tsx",
+        "src/features/bridge/ParentBridgeSummaryInbox.tsx"
+      ],
+      "testPaths": [
+        "test/founder-preview-unlock.test.mjs",
+        "test/feature-flow-contracts.test.mjs"
+      ],
+      "telemetryPaths": [
+        "app/(dev)/feature-preview.tsx",
+        "src/services/logEvent.ts"
+      ],
+      "rollout": {
+        "state": "development_only",
+        "controlPath": "src/constants/founderPreview.ts",
+        "controlKey": "__DEV__ && (explicit true || native platform default)"
+      },
+      "verification": {
+        "state": "partial",
+        "evidence": "https://github.com/jussray/Sekret-Bip/issues/406",
+        "blocker": "Exact-head CI plus an Expo Go founder-device walkthrough, confirmation that preview actions do not change real point or reward data, and controlled teen/parent account proof remain before verified status."
+      },
+      "rollback": "Revert the Founder Preview merge. No schema rollback is required because the feature introduces no database migration and writes no preview point, Crew sample, Bridge sample, or Scrapbook prototype data."
+    }
+  ]
+}

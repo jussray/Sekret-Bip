@@ -9,13 +9,35 @@
 // NEVER reference service_role keys in client code.
 
 import 'react-native-url-polyfill/auto';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { AppState, Platform } from 'react-native';
+import { createClient, processLock, type SupabaseClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { SUPABASE_URL, SUPABASE_ANON, isSupabaseReady } from '../utils/env';
+import { PASSWORD_RECOVERY_PATH } from '@/features/auth/passwordRecovery';
+import { SUPABASE_URL, SUPABASE_ANON, isSupabaseReady } from './env';
 
 export const isSupabaseConfigured = isSupabaseReady;
 
 let _client: SupabaseClient | null = null;
+let _autoRefreshListenerInstalled = false;
+
+function installNativeAutoRefresh(client: SupabaseClient) {
+  if (Platform.OS === 'web' || _autoRefreshListenerInstalled) return;
+  _autoRefreshListenerInstalled = true;
+
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') client.auth.startAutoRefresh();
+    else client.auth.stopAutoRefresh();
+  });
+}
+
+function shouldDetectSessionInUrl(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  // Confirmation links may be consumed globally. Password recovery is handled by
+  // ResetPasswordScreen so its one-time PKCE code cannot be exchanged twice.
+  return !pathname.endsWith(PASSWORD_RECOVERY_PATH);
+}
 
 export function getSupabase(): SupabaseClient | null {
   if (!isSupabaseConfigured) return null;
@@ -25,13 +47,18 @@ export function getSupabase(): SupabaseClient | null {
       storage:            AsyncStorage,
       autoRefreshToken:   true,
       persistSession:     true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: shouldDetectSessionInUrl(),
+      lock:               processLock,
     },
   });
+  installNativeAutoRefresh(_client);
   return _client;
 }
 
 export const TABLES = {
+  // ── Account identity + verification ────────────────────────────────────────
+  appProfiles:         'app_profiles',
+  accountVerification: 'account_verification',
   // ── Private per-user tables (0001_init.sql) ─────────────────────────────
   journalEntries:     'journal_entries',
   moodHistory:        'mood_history',
@@ -45,6 +72,7 @@ export const TABLES = {
   bipPoints:          'bip_points',
   circlePosts:        'circle_posts',
   parentCirclePosts:  'parent_circle_posts',
+  dailyIntentions:    'daily_intentions',
   // ── Shared Circle V1 tables (0002_circle_v1.sql) ────────────────────────
   publicCirclePosts:   'public_circle_posts',
   friendsCirclePosts:  'friends_circle_posts',
@@ -67,6 +95,15 @@ export const TABLES = {
   friendships:         'friendships',
   // ── Oracle tables (0003_oracle_parentlinks_period_safety.sql) ───────────
   oracleSessions:      'oracle_sessions',
+  // ── Bridge tables (20260618 + 20260621 migrations) ───────────────────────
+  bridgeSignals:       'bridge_signals',
+  parentNotes:         'parent_notes',
+  // ── Teen activity summary (20260626) ─────────────────────────────────────────
+  teenActivitySummary: 'teen_activity_summary',
+  // ── Activity event ledger (20260627) ─────────────────────────────────────────
+  bipEvents:           'bip_events',
+  // ── Point transaction ledger (20260627) ──────────────────────────────────────
+  pointTransactions:   'point_transactions',
   // ── Compliance tables (20260724_compliance_foundation.sql) ──────────────
   userProfiles:        'user_profiles',
   consentLog:          'consent_log',

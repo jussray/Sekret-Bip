@@ -5,7 +5,7 @@
 // What happened? What did I feel? What do I wish I had done differently?
 //
 // Voice-note-style: one prompt at a time, quick capture, private history.
-// Prompts rotate through different lenses: observation, self, teen, next time.
+// Prompts rotate through different lenses: observation, self, teen, next time, patterns.
 
 import React, { useState, useEffect, useRef } from 'react';
 import {
@@ -24,34 +24,61 @@ const PROMPT_SETS = {
     "What did my teen do or say that surprised me?",
     "What moment today felt like connection?",
     "What moment felt like distance?",
+    "What do I actually know about what my teen's day was like today?",
+    "When did I make an assumption instead of asking?",
+    "What did their body language tell me that their words didn't?",
+    "What was I doing when they needed my attention most?",
   ],
   self: [
     "What was I feeling when things got hard?",
     "What triggered me, and why might that be?",
     "Where did I show up the way I wanted to?",
     "Where did I show up in ways I regret?",
+    "What am I carrying today that isn't actually about them?",
+    "What fear is underneath my frustration right now?",
+    "When today did I react instead of respond?",
+    "What do I need that I haven't asked for?",
   ],
   teen: [
     "What might my teen have been feeling today?",
     "What do they need from me that I might not be giving?",
     "What are they good at that I rarely say out loud?",
     "What is hard for them right now that I can acknowledge?",
+    "What did they say today that I dismissed too quickly?",
+    "What are they proud of right now that I haven't noticed?",
+    "What are they afraid of that they haven't told me?",
+    "If I were their age right now, what would I need from my parent?",
   ],
   next: [
     "If I could rewind one moment today, what would I do differently?",
     "What is one thing I want to do tomorrow to stay connected?",
     "What is one thing I want to stop doing?",
     "What do I want them to know — even if I never say it out loud?",
+    "What pattern do I want to break this week?",
+    "What strength do I want to lean on more?",
+    "What conversation have I been avoiding?",
+    "What would 'good enough' look like tomorrow instead of perfect?",
+  ],
+  pattern: [
+    "What is one dynamic between us that keeps repeating?",
+    "When does our relationship feel the most stuck? What's usually happening?",
+    "What do I always say that they always seem to shut down to?",
+    "What pattern in me might be making connection harder?",
+    "What cycles do we keep running? What would break them?",
+    "When we're at our best, what's different?",
+    "What am I modeling for them without realizing it?",
+    "What do I keep promising to change that I haven't?",
   ],
 };
 
 type Lens = keyof typeof PROMPT_SETS;
 
 const LENS_LABELS: Record<Lens, { icon: string; label: string }> = {
-  observe: { icon: '👁️', label: 'Observe'    },
-  self:    { icon: '🪞', label: 'Self'        },
-  teen:    { icon: '💜', label: 'My Teen'     },
-  next:    { icon: '🔄', label: 'Next Time'   },
+  observe: { icon: '👁️', label: 'Observe'   },
+  self:    { icon: '🪞', label: 'Self'       },
+  teen:    { icon: '💜', label: 'My Teen'    },
+  next:    { icon: '🔄', label: 'Next Time'  },
+  pattern: { icon: '🔁', label: 'Patterns'   },
 };
 
 interface ReflectionEntry {
@@ -75,7 +102,7 @@ export function ParentVoiceReflectionScreen({ setScreen, BottomNav }: ParentVoic
   const [saved, setSaved]             = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  const fadeIn   = useRef(new Animated.Value(0)).current;
+  const fadeIn    = useRef(new Animated.Value(0)).current;
   const savedAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -114,7 +141,6 @@ export function ParentVoiceReflectionScreen({ setScreen, BottomNav }: ParentVoic
     setDraft('');
     setSaved(true);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
-    // Fade the save confirmation
     savedAnim.setValue(1);
     Animated.timing(savedAnim, { toValue: 0, duration: 2000, delay: 800, useNativeDriver: true }).start();
     setTimeout(() => setSaved(false), 3000);
@@ -162,7 +188,7 @@ export function ParentVoiceReflectionScreen({ setScreen, BottomNav }: ParentVoic
         <View style={s.promptCard}>
           <Text style={s.promptText}>{currentPrompt}</Text>
           <TouchableOpacity onPress={nextPrompt} style={s.skipBtn}>
-            <Text style={s.skipText}>Different question</Text>
+            <Text style={s.skipText}>Different question ({(promptIdx % PROMPT_SETS[lens].length) + 1}/{PROMPT_SETS[lens].length})</Text>
           </TouchableOpacity>
         </View>
 
@@ -226,11 +252,11 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingTop: TOP, paddingHorizontal: 20, paddingBottom: 16,
   },
-  back:     { color: '#c4b5fd', fontSize: 22, fontWeight: '300' },
-  title:    { color: '#fff', fontSize: 20, fontWeight: '800' },
-  sub:      { color: '#94A3B8', fontSize: 12, marginTop: 2 },
-  lockBadge:{ backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 6 },
-  lockText: { fontSize: 16 },
+  back:      { color: '#c4b5fd', fontSize: 22, fontWeight: '300' },
+  title:     { color: '#fff', fontSize: 20, fontWeight: '800' },
+  sub:       { color: '#94A3B8', fontSize: 12, marginTop: 2 },
+  lockBadge: { backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 10, padding: 6 },
+  lockText:  { fontSize: 16 },
 
   lensScroll: { marginBottom: 16 },
   lensTabs:   { paddingHorizontal: 20, gap: 8, flexDirection: 'row' },
@@ -239,10 +265,10 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#374151', borderRadius: 20,
     paddingHorizontal: 12, paddingVertical: 8,
   },
-  lensTabActive:  { backgroundColor: 'rgba(192,132,252,0.18)', borderColor: '#c084fc' },
-  lensIcon:       { fontSize: 16 },
-  lensLabel:      { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
-  lensLabelActive:{ color: '#e9d5ff' },
+  lensTabActive:   { backgroundColor: 'rgba(192,132,252,0.18)', borderColor: '#c084fc' },
+  lensIcon:        { fontSize: 16 },
+  lensLabel:       { color: '#94A3B8', fontSize: 12, fontWeight: '600' },
+  lensLabelActive: { color: '#e9d5ff' },
 
   promptCard: {
     marginHorizontal: 20, marginBottom: 16,
@@ -271,7 +297,7 @@ const s = StyleSheet.create({
   },
   saveBtnText: { color: '#e9d5ff', fontSize: 14, fontWeight: '700' },
 
-  historyToggle: { marginHorizontal: 20, marginBottom: 12, alignItems: 'center' },
+  historyToggle:     { marginHorizontal: 20, marginBottom: 12, alignItems: 'center' },
   historyToggleText: { color: '#64748B', fontSize: 12 },
 
   historyCard: {

@@ -1,0 +1,57 @@
+{
+  "cloud": {
+    "$metadata": {
+      "vibeKey": "cloud",
+      "displayName": "Cloud Drift",
+      "atmosphere": "atmosphere",
+      "character": "cloud",
+      "isAtmosphereOnly": false,
+      "isCompanionMascot": true
+    },
+    "color": {
+      "bg":          { "value": "#F3FEFA", "type": "color" },
+      "card":        { "value": "#E8FAF4", "type": "color" },
+      "cardAlt":     { "value": "#D8F5EC", "type": "color" },
+      "accentA":     { "value": "#A8E6CF", "type": "color", "$description": "softMint — buttons, focus rings" },
+      "accentB":     { "value": "#7EC8E3", "type": "color", "$description": "skyBlue — secondary accents" },
+      "accentC":     { "value": "#FFD166", "type": "color", "$description": "sunGold — tertiary accents" },
+      "textHigh":    { "value": "#0E2E22", "type": "color" },
+      "textMid":     { "value": "#3A6A52", "type": "color" },
+      "textLow":     { "value": "#7ABAA2", "type": "color" },
+      "divider":     { "value": "rgba(14,46,34,0.08)", "type": "color" },
+      "glowColor":   { "value": "#A8E6CF", "type": "color" },
+      "glowRadius":  { "value": "44", "type": "other" },
+      "selectorRing": { "value": "#A8E6CF", "type": "color" }
+    },
+    "overlay": {
+      "base":    { "value": "rgba(243,254,250,0.74)", "type": "color" },
+      "accent":  { "value": "rgba(126,200,227,0.12)", "type": "color" },
+      "primary": { "value": "rgba(168,230,207,0.08)", "type": "color" }
+    },
+    "input": {
+      "bg":          { "value": "{cloud.color.bg}",     "type": "color" },
+      "border":      { "value": "{cloud.color.divider}", "type": "color" },
+      "borderFocus": { "value": "{cloud.color.accentA}", "type": "color" },
+      "radius":      { "value": "{global.radius.md}",   "type": "borderRadius" }
+    },
+    "button": {
+      "primaryBg":    { "value": "{cloud.color.accentA}", "type": "color" },
+      "primaryText":  { "value": "{cloud.color.textHigh}", "type": "color" },
+      "secondaryBg":  { "value": "{cloud.color.card}",    "type": "color" },
+      "secondaryText": { "value": "{cloud.color.textHigh}", "type": "color" },
+      "secondaryBorder": { "value": "{cloud.color.accentA}", "type": "color" },
+      "radius":       { "value": "{global.radius.pill}", "type": "borderRadius" }
+    },
+    "badge": {
+      "bg":     { "value": "{cloud.color.accentA}", "type": "color" },
+      "text":   { "value": "{cloud.color.textHigh}", "type": "color" },
+      "radius": { "value": "{global.radius.pill}", "type": "borderRadius" }
+    },
+    "card": {
+      "bg":          { "value": "{cloud.color.card}",   "type": "color" },
+      "border":      { "value": "{cloud.color.divider}", "type": "color" },
+      "borderWidth": { "value": "1", "type": "borderWidth" },
+      "radius":      { "value": "{global.radius.card}", "type": "borderRadius" }
+    }
+  }
+}

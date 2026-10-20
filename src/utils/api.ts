@@ -1,15 +1,43 @@
-/**
+/*
  * src/utils/api.ts
  *
- * Canonical backend API helpers. OpenAI is called only by the secure backend;
- * the Expo app sends teen-safe request context and never receives or stores an
- * OPENAI_API_KEY.
+ * Backward-compatible Se'kret API helpers. Network transport now flows through
+ * the shared typed Worker client so every surface receives the same auth,
+ * timeout, status-code, and trace behavior.
+ *
+ * Launch voice policy:
+ * - Text companion replies may use the Worker/OpenAI path.
+ * - STT and server TTS are OFF by default to keep launch cost near zero.
+ * - Companion speech uses the device/browser speech engine by default.
+ * - Paid/server audio can be explicitly re-enabled with Expo public flags.
  */
-const BASE_URL = ((process.env as Record<string, string | undefined>).EXPO_PUBLIC_BACKEND_URL ?? '').replace(/\/$/, '');
+import type {
+  CharacterAlignment,
+  CompanionAvatarState,
+  CompanionHistoryTurn,
+  CompanionReplyRequest,
+  CompanionReplySource,
+  VoiceProvider,
+  VoiceSynthesisRequest,
+} from '@/contracts/sekretApi';
+import {
+  createNaturalFallbackResponse,
+  type NaturalFallbackResponse,
+} from '@/features/sekret/naturalFallbacks';
+import { sekretClient, WORKER_BASE_URL } from '@/services/backend/sekretClient';
+import { logCompanionFallbackUsage } from '@/services/runtimeAudit';
+import { speakDeviceReply } from '../../utils/deviceSpeech';
 
-export type SekretCharacterId = 'raylene' | 'rylane' | 'cloud' | 'night';
-export type SekretSurface = 'journal' | 'voiceBip' | 'comfort' | 'circle' | 'parentBridge';
-export type SekretAvatarState = 'neutral' | 'listening' | 'thinking' | 'comforting' | 'happy' | 'concerned' | 'responding';
+export type VisibleSekretCharacterId = 'suhana' | 'sy' | 'cloud' | 'night';
+export type LegacySekretCharacterId = 'raylene' | 'rylane';
+export type SekretCharacterId = VisibleSekretCharacterId | 'sekret';
+export type SekretSurface = 'journal' | 'voiceBip' | 'comfort' | 'circle' | 'parentBridge' | 'selfDiscovery';
+export type SekretAvatarState = CompanionAvatarState;
+export type SekretReplySource = CompanionReplySource;
+export type SekretHistoryTurn = CompanionHistoryTurn;
+export type SekretVoiceRequest = Omit<VoiceSynthesisRequest, 'characterId'> & {
+  characterId: SekretCharacterId;
+};
 
 export interface SekretBrainResponse {
   reply: string;
@@ -18,17 +46,56 @@ export interface SekretBrainResponse {
   safetyFlag: boolean;
   parentShareSummary: string | null;
   suggestedComfortTool: string | null;
+  replySource: SekretReplySource;
+  traceId?: string;
+  questionBudget?: number;
 }
 
 export interface SekretVoiceResponse {
   audioBase64: string;
   contentType: string;
   characterId: SekretCharacterId;
+  voiceProvider?: VoiceProvider;
+  primaryVoiceProvider?: VoiceProvider;
+  model?: string;
+  voiceId?: string;
+  usedFallback: boolean;
+  timing?: CharacterAlignment;
+  traceId?: string;
 }
 
-function normalizeCharacter(value?: string): SekretCharacterId {
-  if (value === 'rylane' || value === 'cloud' || value === 'night') return value;
-  return 'raylene';
+const VISIBLE_NAMES: Record<SekretCharacterId, string> = {
+  suhana: 'Suhana',
+  sy: 'Sy',
+  cloud: 'Cloud',
+  night: 'Night',
+  sekret: "Se'kret",
+};
+
+const PAID_STT_ENABLED = process.env.EXPO_PUBLIC_VOICE_STT_ENABLED === 'true';
+const PAID_TTS_ENABLED = process.env.EXPO_PUBLIC_VOICE_TTS_ENABLED === 'true';
+
+function localVoiceAck(avatarKey?: string): string {
+  const character = normalizeSekretCharacter(avatarKey);
+  if (character === 'sy') return "Bet. You got it out. You don't gotta run it back right now.";
+  if (character === 'cloud') return 'Okay. You can let that one stay here for a minute.';
+  if (character === 'night') return 'Got it. You can leave that here for tonight.';
+  if (character === 'sekret') return 'Got it. You can leave that here for now.';
+  return 'Got you. You got it out. You can leave it right here.';
+}
+
+export function normalizeSekretCharacter(value?: string, fallback: SekretCharacterId = 'suhana'): SekretCharacterId {
+  const raw = (value ?? '').trim().toLowerCase().replace(/[’']/g, '').replace(/[\s_-]+/g, '');
+  if (raw === 'suhana' || raw === 'raylene' || raw.includes('suhana') || raw.includes('raylene') || raw === 'soft' || raw === 'star') return 'suhana';
+  if (raw === 'sy' || raw === 'rylane' || raw.includes('rylane') || raw === 'bro') return 'sy';
+  if (raw === 'cloud' || raw.includes('cloud')) return 'cloud';
+  if (raw === 'night' || raw.includes('night')) return 'night';
+  if (raw === 'sekret' || raw === 'secret' || raw === 'oracle' || raw.includes('sekret')) return 'sekret';
+  return fallback;
+}
+
+export function getVisibleSekretName(characterId: SekretCharacterId): string {
+  return VISIBLE_NAMES[characterId] ?? VISIBLE_NAMES.suhana;
 }
 
 function normalizeAvatarState(value?: unknown): SekretAvatarState {
@@ -39,32 +106,71 @@ function normalizeAvatarState(value?: unknown): SekretAvatarState {
   return 'neutral';
 }
 
-function fallbackReply(characterId: SekretCharacterId, text: string): SekretBrainResponse {
-  const crisis = /\b(kill myself|end my life|want to die|suicidal|self[- ]?harm|not safe|abuse|danger)\b/i.test(text);
-  if (crisis) {
-    return {
-      reply: "I'm an AI companion, not emergency help. If you're in danger or might hurt yourself, tell a trusted adult now, call 911, call/text 988, or text HOME to 741741.",
-      tone: 'supportive-safety',
-      avatarState: 'concerned',
-      safetyFlag: true,
-      parentShareSummary: null,
-      suggestedComfortTool: 'safety-plan',
-    };
+function normalizeReplySource(value?: unknown): SekretReplySource {
+  return value === 'openai' ? 'openai' : 'fallback';
+}
+
+function normalizeHistory(value?: unknown[]): SekretHistoryTurn[] {
+  if (!Array.isArray(value)) return [];
+  const turns: SekretHistoryTurn[] = [];
+  for (const item of value.slice(-12)) {
+    if (!item || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    const rawRole = record.role;
+    const role: SekretHistoryTurn['role'] | null = rawRole === 'assistant' || rawRole === 'sekret'
+      ? 'assistant'
+      : rawRole === 'user' || rawRole === 'teen'
+        ? 'user'
+        : null;
+    const rawContent = typeof record.content === 'string'
+      ? record.content
+      : typeof record.text === 'string'
+        ? record.text
+        : typeof record.reply === 'string'
+          ? record.reply
+          : '';
+    const content = rawContent.trim().slice(0, 1200);
+    if (role && content) turns.push({ role, content });
   }
-  const replies: Record<SekretCharacterId, string> = {
-    raylene: "I'm glad you wrote it down. I'm an AI companion, not a person, but I can help you sort the next small piece.",
-    rylane: "Good. You said it. I'm an AI companion, so don't make me the only place for it — what's the real part?",
-    cloud: "No rush. I'm an AI companion, and we can make this smaller for one breath.",
-    night: "Stay close. I'm an AI companion, not a person; if it gets too heavy, pull in someone safe.",
-  };
-  return {
-    reply: replies[characterId],
-    tone: characterId,
-    avatarState: characterId === 'cloud' || characterId === 'night' ? 'comforting' : 'responding',
-    safetyFlag: false,
-    parentShareSummary: null,
-    suggestedComfortTool: 'journal',
-  };
+  return turns.slice(-10);
+}
+
+function fallbackReply(
+  characterId: SekretCharacterId,
+  text: string,
+  options: {
+    surface?: SekretSurface;
+    mood?: string;
+    history?: SekretHistoryTurn[];
+  } = {},
+): NaturalFallbackResponse {
+  return createNaturalFallbackResponse({
+    characterId,
+    userText: text,
+    surface: options.surface,
+    mood: options.mood,
+    history: options.history,
+  });
+}
+
+function reportFallbackUsage(input: {
+  fallback: NaturalFallbackResponse;
+  characterId: SekretCharacterId;
+  surface: SekretSurface;
+  mood?: string;
+  history?: SekretHistoryTurn[];
+  reason: string;
+}): void {
+  void logCompanionFallbackUsage({
+    characterId: input.characterId,
+    surface: input.surface,
+    mood: input.mood,
+    historyTurnCount: input.history?.length ?? 0,
+    reason: input.reason,
+    fallback: input.fallback,
+  }).catch((error) => {
+    console.warn('[sekretApi] fallback telemetry failed:', error instanceof Error ? error.message : error);
+  });
 }
 
 export async function fetchSekretBrainReply(input: {
@@ -74,48 +180,113 @@ export async function fetchSekretBrainReply(input: {
   mood?: string;
   memory?: Record<string, unknown>;
   parentSharingEnabled?: boolean;
+  history?: SekretHistoryTurn[];
+  userName?: string;
+  displayName?: string;
+  profileName?: string;
+  conversationPhase?: string;
+  phaseInstruction?: string;
+  isArrival?: boolean;
+  isFirstCompanionChat?: boolean;
 }): Promise<SekretBrainResponse> {
-  if (!BASE_URL) return fallbackReply(input.characterId, input.userText);
-  try {
-    const res = await fetch(`${BASE_URL}/api/sekret/reply`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
+  const fallbackOptions = {
+    surface: input.surface,
+    mood: input.mood,
+    history: input.history,
+  };
+
+  if (!WORKER_BASE_URL) {
+    const fallback = fallbackReply(input.characterId, input.userText, fallbackOptions);
+    reportFallbackUsage({
+      fallback,
+      characterId: input.characterId,
+      surface: input.surface,
+      mood: input.mood,
+      history: input.history,
+      reason: 'worker_base_url_missing',
     });
-    if (!res.ok) throw new Error(`api error ${res.status}`);
-    const data = await res.json() as Partial<SekretBrainResponse>;
-    const fallback = fallbackReply(input.characterId, input.userText);
-    return {
-      reply: data.reply || fallback.reply,
-      tone: data.tone || input.characterId,
-      avatarState: normalizeAvatarState(data.avatarState),
-      safetyFlag: Boolean(data.safetyFlag),
-      parentShareSummary: typeof data.parentShareSummary === 'string' ? data.parentShareSummary : null,
-      suggestedComfortTool: typeof data.suggestedComfortTool === 'string' ? data.suggestedComfortTool : null,
-    };
-  } catch {
-    return fallbackReply(input.characterId, input.userText);
+    return fallback;
   }
+
+  const request: CompanionReplyRequest = input;
+  const result = await sekretClient.sendReply(request);
+  if (!result.ok) {
+    const fallback = fallbackReply(input.characterId, input.userText, fallbackOptions);
+    reportFallbackUsage({
+      fallback,
+      characterId: input.characterId,
+      surface: input.surface,
+      mood: input.mood,
+      history: input.history,
+      reason: result.error.code || 'worker_reply_failed',
+    });
+    return fallback;
+  }
+
+  const data = result.data;
+  const fallback = fallbackReply(input.characterId, input.userText, fallbackOptions);
+  if (!data.reply?.trim()) {
+    reportFallbackUsage({
+      fallback,
+      characterId: input.characterId,
+      surface: input.surface,
+      mood: input.mood,
+      history: input.history,
+      reason: 'worker_reply_empty',
+    });
+  }
+
+  return {
+    reply: data.reply || fallback.reply,
+    tone: data.tone || input.characterId,
+    avatarState: normalizeAvatarState(data.avatarState),
+    safetyFlag: Boolean(data.safetyFlag),
+    parentShareSummary: typeof data.parentShareSummary === 'string' ? data.parentShareSummary : null,
+    suggestedComfortTool: typeof data.suggestedComfortTool === 'string' ? data.suggestedComfortTool : null,
+    replySource: normalizeReplySource(data.replySource),
+    traceId: data.traceId ?? result.meta.traceId,
+  };
 }
 
-export async function fetchSekretVoice(input: {
-  reply: string;
-  characterId: SekretCharacterId;
-}): Promise<SekretVoiceResponse | null> {
-  if (!BASE_URL || !input.reply.trim()) return null;
-  try {
-    const res = await fetch(`${BASE_URL}/api/sekret/voice`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(input),
-    });
-    if (!res.ok) throw new Error(`voice api error ${res.status}`);
-    const data = await res.json() as Partial<SekretVoiceResponse>;
-    if (!data.audioBase64 || !data.contentType) return null;
-    return { audioBase64: data.audioBase64, contentType: data.contentType, characterId: normalizeCharacter(data.characterId) };
-  } catch {
+export async function fetchSekretVoice(input: SekretVoiceRequest): Promise<SekretVoiceResponse | null> {
+  if (!input.reply.trim()) return null;
+
+  if (!PAID_TTS_ENABLED) {
+    await speakDeviceReply(input.reply, input.characterId);
     return null;
   }
+
+  if (!WORKER_BASE_URL) return null;
+  const result = await sekretClient.synthesizeVoice(input);
+  if (!result.ok || !result.data.audioBase64 || !result.data.contentType) return null;
+  return {
+    audioBase64: result.data.audioBase64,
+    contentType: result.data.contentType,
+    characterId: normalizeSekretCharacter(result.data.characterId, input.characterId),
+    voiceProvider: result.data.voiceProvider,
+    primaryVoiceProvider: result.data.primaryVoiceProvider,
+    model: result.data.model,
+    voiceId: result.data.voiceId,
+    usedFallback: result.data.usedFallback ?? result.meta.fallbackUsed,
+    timing: result.data.timing,
+    traceId: result.data.traceId ?? result.meta.traceId,
+  };
+}
+
+export async function fetchSekretTranscribe(input: {
+  audioBase64: string;
+  contentType: string;
+}): Promise<string | null> {
+  if (!PAID_STT_ENABLED) return null;
+  if (!WORKER_BASE_URL || !input.audioBase64) return null;
+  const result = await sekretClient.transcribeAudio(input);
+  if (!result.ok) return null;
+  const transcript = typeof result.data.transcript === 'string'
+    ? result.data.transcript.trim()
+    : typeof result.data.text === 'string'
+      ? result.data.text.trim()
+      : '';
+  return transcript || null;
 }
 
 export async function fetchSekretReply(
@@ -124,17 +295,31 @@ export async function fetchSekretReply(
   mood?: string,
   avatarKey?: string,
   _extra1?: unknown,
-  _privateProfile?: unknown,
+  privateProfile?: unknown,
   profileSide?: string,
-  _history?: unknown[],
+  history?: unknown[],
 ): Promise<string> {
-  const surface: SekretSurface = context === 'voiceBip' || context === 'comfort' || context === 'circle' || context === 'parentBridge' ? context : 'journal';
+  const surface: SekretSurface = context === 'voiceBip' || context === 'comfort' || context === 'circle' || context === 'parentBridge' || context === 'selfDiscovery' ? context : 'journal';
+
+  const isUntranscribedVoiceBip =
+    !PAID_STT_ENABLED &&
+    surface === 'voiceBip' &&
+    text.trim() === 'I needed to get some feelings out.';
+
+  if (isUntranscribedVoiceBip) {
+    return localVoiceAck(avatarKey);
+  }
+
+  const memory = privateProfile && typeof privateProfile === 'object' ? privateProfile as Record<string, unknown> : undefined;
   const response = await fetchSekretBrainReply({
-    characterId: normalizeCharacter(avatarKey),
+    characterId: normalizeSekretCharacter(avatarKey),
     surface,
     mood,
     userText: text,
+    memory,
     parentSharingEnabled: profileSide === 'parent',
+    history: normalizeHistory(history),
+    isFirstCompanionChat: !history || history.length === 0,
   });
   return response.reply;
 }

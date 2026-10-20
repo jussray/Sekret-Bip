@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "owner": "Control Room",
+  "description": "Canonical local verification registry for the founder Control Room. Do not duplicate this under .agents/.",
+  "checks": [
+    { "id": "runtime-assets", "label": "Runtime assets", "command": "npm", "args": ["run", "audit:runtime-assets"], "area": "app", "required": true },
+    { "id": "control-room-structure", "label": "Control Room structure", "command": "npm", "args": ["run", "audit:control-room:structure"], "area": "control-room", "required": true },
+    { "id": "control-room-rls", "label": "Supabase RLS scan", "command": "npm", "args": ["run", "audit:control-room:rls"], "area": "supabase", "required": true },
+    { "id": "companions", "label": "Companion assets", "command": "npm", "args": ["run", "validate:companions"], "area": "companions", "required": true },
+    { "id": "type-check", "label": "TypeScript", "command": "npm", "args": ["run", "type-check"], "area": "code-quality", "required": true },
+    { "id": "lint", "label": "Lint", "command": "npm", "args": ["run", "lint"], "area": "code-quality", "required": true },
+    { "id": "unit-tests", "label": "Unit tests", "command": "npm", "args": ["test"], "area": "tests", "required": true },
+    { "id": "voice-intelligence", "label": "Voice intelligence", "command": "npm", "args": ["run", "test:voice-intelligence"], "area": "voice", "required": true },
+    { "id": "oracle", "label": "Oracle discovery", "command": "npm", "args": ["run", "test:oracle"], "area": "oracle", "required": true },
+    { "id": "room-archives", "label": "Room archives", "command": "npm", "args": ["run", "verify:room-archives"], "area": "assets", "required": true }
+  ]
+}

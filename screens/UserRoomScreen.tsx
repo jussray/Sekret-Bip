@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
   ViewStyle,
@@ -26,14 +27,16 @@ import {
   type RoomPhase,
   type VibeKey,
 } from '../constants/theme';
-import { STICKER_REGISTRY, type StickerCharacter } from '../constants/characterStickers';
 import STICKER_IMAGES from '../constants/stickerImages';
+import { FURNISH_CATALOG, type FurnishCategory } from '../constants/furnishingCatalog';
 import { BareRoomRenderer } from '../components/rooms/BareRoomRenderer';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
+import { getCompanionRuntime } from '@/config/companionRuntimeRegistry';
 
 const { width, height } = Dimensions.get('window');
 
-const STORAGE_KEY = 'sekretbip_user_room_v1';
+const STORAGE_KEY    = 'sekretbip_user_room_v2';
+const STORAGE_KEY_V1 = 'sekretbip_user_room_v1';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,7 +44,7 @@ export type LightingMode = RoomPhase | 'auto';
 
 export interface PlacedItem {
   uid:       string;     // unique instance id
-  stickerId: string;     // CharacterSticker.id from STICKER_REGISTRY
+  stickerId: string;     // FurnishItem.id from FURNISH_CATALOG
   x:         number;     // % from left (0–100)
   y:         number;     // % from top  (0–100)
   scale:     number;     // default 1.0
@@ -53,6 +56,9 @@ export interface UserRoomConfig {
   companionId:  Character;
   roomName:     string;
   placedItems:  PlacedItem[];
+  vibeOverlay:  string;   // rgba color or 'none'
+  roomQuote:    string;   // pinned note, max 60 chars
+  glowColor:    string;   // hex for accent glow
 }
 
 const DEFAULT_USER_ROOM: UserRoomConfig = {
@@ -61,6 +67,9 @@ const DEFAULT_USER_ROOM: UserRoomConfig = {
   companionId:  'raylene',
   roomName:     '',
   placedItems:  [],
+  vibeOverlay:  'none',
+  roomQuote:    '',
+  glowColor:    '#c084fc',
 };
 
 // Spread-out default drop positions (right side / bottom to avoid companion on left)
@@ -95,6 +104,7 @@ type Hotspot = {
 };
 
 type AvatarMap = Partial<Record<Pose, ImageSourcePropType>>;
+type CompanionPlacement = { bottom: DimensionValue; left: DimensionValue; w: number; h: number };
 
 // ─── Asset maps ───────────────────────────────────────────────────────────────
 
@@ -127,13 +137,26 @@ const CHARACTER_OVERLAYS: Record<Character, string> = {
 };
 
 // ─── Companion placement ──────────────────────────────────────────────────────
-// Positions chosen so the companion sits naturally in each room's left/open area
+// Visual presence and the tap target intentionally have separate geometry.
+// This lets the companion lead the composition without stealing Room hotspots.
 
-const COMPANION_POSITIONS: Record<Character, { bottom: DimensionValue; left: DimensionValue; w: number; h: number }> = {
-  raylene: { bottom: '21%', left: '2%',  w: width * 0.54, h: height * 0.46 },
-  rylane:  { bottom: '21%', left: '0%',  w: width * 0.50, h: height * 0.44 },
-  cloud:   { bottom: '30%', left: '28%', w: width * 0.44, h: height * 0.34 },
-  night:   { bottom: '21%', left: '2%',  w: width * 0.52, h: height * 0.45 },
+const HUMAN_VISUAL_W = Math.min(width * 0.78, 420);
+const HUMAN_VISUAL_H = Math.min(height * 0.62, 560);
+const HUMAN_HIT_W    = Math.min(Math.max(width * 0.32, 124), 168);
+const HUMAN_HIT_H    = Math.min(Math.max(height * 0.24, 190), 240);
+
+const COMPANION_VISUAL_POSITIONS: Record<Character, CompanionPlacement> = {
+  raylene: { bottom: '9%',  left: '-7%', w: HUMAN_VISUAL_W, h: HUMAN_VISUAL_H },
+  rylane:  { bottom: '9%',  left: '20%', w: HUMAN_VISUAL_W, h: HUMAN_VISUAL_H },
+  cloud:   { bottom: '24%', left: '16%', w: Math.min(width * 0.62, 280), h: Math.min(height * 0.38, 320) },
+  night:   { bottom: '9%',  left: '-5%', w: HUMAN_VISUAL_W, h: HUMAN_VISUAL_H },
+};
+
+const COMPANION_HIT_TARGETS: Record<Character, CompanionPlacement> = {
+  raylene: { bottom: '22%', left: '4%',  w: HUMAN_HIT_W, h: HUMAN_HIT_H },
+  rylane:  { bottom: '22%', left: '34%', w: HUMAN_HIT_W, h: HUMAN_HIT_H },
+  cloud:   { bottom: '31%', left: '31%', w: Math.min(Math.max(width * 0.28, 108), 148), h: Math.min(Math.max(height * 0.18, 150), 190) },
+  night:   { bottom: '22%', left: '5%',  w: HUMAN_HIT_W, h: HUMAN_HIT_H },
 };
 
 // ─── Hotspot maps ─────────────────────────────────────────────────────────────
@@ -197,8 +220,8 @@ const LIGHTING_PRESETS: { key: LightingMode; label: string; emoji: string; hint:
 ];
 
 const ROOM_META: Record<Character, { name: string; emoji: string; vibe: string }> = {
-  raylene: { name: "Raylene's Room", emoji: '💜', vibe: 'scrapbook soft' },
-  rylane:  { name: "Rylane's Room",  emoji: '⚡', vibe: 'city night'      },
+  raylene: { name: `${getCompanionRuntime('raylene').label}'s Room`, emoji: '💜', vibe: 'scrapbook soft' },
+  rylane:  { name: `${getCompanionRuntime('rylane').label}'s Room`,  emoji: '⚡', vibe: 'city night'      },
   cloud:   { name: 'Cloud Room',     emoji: '☁️', vibe: 'brain dump space' },
   night:   { name: "Night's Room",   emoji: '🌙', vibe: '2AM energy'      },
 };
@@ -208,6 +231,37 @@ const ROOM_PREVIEWS: Record<Character, ImageSourcePropType> = {
   rylane:  IMAGES.bgRylaneRoomEvening,
   cloud:   IMAGES.bgCloudRoomEvening,
   night:   IMAGES.bgNightRoomEvening,
+};
+
+type QuotePos = { top?: DimensionValue; bottom?: DimensionValue; left?: DimensionValue; right?: DimensionValue; rotation: string };
+
+const VIBE_OVERLAYS: { label: string; emoji: string; color: string }[] = [
+  { label: 'none',     emoji: '✦',  color: 'none' },
+  { label: 'lavender', emoji: '💜', color: 'rgba(140,90,240,0.20)' },
+  { label: 'rose',     emoji: '🌹', color: 'rgba(244,63,94,0.16)' },
+  { label: 'ocean',    emoji: '🌊', color: 'rgba(14,165,233,0.18)' },
+  { label: 'forest',   emoji: '🌿', color: 'rgba(16,185,129,0.15)' },
+  { label: 'gold',     emoji: '✨', color: 'rgba(234,179,8,0.14)' },
+  { label: 'midnight', emoji: '🌙', color: 'rgba(20,5,60,0.38)' },
+  { label: 'ember',    emoji: '🔥', color: 'rgba(249,115,22,0.18)' },
+];
+
+const GLOW_COLORS: { label: string; color: string }[] = [
+  { label: 'violet',  color: '#c084fc' },
+  { label: 'pink',    color: '#f472b6' },
+  { label: 'blue',    color: '#60a5fa' },
+  { label: 'cyan',    color: '#22d3ee' },
+  { label: 'emerald', color: '#34d399' },
+  { label: 'amber',   color: '#fbbf24' },
+  { label: 'rose',    color: '#fb7185' },
+  { label: 'cream',   color: '#fef3c7' },
+];
+
+const QUOTE_POSITIONS: Record<Character, QuotePos> = {
+  raylene: { top: '12%',   right: '4%',  rotation: '2deg'    },
+  rylane:  { top: '14%',   right: '6%',  rotation: '-1.5deg' },
+  cloud:   { bottom: '38%', left: '6%',  rotation: '3deg'    },
+  night:   { bottom: '34%', right: '6%', rotation: '-2deg'   },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -221,10 +275,11 @@ const getTimeOfDay = (): TimeOfDay => {
 };
 
 const getPresenceLine = (companion: Character, tod: TimeOfDay): string => {
-  if (companion === 'cloud') return 'Cloud is drifting nearby.';
-  if (companion === 'night') return tod === 'night' ? 'Night is here. Just us awake.' : 'Night is watching over.';
-  if (companion === 'raylene') return 'Raylene is nearby.';
-  return 'Rylane is posted up.';
+  const displayName = getCompanionRuntime(companion).label;
+  if (companion === 'cloud') return `${displayName} is drifting nearby.`;
+  if (companion === 'night') return tod === 'night' ? `${displayName} is here. Just us awake.` : `${displayName} is watching over.`;
+  if (companion === 'raylene') return `${displayName} is nearby.`;
+  return `${displayName} is posted up.`;
 };
 
 const getPose = (mood: Mood, tod: TimeOfDay, character: Character): Pose => {
@@ -267,10 +322,28 @@ const getPose = (mood: Mood, tod: TimeOfDay, character: Character): Pose => {
 const safe = (src: ImageSourcePropType | undefined, fallback: ImageSourcePropType): ImageSourcePropType =>
   src ?? fallback;
 
+// Resolve image for any placed item — checks furnish catalog first, falls back to sticker images
+function resolveItemSource(id: string): ImageSourcePropType | null {
+  const fi = FURNISH_CATALOG.find(i => i.id === id);
+  if (fi) return fi.source;
+  const si = STICKER_IMAGES[id];
+  return si ?? null;
+}
+
+// Category filter metadata for decor tab
+const CATEGORY_META: Record<FurnishCategory | 'all', { label: string; emoji: string }> = {
+  all:         { label: 'all',         emoji: '✦'  },
+  furniture:   { label: 'furniture',   emoji: '🛏️'  },
+  lighting:    { label: 'lighting',    emoji: '✨'  },
+  decor:       { label: 'decor',       emoji: '🖼️'  },
+  accessories: { label: 'accessories', emoji: '🎧'  },
+  plants:      { label: 'plants',      emoji: '🌿'  },
+};
+
 // ─── VibeLab2Sheet ────────────────────────────────────────────────────────────
 
-type VLTab = 'room' | 'lighting' | 'companion' | 'decor';
-type DecorFilter = 'all' | StickerCharacter;
+type VLTab = 'room' | 'lighting' | 'companion' | 'decor' | 'vibe';
+type DecorFilter = 'all' | FurnishCategory;
 const CHARACTERS: Character[] = ['raylene', 'rylane', 'cloud', 'night'];
 
 interface VibeLab2SheetProps {
@@ -299,24 +372,43 @@ function VibeLab2Sheet({ visible, current, onSave, onClose }: VibeLab2SheetProps
 
   const sheetY = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [600, 0] });
 
-  const filteredStickers = useMemo(() =>
-    decorFilter === 'all'
-      ? STICKER_REGISTRY
-      : STICKER_REGISTRY.filter(s => s.character === decorFilter),
-    [decorFilter],
-  );
+  // Items scoped to this room's origin (+ shared) then filtered by category
+  const filteredItems = useMemo(() => {
+    const byOrigin = FURNISH_CATALOG.filter(
+      fi => fi.origin === draft.baseRoomId || fi.origin === 'shared',
+    );
+    return decorFilter === 'all' ? byOrigin : byOrigin.filter(fi => fi.category === decorFilter);
+  }, [decorFilter, draft.baseRoomId]);
 
   const addSticker = useCallback((stickerId: string) => {
     setDraft(d => {
-      if (d.placedItems.length >= MAX_PLACED) return d;
-      const slot = PLACE_SLOTS[d.placedItems.length % PLACE_SLOTS.length];
+      const newFi      = FURNISH_CATALOG.find(fi => fi.id === stickerId);
+      const newCat     = newFi?.category;
+      // Each category allows only one item at a time — placing a new one replaces the old
+      const base = newCat
+        ? d.placedItems.filter(p => {
+            const pFi = FURNISH_CATALOG.find(fi => fi.id === p.stickerId);
+            return pFi?.category !== newCat;
+          })
+        : d.placedItems;
+      if (base.length >= MAX_PLACED) return d;
+      const slot = PLACE_SLOTS[base.length % PLACE_SLOTS.length];
       const uid  = `${stickerId}-${Date.now()}`;
-      return { ...d, placedItems: [...d.placedItems, { uid, stickerId, ...slot, scale: 1 }] };
+      return { ...d, placedItems: [...base, { uid, stickerId, ...slot, scale: 1 }] };
     });
   }, []);
 
   const removeSticker = useCallback((uid: string) => {
     setDraft(d => ({ ...d, placedItems: d.placedItems.filter(i => i.uid !== uid) }));
+  }, []);
+
+  const scaleItem = useCallback((uid: string, delta: number) => {
+    setDraft(d => ({
+      ...d,
+      placedItems: d.placedItems.map(i =>
+        i.uid === uid ? { ...i, scale: Math.max(0.5, Math.min(2.5, i.scale + delta)) } : i
+      ),
+    }));
   }, []);
 
   return (
@@ -328,16 +420,17 @@ function VibeLab2Sheet({ visible, current, onSave, onClose }: VibeLab2SheetProps
 
         {/* Tabs */}
         <View style={vl.tabRow}>
-          {(['room', 'lighting', 'companion', 'decor'] as VLTab[]).map(t => (
+          {(['room', 'lighting', 'companion', 'decor', 'vibe'] as VLTab[]).map(t => (
             <TouchableOpacity
               key={t}
               style={[vl.tab, tab === t && vl.tabActive]}
               onPress={() => setTab(t)}
             >
               <Text style={[vl.tabText, tab === t && vl.tabTextActive]}>
-                {t === 'room'      ? '🏠'    :
-                 t === 'lighting'  ? '✨'    :
-                 t === 'companion' ? '💫'    : '🖼️'}
+                {t === 'room'      ? '🏠' :
+                 t === 'lighting'  ? '✨' :
+                 t === 'companion' ? '💫' :
+                 t === 'decor'     ? '🖼️' : '✦'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -407,55 +500,62 @@ function VibeLab2Sheet({ visible, current, onSave, onClose }: VibeLab2SheetProps
                 >
                   <Image source={avatarSrc} style={vl.companionAvatar} resizeMode="contain" />
                   <Text style={vl.cardEmoji}>{meta.emoji}</Text>
-                  <Text style={vl.cardName}>{id}</Text>
+                  <Text style={vl.cardName}>{getCompanionRuntime(id).label}</Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         )}
 
-        {/* Decor / furnishing picker */}
+        {/* Decor / furnishing picker — items sourced from this room's style catalog */}
         {tab === 'decor' && (
           <View style={{ flex: 1 }}>
-            {/* Character filter chips */}
+            {/* Category filter chips */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={vl.filterRow} contentContainerStyle={vl.filterContent}>
-              {(['all', 'raylene', 'rylane', 'cloud'] as DecorFilter[]).map(f => (
-                <TouchableOpacity
-                  key={f}
-                  style={[vl.filterChip, decorFilter === f && vl.filterChipActive]}
-                  onPress={() => setDecorFilter(f)}
-                >
-                  <Text style={[vl.filterChipText, decorFilter === f && vl.filterChipTextActive]}>
-                    {f === 'all' ? '✦ all' : f === 'raylene' ? '💜 raylene' : f === 'rylane' ? '⚡ rylane' : '☁️ cloud'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {(['all', 'furniture', 'lighting', 'decor', 'accessories', 'plants'] as DecorFilter[]).map(f => {
+                const meta = CATEGORY_META[f];
+                return (
+                  <TouchableOpacity
+                    key={f}
+                    style={[vl.filterChip, decorFilter === f && vl.filterChipActive]}
+                    onPress={() => setDecorFilter(f)}
+                  >
+                    <Text style={[vl.filterChipText, decorFilter === f && vl.filterChipTextActive]}>
+                      {meta.emoji} {meta.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
 
-            {/* Sticker grid */}
+            {/* Catalog grid — room-native items + shared */}
             <ScrollView style={vl.decorScroll} contentContainerStyle={vl.decorGrid} showsVerticalScrollIndicator={false}>
-              {filteredStickers.map(sticker => {
-                const src = STICKER_IMAGES[sticker.id];
-                const placed = draft.placedItems.filter(i => i.stickerId === sticker.id).length;
+              {filteredItems.map(fi => {
+                const src    = fi.source;
+                const placed = draft.placedItems.filter(p => p.stickerId === fi.id).length;
                 const atCap  = draft.placedItems.length >= MAX_PLACED;
                 return (
                   <TouchableOpacity
-                    key={sticker.id}
+                    key={fi.id}
                     style={[vl.decorCell, atCap && !placed && vl.decorCellDim]}
-                    onPress={() => !atCap && addSticker(sticker.id)}
+                    onPress={() => !atCap && addSticker(fi.id)}
                     activeOpacity={0.75}
                     disabled={atCap && !placed}
                   >
                     {src
                       ? <Image source={src} style={vl.decorThumb} resizeMode="contain" />
-                      : <View style={vl.decorPlaceholder} />
+                      : (
+                        <View style={vl.decorPlaceholder}>
+                          <Text style={vl.decorPlaceholderEmoji}>{fi.emoji}</Text>
+                        </View>
+                      )
                     }
                     {placed > 0 && (
                       <View style={vl.decorBadge}>
                         <Text style={vl.decorBadgeText}>{placed}</Text>
                       </View>
                     )}
-                    <Text style={vl.decorLabel} numberOfLines={1}>{sticker.emotion}</Text>
+                    <Text style={vl.decorLabel} numberOfLines={1}>{fi.label}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -466,12 +566,24 @@ function VibeLab2Sheet({ visible, current, onSave, onClose }: VibeLab2SheetProps
               <View style={vl.placedSection}>
                 <Text style={vl.placedTitle}>in your room ({draft.placedItems.length}/{MAX_PLACED})</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={vl.placedRow}>
-                  {draft.placedItems.map(item => {
-                    const src = STICKER_IMAGES[item.stickerId];
+                  {draft.placedItems.map(pi => {
+                    const src = resolveItemSource(pi.stickerId);
+                    const fi  = FURNISH_CATALOG.find(f => f.id === pi.stickerId);
                     return (
-                      <View key={item.uid} style={vl.placedChip}>
-                        {src && <Image source={src} style={vl.placedThumb} resizeMode="contain" />}
-                        <TouchableOpacity style={vl.placedRemove} onPress={() => removeSticker(item.uid)}>
+                      <View key={pi.uid} style={vl.placedChip}>
+                        {src
+                          ? <Image source={src} style={vl.placedThumb} resizeMode="contain" />
+                          : <Text style={vl.decorPlaceholderEmoji}>{fi?.emoji ?? '✦'}</Text>
+                        }
+                        <View style={vl.scaleBtnRow}>
+                          <TouchableOpacity style={vl.scaleBtn} onPress={() => scaleItem(pi.uid, -0.25)}>
+                            <Text style={vl.scaleBtnText}>−</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={vl.scaleBtn} onPress={() => scaleItem(pi.uid, +0.25)}>
+                            <Text style={vl.scaleBtnText}>+</Text>
+                          </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity style={vl.placedRemove} onPress={() => removeSticker(pi.uid)}>
                           <Text style={vl.placedRemoveText}>✕</Text>
                         </TouchableOpacity>
                       </View>
@@ -481,6 +593,59 @@ function VibeLab2Sheet({ visible, current, onSave, onClose }: VibeLab2SheetProps
               </View>
             )}
           </View>
+        )}
+
+        {/* Vibe tab */}
+        {tab === 'vibe' && (
+          <ScrollView style={vl.scroll} contentContainerStyle={{ paddingBottom: 16 }} showsVerticalScrollIndicator={false}>
+            <Text style={vl.vibeLabel}>room name</Text>
+            <TextInput
+              style={vl.vibeInput}
+              value={draft.roomName}
+              onChangeText={v => setDraft(d => ({ ...d, roomName: v.slice(0, 30) }))}
+              placeholder="name your space…"
+              placeholderTextColor="rgba(196,181,253,0.35)"
+              maxLength={30}
+            />
+
+            <Text style={[vl.vibeLabel, { marginTop: 16 }]}>pinned note</Text>
+            <TextInput
+              style={[vl.vibeInput, { height: 64 }]}
+              value={draft.roomQuote}
+              onChangeText={v => setDraft(d => ({ ...d, roomQuote: v.slice(0, 60) }))}
+              placeholder="something pinned to your wall…"
+              placeholderTextColor="rgba(196,181,253,0.35)"
+              multiline
+              maxLength={60}
+            />
+            <Text style={vl.vibeCount}>{draft.roomQuote.length}/60</Text>
+
+            <Text style={[vl.vibeLabel, { marginTop: 16 }]}>glow color</Text>
+            <View style={vl.colorRow}>
+              {GLOW_COLORS.map(gc => (
+                <TouchableOpacity
+                  key={gc.color}
+                  style={[vl.colorSwatch, { backgroundColor: gc.color }, draft.glowColor === gc.color && vl.colorSwatchSelected]}
+                  onPress={() => setDraft(d => ({ ...d, glowColor: gc.color }))}
+                  accessibilityLabel={gc.label}
+                />
+              ))}
+            </View>
+
+            <Text style={[vl.vibeLabel, { marginTop: 16 }]}>wall vibe</Text>
+            <View style={vl.overlayRow}>
+              {VIBE_OVERLAYS.map(o => (
+                <TouchableOpacity
+                  key={o.color}
+                  style={[vl.overlayChip, draft.vibeOverlay === o.color && vl.overlayChipActive]}
+                  onPress={() => setDraft(d => ({ ...d, vibeOverlay: o.color }))}
+                >
+                  <Text style={vl.overlayEmoji}>{o.emoji}</Text>
+                  <Text style={vl.overlayLabel}>{o.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </ScrollView>
         )}
 
         <TouchableOpacity style={vl.saveBtn} onPress={() => { onSave(draft); onClose(); }}>
@@ -531,15 +696,31 @@ export function UserRoomScreen({
   });
   const [vibeLabOpen, setVibeLabOpen] = useState(false);
 
-  // Load persisted config on mount
+  // Load persisted config on mount — migrates v1 saves to v2, clearing old sticker placements
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY).then(raw => {
-      if (!raw) return;
-      try {
-        const saved = JSON.parse(raw) as Partial<UserRoomConfig>;
-        setUserRoom(prev => ({ ...prev, ...saved }));
-      } catch {}
-    });
+    (async () => {
+      const raw2 = await AsyncStorage.getItem(STORAGE_KEY);
+      if (raw2) {
+        try { setUserRoom(prev => ({ ...prev, ...(JSON.parse(raw2) as Partial<UserRoomConfig>) })); } catch {}
+        return;
+      }
+      // v1 → v2 migration: carry room/lighting/companion settings, drop old sticker placements
+      const raw1 = await AsyncStorage.getItem(STORAGE_KEY_V1);
+      if (raw1) {
+        try {
+          const old = JSON.parse(raw1) as Partial<UserRoomConfig>;
+          const migrated: Partial<UserRoomConfig> = {
+            baseRoomId:   old.baseRoomId,
+            lightingMode: old.lightingMode,
+            companionId:  old.companionId,
+            roomName:     old.roomName ?? '',
+            placedItems:  [], // old sticker IDs don't match new catalog — start fresh
+          };
+          setUserRoom(prev => ({ ...prev, ...migrated }));
+          AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...DEFAULT_USER_ROOM, ...migrated })).catch(() => {});
+        } catch {}
+      }
+    })();
   }, []);
 
   const saveUserRoom = useCallback((cfg: UserRoomConfig) => {
@@ -562,12 +743,15 @@ export function UserRoomScreen({
   const vibePack = THEME_PACKS[vibe] ?? THEME_PACKS.raylene;
 
   // ─── Companion ─────────────────────────────────────────────────────────
-  const cId   = userRoom.companionId;
-  const pose  = useMemo(() => getPose(mood, timeOfDay, cId), [mood, timeOfDay, cId]);
-  const cPos  = COMPANION_POSITIONS[cId];
-  const cSrc  = safe(AVATARS[cId]?.[pose], FALLBACK_AVATAR[cId]);
-  const hotspots = useMemo(() => ROOM_HOTSPOTS[userRoom.baseRoomId], [userRoom.baseRoomId]);
-  const roomLabel = userRoom.roomName || ROOM_META[userRoom.baseRoomId].name;
+  const cId         = userRoom.companionId;
+  const pose        = useMemo(() => getPose(mood, timeOfDay, cId), [mood, timeOfDay, cId]);
+  const cRuntime    = getCompanionRuntime(cId);
+  const cPoseSrc    = safe(AVATARS[cId]?.[pose], FALLBACK_AVATAR[cId]);
+  const cSrc        = safe(AVATARS[cId]?.fullbody, cRuntime.source ?? cPoseSrc);
+  const cVisualPos  = COMPANION_VISUAL_POSITIONS[cId];
+  const cHitPos     = COMPANION_HIT_TARGETS[cId];
+  const hotspots    = useMemo(() => ROOM_HOTSPOTS[userRoom.baseRoomId], [userRoom.baseRoomId]);
+  const roomLabel   = userRoom.roomName || ROOM_META[userRoom.baseRoomId].name;
 
   // ─── Animations ────────────────────────────────────────────────────────
   const fadeAnim       = useRef(new Animated.Value(0)).current;
@@ -648,7 +832,7 @@ export function UserRoomScreen({
       <AmbientWeatherOverlay phase={roomPhase} />
 
       {/* ── LAYER 0: Bare room shell (walls, floor, window, atmosphere) ── */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
         <BareRoomRenderer
           character={userRoom.baseRoomId}
           lightingMode={roomPhase}
@@ -658,6 +842,9 @@ export function UserRoomScreen({
         <View style={[s.overlay, { backgroundColor: vibePack.background + '22' }]} />
         {CHARACTER_OVERLAYS[userRoom.baseRoomId] !== 'transparent' && (
           <View style={[s.overlay, { backgroundColor: CHARACTER_OVERLAYS[userRoom.baseRoomId] }]} />
+        )}
+        {userRoom.vibeOverlay !== 'none' && (
+          <View style={[s.overlay, { backgroundColor: userRoom.vibeOverlay }]} />
         )}
       </Animated.View>
 
@@ -676,8 +863,25 @@ export function UserRoomScreen({
         </View>
       )}
 
+      {/* Room quote sticky note */}
+      {userRoom.roomQuote.length > 0 && (() => {
+        const qp = QUOTE_POSITIONS[userRoom.baseRoomId];
+        return (
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              s.stickyNote,
+              { top: qp.top, bottom: qp.bottom, left: qp.left, right: qp.right },
+              { opacity: fadeAnim, transform: [{ rotate: qp.rotation }] },
+            ]}
+          >
+            <Text style={s.stickyNoteText}>{userRoom.roomQuote}</Text>
+          </Animated.View>
+        );
+      })()}
+
       {/* ── LAYER 2: Hotspots ─────────────────────────────────────────── */}
-      <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeAnim }]}>
+      <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
         {hotspots.map(spot => {
           const isHinted = hintSpot === spot.id;
           return (
@@ -717,7 +921,7 @@ export function UserRoomScreen({
 
       {/* ── LAYER 3: Placed decor / furnishing items ─────────────────── */}
       {userRoom.placedItems.map(item => {
-        const src = STICKER_IMAGES[item.stickerId];
+        const src = resolveItemSource(item.stickerId);
         if (!src) return null;
         const sz = width * 0.2 * item.scale;
         return (
@@ -738,15 +942,17 @@ export function UserRoomScreen({
         );
       })}
 
-      {/* ── LAYER 5: Companion — always visible, tappable ─────────────── */}
+      {/* ── LAYER 5: One companion visual + bounded transparent tap target ── */}
       <Animated.View
+        pointerEvents="none"
+        testID="room-companion-visual"
         style={[
           s.companionWrap,
           {
-            bottom: cPos.bottom,
-            left:   cPos.left,
-            width:  cPos.w,
-            height: cPos.h,
+            bottom: cVisualPos.bottom,
+            left:   cVisualPos.left,
+            width:  cVisualPos.w,
+            height: cVisualPos.h,
             opacity: companionAnim,
             transform: [
               { translateY: companionAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) },
@@ -755,30 +961,39 @@ export function UserRoomScreen({
           },
         ]}
       >
-        <TouchableOpacity
-          style={StyleSheet.absoluteFillObject}
-          onPress={handleCompanionTap}
-          activeOpacity={0.88}
-          accessibilityRole="button"
-          accessibilityLabel={`${cId} is here. Tap to talk.`}
-        >
-          <Image
-            source={cSrc}
-            style={s.companionImage}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-            accessible={false}
-          />
-          {/* Ambient breath glow to signal tappability */}
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              s.companionGlow,
-              { opacity: breathAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.18] }) },
-            ]}
-          />
-        </TouchableOpacity>
+        <Image
+          source={cSrc}
+          style={s.companionImage}
+          resizeMode="contain"
+          accessibilityIgnoresInvertColors
+          accessible={false}
+        />
       </Animated.View>
+
+      <TouchableOpacity
+        testID="room-companion-hit-target"
+        style={[
+          s.companionHitTarget,
+          {
+            bottom: cHitPos.bottom,
+            left:   cHitPos.left,
+            width:  cHitPos.w,
+            height: cHitPos.h,
+          },
+        ]}
+        onPress={handleCompanionTap}
+        activeOpacity={0.88}
+        accessibilityRole="button"
+        accessibilityLabel={`${cRuntime.label} is here. Tap to talk.`}
+      >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            s.companionGlow,
+            { opacity: breathAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.12] }), backgroundColor: userRoom.glowColor },
+          ]}
+        />
+      </TouchableOpacity>
 
       {/* Cloud mascot shortcut when companion is not Cloud */}
       {cId !== 'cloud' && (
@@ -794,7 +1009,7 @@ export function UserRoomScreen({
       )}
 
       {/* ── Top bar: room name label ───────────────────────────────────── */}
-      <Animated.View style={[s.topBar, { opacity: fadeAnim }]}>
+      <Animated.View style={[s.topBar, { opacity: fadeAnim }]}> 
         <View style={s.roomBadge}>
           <Text style={s.roomBadgeText}>
             {ROOM_META[userRoom.baseRoomId].emoji} {roomLabel}
@@ -820,6 +1035,7 @@ export function UserRoomScreen({
             s.presenceDot,
             {
               opacity: glowAnim,
+              backgroundColor: userRoom.glowColor,
               transform: [{ scale: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.9, 1.1] }) }],
             },
           ]}
@@ -830,7 +1046,7 @@ export function UserRoomScreen({
       {/* ── VibeLab edit button ───────────────────────────────────────── */}
       <Animated.View style={[s.vibeLabBtnWrap, { opacity: fadeAnim }]}>
         <TouchableOpacity
-          style={s.vibeLabBtn}
+          style={[s.vibeLabBtn, { borderColor: userRoom.glowColor + '88', shadowColor: userRoom.glowColor }]}
           onPress={() => setVibeLabOpen(true)}
           activeOpacity={0.82}
           accessibilityRole="button"
@@ -859,13 +1075,14 @@ export function UserRoomScreen({
 const s = StyleSheet.create({
   root:              { flex: 1, backgroundColor: '#0d0014' },
   bg:                { width, height },
-  overlay:           { ...StyleSheet.absoluteFillObject },
+  overlay:           StyleSheet.absoluteFill,
 
   companionWrap:     { position: 'absolute', zIndex: 10 },
   companionImage:    { width: '100%', height: '100%' },
+  companionHitTarget:{ position: 'absolute', zIndex: 11, borderRadius: 999 },
   companionGlow:     {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 120,
+    position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 999,
     backgroundColor: '#c084fc',
   },
 
@@ -944,13 +1161,34 @@ const s = StyleSheet.create({
   vibeLabBtnText: { color: '#c4b5fd', fontSize: 12, fontWeight: '700', letterSpacing: 0.5 },
 
   bottomSlot: { position: 'absolute', bottom: 0, left: 0, right: 0 },
+
+  stickyNote: {
+    position: 'absolute',
+    backgroundColor: 'rgba(253,247,236,0.93)',
+    borderRadius: 4,
+    padding: 10,
+    maxWidth: 140,
+    zIndex: 7,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 1, height: 2 },
+    elevation: 4,
+  },
+  stickyNoteText: {
+    color: '#3b0764',
+    fontSize: 11,
+    fontWeight: '600',
+    lineHeight: 16,
+    fontStyle: 'italic',
+  },
 });
 
 // ─── VibeLab styles ───────────────────────────────────────────────────────────
 
 const vl = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.54)',
   },
   sheet: {
@@ -994,7 +1232,7 @@ const vl = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 }, elevation: 6,
   },
   selectedOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(192,132,252,0.15)',
   },
   cardEmoji: { color: '#e9d5ff', fontSize: 18, textAlign: 'center', marginTop: 8 },
@@ -1055,7 +1293,8 @@ const vl = StyleSheet.create({
   },
   decorCellDim: { opacity: 0.35 },
   decorThumb:   { width: 46, height: 46 },
-  decorPlaceholder: { width: 46, height: 46, backgroundColor: 'rgba(147,51,234,0.12)', borderRadius: 8 },
+  decorPlaceholder: { width: 46, height: 46, backgroundColor: 'rgba(147,51,234,0.12)', borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  decorPlaceholderEmoji: { fontSize: 20 },
   decorLabel:   { color: 'rgba(196,181,253,0.6)', fontSize: 8, marginTop: 4, textAlign: 'center', paddingHorizontal: 2 },
   decorBadge: {
     position: 'absolute', top: 4, right: 4,
@@ -1068,7 +1307,7 @@ const vl = StyleSheet.create({
   placedTitle:   { color: 'rgba(196,181,253,0.6)', fontSize: 10, fontWeight: '600', marginBottom: 8 },
   placedRow:     { flexDirection: 'row', gap: 8, paddingBottom: 4 },
   placedChip:    {
-    width: 52, height: 52, borderRadius: 12,
+    width: 64, borderRadius: 12, paddingVertical: 6,
     backgroundColor: 'rgba(124,58,237,0.15)',
     borderWidth: 1, borderColor: 'rgba(196,181,253,0.28)',
     alignItems: 'center', justifyContent: 'center',
@@ -1090,4 +1329,32 @@ const vl = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 }, elevation: 8,
   },
   saveBtnText: { color: '#fff', fontSize: 15, fontWeight: '700', letterSpacing: 0.3 },
+
+  vibeLabel:    { color: 'rgba(196,181,253,0.75)', fontSize: 11, fontWeight: '600', marginBottom: 8, letterSpacing: 0.3 },
+  vibeInput: {
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1, borderColor: 'rgba(147,51,234,0.30)',
+    borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10,
+    color: '#e9d5ff', fontSize: 13,
+  },
+  vibeCount:    { color: 'rgba(196,181,253,0.4)', fontSize: 9, textAlign: 'right', marginTop: 4 },
+  colorRow:     { flexDirection: 'row', gap: 10, flexWrap: 'wrap', marginBottom: 4 },
+  colorSwatch:  { width: 36, height: 36, borderRadius: 18, borderWidth: 2.5, borderColor: 'transparent' },
+  colorSwatchSelected: {
+    borderColor: '#fff',
+    shadowColor: '#fff', shadowOpacity: 0.5, shadowRadius: 6, shadowOffset: { width: 0, height: 0 }, elevation: 4,
+  },
+  overlayRow:   { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  overlayChip: {
+    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderWidth: 1, borderColor: 'rgba(147,51,234,0.18)',
+    alignItems: 'center', minWidth: 72,
+  },
+  overlayChipActive: { backgroundColor: 'rgba(124,58,237,0.28)', borderColor: 'rgba(196,181,253,0.55)' },
+  overlayEmoji: { fontSize: 18, textAlign: 'center' },
+  overlayLabel: { color: 'rgba(196,181,253,0.65)', fontSize: 9, fontWeight: '600', textAlign: 'center', marginTop: 4 },
+  scaleBtnRow:  { flexDirection: 'row', gap: 4, marginTop: 4 },
+  scaleBtn:     { width: 20, height: 20, borderRadius: 10, backgroundColor: 'rgba(147,51,234,0.35)', alignItems: 'center', justifyContent: 'center' },
+  scaleBtnText: { color: '#e9d5ff', fontSize: 13, fontWeight: '700', lineHeight: 20 },
 });

@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-13",
+  "projectRef": "tbsevonvegdnlyjgplmm",
+  "migration": {
+    "version": "20260713155855",
+    "name": "preserve_safety_state_on_parent_link_revoke",
+    "repositoryPath": "supabase/migrations/20260713155855_preserve_safety_state_on_parent_link_revoke.sql",
+    "applied": true,
+    "repositoryAndLiveMigrationParity": true
+  },
+  "scope": {
+    "function": "public.revoke_parent_link(uuid)",
+    "productionDataRetained": false,
+    "bridgeVisibilityChanged": false,
+    "guardianIdentityChanged": false
+  },
+  "preDeployDefect": {
+    "transactionOutcome": "rolled_back",
+    "suspendedStateWasOverwritten": true,
+    "manualReviewStateWasOverwritten": true,
+    "protectedReasonWasOverwritten": true,
+    "incorrectReplacementState": "PENDING_PARENT"
+  },
+  "controls": {
+    "permanentSessionRequired": true,
+    "linkedTeenOrParentOnly": true,
+    "activeOrPendingRelationshipOnly": true,
+    "rowLockedBeforeTransition": true,
+    "unrelatedCallerReturnsFalse": true,
+    "repeatedRevokeReturnsFalse": true,
+    "relationshipHistoryRetained": true,
+    "relationshipStateAfterRevoke": "revoked",
+    "normalVerificationStateAfterRevoke": "PENDING_PARENT",
+    "suspendedStatePreserved": true,
+    "manualReviewStatePreserved": true,
+    "protectedVerificationReasonPreserved": true
+  },
+  "postDeployProof": {
+    "probePath": "supabase/probes/authorization_parent_link_revoke_phase1.sql",
+    "transactionOutcome": "rolled_back",
+    "proofParts": [
+      {
+        "name": "ownership_and_retry",
+        "passedChecks": 6,
+        "failedChecks": 0
+      },
+      {
+        "name": "protected_state_preservation",
+        "passedChecks": 4,
+        "failedChecks": 0
+      }
+    ],
+    "passedChecks": 10,
+    "failedChecks": 0,
+    "retainedSyntheticUsers": 0,
+    "retainedParentLinks": 0,
+    "retainedVerificationRows": 0
+  },
+  "advisorClassification": {
+    "classification": "intentional_authenticated_security_definer_api_with_behavior_proof",
+    "warningExpectedToRemain": true,
+    "reason": "The unlink action is an intentional signed-in client API. It remains controlled by explicit grants, fixed search path, relationship ownership checks, row locking, idempotent behavior, and rollback-contained live proof."
+  },
+  "releaseGate": {
+    "authenticatedFunctionBlockerComplete": false,
+    "reason": "Parent-link lifecycle behavior is proved, but additional authenticated SECURITY DEFINER function families remain before L4 activation."
+  }
+}

@@ -1,0 +1,2 @@
+-- Already applied to the linked Supabase project.
+-- Local history marker only; no schema changes.

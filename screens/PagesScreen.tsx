@@ -1,20 +1,17 @@
 /**
  * screens/PagesScreen.tsx
  *
- * PHASE 5 — Pages is now the notebook / scrapbook home.
+ * PHASE 5 — Pages is the notebook / scrapbook home.
  *
- * Teen section order (top nav pills):
- *   Write · Voice Bips · Se'kret Replies · Memories
- *   Cloud Thoughts · S2Tell · Period Calendar · History
+ * Teen section order (top nav pills): Write · Memories · Cloud Thoughts · S2Tell.
  *
- * Se'kret Replies:
- *   Companion-picker grid (Raylene / Rylane / Cloud / Night / Oracle).
- *   Tapping a card calls onOpenCompanion(id) → router.push to chat screen.
- *   Previously saved sekretReply entries are also listed below the picker.
- *
- * SAFETY RULE:
- *   Se'kret is NOT removed. It is relocated here.
- *   If onOpenCompanion is not wired, companion interaction breaks → Phase 5 fails.
+ * Companion involvement stays entry-linked, not a chat thread: each saved
+ * journal entry can carry one Se'kret reply (SekretReplyBubble, fetched via
+ * fetchPagesReply), and the Write tab's "oracle" mode is a scripted,
+ * non-chat Q&A (OracleDiscoveryPanel). Full multi-turn companion chat lives
+ * on its own screen (app/(teen)/chat/[personalityId].tsx) — Pages never
+ * embeds it. Comfort/Calm is a small handoff link, not an embedded
+ * experience (see docs/SCREEN_PURPOSE_AUDIT.md "Pages separation").
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -34,17 +31,18 @@ import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
 import { IMAGES } from '../constants/theme';
-import type { JournalEntry, MoodEntry, VoiceNote } from '../types';
+import type { JournalEntry, MoodEntry, VoiceNote } from '@/types';
 import { OracleDiscoveryPanel } from '../components/OracleDiscoveryPanel';
 import { MiniAvatarSticker } from '../components/MiniAvatarSticker';
 import type { MiniAvatarCharacter } from '../components/MiniAvatarSticker';
 import type { OracleProfile, OracleSessionSummary } from '../services/oracleDiscovery';
-import { fetchPagesReply, THINKING_LABELS, tabToAvatarKey } from '../utils/sekretReply';
+import { buildOracleContext } from '../services/oracleDiscovery';
+import { fetchPagesReply, THINKING_LABELS, tabToAvatarKey } from '@/utils/sekretReply';
 import { fetchSekretVoice } from '../utils/api';
 import { SyncBadge, type SyncStatus } from '../components/SyncBadge';
 import { BipEmptyState } from '../components/BipEmptyState';
 import { PERSONALITY_CONFIG } from '@/services/ai';
-import type { PersonalityId } from '../types';
+import type { PersonalityId } from '@/types';
 
 // ── Section definitions ────────────────────────────────────────────────────
 
@@ -80,7 +78,7 @@ const PARENT_PAGES_SECTIONS: SectionDef[] = [
 
 // ── Legacy write-tab definitions (unchanged) ───────────────────────────────
 
-type TeenTab = 'me' | 'oracle' | 'raylene' | 'rylane' | 'cloud' | 'night';
+type TeenTab = 'me' | 'oracle' | 'suhana' | 'sy' | 'cloud' | 'night';
 type ParentTab = 'me' | 'oracle' | 'parentSekret' | 'bridge';
 export type PagesTab = TeenTab | ParentTab;
 
@@ -164,7 +162,7 @@ const TEEN_TABS: TabDefinition[] = [
   { id: 'me', label: 'Me', icon: '\u25cc', title: '', accent: '#c4b5fd' },
   { id: 'oracle', label: 'Se\u2019kret', icon: '\u25c7', title: 'Se\u2019kret Discovery', accent: '#8b7bb8' },
   {
-    id: 'raylene', label: 'Raylene', icon: '\u2726', eyebrow: 'Raylene pulled up',
+    id: 'suhana', label: 'Suhana', icon: '\u2726', eyebrow: 'Suhana pulled up',
     title: 'You been a little too quiet. What happened?',
     subtitle: 'Warm, curious, and already paying attention.', accent: '#e9a8d2',
     prompts: [
@@ -176,7 +174,7 @@ const TEEN_TABS: TabDefinition[] = [
     placeholder: 'Tell it how it happened\u2026',
   },
   {
-    id: 'rylane', label: 'Rylane', icon: '\u2014', eyebrow: 'Rylane keeps it real',
+    id: 'sy', label: 'Sy', icon: '\u2014', eyebrow: 'Sy keeps it real',
     title: 'What\u2019s real right now?',
     subtitle: 'No cushion. No lecture.', accent: '#79aaf2',
     prompts: [
@@ -248,8 +246,10 @@ const PARENT_TAGS = ['reactive', 'worried', 'hurt', 'stuck', 'open', 'steady'];
 const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'oracle'];
 
 function tabToStickerCharacter(tab: PagesTab): MiniAvatarCharacter {
-  if (tab === 'raylene') return 'raylene';
-  if (tab === 'rylane') return 'rylane';
+  // MiniAvatarCharacter is a separate, unrenamed sticker-asset vocabulary —
+  // only the PagesTab comparison targets the current tab id.
+  if (tab === 'suhana') return 'raylene';
+  if (tab === 'sy') return 'rylane';
   if (tab === 'cloud') return 'cloud';
   if (tab === 'night') return 'night';
   return null;
@@ -259,7 +259,7 @@ function normalizeSource(entry: JournalEntry): PagesTab {
   const source = entry.activeTab || entry.source;
   if (
     source === 'parentSekret' || source === 'bridge' || source === 'oracle' ||
-    source === 'raylene' || source === 'rylane' || source === 'cloud' || source === 'night'
+    source === 'suhana' || source === 'sy' || source === 'cloud' || source === 'night'
   ) {
     return source;
   }
@@ -281,7 +281,7 @@ interface SekretReplyBubbleProps {
 
 function SekretReplyBubble({ tab, reply, typing, accent }: SekretReplyBubbleProps) {
   const avatarKey = tabToAvatarKey(tab);
-  const voiceCharacter = avatarKey || (tab === 'bridge' ? 'rylane' : tab === 'parentSekret' ? 'raylene' : null);
+  const voiceCharacter = avatarKey || (tab === 'bridge' ? 'sy' : tab === 'parentSekret' ? 'suhana' : null);
   const [audioUri, setAudioUri] = useState('');
   const [loadingVoice, setLoadingVoice] = useState(false);
   if (!voiceCharacter) return null;
@@ -307,7 +307,7 @@ function SekretReplyBubble({ tab, reply, typing, accent }: SekretReplyBubbleProp
 
   return (
     <View style={[replyStyles.bubble, { borderColor: accent + '55' }]}>
-      <Text style={[replyStyles.name, { color: accent }]}>{avatarKey ? avatarKey.charAt(0).toUpperCase() + avatarKey.slice(1) : 'Parent Se’kret'}</Text>
+      <Text style={[replyStyles.name, { color: accent }]}>{avatarKey ? avatarKey.charAt(0).toUpperCase() + avatarKey.slice(1) : "Parent Se'kret"}</Text>
       <Text style={replyStyles.text}>
         {typing ? label : reply}
       </Text>
@@ -575,8 +575,8 @@ function PagesWorkspace({
   }, []);
 
   const COMPANION_IMAGES: Partial<Record<PagesTab, any>> = {
-    raylene: IMAGES.rayleneNeutral,
-    rylane:  IMAGES.rylaneNeutral,
+    suhana: IMAGES.rayleneNeutral,
+    sy:     IMAGES.rylaneNeutral,
     cloud:   IMAGES.cloudAvatarNeutral,
     night:   IMAGES.nightNeutral,
     parentSekret: IMAGES.rayleneNeutral,
@@ -649,7 +649,7 @@ function PagesWorkspace({
     });
 
     if (isFirstEverEntry) {
-      Alert.alert('there it is. 💜', "that's your first page in here. come back whenever you need to put something down — it'll be waiting.");
+      Alert.alert('there it is. 💜', "that\'s your first page in here. come back whenever you need to put something down — it'll be waiting.");
     }
 
     const savedText = text.trim();
@@ -666,6 +666,7 @@ function PagesWorkspace({
       tab: activeTab,
       text: savedText,
       mood: entryMoodTag,
+      oracleContext: buildOracleContext(oracleProfile, 'teen'),
     });
 
     setReplyState(prev => ({ ...prev, [entryId]: { typing: false, reply } }));
@@ -862,9 +863,15 @@ function PagesWorkspace({
                     </TouchableOpacity>
                   </View>
 
+                  {side === 'teen' && (
+                    <TouchableOpacity style={styles.comfortHandoff} onPress={() => setScreen('calm')} activeOpacity={0.82}>
+                      <Text style={styles.comfortHandoffText}>Need a moment? Try a Calm tool →</Text>
+                    </TouchableOpacity>
+                  )}
+
                   <Text style={styles.privacyLine}>
                     {side === 'teen'
-                      ? 'Only you can see these pages. Nothing goes to Parent Pages unless you deliberately choose to share elsewhere.'
+                      ? 'These pages sync to your account and aren’t shown in Parent Pages unless you choose to share one yourself.'
                       : 'For your reflection only. Teen Pages are separate and never shown here.'}
                   </Text>
 
@@ -1162,7 +1169,7 @@ const styles = StyleSheet.create({
     width: 1,
     backgroundColor: 'rgba(219, 116, 129, 0.38)',
   },
-  paperLines: { ...StyleSheet.absoluteFillObject, paddingTop: 26 },
+  paperLines: { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, paddingTop: 26 },
   paperLine: {
     height: 29,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -1226,6 +1233,17 @@ const styles = StyleSheet.create({
   },
   saveDisabled: { opacity: 0.3 },
   saveText: { color: '#171018', fontSize: 13, fontWeight: '900' },
+  comfortHandoff: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(196,181,253,0.35)',
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    backgroundColor: 'rgba(196,181,253,0.08)',
+  },
+  comfortHandoffText: { color: '#c4b5fd', fontSize: 12, fontWeight: '700' },
   privacyLine: { color: '#77707f', fontSize: 10, lineHeight: 15, marginTop: 13 },
   savedHeader: {
     flexDirection: 'row',

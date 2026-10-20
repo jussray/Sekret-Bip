@@ -1,0 +1,16 @@
+export const FRONT_DOOR_MOTION = Object.freeze({
+  arrivalDurationMs: 900,
+  arrivalOpacity: [0.18, 1],
+  arrivalTranslateY: [28, 0],
+  arrivalScale: [0.985, 1],
+  pulseDurationMs: 3200,
+  driftDurationMs: 4200,
+  reducedPulseRestValue: 0.35,
+  ambientOpacity: [0.72, 1],
+  ambientScale: [1, 1.08],
+  heroTranslateY: [0, -8],
+  heroScale: [1, 1.018],
+  sparkOpacity: [0.62, 1],
+  sparkTranslateY: [0, -5],
+  sparkRotate: ['0deg', '9deg'],
+});

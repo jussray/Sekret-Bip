@@ -16,14 +16,17 @@ import { Platform } from 'react-native';
 
 // ── env vars ──────────────────────────────────────────────────────────────────
 // Expo uses EXPO_PUBLIC_* prefix (not NEXT_PUBLIC_*).
-// These must exist in .env.local — never hardcode real values here.
-const supabaseUrl = (process.env as Record<string, string | undefined>).EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseKey = (process.env as Record<string, string | undefined>).EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+// These must exist in .env.local locally and in the deployment environment.
+const env = process.env as Record<string, string | undefined>;
+const supabaseUrl = env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseKey =
+  env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   throw new Error(
-    '[supabase/client] Missing EXPO_PUBLIC_SUPABASE_URL or EXPO_PUBLIC_SUPABASE_ANON_KEY.\n' +
-    'Copy .env.example → .env.local and fill in the values.',
+    '[supabase/client] Missing EXPO_PUBLIC_SUPABASE_URL and a Supabase client key.\n' +
+    'Set EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (preferred) or EXPO_PUBLIC_SUPABASE_ANON_KEY.',
   );
 }
 

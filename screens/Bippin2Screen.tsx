@@ -1,7 +1,7 @@
 // screens/Bippin2Screen.tsx
 // Phase 1 polish: time-of-day backdrop, mood-tinted glow, char-aware greeting,
 // staggered entrance, breath loop on cloud + streak. Also fixes inverted
-// gender-polarity: Raylene → Womanhood content, Rylane → Manhood content
+// gender-polarity: Suhana → Womanhood content, Sy → Manhood content
 // (was swapped). No screens removed, no new features.
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -10,9 +10,11 @@ import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import { MiniReactionSticker } from '../components/MiniReactionSticker';
 import {
   Text, TouchableOpacity, ScrollView, View,
-  Image, ImageBackground, Animated, StyleSheet, Platform, Easing,
+  Image, ImageBackground, Animated, StyleSheet, Platform, Easing, Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { sendParentNote, fetchLinkedTeenId, fetchParentEngagement, ParentEngagement } from '@/utils/sync';
+import { usePoints, TIERS, tierFor, type Tier } from '@/features/activity/ledger';
 
 const ART: Record<string, Record<string, any>> = {
   raylene: {
@@ -35,7 +37,7 @@ const ART: Record<string, Record<string, any>> = {
   },
 };
 
-// ─── Static data — Womanhood (Raylene) ─────────────────────────────────────────
+// ─── Static data — Womanhood (Suhana) ─────────────────────────────────────────
 const W_CHIPS = [
   { key: 'period',   emoji: '🩸', label: 'First Period\nSupport' },
   { key: 'cycle',    emoji: '🫶', label: 'Cycle\nWellness' },
@@ -62,7 +64,7 @@ const W_BIP_FLOW = [
   { icon: '🕊️', step: 'grow',     sub: 'keep bippin' },
 ];
 
-// ─── Static data — Manhood (Rylane) ───────────────────────────────────────────
+// ─── Static data — Manhood (Sy) ───────────────────────────────────────────
 const M_CHIPS = [
   { key: 'puberty',    emoji: '🪱', label: 'Puberty\nGuide' },
   { key: 'body',       emoji: '🧠', label: 'Body\nChanges' },
@@ -97,7 +99,45 @@ interface Bippin2ScreenProps {
   onMilestone?: () => void;
   BottomNav: React.ReactNode;
   streakDays?: number;
+  onOpenGuide?: (guide: 'womanhood' | 'manhood') => void;
+  side: 'teen' | 'parent';
 }
+
+// ─── Parent milestone definitions ────────────────────────────────────────────
+const PARENT_MILESTONES: Array<{
+  id: string; emoji: string; label: string; sub: string;
+  check: (e: ParentEngagement) => boolean;
+}> = [
+  { id: 'first_note',    emoji: '💜', label: 'First Warm Note',  sub: 'You reached out. That already matters.',       check: e => e.notesSent >= 1    },
+  { id: 'tip_explorer',  emoji: '📖', label: 'Tip Explorer',     sub: 'Read 3 or more parent tips.',                  check: e => e.tipsRead >= 3     },
+  { id: 'notes_five',    emoji: '✉️', label: 'Regular Voice',    sub: 'Sent 5 warm notes to your teen.',              check: e => e.notesSent >= 5    },
+  { id: 'bridge_builder',emoji: '🌉', label: 'Bridge Builder',   sub: 'Connected through the Bridge.',                check: e => e.bridgeUsed        },
+  { id: 'week_presence', emoji: '🌿', label: '7-Day Presence',   sub: 'Showed up for your teen 7 days running.',      check: e => e.daysActive >= 7   },
+  { id: 'month_connected',emoji: '🤝', label: '30-Day Connected', sub: 'A full month of staying close.',              check: e => e.daysActive >= 30  },
+];
+
+const PARENT_TIPS = [
+  { title: "Let them lead",          body: "Growth questions come when they feel safe -- not when pushed. Being available is enough." },
+  { title: "Normalise the conversation", body: "One casual mention of puberty or emotions makes the next conversation easier. Lower the stakes." },
+  { title: "Don't project",          body: "Your experience of adolescence isn't theirs. Ask more than you assume." },
+  { title: "Celebrate consistency",  body: "Showing up to their growth journey, even imperfectly, matters more than perfect advice." },
+];
+
+const PARENT_STARTERS = [
+  "I'm proud of who you're becoming.",
+  "You don't have to figure it all out today.",
+  "I'm here -- no pressure, no lecture.",
+  "Growing up is hard. You're doing it anyway.",
+  "I see you working on yourself. That matters.",
+];
+
+// ─── Compact mood history for progress card (top moods shown inline) ──────────
+const BIP2_MOOD_HISTORY = [
+  { label: 'calm',   emoji: '😌' },
+  { label: 'happy',  emoji: '😊' },
+  { label: 'tired',  emoji: '😴' },
+  { label: 'okay',   emoji: '🤍' },
+];
 
 const getTimeOfDay = (): TimeOfDay => {
   const h = new Date().getHours();
@@ -144,13 +184,24 @@ const moodGlow = (mood?: string): string => {
 };
 
 export function Bippin2Screen({
-  t, mood, selectedSekret, setScreen, onMilestone, BottomNav, streakDays = 0,
+  t, mood, selectedSekret, setScreen, onMilestone, BottomNav, streakDays = 0, onOpenGuide,
+  side,
 }: Bippin2ScreenProps) {
+
+  // ── Parent-side state (only active when side === 'parent') ─────────────────
+  const [parentTab,   setParentTab]   = useState<'journey' | 'tips' | 'note'>('journey');
+  const [noteMsg,     setNoteMsg]     = useState('');
+  const [noteSent,    setNoteSent]    = useState(false);
+  const [noteSending, setNoteSending] = useState(false);
+  const [teenId,      setTeenId]      = useState<string | null>(null);
+  const [engagement,  setEngagement]  = useState<ParentEngagement>({
+    notesSent: 0, tipsRead: 0, daysActive: 0, bridgeUsed: false,
+  });
 
   const isRylane      = selectedSekret === 'rylane';
   const isNight       = selectedSekret === 'night';
   const isManhoodChar = isRylane || isNight;
-  const charName      = isRylane ? 'Rylane' : isNight ? 'Night' : 'Raylene';
+  const charName      = isRylane ? 'Sy' : isNight ? 'Night' : 'Suhana';
   const charEmoji     = isRylane ? '🪱' : isNight ? '🌙' : '🫶';
   const artKey        = isNight ? 'night' : (isRylane ? 'rylane' : 'raylene');
   const art           = ART[artKey];
@@ -159,10 +210,20 @@ export function Bippin2Screen({
   const time = useMemo(() => getTimeOfDay(), []);
   const bg   = useMemo(() => getRoomBg(charKey, time), [charKey, time]);
 
-  // Manhood chars (Rylane/Night): cool electric blue. Raylene: warm purple.
+  // Manhood chars (Sy/Night): cool electric blue. Suhana: warm purple.
   const idAccent   = isManhoodChar ? '#4DA3FF' : t.accent;
   const idSoft     = isManhoodChar ? '#B6DCFF' : t.soft;
   const glow       = useMemo(() => moodGlow(mood), [mood]);
+
+  // ─── Bip Points ledger (live, teen-only) ──────────────────────────────────
+  const ledger     = usePoints();
+  const bipTier: Tier   = ledger.isLoaded ? ledger.tier : tierFor(0);
+  const bipTierIdx      = TIERS.findIndex(t2 => t2.key === bipTier.key);
+  const bipNextTier     = TIERS[bipTierIdx + 1];
+  const bipTotal        = ledger.isLoaded ? ledger.total : 0;
+  const bipProgress     = bipNextTier
+    ? Math.min(1, Math.max(0, (bipTotal - bipTier.min) / (bipNextTier.min - bipTier.min)))
+    : 1;
 
   // ─── Animations ───────────────────────────────────────────────────────────
   const fadeIn   = useRef(new Animated.Value(0)).current;
@@ -207,6 +268,12 @@ export function Bippin2Screen({
     return () => { glowLoop.stop(); breathLoop.stop(); };
   }, [fadeIn, glowAnim, breath, card1, card2, card3, card4]);
 
+  useEffect(() => {
+    if (side !== 'parent') return;
+    fetchLinkedTeenId().then(id => { if (id) setTeenId(id); });
+    fetchParentEngagement().then(data => { if (data) setEngagement(data); });
+  }, [side]);
+
   const glowOpacity = glowAnim.interpolate({ inputRange: [0.4, 1], outputRange: [0.18, 0.42] });
   const breathScale = breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
   const cardStyle = (val: Animated.Value) => ({
@@ -217,6 +284,188 @@ export function Bippin2Screen({
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [energyLevel] = useState(72);
   const [sleepHours] = useState('6h 42m');
+
+  const handleNote = async () => {
+    const text = noteMsg.trim();
+    if (!text) return;
+    if (!teenId) {
+      Alert.alert('Not linked', 'Link to your teen in Settings first.');
+      return;
+    }
+    setNoteSending(true);
+    try {
+      const ok = await sendParentNote(teenId, text);
+      if (ok) {
+        setNoteSent(true);
+        setNoteMsg('');
+        setEngagement(prev => ({ ...prev, notesSent: prev.notesSent + 1 }));
+      } else {
+        Alert.alert('Could not send', 'Try again in a moment.');
+      }
+    } catch {
+      Alert.alert('Could not send', 'Check your connection.');
+    } finally {
+      setNoteSending(false);
+    }
+  };
+
+  // ── Parent view ─────────────────────────────────────────────────────────────
+  if (side === 'parent') {
+    const achieved = PARENT_MILESTONES.filter(m => m.check(engagement)).length;
+    const pAccent  = '#a78bfa';
+    const pSoft    = '#ede9fe';
+    const pGreen   = '#6ee7b7';
+    const pAmber   = '#fcd34d';
+    const pDeep    = '#1e0f3a';
+
+    return (
+      <View style={styles.root}>
+        <AmbientWeatherOverlay />
+        <LinearGradient colors={['#100826', '#1a0d3a']} style={StyleSheet.absoluteFill} />
+
+        <Animated.ScrollView
+          style={{ opacity: fadeIn }}
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.backChip} onPress={() => setScreen('home')}>
+              <Text style={styles.backChipText}>🏡 room</Text>
+            </TouchableOpacity>
+            <View style={[styles.privateBadge, { backgroundColor: 'rgba(20,12,40,0.7)', borderColor: pAccent + '66' }]}>
+              <Text style={styles.privateBadgeText}>your space</Text>
+            </View>
+          </View>
+
+          <Text style={[styles.screenTitle, { color: pAccent }]}>Bippin 2{'\n'}Parent 🌿</Text>
+          <Text style={[styles.screenSub, { color: pSoft }]}>your journey in Bip. all yours.</Text>
+
+          {/* Stats row */}
+          <Animated.View style={[{ flexDirection: 'row', gap: 10, marginBottom: 20 }, cardStyle(card1)]}>
+            {[
+              { num: engagement.notesSent, label: 'notes sent',   color: pAccent },
+              { num: engagement.daysActive, label: 'days active', color: pGreen  },
+              { num: `${achieved}/${PARENT_MILESTONES.length}`, label: 'milestones', color: pAmber },
+            ].map(s => (
+              <View key={s.label} style={[pSt.statCard, { borderColor: s.color + '55' }]}>
+                <Animated.Text style={[pSt.statNum, { color: s.color, transform: [{ scale: breathScale }] }]}>
+                  {s.num}
+                </Animated.Text>
+                <Text style={[pSt.statLabel, { color: pSoft }]}>{s.label}</Text>
+              </View>
+            ))}
+          </Animated.View>
+
+          {/* Tabs */}
+          <Animated.View style={[{ flexDirection: 'row', gap: 8, marginBottom: 18 }, cardStyle(card2)]}>
+            {(['journey', 'tips', 'note'] as const).map(tab => (
+              <TouchableOpacity
+                key={tab}
+                style={[pSt.tabBtn, parentTab === tab && { backgroundColor: pAccent + '33', borderColor: pAccent }]}
+                onPress={() => setParentTab(tab)}
+              >
+                <Text style={[pSt.tabLabel, { color: parentTab === tab ? pAccent : pSoft + '88' }]}>
+                  {tab === 'journey' ? 'Journey' : tab === 'tips' ? 'Tips' : 'Send Note'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </Animated.View>
+
+          {/* Journey tab */}
+          {parentTab === 'journey' && (
+            <Animated.View style={cardStyle(card3)}>
+              <Text style={[pSt.sectionNote, { color: pSoft + 'aa' }]}>
+                Milestones you earn by being present in Bip.
+              </Text>
+              {PARENT_MILESTONES.map(m => {
+                const done = m.check(engagement);
+                return (
+                  <View key={m.id} style={[pSt.milestoneCard, { borderColor: done ? pAccent + '88' : pSoft + '22', opacity: done ? 1 : 0.45 }]}>
+                    <Animated.Text style={[{ fontSize: 26 }, done && { transform: [{ scale: breathScale }] }]}>
+                      {m.emoji}
+                    </Animated.Text>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[pSt.milestoneLabel, { color: done ? '#fff' : pSoft + '88' }]}>{m.label}</Text>
+                      <Text style={[pSt.milestoneSub, { color: pSoft + '77' }]}>{m.sub}</Text>
+                    </View>
+                    {done && <Text style={[{ fontSize: 11, fontWeight: '700' }, { color: pGreen }]}>done</Text>}
+                  </View>
+                );
+              })}
+            </Animated.View>
+          )}
+
+          {/* Tips tab */}
+          {parentTab === 'tips' && (
+            <Animated.View style={cardStyle(card3)}>
+              {PARENT_TIPS.map(tip => (
+                <View key={tip.title} style={[pSt.tipCard, { borderColor: pAccent + '44' }]}>
+                  <Text style={[pSt.tipTitle, { color: pAccent }]}>{tip.title}</Text>
+                  <Text style={[pSt.tipBody, { color: pSoft }]}>{tip.body}</Text>
+                </View>
+              ))}
+            </Animated.View>
+          )}
+
+          {/* Send note tab */}
+          {parentTab === 'note' && (
+            <Animated.View style={cardStyle(card3)}>
+              <View style={[pSt.noteInfo, { borderColor: pAccent + '44' }]}>
+                <Text style={[pSt.noteInfoText, { color: pSoft }]}>
+                  One-way warmth. Your teen sees it in their Bip space. You can't read their journal -- this is yours to give.
+                </Text>
+              </View>
+              <Text style={[styles.cardLabel, { color: pSoft, marginBottom: 10 }]}>need a starting point?</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 14 }}>
+                {PARENT_STARTERS.map(s => (
+                  <TouchableOpacity key={s} style={[pSt.starterChip, { borderColor: pAccent + '55' }]} onPress={() => setNoteMsg(s)}>
+                    <Text style={[pSt.starterText, { color: pSoft }]}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+              {!noteSent ? (
+                <>
+                  <View style={[pSt.inputWrap, { borderColor: pAccent + '88' }]}>
+                    <Text style={[pSt.inputPh, { color: noteMsg ? '#fff' : pSoft + '66' }]}>
+                      {noteMsg || 'Write something warm...'}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.accentBtn, { backgroundColor: noteMsg.trim() ? pAccent : 'rgba(60,30,80,0.5)', shadowColor: pAccent }]}
+                    onPress={handleNote}
+                    disabled={!noteMsg.trim() || noteSending}
+                  >
+                    <Text style={[styles.accentBtnText, { color: noteMsg.trim() ? pDeep : pSoft + '66' }]}>
+                      {noteSending ? 'sending...' : 'send with love 💜'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={[pSt.sentCard, { borderColor: pAccent + '55' }]}>
+                  <Animated.Text style={{ fontSize: 48, textAlign: 'center', marginBottom: 10, transform: [{ scale: breathScale }] }}>
+                    {'💜'}
+                  </Animated.Text>
+                  <Text style={[pSt.sentTitle, { color: '#fff' }]}>Sent.</Text>
+                  <Text style={[pSt.sentSub, { color: pSoft }]}>Your teen will see it as a warm note.</Text>
+                  <TouchableOpacity style={[styles.accentBtn, { backgroundColor: pAccent, marginTop: 16 }]} onPress={() => setNoteSent(false)}>
+                    <Text style={[styles.accentBtnText, { color: pDeep }]}>send another</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </Animated.View>
+          )}
+
+          <TouchableOpacity style={styles.ghostBtn} onPress={() => setScreen('home')}>
+            <Text style={styles.ghostBtnText}>{'<- back to room'}</Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 36 }} />
+        </Animated.ScrollView>
+
+        {BottomNav}
+      </View>
+    );
+  }
 
   const handleChip = (key: string) => {
     const routes: Record<string, string> = {
@@ -296,7 +545,7 @@ export function Bippin2Screen({
         {/* Phase 2: deep link to dedicated content layer */}
         <TouchableOpacity
           style={{ alignSelf: 'center', backgroundColor: idAccent, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 999, marginBottom: 16, shadowColor: idAccent, shadowOpacity: 0.5, shadowRadius: 10, shadowOffset: { width: 0, height: 0 } }}
-          onPress={() => setScreen(isManhoodChar ? 'manhood' : 'womanhood')}
+          onPress={() => onOpenGuide ? onOpenGuide(isManhoodChar ? 'manhood' : 'womanhood') : setScreen(isManhoodChar ? 'manhood' : 'womanhood')}
         >
           <Text style={{ color: '#0a0420', fontWeight: '800', fontSize: 13 }}>
             {isManhoodChar ? 'open the manhood guide →' : 'open the womanhood guide →'}
@@ -354,7 +603,7 @@ export function Bippin2Screen({
           </ScrollView>
         </Animated.View>
 
-        {/* WOMANHOOD CARDS (Raylene only — no boy avatars here). */}
+        {/* WOMANHOOD CARDS (Suhana only — no boy avatars here). */}
         <Animated.View style={cardStyle(card3)}>
           {!isManhoodChar && (
             <>
@@ -434,7 +683,7 @@ export function Bippin2Screen({
             </>
           )}
 
-          {/* MANHOOD CARDS (Rylane or Night). */}
+          {/* MANHOOD CARDS (Sy or Night). */}
           {isManhoodChar && (
             <>
               <View style={styles.threeColRow}>
@@ -530,6 +779,54 @@ export function Bippin2Screen({
         </Animated.View>
 
         <Animated.View style={cardStyle(card4)}>
+          {/* ── Bip Progress + Insights ──────────────────────────────────────── */}
+          <View style={scrapCard()}>
+            <Text style={[styles.cardLabel, { color: idAccent }]}>bip progress ✨</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <Animated.Text style={[{ fontSize: 30 }, { transform: [{ scale: breathScale }] }]}>
+                {bipTier.emoji}
+              </Animated.Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>{bipTotal}</Text>
+                <Text style={{ color: bipTier.color, fontSize: 13, fontWeight: '800' }}>{bipTier.label}</Text>
+              </View>
+              <View style={{ backgroundColor: idAccent + '22', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ color: idAccent, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>pts</Text>
+              </View>
+            </View>
+            <View style={{ height: 8, width: '100%', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 6 }}>
+              <View style={{ height: '100%', width: `${bipProgress * 100}%` as any, backgroundColor: bipTier.color, borderRadius: 999 }} />
+            </View>
+            <Text style={{ color: 'rgba(255,255,255,0.52)', fontSize: 11, fontWeight: '600', marginBottom: 14 }}>
+              {bipNextTier ? `${Math.max(0, bipNextTier.min - bipTotal)} until ${bipNextTier.label}` : 'you filled the whole sky ✨'}
+            </Text>
+            <Text style={[styles.cardBodySmall, { marginBottom: 8 }]}>your recent moods</Text>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              {BIP2_MOOD_HISTORY.map(m => (
+                <View key={m.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(20,12,40,0.65)', borderWidth: 1, borderColor: idAccent + '44', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
+                  <Text style={{ fontSize: 14 }}>{m.emoji}</Text>
+                  <Text style={{ color: idSoft, fontSize: 11, fontWeight: '600' }}>{m.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {ledger.isLoaded && ledger.breakdown.some(row => row.count > 0) && (
+              <>
+                <Text style={[styles.cardBodySmall, { marginTop: 14, marginBottom: 8 }]}>where your points came from</Text>
+                <View style={{ gap: 6 }}>
+                  {ledger.breakdown.filter(row => row.count > 0).map(row => (
+                    <View key={row.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 14 }}>{row.emoji}</Text>
+                      <Text style={{ flex: 1, color: idSoft, fontSize: 12, fontWeight: '600' }}>{row.label}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>{row.count}×</Text>
+                      <Text style={{ color: idAccent, fontSize: 12, fontWeight: '800', minWidth: 34, textAlign: 'right' }}>{row.pts}pt</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+
           <View style={scrapCard()}>
             <Text style={[styles.cardLabel, { color: idAccent }]}>
               BIP FLOW {isManhoodChar ? (isRylane ? '🪱' : '🌙') : '🫶'}
@@ -570,7 +867,7 @@ export function Bippin2Screen({
             <Text style={styles.stickyText}>
               {isManhoodChar
                 ? `”grow at your pace. no race. respect.”`
-                : `”soft is strong. you’re growing right on time.”`
+                : `”soft is strong. you're growing right on time.”`
               }
             </Text>
           </View>
@@ -706,4 +1003,28 @@ const styles = StyleSheet.create({
   accentBtnText:  { color: '#fff', fontSize: 15, fontWeight: 'bold' },
   ghostBtn:       { backgroundColor: 'rgba(20,12,40,0.75)', padding: 13, borderRadius: 16, alignItems: 'center', marginBottom: 8 },
   ghostBtnText:   { color: '#cbb6f7', fontWeight: '600', fontSize: 14 },
+});
+
+const pSt = StyleSheet.create({
+  statCard:      { flex: 1, backgroundColor: 'rgba(40,20,70,0.82)', borderWidth: 1, borderRadius: 16, padding: 14, alignItems: 'center' },
+  statNum:       { fontSize: 28, fontWeight: '800', marginBottom: 2 },
+  statLabel:     { fontSize: 11, fontWeight: '600', textAlign: 'center' },
+  tabBtn:        { flex: 1, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: 'transparent', alignItems: 'center' },
+  tabLabel:      { fontSize: 12, fontWeight: '700' },
+  sectionNote:   { fontSize: 12, marginBottom: 14, fontStyle: 'italic' },
+  milestoneCard: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: 'rgba(40,20,70,0.75)', borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 10 },
+  milestoneLabel:{ fontSize: 14, fontWeight: '700', marginBottom: 2 },
+  milestoneSub:  { fontSize: 12, lineHeight: 17 },
+  tipCard:       { backgroundColor: 'rgba(40,20,70,0.75)', borderWidth: 1, borderRadius: 16, padding: 16, marginBottom: 12 },
+  tipTitle:      { fontSize: 14, fontWeight: '700', marginBottom: 6 },
+  tipBody:       { fontSize: 13, lineHeight: 21 },
+  noteInfo:      { borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 16 },
+  noteInfoText:  { fontSize: 13, lineHeight: 20 },
+  starterChip:   { backgroundColor: 'rgba(40,20,70,0.8)', borderWidth: 1, borderRadius: 14, padding: 10, marginRight: 8, maxWidth: 220 },
+  starterText:   { fontSize: 12, lineHeight: 18 },
+  inputWrap:     { backgroundColor: 'rgba(40,20,70,0.8)', borderWidth: 1, borderRadius: 18, padding: 16, minHeight: 110, marginBottom: 10 },
+  inputPh:       { fontSize: 14, lineHeight: 22 },
+  sentCard:      { borderWidth: 1, borderRadius: 20, padding: 24, alignItems: 'center', marginBottom: 12 },
+  sentTitle:     { fontSize: 20, fontWeight: 'bold', marginBottom: 6 },
+  sentSub:       { fontSize: 13, textAlign: 'center', lineHeight: 20 },
 });

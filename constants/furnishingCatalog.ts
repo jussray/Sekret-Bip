@@ -9,13 +9,13 @@
  * Items that are ready show `available: true`.
  *
  * Sourced from visual inventory of the four Avatar Room bg images:
- * Raylene (cozy purple bedroom), Rylane (dark city setup),
+ * Suhana (legacy `raylene` asset key, cozy purple bedroom),
+ * Sy (legacy `rylane` asset key, dark city setup),
  * Cloud (brain dump creative space), Night (late-night thinker den).
  */
 
 import type { ImageSourcePropType } from 'react-native';
 import { IMAGES } from './theme';
-import STICKER_IMAGES from './stickerImages';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,8 +24,7 @@ export type FurnishCategory =
   | 'lighting'     // lamps, neons, candles, fairy lights
   | 'decor'        // banners, posters, photo wall, signs, rugs
   | 'accessories'  // headphones, journal, boba, hoodie, backpack
-  | 'plants'       // ivy, succulents, potted plants
-  | 'characters';  // the 53 Bip stickers (characters in poses)
+  | 'plants';      // ivy, succulents, potted plants
 
 export type RoomOrigin = 'raylene' | 'rylane' | 'cloud' | 'night' | 'shared';
 
@@ -104,7 +103,7 @@ export const FURNISH_CATALOG: FurnishItem[] = [
   // String / fairy lights
   item('fairy-lights',   'Fairy String Lights','✨',   'lighting', 'night',   null, ['lights', 'fairy', 'night', 'cozy']),
 
-  // Cloud lamp plush (on Raylene's bed)
+  // Cloud lamp plush (on Suhana's bed; legacy room key remains `raylene`)
   item('cloud-lamp',     'Cloud Lamp Plush',   '☁️',  'lighting', 'raylene',
     IMAGES.cloudSleepy, // closest existing asset — sleepy cloud
     ['cloud', 'lamp', 'plush', 'cozy', 'raylene']),
@@ -131,9 +130,9 @@ export const FURNISH_CATALOG: FurnishItem[] = [
   item('sticky-thoughts','Cloud Thoughts Wall','🌫️',  'decor', 'cloud',       null, ['sticky', 'cloud', 'thoughts', 'brain-dump']),
 
   // Character art / photo pins
-  item('char-art-raylene', 'Raylene Photo',   '💜',  'decor', 'raylene',
+  item('char-art-raylene', 'Suhana Photo',    '💜',  'decor', 'raylene',
     IMAGES.rayleneNeutral, ['photo', 'raylene', 'wall', 'art']),
-  item('char-art-rylane',  'Rylane Photo',    '⚡',  'decor', 'rylane',
+  item('char-art-rylane',  'Sy Photo',        '⚡',  'decor', 'rylane',
     IMAGES.rylaneNeutral, ['photo', 'rylane', 'wall', 'art']),
   item('char-art-cloud',   'Cloud Photo',     '☁️',  'decor', 'cloud',
     IMAGES.cloudAvatarNeutral, ['photo', 'cloud', 'wall', 'art']),
@@ -155,9 +154,7 @@ export const FURNISH_CATALOG: FurnishItem[] = [
   item('journal-cloud',     'Cloud Thoughts Journal','📓','accessories','cloud', null, ['journal', 'cloud', 'thoughts', 'writing']),
 
   // Drinks
-  item('boba',             'Boba Iced Coffee',  '🧋', 'accessories', 'shared',
-    STICKER_IMAGES['raylene-boba'], // raylene-boba sticker is perfect here
-    ['boba', 'iced coffee', 'drink', 'cozy']),
+  item('boba',             'Boba Iced Coffee',  '🧋', 'accessories', 'shared',  null, ['boba', 'iced coffee', 'drink', 'cozy']),
 
   // Hoodies
   item('hoodie-raylene',   'Se\'kret Hoodie 💜','👕', 'accessories', 'raylene', null, ['hoodie', 'purple', 'sekret', 'raylene']),
@@ -190,66 +187,6 @@ export const FURNISH_CATALOG: FurnishItem[] = [
   item('plant-potted',     'Potted Plant',        '🪴', 'plants', 'shared', null, ['plant', 'potted', 'green']),
   item('plant-pencil',     'Pencil Cup + Plant',  '✏️', 'plants', 'shared', null, ['plant', 'pencil', 'desk', 'small']),
 
-  // ── CHARACTERS (the 53 Bip stickers — all immediately available) ───────────
-
-  // Raylene stickers
-  item('stk-ray-standing',    'Raylene',         '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-standing'],   ['raylene', 'standing', 'confident']),
-  item('stk-ray-lounging',    'Raylene Lounging','💜', 'characters', 'raylene', STICKER_IMAGES['raylene-lounging'],   ['raylene', 'lounging', 'relaxed']),
-  item('stk-ray-studying',    'Raylene Studying','💜', 'characters', 'raylene', STICKER_IMAGES['raylene-studying'],   ['raylene', 'studying', 'focused']),
-  item('stk-ray-sleepy',      'Raylene Sleepy',  '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-sleepy'],     ['raylene', 'sleepy', 'tired']),
-  item('stk-ray-peace',       'Raylene Peace',   '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-peace'],      ['raylene', 'peace', 'calm']),
-  item('stk-ray-listening',   'Raylene Listening','💜','characters', 'raylene', STICKER_IMAGES['raylene-listening'],  ['raylene', 'headphones', 'music']),
-  item('stk-ray-comfort',     'Raylene Comfort', '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-comfort'],    ['raylene', 'comfort', 'hug']),
-  item('stk-ray-sunglasses',  'Raylene Sunglasses','💜','characters','raylene', STICKER_IMAGES['raylene-sunglasses'],['raylene', 'cool', 'sunglasses']),
-  item('stk-ray-happy',       'Raylene Happy',   '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-happy'],      ['raylene', 'happy', 'excited']),
-  item('stk-ray-journaling',  'Raylene Journaling','💜','characters','raylene', STICKER_IMAGES['raylene-journaling'],['raylene', 'journal', 'writing']),
-  item('stk-ray-thinking',    'Raylene Thinking','💜', 'characters', 'raylene', STICKER_IMAGES['raylene-thinking'],  ['raylene', 'thinking', 'curious']),
-  item('stk-ray-boba',        'Raylene + Boba',  '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-boba'],       ['raylene', 'boba', 'cozy']),
-  item('stk-ray-crown',       'Raylene Crown',   '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-crown'],      ['raylene', 'crown']),
-  item('stk-ray-sunnies',     'Raylene Sunnies', '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-sunnies'],   ['raylene', 'sunnies']),
-  item('stk-ray-hoodie',      'Raylene Hoodie',  '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-hoodie'],    ['raylene', 'hoodie']),
-  item('stk-ray-sekret-bip',  'Raylene Sekret',  '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-sekret-bip'],['raylene', 'sekret']),
-  item('stk-ray-sekret-heart','Raylene Heart',   '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-sekret-heart'],['raylene', 'heart', 'love']),
-  item('stk-ray-pillow',      'Raylene + Pillow','💜', 'characters', 'raylene', STICKER_IMAGES['raylene-pillow'],    ['raylene', 'pillow', 'cozy']),
-  item('stk-ray-icon-cloud',  'Raylene Cloud',   '💜', 'characters', 'raylene', STICKER_IMAGES['raylene-icon-cloud'],['raylene', 'cloud', 'icon']),
-
-  // Rylane stickers
-  item('stk-ryl-mini',        'Rylane',          '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-mini'],        ['rylane', 'mini', 'neutral']),
-  item('stk-ryl-reading',     'Rylane Reading',  '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-reading'],     ['rylane', 'reading', 'focused']),
-  item('stk-ryl-phone',       'Rylane Phone',    '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-phone'],       ['rylane', 'phone', 'casual']),
-  item('stk-ryl-thinking',    'Rylane Thinking', '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-thinking'],    ['rylane', 'thinking', 'curious']),
-  item('stk-ryl-sitting',     'Rylane Sitting',  '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-sitting'],     ['rylane', 'sitting', 'calm']),
-  item('stk-ryl-headphones',  'Rylane Headphones','⚡','characters', 'rylane',  STICKER_IMAGES['rylane-headphones'], ['rylane', 'headphones', 'music']),
-  item('stk-ryl-hoodie',      'Rylane Hoodie',   '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-hoodie'],      ['rylane', 'hoodie', 'cozy']),
-  item('stk-ryl-calm',        'Rylane Calm',     '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-calm'],        ['rylane', 'calm', 'grounded']),
-  item('stk-ryl-stormy',      'Rylane Stormy',   '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-stormy'],      ['rylane', 'stormy', 'upset']),
-  item('stk-ryl-peace',       'Rylane Peace',    '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-peace'],       ['rylane', 'peace', 'proud']),
-  item('stk-ryl-happy',       'Rylane Happy',    '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-happy'],       ['rylane', 'happy', 'excited']),
-  item('stk-ryl-sleepy',      'Rylane Sleepy',   '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-sleepy'],      ['rylane', 'sleepy', 'tired']),
-  item('stk-ryl-night',       'Rylane Night',    '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-night'],       ['rylane', 'night', 'window']),
-  item('stk-ryl-music',       'Rylane Music',    '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-music'],       ['rylane', 'music', 'listening']),
-  item('stk-ryl-late-night',  'Late Night',      '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-late-night'], ['rylane', 'late-night', 'text']),
-  item('stk-ryl-protect',     'Protect Sign',    '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-protect'],    ['rylane', 'protect', 'text']),
-  item('stk-ryl-why-i-love',  'Why I Love',      '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-why-i-love'],['rylane', 'love', 'text']),
-  item('stk-ryl-writing',     'Writing Icon',    '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-writing'],    ['rylane', 'writing', 'icon']),
-  item('stk-ryl-speech',      'Speech Bubble',   '⚡', 'characters', 'rylane',  STICKER_IMAGES['rylane-speech'],     ['rylane', 'speech', 'icon']),
-
-  // Cloud stickers
-  item('stk-cld-sleepy',      'Cloud Sleepy',    '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-sleepy'],       ['cloud', 'sleepy', 'rest']),
-  item('stk-cld-happy',       'Cloud Happy',     '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-happy'],        ['cloud', 'happy', 'energetic']),
-  item('stk-cld-listening',   'Cloud Listening', '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-listening'],   ['cloud', 'listening', 'focused']),
-  item('stk-cld-voice-bip',   'Cloud Voice Bip', '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-voice-bip'],   ['cloud', 'voice', 'active']),
-  item('stk-cld-journal',     'Cloud Journal',   '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-journal'],     ['cloud', 'journal', 'writing']),
-  item('stk-cld-comfort',     'Cloud Comfort',   '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-comfort'],     ['cloud', 'comfort', 'calm']),
-  item('stk-cld-hug',         'Cloud Hug',       '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-hug'],         ['cloud', 'hug', 'loving']),
-  item('stk-cld-proud',       'Cloud Proud',     '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-proud'],       ['cloud', 'proud', 'happy']),
-  item('stk-cld-stormy',      'Cloud Stormy',    '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-stormy'],      ['cloud', 'stormy', 'moody']),
-  item('stk-cld-crying',      'Cloud Crying',    '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-crying'],      ['cloud', 'crying', 'sad']),
-  item('stk-cld-cozy',        'Cloud Cozy',      '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-cozy'],        ['cloud', 'cozy', 'calm']),
-  item('stk-cld-dreamy',      'Cloud Dreamy',    '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-dreamy'],      ['cloud', 'dreamy', 'night']),
-  item('stk-cld-thinking',    'Cloud Thinking',  '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-thinking'],   ['cloud', 'thinking', 'curious']),
-  item('stk-cld-bippin-brb',  'Bippin BRB',      '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-bippin-brb'], ['cloud', 'brb', 'sleepy']),
-  item('stk-cld-cheer',       'Cloud Cheer',     '☁️', 'characters', 'cloud',   STICKER_IMAGES['cloud-cheer'],      ['cloud', 'cheer', 'excited']),
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

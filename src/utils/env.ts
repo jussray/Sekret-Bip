@@ -10,57 +10,94 @@
  * Call validateEnv() once at app startup (app/_layout.tsx).
  */
 
-const env = process.env as Record<string, string | undefined>;
+function clean(value: string | undefined): string {
+  return value?.trim() ?? '';
+}
 
 // ── Resolved values ──────────────────────────────────────────────────────────
-export const SUPABASE_URL  = env.EXPO_PUBLIC_SUPABASE_URL      ?? '';
-export const SUPABASE_ANON = env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
-export const BACKEND_URL   = env.EXPO_PUBLIC_BACKEND_URL       ?? '';
+// Expo only inlines public variables when they are referenced statically as
+// process.env.EXPO_PUBLIC_* with dot notation. Do not alias, destructure, or use
+// bracket notation for these reads: the browser bundle would receive blanks.
+export const SUPABASE_URL = clean(process.env.EXPO_PUBLIC_SUPABASE_URL);
+
+// Prefer the modern publishable-key variable while retaining the legacy anon
+// name for older EAS and Cloudflare environments.
+export const SUPABASE_ANON =
+  clean(process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
+  || clean(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+
+export const BACKEND_URL = clean(process.env.EXPO_PUBLIC_BACKEND_URL);
+/**
+ * Shared client token for the Cloudflare Worker backend. Sent as
+ * `Authorization: Bearer <token>` by backendHeaders(). Safe to ship in the
+ * client bundle (it is a coarse abuse speed-bump, not a per-user credential);
+ * the Worker enforces it only when its matching SEKRET_CLIENT_TOKEN secret is
+ * set. Leave unset and the app calls the backend unauthenticated as before.
+ */
+export const BACKEND_TOKEN = clean(process.env.EXPO_PUBLIC_BACKEND_TOKEN);
+
+/**
+ * Canonical headers for Worker backend calls. Always JSON; attaches `token` as
+ * a bearer credential when non-empty. Defaults to the shared BACKEND_TOKEN, but
+ * callers pass the user's Supabase access token when signed in — see
+ * backendAuthHeaders() in ./backendAuth. Kept synchronous and token-agnostic so
+ * the token-resolution policy lives in one place.
+ */
+export function backendHeaders(token: string = BACKEND_TOKEN, extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
 
 // ── Flags ────────────────────────────────────────────────────────────────────
 export const isSupabaseReady = Boolean(SUPABASE_URL && SUPABASE_ANON);
-export const isBackendReady  = Boolean(BACKEND_URL);
+export const isBackendReady = Boolean(BACKEND_URL);
 
-// Safe __DEV__ guard — RN global is undefined in Node/Vercel SSG context
-const isDev = typeof __DEV__ !== 'undefined' ? __DEV__ : process.env.NODE_ENV === 'development';
+const isDev = process.env.NODE_ENV === 'development';
 
 /**
  * validateEnv()
  *
  * Missing SUPABASE vars  → cloud sync disabled, AsyncStorage only.
- * Missing BACKEND_URL    → HARD ERROR logged; AI replies will silently fail
- *                          mid-chat without it. Fix before shipping to testers.
+ * Missing BACKEND_URL    → AI replies fall back to pre-written companion
+ *                          replies (see fallbackReply() in ./api). Fine for
+ *                          local dev; deploy the Worker before real launch.
  * Banned keys present    → security violation logged.
+ *
+ * Note: missing-config cases use console.warn, not console.error — in Expo
+ * web dev, console.error triggers a full-screen LogBox overlay that blocks
+ * all interaction with the app underneath it.
  */
 export function validateEnv(): void {
   // ── Required for cloud sync ──────────────────────────────────────────────
   if (!SUPABASE_URL) {
     console.warn(
       "[Se'kret Bip] ⚠️  EXPO_PUBLIC_SUPABASE_URL is not set.\n" +
-      '   Cloud sync is disabled. Add it to .env.local (see .env.example).'
+      '   Cloud sync is disabled. Add it to the deployment environment.'
     );
   }
   if (!SUPABASE_ANON) {
     console.warn(
-      "[Se'kret Bip] ⚠️  EXPO_PUBLIC_SUPABASE_ANON_KEY is not set.\n" +
-      '   Cloud sync is disabled. Add it to .env.local (see .env.example).'
+      "[Se'kret Bip] ⚠️  Supabase publishable key is not set.\n" +
+      '   Configure EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or the legacy EXPO_PUBLIC_SUPABASE_ANON_KEY).'
     );
   }
 
-  // ── Required for AI replies — hard error ────────────────────────────────
+  // ── Backend URL: falls back to pre-written companion replies ────────────
   if (!BACKEND_URL) {
-    console.error(
-      "[Se'kret Bip] 🚨 EXPO_PUBLIC_BACKEND_URL is not set.\n" +
-      "   Se'kret AI WILL silently drop all replies without this.\n" +
-      '   Set it to your Cloudflare Worker URL after `wrangler deploy`.\n' +
+    console.warn(
+      "[Se'kret Bip] ℹ️  EXPO_PUBLIC_BACKEND_URL is not set.\n" +
+      "   Se'kret AI is running in fallback mode (pre-written replies).\n" +
+      '   Set it to your Cloudflare Worker URL after `wrangler deploy` for live AI replies.\n' +
       '   Example: EXPO_PUBLIC_BACKEND_URL=https://sekret-reply.<account>.workers.dev'
     );
   }
 
   // ── Security: banned keys must never reach the client ────────────────────
+  const runtimeEnv = process.env as Record<string, string | undefined>;
   const BANNED = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'SERVICE_ROLE'];
   for (const key of BANNED) {
-    if (env[key]) {
+    if (runtimeEnv[key]) {
       console.error(
         `[Se'kret Bip] 🚨 SECURITY: "${key}" is present in client environment.\n` +
         '   This key must NEVER be in Expo, Vercel, or client code.\n' +

@@ -10,9 +10,12 @@ import {
   StyleSheet,
   Platform,
   Easing,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { SOFT_CONTENT_FLAGS, CRISIS_NUDGE, TONE } from '../constants/guardrails';
+import { reportPost } from '@/utils/circleModeration';
 
 type ParentCirclePost = {
   id: string | number;
@@ -31,6 +34,13 @@ type ParentCirclePost = {
   };
 };
 
+type FeedTab = 'foryou' | 'new' | 'following';
+const FEED_TABS: { key: FeedTab; label: string }[] = [
+  { key: 'foryou',    label: 'For You'   },
+  { key: 'new',       label: 'New'       },
+  { key: 'following', label: 'Following' },
+];
+
 type ParentCircleScreenProps = {
   parentCirclePosts: ParentCirclePost[];
   parentCirclePostText: string;
@@ -39,6 +49,7 @@ type ParentCircleScreenProps = {
   reactToParentPost: (id: string | number, type: string) => void;
   setScreen: (screen: string) => void;
   BottomNav: React.ReactNode;
+  onPostPress?: (id: string | number) => void;
 };
 
 const PARENT_REACTIONS = [
@@ -52,7 +63,7 @@ const PARENT_REACTIONS = [
 const PARENT_POST_TYPES = [
   { id: 'parenting-win',   emoji: '🏡', label: 'Parenting win',    sub: 'something landed right'               },
   { id: 'parenting-hard',  emoji: '🌧', label: 'Hard right now',   sub: 'carrying something heavy'              },
-  { id: 'lets-talk',       emoji: '💬', label: "Let's talk",       sub: 'want to hear from other parents'       },
+  { id: 'lets-talk',       emoji: '💬', label: "Let\'s talk",       sub: 'want to hear from other parents'       },
   { id: 'connection',      emoji: '🌉', label: 'Connection moment', sub: 'the moment something clicked'         },
 ];
 
@@ -148,13 +159,37 @@ export function ParentCircleScreen({
   reactToParentPost,
   setScreen,
   BottomNav,
+  onPostPress,
 }: ParentCircleScreenProps) {
   const [selectedType, setSelectedType] = useState(PARENT_POST_TYPES[0].id);
   const [selectedTag, setSelectedTag]   = useState('');
   const [showTagPicker, setShowTagPicker] = useState(false);
   const [isSubmitting, setIsSubmitting]   = useState(false);
+  const [crisisFlag, setCrisisFlag]       = useState(false);
+  const [confirmedPost, setConfirmedPost] = useState(false);
   const [activeReplyPostId, setActiveReplyPostId] = useState<string | null>(null);
   const [selectedQuietReply, setSelectedQuietReply] = useState('');
+  const [feedTab, setFeedTab] = useState<FeedTab>('foryou');
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
+
+  function handleReport(postId: string | number) {
+    Alert.alert(
+      'Report this post?',
+      "We'll take a look. It'll stop showing up in your feed right away.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: () => {
+            setReportedIds(prev => new Set(prev).add(String(postId)));
+            const numericId = Number(postId);
+            if (Number.isFinite(numericId)) void reportPost(numericId, 'parent');
+          },
+        },
+      ],
+    );
+  }
 
   const currentType = PARENT_POST_TYPES.find(p => p.id === selectedType) || PARENT_POST_TYPES[0];
 
@@ -188,8 +223,19 @@ export function ParentCircleScreen({
     try { await Haptics.impactAsync(style); } catch { void 0; }
   };
 
+  const handleTextChange = (val: string) => {
+    setParentCirclePostText(val);
+    const lower = val.toLowerCase();
+    setCrisisFlag(SOFT_CONTENT_FLAGS.some(f => lower.includes(f)));
+    setConfirmedPost(false);
+  };
+
   const handleSavePost = async () => {
     if (!parentCirclePostText.trim()) return;
+    if (crisisFlag && !confirmedPost) {
+      setConfirmedPost(true);
+      return;
+    }
     setIsSubmitting(true);
     saveParentCirclePost({
       text:      parentCirclePostText,
@@ -197,6 +243,8 @@ export function ParentCircleScreen({
     });
     setParentCirclePostText('');
     setSelectedTag('');
+    setCrisisFlag(false);
+    setConfirmedPost(false);
     setIsSubmitting(false);
     await triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
   };
@@ -307,8 +355,14 @@ export function ParentCircleScreen({
               placeholderTextColor="#6b7a5e"
               multiline
               value={parentCirclePostText}
-              onChangeText={setParentCirclePostText}
+              onChangeText={handleTextChange}
             />
+
+            {crisisFlag && (
+              <View style={styles.crisisNudge}>
+                <Text style={styles.crisisNudgeText}>{CRISIS_NUDGE}</Text>
+              </View>
+            )}
 
             <TouchableOpacity
               style={styles.postBtn}
@@ -316,7 +370,7 @@ export function ParentCircleScreen({
               disabled={isSubmitting}
             >
               <Text style={styles.postBtnText}>
-                {isSubmitting ? 'posting…' : '+ share anonymously'}
+                {isSubmitting ? 'posting…' : crisisFlag && !confirmedPost ? 'continue?' : '+ share anonymously'}
               </Text>
             </TouchableOpacity>
 
@@ -332,13 +386,31 @@ export function ParentCircleScreen({
 
         {/* ── Posts ──────────────────────────────────────────────────────── */}
         <Animated.View style={cardStyle(fade4)}>
+          {/* Feed tabs */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.feedTabRail}
+          >
+            {FEED_TABS.map(ft => {
+              const active = feedTab === ft.key;
+              return (
+                <TouchableOpacity
+                  key={ft.key}
+                  onPress={() => setFeedTab(ft.key)}
+                  style={[styles.feedTab, active && styles.feedTabActive]}
+                >
+                  <Text style={[styles.feedTabText, active && styles.feedTabTextActive]}>{ft.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>what parents are carrying</Text>
 
             {parentCirclePosts.length === 0 && (
-              <Text style={styles.emptyText}>
-                circle is quiet. be the first to pull up a chair.
-              </Text>
+              <Text style={styles.emptyText}>{TONE.emptyCircle}</Text>
             )}
 
             <View style={styles.circlePromise}>
@@ -346,12 +418,26 @@ export function ParentCircleScreen({
               <Text style={styles.circlePromiseSub}>anonymous · no likes · no ranking</Text>
             </View>
 
-            {visiblePosts.map(post => (
-              <View key={post.id} style={styles.postCard}>
+            {visiblePosts.filter(post => !reportedIds.has(String(post.id))).map(post => (
+              <TouchableOpacity
+                key={post.id}
+                style={styles.postCard}
+                onPress={() => onPostPress ? onPostPress(post.id) : setActiveReplyPostId(String(post.id))}
+                activeOpacity={0.8}
+              >
                 <Text style={styles.postSticker}>{postSticker(post.id)}</Text>
                 <View style={styles.postMetaRow}>
                   <View style={styles.anonymousDot} />
                   <Text style={styles.anonymousName}>{post.anonymousName || 'anonymous parent'}</Text>
+                  {!String(post.id).startsWith('ps-') && (
+                    <TouchableOpacity
+                      style={styles.reportBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={(e) => { e.stopPropagation?.(); handleReport(post.id); }}
+                    >
+                      <Text style={styles.reportBtnText}>⚑</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 {!!post.circleTag && (
                   <View style={styles.tagBadge}>
@@ -365,7 +451,8 @@ export function ParentCircleScreen({
                   {PARENT_REACTIONS.map(r => (
                     <TouchableOpacity
                       key={r.key}
-                      onPress={() => {
+                      onPress={(e) => {
+                        e.stopPropagation?.();
                         if (!String(post.id).startsWith('ps-')) reactToParentPost(post.id, r.key);
                       }}
                       style={styles.reactionBtn}
@@ -379,13 +466,16 @@ export function ParentCircleScreen({
 
                 <TouchableOpacity
                   style={styles.replyBtn}
-                  onPress={() => setActiveReplyPostId(String(post.id))}
+                  onPress={(e) => {
+                    e.stopPropagation?.();
+                    if (onPostPress) { onPostPress(post.id); } else { setActiveReplyPostId(String(post.id)); }
+                  }}
                 >
                   <Text style={styles.replyBtnText}>
                     reply softly{post.quietRepliesCount ? ` · ${post.quietRepliesCount} quiet replies` : ''}
                   </Text>
                 </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
 
@@ -502,6 +592,8 @@ const styles = StyleSheet.create({
   postBtn:    { padding: 14, borderRadius: 18, marginBottom: 8, alignItems: 'center', backgroundColor: WARM },
   postBtnText:{ color: '#fff', fontSize: 15, fontWeight: 'bold' },
   safeText:   { color: '#6b7a5e', fontSize: 11, textAlign: 'center', marginTop: 4 },
+  crisisNudge:    { backgroundColor: 'rgba(5,150,105,0.12)', borderRadius: 12, padding: 12, marginBottom: 10, borderLeftWidth: 3, borderLeftColor: SAGE },
+  crisisNudgeText:{ color: SAGE_SOFT, fontSize: 13, lineHeight: 19 },
 
   journalNote:    { borderWidth: 1, borderColor: '#3a4a35', borderStyle: 'dashed', borderRadius: 12, padding: 10, marginBottom: 12, backgroundColor: '#f5f0e808', transform: [{ rotate: '1deg' }] },
   journalNoteText:{ color: '#8fa885', fontSize: 13, fontStyle: 'italic', textAlign: 'center' },
@@ -518,6 +610,8 @@ const styles = StyleSheet.create({
   postMetaRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   anonymousDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: AMBER_GLOW, marginRight: 7 },
   anonymousName: { color: '#c9dfc2', fontSize: 11, fontWeight: '800', flex: 1 },
+  reportBtn:     { paddingHorizontal: 4 },
+  reportBtnText: { color: '#c9dfc2', fontSize: 13, opacity: 0.6 },
   postDate:      { color: '#6b7a5e', fontSize: 11, marginTop: 4, marginBottom: 6 },
   postText:      { color: '#f5f0e8', fontSize: 15, lineHeight: 22, marginBottom: 8 },
 
@@ -529,6 +623,12 @@ const styles = StyleSheet.create({
   reactionEmoji:{ fontSize: 15 },
   reactionCount:{ color: '#f5f0e8', fontWeight: 'bold', fontSize: 12, marginTop: 1 },
   reactionLabel:{ color: '#6b7a5e', fontSize: 9, marginTop: 2, textAlign: 'center' },
+
+  feedTabRail:      { gap: 8, paddingHorizontal: 0, paddingBottom: 12, paddingTop: 4 },
+  feedTab:          { borderRadius: 999, borderWidth: 1, borderColor: '#3a4a35', backgroundColor: 'rgba(20,30,18,0.7)', paddingHorizontal: 14, paddingVertical: 6 },
+  feedTabActive:    { borderColor: WARM, backgroundColor: 'rgba(217,119,6,0.18)' },
+  feedTabText:      { color: '#6b7a5e', fontSize: 11, fontWeight: '700' },
+  feedTabTextActive:{ color: WARM_SOFT },
 
   replyBtn:     { marginTop: 10, padding: 10, borderRadius: 14, backgroundColor: 'rgba(217,119,6,0.15)' },
   replyBtnText: { color: WARM_SOFT, fontWeight: '700', fontSize: 12, textAlign: 'center' },

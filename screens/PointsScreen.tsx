@@ -7,8 +7,8 @@
 // journal, voice, calm, comfort, circle, crew check-ins). No backend needed.
 //
 // Voice:
-//   • Rylane: "the reps stack. respect."
-//   • Raylene: "soft points 💜 you earned every single one."
+//   • Sy: "the reps stack. respect."
+//   • Suhana: "soft points 💜 you earned every single one."
 //
 // Tiers are emotional, not competitive:
 //   • cloud just forming   (0–49)
@@ -17,8 +17,10 @@
 //   • full moon energy     (350–749)
 //   • whole night sky      (750+)
 
-import React, { useEffect, useMemo, useRef } from 'react';
-import { snapshotPoints } from '../utils/sync';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { snapshotPoints } from '@/utils/sync';
+import { fetchPointsHistory, syncTeenActivitySummary, type PointsHistoryEntry } from '@/utils/pointsCompat';
+import { usePoints, TIERS, tierFor, type Tier } from '@/features/activity/ledger';
 import {
   Text, TouchableOpacity, ScrollView, View,
   ImageBackground, Animated, Easing, StyleSheet, Platform,
@@ -29,7 +31,7 @@ import { glowForMood as glowFor } from '../constants/moodGlow';
 import type {
   MoodEntry, JournalEntry, VoiceNote, CirclePost,
   ComfortSession, CrewCheckIn,
-} from '../types/index';
+} from '@/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function timeOfDay(): TimeOfDay {
@@ -40,35 +42,14 @@ function timeOfDay(): TimeOfDay {
   return 'night';
 }
 
-// ── Point values (small, soft, not addictive) ────────────────────────────────
+// ── Point values (small, soft, not addictive) ─── kept for prop-based fallback ─
 const PT_MOOD     = 2;
 const PT_JOURNAL  = 5;
 const PT_VOICE    = 5;
 const PT_CIRCLE   = 4;
-const PT_COMFORT  = 3;  // per session log
-const PT_CREW     = 6;  // crew check-in = bigger, accountability is hard
-const PT_STREAK   = 3;  // per day of current streak
-
-interface Tier {
-  key: string;
-  label: string;
-  min: number;
-  max: number; // exclusive
-  emoji: string;
-  color: string;
-}
-const TIERS: Tier[] = [
-  { key: 't0', label: 'cloud just forming', min: 0,    max: 50,   emoji: '\u{1F32B}\uFE0F', color: '#c4b5fd' },
-  { key: 't1', label: 'cloud is here',      min: 50,   max: 150,  emoji: '☁\uFE0F',     color: '#7dd3fc' },
-  { key: 't2', label: 'soft sky',           min: 150,  max: 350,  emoji: '\u{1F324}\uFE0F', color: '#f5b8cf' },
-  { key: 't3', label: 'full moon energy',   min: 350,  max: 750,  emoji: '\u{1F319}',        color: '#fbbf24' },
-  { key: 't4', label: 'whole night sky',    min: 750,  max: 9999999, emoji: '\u{2728}',     color: '#e879a3' },
-];
-
-function tierFor(pts: number): Tier {
-  for (const t of TIERS) if (pts >= t.min && pts < t.max) return t;
-  return TIERS[0];
-}
+const PT_COMFORT  = 3;
+const PT_CREW     = 6;
+const PT_STREAK   = 3;
 
 // ── Props ────────────────────────────────────────────────────────────────────
 interface Props {
@@ -100,8 +81,16 @@ export function PointsScreen({
   const softAccent = isRylane ? '#b6dcff' : '#f5b8cf';
   const cardBg = isRylane ? 'rgba(10,20,40,0.82)' : 'rgba(40,15,40,0.82)';
 
-  // ── Compute points ─────────────────────────────────────────────────────────
+  const ledger = usePoints();
+
+  // ── Compute points — ledger wins when loaded, props used as offline fallback ─
   const breakdown = useMemo(() => {
+    if (ledger.isLoaded) {
+      return {
+        total: ledger.total,
+        rows: ledger.breakdown.map(r => ({ key: r.key, label: r.label, each: r.each, count: r.count, pts: r.pts, emoji: r.emoji })),
+      };
+    }
     const moodPts    = (moodHistory?.length    || 0) * PT_MOOD;
     const journalPts = (journalEntries?.length || 0) * PT_JOURNAL;
     const voicePts   = (voiceNotes?.length     || 0) * PT_VOICE;
@@ -113,339 +102,148 @@ export function PointsScreen({
     return {
       total,
       rows: [
-        { key: 'mood',    label: 'mood logs',        each: PT_MOOD,    count: moodHistory?.length    || 0, pts: moodPts,    emoji: '\u{1F4AD}' },
-        { key: 'journal', label: 'journal entries',  each: PT_JOURNAL, count: journalEntries?.length || 0, pts: journalPts, emoji: '\u{1F4D3}' },
-        { key: 'voice',   label: 'voice bips',       each: PT_VOICE,   count: voiceNotes?.length     || 0, pts: voicePts,   emoji: '\u{1F3A4}' },
-        { key: 'circle',  label: 'circle drops',     each: PT_CIRCLE,  count: circlePosts?.length    || 0, pts: circlePts,  emoji: '\u{1F32B}\uFE0F' },
-        { key: 'comfort', label: 'comfort sessions', each: PT_COMFORT, count: comfortSessions?.length|| 0, pts: comfortPts, emoji: '\u{1F90D}' },
-        { key: 'crew',    label: 'crew check-ins',   each: PT_CREW,    count: crewCheckIns?.length   || 0, pts: crewPts,    emoji: '\u{1F91D}' },
-        { key: 'streak',  label: 'streak days',      each: PT_STREAK,  count: Math.max(0, streakDays),       pts: streakPts,  emoji: '\u{1F319}' },
+        { key: 'mood',    label: 'mood logs',        each: PT_MOOD,    count: moodHistory?.length    || 0, pts: moodPts,    emoji: '💭' },
+        { key: 'journal', label: 'journal entries',  each: PT_JOURNAL, count: journalEntries?.length || 0, pts: journalPts, emoji: '📓' },
+        { key: 'voice',   label: 'voice bips',       each: PT_VOICE,   count: voiceNotes?.length     || 0, pts: voicePts,   emoji: '🎤' },
+        { key: 'circle',  label: 'circle drops',     each: PT_CIRCLE,  count: circlePosts?.length    || 0, pts: circlePts,  emoji: '🌫️' },
+        { key: 'comfort', label: 'comfort sessions', each: PT_COMFORT, count: comfortSessions?.length|| 0, pts: comfortPts, emoji: '🤍' },
+        { key: 'crew',    label: 'crew check-ins',   each: PT_CREW,    count: crewCheckIns?.length   || 0, pts: crewPts,    emoji: '🤝' },
+        { key: 'streak',  label: 'streak days',      each: PT_STREAK,  count: Math.max(0, streakDays),     pts: streakPts,  emoji: '🌙' },
       ],
     };
-  }, [moodHistory, journalEntries, voiceNotes, circlePosts, comfortSessions, crewCheckIns, streakDays]);
+  }, [ledger, moodHistory, journalEntries, voiceNotes, circlePosts, comfortSessions, crewCheckIns, streakDays]);
+
+  const [pointsHistory, setPointsHistory] = useState<PointsHistoryEntry[]>([]);
 
   // Snapshot current points total to Supabase for cross-device history
   useEffect(() => {
     if (breakdown.total > 0) void snapshotPoints(breakdown.total);
   }, [breakdown.total]);
 
-  const tier = tierFor(breakdown.total);
+  // Load 30-day history for chart
+  useEffect(() => {
+    fetchPointsHistory(30).then(setPointsHistory).catch(() => {});
+  }, []);
+
+  // Sync wellbeing summary for parent dashboard (privacy-safe aggregates only).
+  // pointsCompat reads streakDays / sessionCount / pointsTier from stored state
+  // internally — no args needed here.
+  useEffect(() => {
+    if (breakdown.total === 0) return;
+    void syncTeenActivitySummary();
+  }, [breakdown.total]);
+
+  const tier: Tier = ledger.isLoaded ? ledger.tier : tierFor(breakdown.total);
   const tierIdx = TIERS.findIndex(t2 => t2.key === tier.key);
   const nextTier = TIERS[tierIdx + 1];
   const progress = nextTier
     ? Math.min(1, Math.max(0, (breakdown.total - tier.min) / (nextTier.min - tier.min)))
     : 1;
-  const pointsToNext = nextTier ? Math.max(0, nextTier.min - breakdown.total) : 0;
 
-  // recent earning log = chronological merge of last 6 events
-  const recentLog = useMemo(() => {
-    type Ev = { id: string; ts: number; label: string; pts: number; emoji: string; meta: string };
-    const evs: Ev[] = [];
-    for (const m of (moodHistory || []).slice(0, 8)) {
-      const ts = new Date(`${m.date} ${m.time}`).getTime();
-      evs.push({ id: `m${m.id}`, ts, label: 'mood logged', pts: PT_MOOD, emoji: '\u{1F4AD}', meta: m.mood });
-    }
-    for (const j of (journalEntries || []).slice(0, 6)) {
-      const ts = new Date(`${j.date} ${j.time}`).getTime();
-      evs.push({ id: `j${j.id}`, ts, label: 'journal entry', pts: PT_JOURNAL, emoji: '\u{1F4D3}', meta: j.text?.slice(0, 30) || '' });
-    }
-    for (const v of (voiceNotes || []).slice(0, 6)) {
-      const ts = new Date(`${v.date} ${v.time}`).getTime();
-      evs.push({ id: `v${v.id}`, ts, label: 'voice bip', pts: PT_VOICE, emoji: '\u{1F3A4}', meta: v.title || '' });
-    }
-    for (const c of (circlePosts || []).slice(0, 6)) {
-      const ts = new Date(`${c.date} ${c.time}`).getTime();
-      evs.push({ id: `c${c.id}`, ts, label: 'circle drop', pts: PT_CIRCLE, emoji: '\u{1F32B}\uFE0F', meta: c.text?.slice(0, 30) || '' });
-    }
-    for (const s of (comfortSessions || []).slice(0, 8)) {
-      const ts = new Date(`${s.date} ${s.time}`).getTime();
-      evs.push({ id: `s${s.id}`, ts, label: `${s.type} session`, pts: PT_COMFORT, emoji: '\u{1F90D}', meta: '' });
-    }
-    for (const k of (crewCheckIns || []).slice(0, 6)) {
-      const ts = new Date(`${k.date} ${k.time}`).getTime();
-      evs.push({ id: `k${k.id}`, ts, label: 'crew check-in', pts: PT_CREW, emoji: '\u{1F91D}', meta: k.note?.slice(0, 30) || '' });
-    }
-    return evs
-      .filter(e => !isNaN(e.ts))
-      .sort((a, b) => b.ts - a.ts)
-      .slice(0, 8);
-  }, [moodHistory, journalEntries, voiceNotes, circlePosts, comfortSessions, crewCheckIns]);
-
-  // ── Animations ─────────────────────────────────────────────────────────────
-  const heroAnim  = useRef(new Animated.Value(0)).current;
-  const card1Anim = useRef(new Animated.Value(0)).current;
-  const card2Anim = useRef(new Animated.Value(0)).current;
-  const card3Anim = useRef(new Animated.Value(0)).current;
-  const card4Anim = useRef(new Animated.Value(0)).current;
-  const noteAnim  = useRef(new Animated.Value(0)).current;
-  const breath    = useRef(new Animated.Value(0)).current;
-  const progAnim  = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
+  const slide = useRef(new Animated.Value(12)).current;
+  const breath = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.stagger(140, [
-      Animated.timing(heroAnim,  { toValue: 1, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(card1Anim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(card2Anim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(card3Anim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(card4Anim, { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(noteAnim,  { toValue: 1, duration: 400, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    Animated.parallel([
+      Animated.timing(fade, { toValue: 1, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(slide, { toValue: 0, duration: 500, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
     ]).start();
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(breath, { toValue: 1, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      Animated.timing(breath, { toValue: 0, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [fade, slide, breath]);
 
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(breath, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(breath, { toValue: 0, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-      ]),
-    ).start();
+  const breathScale = breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
 
-    Animated.timing(progAnim, { toValue: progress, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
-  }, [breath, heroAnim, card1Anim, card2Anim, card3Anim, card4Anim, noteAnim, progAnim, progress]);
+  const chartMax = Math.max(1, ...pointsHistory.map(p => p.total));
 
-  const enter = (a: Animated.Value) => ({
-    opacity: a,
-    transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
-  });
-  const breathScale   = breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
-  const breathOpacity = breath.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] });
-
-  // ── Copy ───────────────────────────────────────────────────────────────────
-  const heroTitle = isRylane ? 'bip points' : 'bip points \u{1F49C}';
-  const heroSub = isRylane
-    ? 'soft receipts. not a score. every rep counts.'
-    : 'soft points \u{1F49C} not a score, just proof you showed up.';
-
-  const tierCopy = isRylane
-    ? `tier: ${tier.label}`
-    : `tier: ${tier.label} \u{1F49C}`;
-
-  const nextCopy = nextTier
-    ? (isRylane
-        ? `${pointsToNext} more pts → ${nextTier.label}`
-        : `${pointsToNext} more pts → ${nextTier.label} \u{1F49C}`)
-    : (isRylane
-        ? 'top tier reached. respect.'
-        : 'top tier reached \u{1F49C} you are the whole night sky');
-
-  const stickyAffirmation = isRylane
-    ? '“the points are receipts, not a leaderboard.”'
-    : '“these aren’t scores. they’re soft proof you’re you-ing well.”';
-
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <ImageBackground source={bg} style={styles.bg} resizeMode="cover">
-      <LinearGradient
-        colors={['rgba(20,10,40,0.55)', 'rgba(40,20,70,0.72)', 'rgba(15,8,30,0.92)']}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={{ flex: 1, backgroundColor: '#0a0612' }}>
+      <ImageBackground source={bg} style={StyleSheet.absoluteFill} resizeMode="cover" />
+      <LinearGradient colors={['rgba(5,3,10,0.50)', 'rgba(5,3,10,0.84)']} style={StyleSheet.absoluteFill} />
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Hero */}
-        <Animated.View style={[styles.hero, enter(heroAnim)]}>
-          <Animated.View
-            style={[
-              styles.pill,
-              { borderColor: softAccent, backgroundColor: 'rgba(20,12,40,0.55)' },
-              { opacity: breathOpacity, transform: [{ scale: breathScale }] },
-            ]}
-          >
-            <Text style={[styles.pillText, { color: softAccent }]}>
-              {isRylane ? '\u{1F9CD} rylane is here' : '☁\uFE0F raylene is here'}
-            </Text>
-          </Animated.View>
-
-          <Text style={[styles.heroTitle, { textShadowColor: glow }]}>{heroTitle}</Text>
-          <Text style={styles.heroSub}>{heroSub}</Text>
+      <ScrollView contentContainerStyle={st.scroll} showsVerticalScrollIndicator={false}>
+        <Animated.View style={{ opacity: fade, transform: [{ translateY: slide }] }}>
+          <Text style={[st.eyebrow, { color: softAccent }]}>Bip Points</Text>
+          <Text style={st.title}>{isRylane ? 'the reps stack.' : 'soft points 💜'}</Text>
+          <Text style={st.sub}>{isRylane ? 'quiet proof you kept showing up.' : 'you earned these by coming back to yourself.'}</Text>
         </Animated.View>
 
-        {/* Big total + tier */}
-        <Animated.View style={[styles.card, { backgroundColor: cardBg, borderColor: softAccent }, enter(card1Anim)]}>
-          <Text style={[styles.cardKicker, { color: softAccent }]}>your total</Text>
-          <Text style={styles.bigNum}>{breakdown.total}</Text>
-          <Text style={styles.tierLabel}>
-            <Text>{tier.emoji}  </Text>
-            <Text style={{ color: tier.color }}>{tierCopy}</Text>
-          </Text>
-
-          {/* progress bar to next tier */}
-          <View style={styles.progTrack}>
-            <Animated.View
-              style={[
-                styles.progFill,
-                {
-                  backgroundColor: tier.color,
-                  width: progAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
-                },
-              ]}
-            />
+        <Animated.View style={[st.hero, { borderColor: glow, backgroundColor: cardBg, transform: [{ scale: breathScale }] }]}>
+          <Text style={st.heroEmoji}>{tier.emoji}</Text>
+          <Text style={[st.total, { color: tier.color }]}>{breakdown.total}</Text>
+          <Text style={st.totalLabel}>total points</Text>
+          <Text style={[st.tier, { color: tier.color }]}>{tier.label}</Text>
+          <View style={st.barTrack}>
+            <View style={[st.barFill, { width: `${progress * 100}%`, backgroundColor: tier.color }]} />
           </View>
-          <Text style={styles.nextLine}>{nextCopy}</Text>
+          <Text style={st.nextText}>{nextTier ? `${Math.max(0, nextTier.min - breakdown.total)} until ${nextTier.label}` : 'you filled the whole sky ✨'}</Text>
         </Animated.View>
 
-        {/* Breakdown */}
-        <Animated.View style={[styles.card, { backgroundColor: cardBg, borderColor: softAccent }, enter(card2Anim)]}>
-          <Text style={[styles.cardKicker, { color: softAccent }]}>where it came from</Text>
-          <View style={{ marginTop: 6, gap: 10 }}>
-            {breakdown.rows.map(r => (
-              <View key={r.key} style={styles.brRow}>
-                <Text style={styles.brEmoji}>{r.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.brLabel}>{r.label}</Text>
-                  <Text style={styles.brMeta}>{r.count} \u00d7 {r.each} pts</Text>
-                </View>
-                <Text style={[styles.brPts, { color: accent }]}>+{r.pts}</Text>
-              </View>
-            ))}
-          </View>
-        </Animated.View>
-
-        {/* Tier ladder */}
-        <Animated.View style={[styles.card, { backgroundColor: cardBg, borderColor: softAccent }, enter(card3Anim)]}>
-          <Text style={[styles.cardKicker, { color: softAccent }]}>tiers · emotional, not competitive</Text>
-          {TIERS.map(t2 => {
-            const reached = breakdown.total >= t2.min;
-            const current = t2.key === tier.key;
-            return (
-              <View
-                key={t2.key}
-                style={[
-                  styles.tierRow,
-                  current && { backgroundColor: 'rgba(255,255,255,0.06)' },
-                ]}
-              >
-                <Text style={styles.tierEmoji}>{t2.emoji}</Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.tierName, !reached && { opacity: 0.5 }, { color: reached ? t2.color : '#cfc6e8' }]}>
-                    {t2.label}
-                  </Text>
-                  <Text style={styles.tierRange}>
-                    {t2.min}{t2.max < 9000000 ? `–${t2.max - 1}` : '+'} pts
-                  </Text>
-                </View>
-                {current && (
-                  <Text style={[styles.tierBadge, { color: t2.color }]}>you’re here</Text>
-                )}
-              </View>
-            );
-          })}
-        </Animated.View>
-
-        {/* Recent earning log */}
-        <Animated.View style={[styles.card, { backgroundColor: cardBg, borderColor: softAccent }, enter(card4Anim)]}>
-          <Text style={[styles.cardKicker, { color: softAccent }]}>recently earned</Text>
-          {recentLog.length === 0 ? (
-            <Text style={styles.empty}>
-              {isRylane ? 'no points yet. show up once and they start.' : 'no points yet. just show up once \u{1F49C}'}
-            </Text>
-          ) : (
-            <View style={{ marginTop: 6, gap: 8 }}>
-              {recentLog.map(e => (
-                <View key={e.id} style={styles.logRow}>
-                  <Text style={styles.logEmoji}>{e.emoji}</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.logLine}>{e.label}</Text>
-                    {!!e.meta && <Text style={styles.logMeta} numberOfLines={1}>{e.meta}</Text>}
-                  </View>
-                  <Text style={[styles.logPts, { color: accent }]}>+{e.pts}</Text>
+        {pointsHistory.length > 0 && (
+          <View style={[st.card, { borderColor: glow + '44', backgroundColor: cardBg }]}>
+            <Text style={st.cardTitle}>last 30 days</Text>
+            <View style={st.chartRow}>
+              {pointsHistory.slice(-30).map((p, i) => (
+                <View key={`${p.captured_at}-${i}`} style={st.chartBarWrap}>
+                  <View style={[st.chartBar, { height: `${Math.max(8, (p.total / chartMax) * 100)}%`, backgroundColor: tier.color }]} />
                 </View>
               ))}
             </View>
-          )}
-
-          <View style={styles.ctaRow}>
-            <TouchableOpacity
-              style={[styles.cta, { backgroundColor: accent, flex: 1 }]}
-              onPress={() => setScreen('history')}
-            >
-              <Text style={styles.ctaText}>{isRylane ? 'see history →' : 'see history \u{1F49C}'}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.cta, { backgroundColor: 'rgba(255,255,255,0.12)', flex: 1, borderWidth: 1, borderColor: softAccent }]}
-              onPress={() => setScreen('home')}
-            >
-              <Text style={styles.ctaText}>{isRylane ? 'back to room →' : 'back to room \u{1F49C}'}</Text>
-            </TouchableOpacity>
           </View>
-        </Animated.View>
+        )}
 
-        {/* Scrapbook sticky note */}
-        <Animated.View style={[styles.sticky, enter(noteAnim)]}>
-          <Text style={styles.stickyText}>{stickyAffirmation}</Text>
-          <Text style={styles.stickySig}>{isRylane ? '— rylane' : '— raylene'}</Text>
-        </Animated.View>
+        <View style={[st.card, { borderColor: glow + '44', backgroundColor: cardBg }]}>
+          <Text style={st.cardTitle}>where they came from</Text>
+          {breakdown.rows.map(row => (
+            <View key={row.key} style={st.row}>
+              <Text style={st.rowEmoji}>{row.emoji}</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={st.rowLabel}>{row.label}</Text>
+                <Text style={st.rowSub}>{row.count} × {row.each} pts</Text>
+              </View>
+              <Text style={[st.rowPts, { color: accent }]}>{row.pts}</Text>
+            </View>
+          ))}
+        </View>
 
-        <View style={{ height: 100 }} />
+        <TouchableOpacity onPress={() => setScreen('home')} style={[st.back, { borderColor: glow + '55' }]}>
+          <Text style={st.backText}>← back to room</Text>
+        </TouchableOpacity>
       </ScrollView>
+
       {BottomNav}
-    </ImageBackground>
+    </View>
   );
 }
 
-// ── Styles ───────────────────────────────────────────────────────────────────
-const styles = StyleSheet.create({
-  bg:     { flex: 1 },
-  scroll: { padding: 20, paddingTop: 60, ...(Platform.OS === 'web' ? { maxWidth: 520, width: '100%', alignSelf: 'center' as const } : {}) },
-
-  hero:      { alignItems: 'center', marginBottom: 22 },
-  pill:      {
-    borderWidth: 1, borderRadius: 999,
-    paddingHorizontal: 14, paddingVertical: 6, marginBottom: 12,
-  },
-  pillText:  { fontSize: 12, letterSpacing: 0.4 },
-  heroTitle: {
-    color: '#fff', fontSize: 28, fontWeight: '700',
-    textAlign: 'center', textShadowRadius: 14, textShadowOffset: { width: 0, height: 0 },
-    marginBottom: 8,
-    ...(Platform.OS === 'web' ? ({ textShadow: '0 0 14px rgba(196,181,253,0.6)' } as any) : null),
-  },
-  heroSub:   { color: '#e9e4ff', fontSize: 14, textAlign: 'center', opacity: 0.9 },
-
-  card: {
-    borderRadius: 18, borderWidth: 1,
-    padding: 18, marginBottom: 16,
-  },
-  cardKicker: { fontSize: 12, letterSpacing: 0.6, marginBottom: 6, textTransform: 'uppercase' },
-  empty:      { color: '#cfc6e8', fontSize: 13, marginTop: 12, fontStyle: 'italic' },
-
-  bigNum:    { color: '#fff', fontSize: 64, fontWeight: '700', textAlign: 'center', marginVertical: 4 },
-  tierLabel: { textAlign: 'center', fontSize: 15, marginBottom: 14, color: '#e9e4ff' },
-
-  progTrack: { height: 10, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  progFill:  { height: '100%', borderRadius: 999 },
-  nextLine:  { color: '#cfc6e8', fontSize: 13, marginTop: 8, textAlign: 'center', fontStyle: 'italic' },
-
-  brRow:     { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  brEmoji:   { fontSize: 18, width: 28, textAlign: 'center' },
-  brLabel:   { color: '#fff', fontSize: 14, fontWeight: '600' },
-  brMeta:    { color: '#9ea0c0', fontSize: 11, marginTop: 2 },
-  brPts:     { fontSize: 16, fontWeight: '700' },
-
-  tierRow:   { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8, paddingHorizontal: 8, borderRadius: 10 },
-  tierEmoji: { fontSize: 22, width: 30, textAlign: 'center' },
-  tierName:  { fontSize: 14, fontWeight: '600' },
-  tierRange: { color: '#9ea0c0', fontSize: 11, marginTop: 2 },
-  tierBadge: { fontSize: 11, fontWeight: '700', letterSpacing: 0.4 },
-
-  logRow:    { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  logEmoji:  { fontSize: 18, width: 28, textAlign: 'center' },
-  logLine:   { color: '#fff', fontSize: 14, fontWeight: '600' },
-  logMeta:   { color: '#cfc6e8', fontSize: 11, marginTop: 2, fontStyle: 'italic' },
-  logPts:    { fontSize: 14, fontWeight: '700' },
-
-  ctaRow:    { flexDirection: 'row', gap: 10, marginTop: 16 },
-  cta:       { borderRadius: 14, paddingVertical: 12, alignItems: 'center' },
-  ctaText:   { color: '#fff', fontWeight: '700', fontSize: 13, letterSpacing: 0.3 },
-
-  sticky: {
-    backgroundColor: '#fff8e7',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-    borderStyle: 'dashed',
-    transform: [{ rotate: '-2deg' }],
-    marginTop: 4,
-    marginHorizontal: 8,
-  },
-  stickyText: { color: '#3b2a1a', fontSize: 14, fontStyle: 'italic', lineHeight: 20 },
-  stickySig:  { color: '#7a5a2a', fontSize: 12, marginTop: 6, textAlign: 'right' },
+const st = StyleSheet.create({
+  scroll: { padding: 20, paddingTop: Platform.OS === 'ios' ? 60 : 42, paddingBottom: 120, ...(Platform.OS === 'web' ? { maxWidth: 520, width: '100%', alignSelf: 'center' as const } : {}) },
+  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1.4, textTransform: 'uppercase', marginBottom: 6 },
+  title: { color: '#fff', fontSize: 30, fontWeight: '900', marginBottom: 6 },
+  sub: { color: 'rgba(255,255,255,0.78)', fontSize: 13, lineHeight: 20, marginBottom: 18 },
+  hero: { borderWidth: 1, borderRadius: 28, padding: 22, alignItems: 'center', marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.35, shadowRadius: 14, shadowOffset: { width: 0, height: 8 } },
+  heroEmoji: { fontSize: 38, marginBottom: 4 },
+  total: { fontSize: 56, fontWeight: '900', letterSpacing: -1 },
+  totalLabel: { color: 'rgba(255,255,255,0.68)', fontSize: 12, fontWeight: '700', marginTop: -4, marginBottom: 6 },
+  tier: { fontSize: 16, fontWeight: '900', marginBottom: 14 },
+  barTrack: { height: 9, width: '100%', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 8 },
+  barFill: { height: '100%', borderRadius: 999 },
+  nextText: { color: 'rgba(255,255,255,0.60)', fontSize: 11, fontWeight: '600' },
+  card: { borderWidth: 1, borderRadius: 24, padding: 16, marginBottom: 16 },
+  cardTitle: { color: '#fff', fontSize: 15, fontWeight: '900', marginBottom: 12 },
+  chartRow: { height: 90, flexDirection: 'row', alignItems: 'flex-end', gap: 4 },
+  chartBarWrap: { flex: 1, height: '100%', justifyContent: 'flex-end', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 5, overflow: 'hidden' },
+  chartBar: { width: '100%', borderTopLeftRadius: 5, borderTopRightRadius: 5 },
+  row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 11, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
+  rowEmoji: { fontSize: 22, width: 34 },
+  rowLabel: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  rowSub: { color: 'rgba(255,255,255,0.55)', fontSize: 11, marginTop: 2 },
+  rowPts: { fontSize: 18, fontWeight: '900' },
+  back: { borderWidth: 1, borderRadius: 18, padding: 14, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
+  backText: { color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: '800' },
 });

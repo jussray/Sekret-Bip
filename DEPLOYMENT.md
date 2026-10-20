@@ -1,173 +1,157 @@
-# Se'kret Bip — Deployment Guide
+<!-- truth-mode: durable -->
+# Se’kret Bip — Deployment Guide
 
-> Environment configuration, secrets management, and deployment steps.
+This guide defines the deployment contract. It does not declare the live release state.
 
----
+## Live truth boundary
 
-## Architecture Overview
+Before any deployment or release claim, resolve fresh GitHub `main`, the newest marked exact-production receipt on issue #696, Cloudflare provider/runtime evidence for the same release target, the intended Supabase project, and applicable production browser/account/device evidence. See `docs/TRUTH_AUTHORITY.md` for scope-aware expiry and supersession.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│  Expo / React Native App                                        │
-│  Deployed on Vercel (web) + EAS (native)                        │
-│  Uses: EXPO_PUBLIC_SUPABASE_URL                                 │
-│        EXPO_PUBLIC_SUPABASE_ANON_KEY                            │
-│        EXPO_PUBLIC_BACKEND_URL                                  │
-└────────────────────────┬────────────────────────────────────────┘
-                         │ POST /api/sekret/reply
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Cloudflare Worker (worker/sekret-reply.ts)                     │
-│  Secret: OPENAI_API_KEY  ← set via `wrangler secret put` ONLY  │
-│  Never exposed to Expo, Vercel, GitHub, or any client code      │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Supabase                                                       │
-│  Project ref: tbsevonvegdnlyjgplmm                              │
-│  URL: https://tbsevonvegdnlyjgplmm.supabase.co                 │
-│  Anon key: safe to expose (RLS enforced)                        │
-│  service_role key: server-side ONLY, never in client code       │
-└─────────────────────────────────────────────────────────────────┘
-```
+## Production authority
 
----
+- Web: Cloudflare Pages project `sekret-bip` through native Git integration.
+- Public API origin: `https://api.sekretbip.net`, currently attached by repository configuration to `sekret-backend`.
+- Companion execution lineage: Cloudflare Worker `sekret`, founder-confirmed active; exact live provider binding remains Cloudflare readback truth.
+- Database/Auth/Storage/RLS/Edge Functions: Supabase.
+- Native builds: Expo / EAS.
 
-## Environment Variables
+The canonical Cloudflare Worker `sekret-backend` remains the repository-configured public production API authority until an explicitly approved and independently proven routing change says otherwise.
 
-### Frontend (Expo / Vercel)
+GitHub Actions verifies production evidence; it must not quietly become a second normal production deployment authority. Manual deployment commands are emergency administrator fallbacks and require separate authority.
 
-| Variable | Required | Description |
-|---|---|---|
-| `EXPO_PUBLIC_SUPABASE_URL` | Yes | Supabase project URL |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase anon/public key (safe to expose — RLS enforced) |
-| `EXPO_PUBLIC_BACKEND_URL` | No | Cloudflare Worker URL. Blank = Se'kret AI runs in fallback mode |
+## Worker purpose boundary
 
-### Backend (Cloudflare Worker — secrets only)
+The production client remains single-homed to `api.sekretbip.net`. Do not add a second public companion endpoint to client configuration merely to separate Worker responsibilities.
 
-| Variable | How to set | Description |
-|---|---|---|
-| `OPENAI_API_KEY` | `wrangler secret put OPENAI_API_KEY` | OpenAI API key. **Never** in any file or Expo env |
+The preferred end-state is:
 
-### Forbidden
+- `sekret-backend`: public ingress, Bridge/privileged-data operations, server-side Supabase service-role work, inbound email, and other platform backend logic;
+- `sekret`: `/api/sekret/reply`, `/api/sekret/voice`, `/api/sekret/transcribe`, companion style/safety enforcement, and AI/voice provider execution;
+- `sekret-backend` delegates `/api/sekret/*` to `sekret` through a Cloudflare Service Binding after explicit provider readback, exact-head testing, and founder approval.
 
-These must **never** appear in any Expo file, `.env.local`, Vercel env, or GitHub:
-- `OPENAI_API_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- Any `SERVICE_ROLE` value
+This is a migration target, not a claim that delegation is currently deployed. Until cutover proof exists, current `wrangler.toml` and `api.sekretbip.net` remain the active repository deployment contract.
 
----
+`SUPABASE_SERVICE_ROLE_KEY` must stay with the privileged platform boundary. Do not copy it into `sekret` merely because the current companion telemetry path writes metadata directly to Supabase; migrate that telemetry through a narrow internal/backend-owned path first.
 
-## Local Development Setup
+## Local development
 
 ```bash
-# 1. Copy env template
+npm install --legacy-peer-deps
 cp .env.example .env.local
-
-# 2. Fill in .env.local:
-#    EXPO_PUBLIC_SUPABASE_URL=https://tbsevonvegdnlyjgplmm.supabase.co
-#    EXPO_PUBLIC_SUPABASE_ANON_KEY=<from Supabase → Project Settings → API>
-#    EXPO_PUBLIC_BACKEND_URL=   (blank until Worker is deployed)
-
-# 3. Install dependencies
-npm install
-
-# 4. Start Expo
-npx expo start
+git lfs pull
+npx expo start --web -c
 ```
 
-Values for `EXPO_PUBLIC_SUPABASE_ANON_KEY` are in your Supabase dashboard:
-**Project Settings → API → Project API Keys → anon / public**
+Only client-safe public values belong in the Expo bundle. Provider keys, service-role credentials, Cloudflare credentials, webhook secrets, and account-processing secrets stay in server-side secret stores.
 
----
+## Supabase
 
-## Supabase Setup
+`supabase/migrations/` is the schema source of truth.
 
 ```bash
-# Run the full bootstrap SQL once on a fresh project:
-# 1. Open Supabase dashboard → SQL Editor
-# 2. Open the Raw view of: supabase/migrations/sekret_bip_full_bootstrap.sql
-#    (GitHub → file → Raw button → Select All → Copy)
-# 3. Paste into SQL Editor → Run
+npx supabase login
+npx supabase link --project-ref <project-ref>
+npx supabase db push
 ```
 
-The bootstrap creates all tables, enums, RLS policies, triggers, functions,
-and storage buckets in a single idempotent script.
+Do not maintain a second bootstrap schema. Migration history is append-only; fresh projects must replay ordered migrations, and production mutation/repair requires explicit authority and independent evidence.
 
----
+Deploy Edge Functions with reviewed authentication settings. Custom server-to-server authentication boundaries require focused negative-auth proof; repository configuration alone is not live behavior evidence.
 
-## Cloudflare Worker Deployment
+## Cloudflare Workers
+
+### `sekret-backend`
+
+Current canonical public Worker, configured by `wrangler.toml`.
+
+Emergency manual fallback:
 
 ```bash
-# 1. Set the OpenAI secret (one-time per account)
-wrangler secret put OPENAI_API_KEY
-# Paste your key when prompted — it is never written to disk
-
-# 2. Deploy the worker
-wrangler deploy
-
-# 3. Copy the deployed URL (e.g. https://bip-worker.<account>.workers.dev)
-#    and set it in .env.local:
-#    EXPO_PUBLIC_BACKEND_URL=https://bip-worker.<account>.workers.dev
-
-# 4. (Optional) Set a custom domain in Cloudflare dashboard
+npm run deploy:worker
 ```
 
-The worker route is `POST /api/sekret/reply`.
+This command requires independently authorized Cloudflare credentials. Private Worker routes must verify authenticated identity and must not trust a user identifier supplied only in a request body.
 
----
+### `sekret`
 
-## Vercel (Web) Deployment
+`sekret` is a protected founder-confirmed active companion Worker lineage. Before any deployment/routing mutation involving it, retain provider evidence for routes/custom domains, workers.dev state, service bindings, secret names, build trigger/branch, immutable version identity, traffic, errors, and callers.
+
+If the approved purpose split is implemented, deploy a backward-compatible `sekret` companion release first, then add/activate the backend service binding, then remove duplicate companion code only after rollback proof. Cloudflare Workers using Service Bindings are deployed separately, so the target companion Worker must exist before the caller declares the binding.
+
+## Cloudflare Pages
+
+The canonical Pages project is `sekret-bip`. The repository build contract emits `dist/.well-known/sekret-release.json`; that exact marker is the canonical frontend release witness. `dist/release.json` is compatibility output, not release authority.
+
+The repository-owned Pages build contract is durable:
+
+- Node runtime: `.node-version` must resolve to `22.16.0`;
+- build command: `npm run build:web`;
+- output directory: `dist`.
+
+Expo SDK 56 requires Node 22.13 or newer. The repository pin keeps the build on a supported runtime without relying on a provider-side default.
+
+Emergency manual preview fallback:
 
 ```bash
-# Deploy
-vercel --prod
+npm run deploy:pages
 ```
 
-In the Vercel dashboard → Project Settings → Environment Variables, add:
+Preview success is preview evidence only. It must not be promoted into canonical-domain production proof.
 
-| Name | Value | Environment |
-|---|---|---|
-| `EXPO_PUBLIC_SUPABASE_URL` | `https://tbsevonvegdnlyjgplmm.supabase.co` | Production, Preview, Development |
-| `EXPO_PUBLIC_SUPABASE_ANON_KEY` | `<anon key>` | Production, Preview, Development |
-| `EXPO_PUBLIC_BACKEND_URL` | `<worker URL>` | Production, Preview, Development |
+## Repository head versus production release target
 
-**Do not add `OPENAI_API_KEY` to Vercel.** It belongs only in the Worker secret store.
+Keep repository identity and release identity exact, but do not pretend they are always the same fact.
 
----
+- `repository_head_sha` is the exact current GitHub `main` commit.
+- `release_target_sha` is the exact source commit represented by the canonical production release witness.
 
-## EAS (Native Build) Deployment
+A production-impacting or unknown-scope `main` change invalidates current release authority until the new intended release target is verified. A positively verified non-production-only merge may advance `repository_head_sha` without changing `release_target_sha`.
+
+Non-production-only classification is fail-closed and requires the exact merged diff plus current ownership/build contracts. A workflow path filter is supporting evidence, not sole authority. Any ambiguous path or effect must be treated as production-impacting/UNKNOWN and re-verified.
+
+An isolated tooling, documentation, test-only, or internal-control-plane change qualifies only when it cannot alter the canonical app, `sekret-backend`, `sekret-bip`, Supabase production behavior, native release artifact, production route, secret/config binding, or deployment authority.
+
+This distinction cannot turn a known failed provider check into success. If the retained release target is blocked, it remains blocked until newer authoritative provider/runtime evidence supersedes that blocker.
+
+## Exact production verification
+
+Before any Worker split, a production release is VERIFIED only when the same intended `release_target_sha` has all applicable witnesses:
+
+1. exact repository authority records both the then-current `repository_head_sha` and the exact `release_target_sha`, including scope evidence if they differ;
+2. successful canonical Pages provider event and deployed release marker matching `release_target_sha`;
+3. canonical `sekret-backend` identity and healthy runtime for `release_target_sha` at `api.sekretbip.net`;
+4. live Supabase migration/schema/runtime evidence for the intended project;
+5. read-only production Playwright against that exact deployment;
+6. any required controlled-account or physical-device journeys.
+
+After an approved `sekret-backend -> sekret` service-binding cutover, add these required witnesses:
+
+- exact `sekret` companion Worker release identity/version;
+- provider readback of the service binding;
+- reply, voice, and transcription journeys proving requests actually execute on the intended companion release;
+- rollback proof showing `/api/sekret/*` can return to the previous backend-local implementation without a client release.
+
+If Cloudflare Access protects a verification path, use only an explicitly authorized service-auth verification lane. Never weaken Access, leak credentials into traces/artifacts, or treat an interception as application success.
+
+The verifier must fail closed. Zero-step/no-log jobs, missing markers, stale SHAs, skipped browser steps, provider upload receipts, unauthenticated control-plane reads, or unclassified repository/release-target divergence cannot be relabeled as release proof.
+
+## Validation
 
 ```bash
-# Configure EAS secrets (replaces .env.local for CI builds)
-eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_URL --value "https://tbsevonvegdnlyjgplmm.supabase.co"
-eas secret:create --scope project --name EXPO_PUBLIC_SUPABASE_ANON_KEY --value "<anon key>"
-eas secret:create --scope project --name EXPO_PUBLIC_BACKEND_URL --value "<worker URL>"
-
-# Build
-eas build --platform all
+npm run type-check
+npm test
+npm run lint
+node scripts/audit-documentation-truth.mjs
+npm run audit:control-room
+npm run validate:companions
+npm run verify:bundle
+npm run test:e2e
+npm run test:e2e:production
+npm run verify:prepush
 ```
 
-**Do not add `OPENAI_API_KEY` as an EAS secret.** Client builds must never contain it.
+## Release decision checklist
 
----
+Before calling an environment demo-ready or launch-ready, verify the applicable exact release identity, Worker-to-Worker binding when present, database authorization/runtime state, secrets/configuration boundaries, CORS, Teen/Parent privacy, account deletion/cleanup, accessibility/device behavior, legal/safeguarding/store requirements, monitoring, incident response, backup, restore, and rollback.
 
-## Startup Validation
-
-`utils/env.ts` runs at app boot and logs:
-
-- `⚠️ warning` if `EXPO_PUBLIC_SUPABASE_URL` or `EXPO_PUBLIC_SUPABASE_ANON_KEY` is missing → cloud sync disabled, app runs on local AsyncStorage
-- `ℹ️ info` if `EXPO_PUBLIC_BACKEND_URL` is missing → Se'kret AI uses pre-written fallback replies
-- `🚨 SECURITY error` if `OPENAI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, or `SERVICE_ROLE` is found in client env → rotate immediately
-
----
-
-## Security Checklist
-
-- [ ] `.env.local` is in `.gitignore` (already configured)
-- [ ] `OPENAI_API_KEY` set via `wrangler secret put` only
-- [ ] `SUPABASE_SERVICE_ROLE_KEY` never in any client file
-- [ ] Supabase RLS policies active (verified via `sekret_bip_full_bootstrap.sql`)
-- [ ] Worker CORS origin restricted to production domain before public launch
-- [ ] No secrets in GitHub Actions (use EAS secrets for builds)
+The implementation ledger must not promote an integrated feature to verified/released without evidence that matches the claimed environment, target, and scope.

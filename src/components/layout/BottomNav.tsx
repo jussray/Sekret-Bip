@@ -21,11 +21,30 @@ const SCREEN_MAP: Record<string, string> = {
   parentBridge:  '/(parent)/bridge',
   cloudThoughts: '/(teen)/cloud',
   settings:      '/(teen)/settings',
-  more:          '/(teen)/settings',
+  more:          '/(teen)/more',       // fix: was /(teen)/settings
   parentHome:    '/(parent)/room',
   parentPages:   '/(parent)/pages',
   parentCircle:  '/(parent)/circle',
   parentMore:    '/(parent)/more',
+};
+
+/**
+ * Maps each nav tab id to the pathname segment it owns.
+ * Using explicit path segments avoids false positives from
+ * pathname.includes(id) (e.g. "home" matching "/more" never fires,
+ * but "room" matching "/parentRoom" would). Exact segment checks
+ * are safer and easier to audit.
+ */
+const ACTIVE_SEGMENT: Record<string, string> = {
+  home:         '/room',
+  pages:        '/pages',
+  calm:         '/calm',
+  circle:       '/circle',
+  more:         '/more',
+  parentHome:   '/room',
+  parentPages:  '/pages',
+  parentCircle: '/circle',
+  parentMore:   '/more',
 };
 
 interface BottomNavProps {
@@ -43,24 +62,27 @@ export function BottomNav({ userSide }: BottomNavProps) {
   const items: [string, string, string][] =
     userSide === 'parent'
       ? [
-          ['parentHome', '🌿', 'Room'],
-          ['parentPages', '📝', 'Pages'],
+          ['parentHome',   '🏡', 'Room'],
+          ['parentPages',  '📝', 'Pages'],
           ['parentCircle', '🤝', 'Circle'],
-          ['parentMore', '☰',  'More'],
+          ['parentMore',   '☰',  'More'],
         ]
       : [
           ['home',   '🏠', 'Home'],
           ['pages',  '📖', 'Pages'],
           ['calm',   '🌙', 'Calm'],
           ['circle', '🌐', 'Circle'],
-          ['sekret', '💜', "Se'kret"],
           ['more',   '☰',  'More'],
         ];
 
   return (
     <View style={styles.bottomNav}>
       {items.map(([id, icon, label]) => {
-        const isActive = pathname.includes(id);
+        // Use explicit path-segment matching instead of pathname.includes(id).
+        // ACTIVE_SEGMENT maps each tab to the route segment it owns so that
+        // e.g. /room is active for 'home', /more is active for 'more', etc.
+        const segment  = ACTIVE_SEGMENT[id] ?? `/${id}`;
+        const isActive = pathname.endsWith(segment) || pathname.includes(`${segment}/`);
         return (
           <TouchableOpacity
             key={id}

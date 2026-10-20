@@ -1,0 +1,56 @@
+{
+  "rain": {
+    "$metadata": {
+      "vibeKey": "rain",
+      "displayName": "Window Rain",
+      "atmosphere": "atmosphere",
+      "character": null,
+      "isAtmosphereOnly": true
+    },
+    "color": {
+      "bg":          { "value": "#EEF4F9", "type": "color" },
+      "card":        { "value": "#E4EEF6", "type": "color" },
+      "cardAlt":     { "value": "#D6E6F2", "type": "color" },
+      "accentA":     { "value": "#7EC8E3", "type": "color", "$description": "skyBlue — buttons, focus rings" },
+      "accentB":     { "value": "#FFB289", "type": "color", "$description": "warmPeach — secondary accents" },
+      "accentC":     { "value": "#A8E6CF", "type": "color", "$description": "softMint — tertiary accents" },
+      "textHigh":    { "value": "#0E2030", "type": "color" },
+      "textMid":     { "value": "#3A5A6E", "type": "color" },
+      "textLow":     { "value": "#6A9AAE", "type": "color" },
+      "divider":     { "value": "rgba(14,32,48,0.08)", "type": "color" },
+      "glowColor":   { "value": "#7EC8E3", "type": "color" },
+      "glowRadius":  { "value": "40", "type": "other" },
+      "selectorRing": { "value": "#7EC8E3", "type": "color" }
+    },
+    "overlay": {
+      "base":    { "value": "rgba(238,244,249,0.75)", "type": "color" },
+      "accent":  { "value": "rgba(126,200,227,0.18)", "type": "color" },
+      "primary": { "value": "rgba(126,200,227,0.08)", "type": "color" }
+    },
+    "input": {
+      "bg":          { "value": "{rain.color.bg}",     "type": "color" },
+      "border":      { "value": "{rain.color.divider}", "type": "color" },
+      "borderFocus": { "value": "{rain.color.accentA}", "type": "color" },
+      "radius":      { "value": "{global.radius.md}",  "type": "borderRadius" }
+    },
+    "button": {
+      "primaryBg":    { "value": "{rain.color.accentA}", "type": "color" },
+      "primaryText":  { "value": "{rain.color.textHigh}", "type": "color" },
+      "secondaryBg":  { "value": "{rain.color.card}",    "type": "color" },
+      "secondaryText": { "value": "{rain.color.textHigh}", "type": "color" },
+      "secondaryBorder": { "value": "{rain.color.accentA}", "type": "color" },
+      "radius":       { "value": "{global.radius.pill}", "type": "borderRadius" }
+    },
+    "badge": {
+      "bg":     { "value": "{rain.color.accentB}", "type": "color" },
+      "text":   { "value": "#2C1A0E",              "type": "color" },
+      "radius": { "value": "{global.radius.pill}", "type": "borderRadius" }
+    },
+    "card": {
+      "bg":          { "value": "{rain.color.card}",   "type": "color" },
+      "border":      { "value": "{rain.color.divider}", "type": "color" },
+      "borderWidth": { "value": "1", "type": "borderWidth" },
+      "radius":      { "value": "{global.radius.card}", "type": "borderRadius" }
+    }
+  }
+}

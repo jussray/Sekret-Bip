@@ -2,7 +2,7 @@
  * utils/supabase/types.ts
  *
  * Hand-maintained lightweight row types that mirror the DB schema.
- * Run `npx supabase gen types typescript --project-id jvmbhralyktmdlvglrxk`
+ * Run `npx supabase gen types typescript --project-id tbsevonvegdnlyjgplmm`
  * to auto-generate a full Database type and replace this file.
  */
 
@@ -78,47 +78,4 @@ export type BipPoints = {
   id: number;
   user_id: string;
   total: number;
-  captured_at: string;
-};
-
-// ─── P8: Bridge signal row ────────────────────────────────────────────────────
-// MESSAGE CONTENT IS NEVER STORED. Only metadata (share type, conversation
-// mode, char key) is synced so the parent-side can surface a gentle nudge.
-export type BridgeSignal = {
-  id: number;
-  teen_user_id: string;          // RLS: only the teen can insert their own row
-  char_key: 'raylene' | 'rylane';
-  share_type: string;            // 'mood' | 'thought' | 'need' | 'win'
-  conv_mode: string | null;      // 'soft' | 'honest' | 'boundary' | 'safety'
-  sent_at: string;               // ISO timestamp
-  created_at: string;
-};
-
-// ─── P8: Oracle row types ────────────────────────────────────────────────────
-
-// oracle_records: upsert snapshot keyed on (user_id, mode).
-export type OracleRecord_Row = {
-  user_id: string;
-  mode: 'teen' | 'parent';
-  session_count: number;
-  total_turns: number;
-  last_session: string | null;
-  dimension_summary: Record<string, number>;
-  profile_snapshot: string;      // JSON.stringify(OracleRecord)
-  updated_at: string;
-};
-
-// oracle_session_log: append-only per-session audit rows.
-// Named oracle_session_log to avoid conflict with oracle_sessions (0003).
-export type OracleSessionLog = {
-  id: number;
-  user_id: string;
-  mode: 'teen' | 'parent';
-  session_index: number;         // record.sessionCount at time of save
-  total_turns: number;           // record.totalTurns
-  question_ids: string[];        // array of question IDs answered this session
-  dimension_summary: Record<string, number>; // dimension -> signal count
-  profile_snapshot: string;      // JSON.stringify(OracleRecord) for full recovery
-  completed_at: string;          // ISO timestamp
-  created_at: string;
 };

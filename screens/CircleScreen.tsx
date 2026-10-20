@@ -1,12 +1,7 @@
-// @ts-nocheck
 // Se'kret Bip — CircleScreen V1
-// Four tabs: Public, Friends, Crew, Parent
-// Identity rules enforced per tab:
-//   Public  → anonymous only, reactions only, no comments, no profile view
-//   Friends → nickname/avatar only, comments allowed
-//   Crew    → trusted identity visible, comments allowed
-//   Parent  → anonymous by default, identity inside parent connections only, comments allowed
-// Teen and Parent data are fully separated — no cross-visibility.
+// Four tabs: Open Bip (Public), My Circle (Friends), Crew Bip, Parent Bridge
+// Identity rules enforced per tab — see circle-v1-spec.md
+// Content safety via guardrails.ts (SOFT_CONTENT_FLAGS + CRISIS_NUDGE)
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
@@ -24,7 +19,10 @@ import {
   SafeAreaView,
   ActivityIndicator,
   RefreshControl,
+  Animated,
+  Easing,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import type {
   CircleTab,
   PublicCirclePost,
@@ -38,18 +36,20 @@ import {
   loadCircleFeed,
   syncCircleReaction,
   writeCirclePost,
-} from '../utils/sync';
+} from '@/utils/sync';
+import { SOFT_CONTENT_FLAGS, CRISIS_NUDGE, TONE } from '../constants/guardrails';
 
 // ─── Reaction sets ──────────────────────────────────────────────────────────
 const TEEN_REACTIONS    = ['💜 felt', '🫂 comfort', '💪 proud', '🌙 stay'];
-const PARENT_REACTIONS  = ['🫶 beenThere', '🤝 solidarity', '⏰ reminder', '💛 needed', '🌿 strength'];
+// Parent Bridge reactions aligned with ParentCircleScreen
+const PARENT_REACTIONS  = ['☕ beenThere', '🤝 solidarity', '🌱 reminder', '💜 needed', '🕯️ strength'];
 
-// ─── Tab config ─────────────────────────────────────────────────────────────
+// ─── Tab config — Se'kret Bip language layer (circle-v1-spec.md §4) ─────────
 const TABS: { key: CircleTab; label: string; emoji: string }[] = [
-  { key: 'public',  label: 'Public',  emoji: '🌎' },
-  { key: 'friends', label: 'Friends', emoji: '💜' },
-  { key: 'crew',    label: 'Crew',    emoji: '🤝' },
-  { key: 'parent',  label: 'Parent',  emoji: '🌿' },
+  { key: 'public',  label: 'Open Bip',      emoji: '🌎' },
+  { key: 'friends', label: 'My Circle',     emoji: '💜' },
+  { key: 'crew',    label: 'Crew Bip',      emoji: '🤝' },
+  { key: 'parent',  label: 'Parent Bridge', emoji: '🌿' },
 ];
 
 // ─── Fallback mock data (shown when Supabase is unconfigured / offline) ──────
@@ -58,10 +58,10 @@ const MOCK_PUBLIC: PublicCirclePost[] = [
   { id: 2, text: 'passed my test today without telling anyone. just wanted to say it somewhere.', post_mood: 'proud', media_kind: null, reactions: { felt: 6, comfort: 3, proud: 22, stay: 5 }, created_at: new Date().toISOString() },
 ];
 const MOCK_FRIENDS: FriendsCirclePost[] = [
-  { id: 1, user_id: 'u1', nickname: 'MoonGirl_17', avatar_emoji: '🌙', text: "today felt like a lot but i'm okay", post_mood: 'okay', media_kind: null, reactions: { felt: 4, comfort: 2, proud: 0, stay: 3 }, created_at: new Date().toISOString() },
+  { id: 1, user_id: 'u1', nickname: 'MoonGirl_17', avatar_emoji: '🌙', text: "today felt like a lot but i\'m okay", post_mood: 'okay', media_kind: null, reactions: { felt: 4, comfort: 2, proud: 0, stay: 3 }, created_at: new Date().toISOString() },
 ];
 const MOCK_CREW: CrewCirclePost[] = [
-  { id: 1, user_id: 'u2', nickname: 'Raylene 💜', avatar_emoji: '💜', text: "crew check-in: what's one thing we're each holding right now?", post_mood: null, media_kind: null, reactions: { felt: 3, comfort: 5, proud: 1, stay: 2 }, created_at: new Date().toISOString() },
+  { id: 1, user_id: 'u2', nickname: 'Suhana 💜', avatar_emoji: '💜', text: "crew check-in: what\'s one thing we're each holding right now?", post_mood: null, media_kind: null, reactions: { felt: 3, comfort: 5, proud: 1, stay: 2 }, created_at: new Date().toISOString() },
 ];
 const MOCK_PARENT: ParentCirclePost[] = [
   { id: 1, user_id: 'p1', text: "does anyone else feel like they don't know how to help without making it worse?", reactions: { beenThere: 9, solidarity: 7, reminder: 2, needed: 5, strength: 4 }, circle_tag: null, created_at: new Date().toISOString(), identity_revealed: false },
@@ -232,13 +232,13 @@ function PublicFeed({ onOptimisticInsert }: {
       }
       ListHeaderComponent={
         <View style={styles.anonBadge}>
-          <Text style={styles.anonBadgeText}>🌎 Anonymous only · Reactions only · No profiles</Text>
+          <Text style={styles.anonBadgeText}>🌎 Open Bip · Anonymous · Reactions only · No profiles</Text>
         </View>
       }
       ListEmptyComponent={
         loading
           ? <ActivityIndicator color={PURPLE} style={{ marginTop: 40 }} />
-          : <Text style={styles.emptyText}>No bips yet. Be the first. 🌙</Text>
+          : <Text style={styles.emptyText}>{TONE.emptyCircle}</Text>
       }
       renderItem={({ item }) => (
         <View style={styles.postCard}>
@@ -286,6 +286,7 @@ function FriendsFeed({ myUserId }: { myUserId: string }) {
     const newComment: CircleComment = {
       id: Date.now(),
       post_id: postId,
+      post_type: 'friends',
       user_id: myUserId,
       nickname: 'Me',
       avatar_emoji: '💜',
@@ -313,7 +314,7 @@ function FriendsFeed({ myUserId }: { myUserId: string }) {
       ListEmptyComponent={
         loading
           ? <ActivityIndicator color={PURPLE} style={{ marginTop: 40 }} />
-          : <Text style={styles.emptyText}>No friends bips yet. Add some friends. 💜</Text>
+          : <Text style={styles.emptyText}>{TONE.emptyCircle}</Text>
       }
       renderItem={({ item }) => (
         <View style={styles.postCard}>
@@ -393,6 +394,7 @@ function CrewFeed({ myUserId }: { myUserId: string }) {
     const newComment: CircleComment = {
       id: Date.now(),
       post_id: postId,
+      post_type: 'crew',
       user_id: myUserId,
       nickname: 'Me',
       avatar_emoji: '💜',
@@ -420,7 +422,7 @@ function CrewFeed({ myUserId }: { myUserId: string }) {
       ListEmptyComponent={
         loading
           ? <ActivityIndicator color={PURPLE} style={{ marginTop: 40 }} />
-          : <Text style={styles.emptyText}>No crew bips yet. Start one. 🤝</Text>
+          : <Text style={styles.emptyText}>{TONE.emptyCrew}</Text>
       }
       renderItem={({ item }) => (
         <View style={styles.postCard}>
@@ -500,6 +502,7 @@ function ParentFeed({ myUserId }: { myUserId: string }) {
     const newComment: CircleComment = {
       id: Date.now(),
       post_id: postId,
+      post_type: 'parent',
       user_id: myUserId,
       nickname: 'Parent',
       avatar_emoji: '🌿',
@@ -526,13 +529,13 @@ function ParentFeed({ myUserId }: { myUserId: string }) {
       contentContainerStyle={styles.feedList}
       ListHeaderComponent={
         <View style={styles.anonBadge}>
-          <Text style={styles.anonBadgeText}>🌿 Anonymous by default · Parent space · Be kind</Text>
+          <Text style={styles.anonBadgeText}>🌿 Parent Bridge · Anonymous · Quiet space · Be kind</Text>
         </View>
       }
       ListEmptyComponent={
         loading
           ? <ActivityIndicator color={PURPLE} style={{ marginTop: 40 }} />
-          : <Text style={styles.emptyText}>No parent bips yet. This space is yours. 🌿</Text>
+          : <Text style={styles.emptyText}>{TONE.emptyCircle}</Text>
       }
       renderItem={({ item }) => (
         <View style={styles.postCard}>
@@ -602,20 +605,35 @@ function Composer({
 }) {
   const [text, setText] = useState('');
   const [selectedTab, setSelectedTab] = useState<CircleTab>(activeTab);
+  const [crisisFlag, setCrisisFlag] = useState(false);
+  const [confirmedPost, setConfirmedPost] = useState(false);
 
   const destinations = COMPOSER_DESTINATIONS.filter(d =>
-    d.key !== 'parent' || activeTab === 'parent'
+    d.tab !== 'parent' || activeTab === 'parent'
   );
+
+  const handleTextChange = (val: string) => {
+    setText(val);
+    const lower = val.toLowerCase();
+    const flagged = SOFT_CONTENT_FLAGS.some(f => lower.includes(f));
+    setCrisisFlag(flagged);
+    setConfirmedPost(false);
+  };
 
   const handlePost = () => {
     const trimmed = text.trim();
     if (!trimmed) return;
+    if (crisisFlag && !confirmedPost) {
+      setConfirmedPost(true);
+      return;
+    }
     onPost(selectedTab, trimmed);
     onClose();
   };
 
   const remaining = MAX_CHARS - text.length;
   const overLimit = remaining < 0;
+  const canPost   = !overLimit && !!text.trim();
 
   return (
     <Modal visible animationType="slide" transparent onRequestClose={onClose}>
@@ -634,12 +652,12 @@ function Composer({
           <View style={styles.composerTabs}>
             {destinations.map(d => (
               <TouchableOpacity
-                key={d.key}
-                style={[styles.composerTab, selectedTab === d.key && styles.composerTabActive]}
-                onPress={() => setSelectedTab(d.key as CircleTab)}
+                key={d.tab}
+                style={[styles.composerTab, selectedTab === d.tab && styles.composerTabActive]}
+                onPress={() => setSelectedTab(d.tab)}
               >
-                <Text style={[styles.composerTabText, selectedTab === d.key && styles.composerTabTextActive]}>
-                  {d.emoji} {d.label}
+                <Text style={[styles.composerTabText, selectedTab === d.tab && styles.composerTabTextActive]}>
+                  {d.label}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -659,22 +677,33 @@ function Composer({
             placeholderTextColor="#555"
             multiline
             value={text}
-            onChangeText={setText}
+            onChangeText={handleTextChange}
             maxLength={MAX_CHARS + 10}
             autoFocus
           />
+
+          {crisisFlag && (
+            <View style={styles.crisisNudge}>
+              <Text style={styles.crisisNudgeText}>{CRISIS_NUDGE}</Text>
+              {confirmedPost && (
+                <Text style={styles.crisisNudgeSub}>tap "Bip it" again if you still want to post.</Text>
+              )}
+            </View>
+          )}
 
           <View style={styles.composerFooter}>
             <Text style={[styles.charCount, overLimit && styles.charCountOver]}>
               {remaining}
             </Text>
             <TouchableOpacity
-              style={[styles.composerPostBtn, (overLimit || !text.trim()) && styles.composerPostBtnDisabled]}
+              style={[styles.composerPostBtn, !canPost && styles.composerPostBtnDisabled]}
               onPress={handlePost}
-              disabled={overLimit || !text.trim()}
+              disabled={!canPost}
               accessibilityLabel="Post bip"
             >
-              <Text style={styles.composerPostBtnText}>Bip it 💜</Text>
+              <Text style={styles.composerPostBtnText}>
+                {crisisFlag && !confirmedPost ? 'continue?' : 'Bip it 💜'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -705,7 +734,7 @@ function AddToCircleModal({ onClose }: { onClose: () => void }) {
             </TouchableOpacity>
           </View>
           {sent ? (
-            <Text style={[styles.emptyText, { marginTop: 24 }]}>✅ {CIRCLE_TERMS.requestSent}</Text>
+            <Text style={[styles.emptyText, { marginTop: 24 }]}>✅ {CIRCLE_TERMS.friendRequest} sent 💜</Text>
           ) : (
             <>
               <TextInput
@@ -736,20 +765,51 @@ export default function CircleScreen(_props: Record<string, unknown> = {}) {
   const [composerOpen,  setComposerOpen]  = useState(false);
   const [addCircleOpen, setAddCircleOpen] = useState(false);
 
+  const breath = useRef(new Animated.Value(0)).current;
   const publicInsertRef = useRef<((text: string) => void) | null>(null);
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(breath, { toValue: 1, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(breath, { toValue: 0, duration: 2600, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+      ]),
+    ).start();
+  }, [breath]);
+
+  const breathOpacity = breath.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] });
+  const breathScale   = breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
 
   const handlePost = useCallback((tab: CircleTab, text: string) => {
     if (tab === 'public') publicInsertRef.current?.(text);
     void writeCirclePost(tab, text);
   }, []);
 
+  const TAB_IDENTITY: Record<CircleTab, string> = {
+    public:  '🌑 anonymous',
+    friends: '💜 nickname visible',
+    crew:    '✨ identity visible',
+    parent:  '🌑 anonymous',
+  };
+
   return (
     <SafeAreaView style={styles.root}>
+      <LinearGradient
+        colors={['#0a0010', '#0d0018', '#100028']}
+        style={StyleSheet.absoluteFill}
+      />
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Circle</Text>
+        <View>
+          <Text style={styles.headerTitle}>Circle</Text>
+          <Animated.View style={[styles.liveBadge, { opacity: breathOpacity, transform: [{ scale: breathScale }] }]}>
+            <Text style={styles.liveBadgeText}>🌐 circle is open</Text>
+          </Animated.View>
+        </View>
         <View style={styles.headerActions}>
           <TouchableOpacity onPress={() => setAddCircleOpen(true)} style={styles.headerBtn} accessibilityLabel={CIRCLE_TERMS.friendRequest}>
-            <Text style={styles.headerBtnText}>+ {CIRCLE_TERMS.friendRequest}</Text>
+            <Text style={styles.headerBtnText}>{CIRCLE_TERMS.friendRequest}</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={() => setComposerOpen(true)} style={styles.headerBtnPrimary} accessibilityLabel="New Bip">
             <Text style={styles.headerBtnPrimaryText}>+ Bip</Text>
@@ -757,22 +817,31 @@ export default function CircleScreen(_props: Record<string, unknown> = {}) {
         </View>
       </View>
 
+      {/* ── Tab bar ────────────────────────────────────────────────────────── */}
       <View style={styles.tabBar}>
-        {TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: activeTab === tab.key }}
-          >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.emoji} {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {TABS.map(tab => {
+          const isActive = activeTab === tab.key;
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, isActive && styles.tabActive]}
+              onPress={() => setActiveTab(tab.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+            >
+              <Text style={[styles.tabEmoji, isActive && styles.tabEmojiActive]}>{tab.emoji}</Text>
+              <Text style={[styles.tabText, isActive && styles.tabTextActive]}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
+      {/* ── Identity strip ─────────────────────────────────────────────────── */}
+      <View style={styles.identityStrip}>
+        <Text style={styles.identityStripText}>{TAB_IDENTITY[activeTab]}</Text>
+      </View>
+
+      {/* ── Feed ───────────────────────────────────────────────────────────── */}
       <View style={styles.feedWrap}>
         {activeTab === 'public'  && <PublicFeed onOptimisticInsert={fn => { publicInsertRef.current = fn; }} />}
         {activeTab === 'friends' && <FriendsFeed myUserId={myUserId} />}
@@ -795,68 +864,102 @@ export default function CircleScreen(_props: Record<string, unknown> = {}) {
 }
 
 const styles = StyleSheet.create({
-  root:        { flex: 1, backgroundColor: '#0a0010' },
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  headerTitle: { color: '#e9defc', fontSize: 22, fontWeight: '800' },
-  headerActions: { flexDirection: 'row', gap: 8 },
-  headerBtn:   { borderColor: '#7c3aed', borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  // ── Root ──────────────────────────────────────────────────────────────────
+  root: { flex: 1, backgroundColor: '#0a0010' },
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 18, paddingTop: 14, paddingBottom: 6 },
+  headerTitle: { color: '#e9defc', fontSize: 26, fontWeight: '800', letterSpacing: -0.5, marginBottom: 2 },
+  liveBadge:   { alignSelf: 'flex-start', borderWidth: 1, borderColor: '#7c3aed66', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 3, backgroundColor: '#7c3aed18' },
+  liveBadgeText: { color: '#c4b5fd', fontSize: 11, fontWeight: '600' },
+  headerActions: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  headerBtn:   { borderColor: '#7c3aed88', borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 7 },
   headerBtnText: { color: '#a855f7', fontSize: 13 },
-  headerBtnPrimary: { backgroundColor: '#7c3aed', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6 },
+  headerBtnPrimary: { backgroundColor: '#7c3aed', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 7 },
   headerBtnPrimaryText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  tabBar:      { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#1a0a2e' },
-  tab:         { flex: 1, paddingVertical: 10, alignItems: 'center' },
-  tabActive:   { borderBottomWidth: 2, borderBottomColor: '#a855f7' },
-  tabText:     { color: '#666', fontSize: 12 },
-  tabTextActive: { color: '#a855f7', fontWeight: '700' },
+
+  // ── Tab bar ───────────────────────────────────────────────────────────────
+  tabBar:        { flexDirection: 'row', paddingHorizontal: 12, paddingTop: 6, paddingBottom: 0, gap: 4 },
+  tab:           { flex: 1, paddingVertical: 8, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: 'transparent' },
+  tabActive:     { borderColor: '#7c3aed55', backgroundColor: '#7c3aed18' },
+  tabEmoji:      { fontSize: 13, marginBottom: 1, opacity: 0.4 },
+  tabEmojiActive:{ opacity: 1 },
+  tabText:       { color: '#444', fontSize: 10, fontWeight: '600' },
+  tabTextActive: { color: '#c4b5fd', fontWeight: '800' },
+
+  // ── Identity strip ────────────────────────────────────────────────────────
+  identityStrip:     { paddingHorizontal: 18, paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#1a0a2e' },
+  identityStripText: { color: '#555', fontSize: 11 },
+
+  // ── Feed ──────────────────────────────────────────────────────────────────
   feedWrap:    { flex: 1 },
-  feedList:    { padding: 12, paddingBottom: 40 },
-  anonBadge:   { backgroundColor: '#12002a', borderRadius: 8, padding: 8, marginBottom: 12, alignItems: 'center' },
-  anonBadgeText: { color: '#888', fontSize: 11 },
-  emptyText:   { color: '#555', textAlign: 'center', marginTop: 40, fontSize: 14 },
-  postCard:    { backgroundColor: '#0f0020', borderRadius: 14, padding: 14, marginBottom: 12, borderWidth: 1, borderColor: '#1a0a2e' },
-  postHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  feedList:    { padding: 14, paddingBottom: 48 },
+
+  // ── Anonymous badge ───────────────────────────────────────────────────────
+  anonBadge:    { backgroundColor: '#12002a', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8, marginBottom: 14, alignItems: 'center', borderWidth: 1, borderColor: '#2a0a4a' },
+  anonBadgeText:{ color: '#6b4fa0', fontSize: 11, fontWeight: '600', letterSpacing: 0.3 },
+
+  // ── Empty state ───────────────────────────────────────────────────────────
+  emptyText: { color: '#4a3a6a', textAlign: 'center', marginTop: 52, fontSize: 14, lineHeight: 21 },
+
+  // ── Post card ─────────────────────────────────────────────────────────────
+  postCard:    { backgroundColor: '#0f0020', borderRadius: 18, padding: 16, marginBottom: 10, borderWidth: 1, borderColor: '#2a0a4a' },
+  postHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   postAuthor:  { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  anonLabel:   { color: '#555', fontSize: 12 },
-  avatarEmoji: { fontSize: 18 },
-  nicknameLabel: { color: '#c4b5fd', fontSize: 13, fontWeight: '600' },
-  postText:    { color: '#e9defc', fontSize: 15, lineHeight: 22, marginBottom: 10 },
-  reactionBar: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  reactionBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a0a2e', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5, gap: 4 },
+  anonLabel:   { color: '#4a3a6a', fontSize: 12, fontWeight: '600' },
+  avatarEmoji: { fontSize: 20 },
+  nicknameLabel: { color: '#c4b5fd', fontSize: 14, fontWeight: '700' },
+  postText:    { color: '#e9defc', fontSize: 15, lineHeight: 23, marginBottom: 12 },
+
+  // ── Reactions ─────────────────────────────────────────────────────────────
+  reactionBar:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  reactionBtn:   { flexDirection: 'row', alignItems: 'center', backgroundColor: '#1a0a2e', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6, gap: 4, borderWidth: 1, borderColor: '#2a0a4a' },
   reactionEmoji: { fontSize: 14 },
-  reactionCount: { color: '#a855f7', fontSize: 12, fontWeight: '600' },
-  commentToggle: { marginTop: 8, paddingVertical: 4 },
-  commentToggleText: { color: '#7c3aed', fontSize: 12 },
-  comment:     { flexDirection: 'row', gap: 6, marginTop: 6, paddingLeft: 8 },
-  commentEmoji: { fontSize: 14 },
-  commentText: { color: '#c4b5fd', fontSize: 13, flex: 1 },
-  commentNick: { fontWeight: '700' },
-  commentInput: { flexDirection: 'row', marginTop: 8, gap: 6 },
-  commentField: { flex: 1, backgroundColor: '#1a0a2e', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6, color: '#e9defc', fontSize: 13 },
-  commentSend:  { justifyContent: 'center', paddingHorizontal: 8 },
+  reactionCount: { color: '#a855f7', fontSize: 12, fontWeight: '700' },
+
+  // ── Comments ──────────────────────────────────────────────────────────────
+  commentToggle:     { marginTop: 10, paddingVertical: 4 },
+  commentToggleText: { color: '#7c3aed', fontSize: 12, fontWeight: '600' },
+  comment:       { flexDirection: 'row', gap: 6, marginTop: 7, paddingLeft: 8 },
+  commentEmoji:  { fontSize: 14 },
+  commentText:   { color: '#c4b5fd', fontSize: 13, flex: 1, lineHeight: 19 },
+  commentNick:   { fontWeight: '700' },
+  commentInput:  { flexDirection: 'row', marginTop: 8, gap: 6 },
+  commentField:  { flex: 1, backgroundColor: '#1a0a2e', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 8, color: '#e9defc', fontSize: 13 },
+  commentSend:   { justifyContent: 'center', paddingHorizontal: 8 },
   commentSendText: { color: '#a855f7', fontSize: 18 },
-  menuDot:     { padding: 4 },
-  menuDotText: { color: '#555', fontSize: 18, letterSpacing: 1 },
-  menuOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  menuSheet:   { backgroundColor: '#0f0020', borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingBottom: 32 },
-  menuItem:    { paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#1a0a2e' },
+
+  // ── Post menu ─────────────────────────────────────────────────────────────
+  menuDot:    { padding: 4 },
+  menuDotText:{ color: '#3a2a5a', fontSize: 18, letterSpacing: 2 },
+  menuOverlay:{ flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
+  menuSheet:  { backgroundColor: '#0f0020', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 36, borderWidth: 1, borderColor: '#2a0a4a' },
+  menuItem:   { paddingHorizontal: 24, paddingVertical: 18, borderBottomWidth: 1, borderBottomColor: '#1a0a2e' },
   menuItemText: { color: '#e9defc', fontSize: 16 },
-  composerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.6)' },
-  composerSheet:   { backgroundColor: '#0f0020', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 36 },
-  composerHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
-  composerTitle:   { color: '#e9defc', fontSize: 18, fontWeight: '800' },
-  composerClose:   { color: '#555', fontSize: 22 },
-  composerTabs:    { flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
-  composerTab:     { borderColor: '#2a0a4a', borderWidth: 1, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
-  composerTabActive: { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
-  composerTabText:   { color: '#888', fontSize: 12 },
+
+  // ── Composer ──────────────────────────────────────────────────────────────
+  composerOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.7)' },
+  composerSheet:   { backgroundColor: '#0f0020', borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, paddingBottom: 40, borderWidth: 1, borderColor: '#2a0a4a', borderBottomWidth: 0 },
+  composerHeader:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  composerTitle:   { color: '#e9defc', fontSize: 20, fontWeight: '800' },
+  composerClose:   { color: '#4a3a6a', fontSize: 24 },
+  composerTabs:    { flexDirection: 'row', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
+  composerTab:     { borderColor: '#2a0a4a', borderWidth: 1, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  composerTabActive:     { backgroundColor: '#7c3aed', borderColor: '#7c3aed' },
+  composerTabText:       { color: '#555', fontSize: 12 },
   composerTabTextActive: { color: '#fff', fontWeight: '700' },
-  composerIdentity: { marginBottom: 10 },
-  composerIdentityText: { color: '#666', fontSize: 12 },
-  composerInput:   { backgroundColor: '#1a0a2e', borderRadius: 14, padding: 14, color: '#e9defc', fontSize: 15, minHeight: 90, textAlignVertical: 'top', marginBottom: 12 },
+  composerIdentity:     { marginBottom: 12 },
+  composerIdentityText: { color: '#555', fontSize: 12 },
+  composerInput:   { backgroundColor: '#1a0a2e', borderRadius: 16, padding: 16, color: '#e9defc', fontSize: 15, minHeight: 100, textAlignVertical: 'top', marginBottom: 12, borderWidth: 1, borderColor: '#2a0a4a' },
   composerFooter:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  charCount:       { color: '#555', fontSize: 13 },
+  charCount:       { color: '#4a3a6a', fontSize: 13 },
   charCountOver:   { color: '#e05' },
-  composerPostBtn: { backgroundColor: '#7c3aed', borderRadius: 20, paddingHorizontal: 20, paddingVertical: 10 },
-  composerPostBtnDisabled: { opacity: 0.4 },
+  composerPostBtn:         { backgroundColor: '#7c3aed', borderRadius: 22, paddingHorizontal: 22, paddingVertical: 11 },
+  composerPostBtnDisabled: { opacity: 0.35 },
   composerPostBtnText:     { color: '#fff', fontWeight: '700', fontSize: 14 },
+
+  // ── Crisis nudge ──────────────────────────────────────────────────────────
+  crisisNudge:    { backgroundColor: '#1a0a2e', borderRadius: 14, padding: 14, marginBottom: 12, borderLeftWidth: 3, borderLeftColor: PURPLE, borderWidth: 1, borderColor: '#2a0a4a' },
+  crisisNudgeText:{ color: '#c4b5fd', fontSize: 13, lineHeight: 20 },
+  crisisNudgeSub: { color: '#777', fontSize: 11, marginTop: 5 },
 });

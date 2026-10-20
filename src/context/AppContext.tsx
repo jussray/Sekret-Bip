@@ -1,76 +1,88 @@
-/**
- * src/context/AppContext.tsx
- *
- * PHASE 5 FIX: Added all parent state + actions.
- * setUserSide exposed so splash can persist side choice.
- * patchJournalEntry added so onSekretReply can persist Worker replies.
- *
- * TYPE PASS: Removed duplicate JournalEntry + CirclePost declarations.
- * Now imports canonical types from @/types to avoid drift.
- */
 import React, {
   createContext,
   useContext,
-  useState,
   useEffect,
   useRef,
-  ReactNode,
+  useState,
+  type ReactNode,
 } from 'react';
 import { Animated } from 'react-native';
-import { useSekretState } from '@/hooks/useSekretState';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HOME_MESSAGES } from '@constants/theme';
+import { useSekretState } from '@/hooks/useSekretState';
+import { useStreak } from '@/hooks/useStreak';
+import { useSyncStatus } from '../../hooks/useSyncStatus';
+import { initPointLedger } from '@/features/activity/ledger';
+import { upsertJournalEntry } from '@/features/journal/journalRepository';
+import { useVerificationContext } from '@/context/VerificationContext';
+import { consentService } from '@/services/consentService';
+import {
+  syncMood,
+  syncParentCirclePost,
+  syncRoomMemory,
+} from '@/utils/sync';
+import { syncOracleDiscovery } from '@/services/oracleDiscovery';
 import type {
   JournalEntry,
   CirclePost,
   MoodEntry,
   VoiceNote,
   ParentCirclePost,
+  ComfortSession,
+  CrewMember,
+  CrewCheckIn,
 } from '@/types';
+import type { RoomMemory } from '@/types/roomMemory';
 import type { OracleProfile, OracleSessionSummary } from '@/services/oracleDiscovery';
+import type { SavePageInput } from '@screens/PagesScreen';
 
 export type { CirclePost } from '@/types';
 
 interface AppContextValue {
-  // Identity
   theme: string;
   setTheme: (theme: string) => void;
   userSide: 'teen' | 'parent' | null;
   setUserSide: (side: 'teen' | 'parent') => void;
   selectedSekret: string;
   setSelectedSekret: (value: string) => void;
+  sekretMode: string;
+  setSekretMode: (mode: string) => void;
 
-  // Teen mood
   mood: string;
   setMood: (mood: string) => void;
   selectMood: (mood: string) => void;
   moodHistory: MoodEntry[];
 
-  // Journal
   journalText: string;
   setJournalText: (text: string) => void;
   entries: JournalEntry[];
   setEntries: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
   saveEntry: () => void;
-  /** Merge a partial update into an existing JournalEntry by id. */
   patchJournalEntry: (id: number, patch: Partial<JournalEntry>) => void;
 
-  // Teen voice notes
   voiceNotes: VoiceNote[];
   setVoiceNotes: React.Dispatch<React.SetStateAction<VoiceNote[]>>;
-
-  // Teen circle
   circlePosts: CirclePost[];
   setCirclePosts: React.Dispatch<React.SetStateAction<CirclePost[]>>;
+  comfortSessions: ComfortSession[];
+  periodDays: string[];
+  roomMemory: RoomMemory;
+  updateRoomMemory: (patch: Partial<RoomMemory>) => void;
 
-  // UI
+  oracleProfile: OracleProfile | null;
+  setOracleProfile: (profile: OracleProfile | null) => void;
+  oracleSessions: OracleSessionSummary[];
+  setOracleSessions: React.Dispatch<React.SetStateAction<OracleSessionSummary[]>>;
+  completeTeenOracleSession: (profile: OracleProfile, session: OracleSessionSummary) => void;
+
   homeMessageIndex: number;
   breatheAnim: Animated.Value;
   isLoading: boolean;
   syncStatus: 'idle' | 'syncing' | 'synced' | 'failed' | 'local';
+  withSyncWrap: (fn: () => Promise<void>) => Promise<void>;
   notificationsEnabled: boolean;
   setNotificationsEnabled: (enabled: boolean) => void;
 
-  // ── Parent state ──────────────────────────────────────────────
   parentMood: string;
   setParentMood: (mood: string) => void;
   parentMoodDate: string;
@@ -92,160 +104,326 @@ interface AppContextValue {
   parentOracleSessions: OracleSessionSummary[];
   setParentOracleSessions: React.Dispatch<React.SetStateAction<OracleSessionSummary[]>>;
 
-  // Parent actions
-  saveParentPageEntry: () => void;
+  crewMembers: CrewMember[];
+  setCrewMembers: React.Dispatch<React.SetStateAction<CrewMember[]>>;
+  crewCheckIns: CrewCheckIn[];
+  setCrewCheckIns: React.Dispatch<React.SetStateAction<CrewCheckIn[]>>;
+  parentCrewMembers: CrewMember[];
+  setParentCrewMembers: React.Dispatch<React.SetStateAction<CrewMember[]>>;
+  parentCrewCheckIns: CrewCheckIn[];
+  setParentCrewCheckIns: React.Dispatch<React.SetStateAction<CrewCheckIn[]>>;
+
+  saveParentPageEntry: (entry: SavePageInput) => void;
   saveParentCirclePost: () => void;
   reactToParentPost: (postId: number, reaction: string) => void;
   completeParentOracleSession: (profile: OracleProfile, session: OracleSessionSummary) => void;
+
+  teenGender: 'girl' | 'boy' | 'other' | null;
+  resetApp: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function useAppContext(): AppContextValue {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useAppContext must be used inside <AppProvider>');
-  return ctx;
+  const context = useContext(AppContext);
+  if (!context) throw new Error('useAppContext must be used inside <AppProvider>');
+  return context;
+}
+
+function nowLabel() {
+  const now = new Date();
+  return {
+    date: now.toLocaleDateString(),
+    time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [journalText, setJournalText] = useState('');
   const [homeMessageIndex, setHomeMessageIndex] = useState(0);
-  const [circlePosts, setCirclePosts] = useState<CirclePost[]>([]);
-  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([]);
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [teenGender, setTeenGender] = useState<'girl' | 'boy' | 'other' | null>(null);
   const breatheAnim = useRef(new Animated.Value(1)).current;
+  const { session } = useVerificationContext();
+  const authenticatedUserId = session && !session.user.is_anonymous ? session.user.id : null;
+  const previousAuthenticatedUserId = useRef<string | null>(null);
 
-  const s = useSekretState();
+  const state = useSekretState(authenticatedUserId);
+  const { streakDays } = useStreak();
+  const { syncStatus, withSyncWrap } = useSyncStatus();
 
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(breatheAnim, { toValue: 1.1, duration: 2200, useNativeDriver: true }),
-        Animated.timing(breatheAnim, { toValue: 1.0, duration: 2200, useNativeDriver: true }),
-      ])
-    ).start();
+    const previousUserId = previousAuthenticatedUserId.current;
+    if (previousUserId && previousUserId !== authenticatedUserId) {
+      state.resetAllState();
+      setJournalText('');
+      setNotificationsEnabled(false);
+      setTeenGender(null);
+      consentService.reset();
+    }
+    previousAuthenticatedUserId.current = authenticatedUserId;
+    // State reset is intentionally account-transition driven. The individual
+    // setters are stable React state controls and must not retrigger this gate.
+  }, [authenticatedUserId]);
+
+  useEffect(() => {
+    AsyncStorage.getItem('teen_profile_data').then(raw => {
+      if (!raw) return;
+      try {
+        const data = JSON.parse(raw) as { gender?: string };
+        if (data.gender === 'girl' || data.gender === 'boy' || data.gender === 'other') {
+          setTeenGender(data.gender);
+        }
+      } catch {
+        // Corrupt cache does not block the signed-in profile or app shell.
+      }
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(breatheAnim, { toValue: 1.1, duration: 2200, useNativeDriver: true }),
+        Animated.timing(breatheAnim, { toValue: 1, duration: 2200, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [breatheAnim]);
+
+  useEffect(() => {
     const id = setInterval(
-      () => setHomeMessageIndex((p) => (p + 1) % HOME_MESSAGES.length),
-      5000
+      () => setHomeMessageIndex(current => (current + 1) % HOME_MESSAGES.length),
+      5000,
     );
     return () => clearInterval(id);
   }, []);
 
-  function selectMood(m: string) {
-    s.setMood(m);
-    s.setMoodHistory((h: MoodEntry[]) => [
-      { id: Date.now(), mood: m, date: new Date().toLocaleDateString(), time: new Date().toLocaleTimeString() },
-      ...h,
-    ]);
+  useEffect(() => {
+    if (state.isLoading || state.userSide !== 'teen') return;
+    return initPointLedger({
+      moodCount: state.moodHistory.length,
+      journalCount: state.entries.length,
+      voiceCount: state.voiceNotes.length,
+      circleCount: state.circlePosts.length,
+      comfortCount: state.comfortSessions.length,
+      crewCount: state.crewCheckIns.length,
+      streakDays,
+    });
+  }, [
+    state.isLoading,
+    state.userSide,
+    state.moodHistory.length,
+    state.entries.length,
+    state.voiceNotes.length,
+    state.circlePosts.length,
+    state.comfortSessions.length,
+    state.crewCheckIns.length,
+    streakDays,
+  ]);
+
+  function selectMood(mood: string) {
+    const timestamp = nowLabel();
+    const entry: MoodEntry = { id: Date.now(), mood, ...timestamp };
+    state.setMood(mood);
+    state.setMoodHistory(current => [entry, ...current]);
+    void withSyncWrap(async () => syncMood(entry));
   }
 
   function saveEntry() {
-    if (!journalText.trim()) return;
-    s.setEntries((e: JournalEntry[]) => [
-      { id: Date.now(), text: journalText, mood: s.mood, date: new Date().toLocaleDateString(), time: new Date().toLocaleTimeString() },
-      ...e,
-    ]);
+    const text = journalText.trim();
+    if (!text) return;
+
+    const entry: JournalEntry = {
+      id: Date.now(),
+      text,
+      mood: state.mood,
+      ...nowLabel(),
+      source: 'me',
+      activeTab: 'me',
+      entryMode: 'typed',
+    };
+
+    state.setEntries(current => [entry, ...current]);
     setJournalText('');
+    void withSyncWrap(() => upsertJournalEntry(entry, 'teen'));
   }
 
-  /**
-   * Merge a partial update into an existing JournalEntry by id.
-   * Used by onSekretReply to persist Worker replies without replacing the entry.
-   */
   function patchJournalEntry(id: number, patch: Partial<JournalEntry>) {
-    s.setEntries((prev: JournalEntry[]) =>
-      prev.map(entry => entry.id === id ? { ...entry, ...patch } : entry)
-    );
+    state.setEntries(current => {
+      const next = current.map(entry => entry.id === id ? { ...entry, ...patch } : entry);
+      const patched = next.find(entry => entry.id === id);
+      if (patched) void withSyncWrap(() => upsertJournalEntry(patched, 'teen'));
+      return next;
+    });
   }
 
-  // ── Parent actions ───────────────────────────────────────────────
-  function saveParentPageEntry() {
-    if (!s.parentPagesDraft.trim()) return;
-    s.setParentPagesEntries((e: JournalEntry[]) => [
-      { id: Date.now(), text: s.parentPagesDraft, mood: s.parentMood, date: new Date().toLocaleDateString(), time: new Date().toLocaleTimeString() },
-      ...e,
-    ]);
-    s.setParentPagesDraft('');
+  function saveParentPageEntry(input: SavePageInput) {
+    if (!input.text.trim() && !input.imageUri) return;
+
+    const entry: JournalEntry = {
+      id: Date.now(),
+      text: input.text.trim(),
+      mood: state.parentMood || 'Calm',
+      ...nowLabel(),
+      source: input.source,
+      activeTab: input.source,
+      entryMode: input.entryMode,
+      moodTag: input.moodTag,
+      locked: input.locked,
+      imageUri: input.imageUri,
+    };
+
+    state.setParentPagesEntries(current => [entry, ...current]);
+    state.setParentPagesDraft('');
+    void withSyncWrap(() => upsertJournalEntry(entry, 'parent'));
   }
 
   function saveParentCirclePost() {
-    if (!s.parentCirclePostText.trim()) return;
-    s.setParentCirclePosts((posts: ParentCirclePost[]) => [
-      { id: Date.now(), text: s.parentCirclePostText, date: new Date().toLocaleDateString(), time: new Date().toLocaleTimeString(), reactions: { felt: 0, support: 0, relate: 0 } },
-      ...posts,
-    ]);
-    s.setParentCirclePostText('');
+    const text = state.parentCirclePostText.trim();
+    if (!text) return;
+
+    const post: ParentCirclePost = {
+      id: Date.now(),
+      text,
+      ...nowLabel(),
+      reactions: {
+        beenThere: 0,
+        solidarity: 0,
+        reminder: 0,
+        needed: 0,
+        strength: 0,
+      },
+    };
+
+    state.setParentCirclePosts(current => [post, ...current]);
+    state.setParentCirclePostText('');
+    void withSyncWrap(async () => syncParentCirclePost(post));
   }
 
   function reactToParentPost(postId: number, reaction: string) {
-    s.setParentCirclePosts((posts: ParentCirclePost[]) =>
-      posts.map(p => p.id === postId
-        ? { ...p, reactions: { ...p.reactions, [reaction]: ((p.reactions as Record<string, number>)[reaction] ?? 0) + 1 } }
-        : p
-      )
-    );
+    state.setParentCirclePosts(current => {
+      const next = current.map(post => post.id === postId
+        ? {
+            ...post,
+            reactions: {
+              ...(post.reactions ?? {}),
+              [reaction]: (post.reactions?.[reaction] ?? 0) + 1,
+            },
+          }
+        : post);
+      const patched = next.find(post => post.id === postId);
+      if (patched) void withSyncWrap(async () => syncParentCirclePost(patched));
+      return next;
+    });
+  }
+
+  function completeTeenOracleSession(profile: OracleProfile, session: OracleSessionSummary) {
+    state.setOracleProfile(profile);
+    state.setOracleSessions(current => [session, ...current].slice(0, 50));
+    void syncOracleDiscovery(profile, session);
   }
 
   function completeParentOracleSession(profile: OracleProfile, session: OracleSessionSummary) {
-    s.setParentOracleSessions((sessions: OracleSessionSummary[]) => [session, ...sessions].slice(0, 50));
-    s.setParentOracleProfile(profile);
+    state.setParentOracleProfile(profile);
+    state.setParentOracleSessions(current => [session, ...current].slice(0, 50));
+    void syncOracleDiscovery(profile, session);
+  }
+
+  function updateRoomMemory(patch: Partial<RoomMemory>) {
+    state.setRoomMemory(current => {
+      const isVisit = Boolean(patch.lastVisit) && !patch.lastHotspot && !patch.lastSummon;
+      const next: RoomMemory = {
+        ...current,
+        ...patch,
+        visitCount: isVisit ? current.visitCount + 1 : current.visitCount,
+      };
+      void withSyncWrap(() => syncRoomMemory(next));
+      return next;
+    });
+  }
+
+  function resetApp() {
+    state.resetAllState();
+    setJournalText('');
+    setNotificationsEnabled(false);
+    setTeenGender(null);
+    consentService.reset();
   }
 
   const value: AppContextValue = {
-    theme: s.theme,
-    setTheme: s.setTheme,
-    userSide: s.userSide,
-    setUserSide: s.setUserSide,
-    selectedSekret: s.selectedSekret,
-    setSelectedSekret: s.setSelectedSekret,
-    mood: s.mood,
-    setMood: s.setMood,
+    theme: state.theme,
+    setTheme: state.setTheme,
+    userSide: state.userSide,
+    setUserSide: state.setUserSide,
+    selectedSekret: state.selectedSekret,
+    setSelectedSekret: state.setSelectedSekret,
+    sekretMode: state.sekretMode,
+    setSekretMode: state.setSekretMode,
+    mood: state.mood,
+    setMood: state.setMood,
     selectMood,
-    moodHistory: s.moodHistory,
+    moodHistory: state.moodHistory,
     journalText,
     setJournalText,
-    entries: s.entries,
-    setEntries: s.setEntries,
+    entries: state.entries,
+    setEntries: state.setEntries,
     saveEntry,
     patchJournalEntry,
-    voiceNotes,
-    setVoiceNotes,
-    circlePosts,
-    setCirclePosts,
+    voiceNotes: state.voiceNotes,
+    setVoiceNotes: state.setVoiceNotes,
+    circlePosts: state.circlePosts,
+    setCirclePosts: state.setCirclePosts,
+    comfortSessions: state.comfortSessions,
+    periodDays: state.periodDays,
+    roomMemory: state.roomMemory,
+    updateRoomMemory,
+    oracleProfile: state.oracleProfile,
+    setOracleProfile: state.setOracleProfile,
+    oracleSessions: state.oracleSessions,
+    setOracleSessions: state.setOracleSessions,
+    completeTeenOracleSession,
     homeMessageIndex,
     breatheAnim,
-    isLoading: s.isLoading,
-    syncStatus: 'idle',
+    isLoading: state.isLoading,
+    syncStatus,
+    withSyncWrap,
     notificationsEnabled,
     setNotificationsEnabled,
-    // parent
-    parentMood: s.parentMood,
-    setParentMood: s.setParentMood,
-    parentMoodDate: s.parentMoodDate,
-    setParentMoodDate: s.setParentMoodDate,
-    parentRoomStyle: s.parentRoomStyle,
-    setParentRoomStyle: s.setParentRoomStyle,
-    parentPagesDraft: s.parentPagesDraft,
-    setParentPagesDraft: s.setParentPagesDraft,
-    parentPagesEntries: s.parentPagesEntries,
-    setParentPagesEntries: s.setParentPagesEntries,
-    parentCirclePosts: s.parentCirclePosts,
-    setParentCirclePosts: s.setParentCirclePosts,
-    parentCirclePostText: s.parentCirclePostText,
-    setParentCirclePostText: s.setParentCirclePostText,
-    parentVoiceNotes: s.parentVoiceNotes,
-    setParentVoiceNotes: s.setParentVoiceNotes,
-    parentOracleProfile: s.parentOracleProfile,
-    setParentOracleProfile: s.setParentOracleProfile,
-    parentOracleSessions: s.parentOracleSessions,
-    setParentOracleSessions: s.setParentOracleSessions,
+    parentMood: state.parentMood,
+    setParentMood: state.setParentMood,
+    parentMoodDate: state.parentMoodDate,
+    setParentMoodDate: state.setParentMoodDate,
+    parentRoomStyle: state.parentRoomStyle,
+    setParentRoomStyle: state.setParentRoomStyle,
+    parentPagesDraft: state.parentPagesDraft,
+    setParentPagesDraft: state.setParentPagesDraft,
+    parentPagesEntries: state.parentPagesEntries,
+    setParentPagesEntries: state.setParentPagesEntries,
+    parentCirclePosts: state.parentCirclePosts,
+    setParentCirclePosts: state.setParentCirclePosts,
+    parentCirclePostText: state.parentCirclePostText,
+    setParentCirclePostText: state.setParentCirclePostText,
+    parentVoiceNotes: state.parentVoiceNotes,
+    setParentVoiceNotes: state.setParentVoiceNotes,
+    parentOracleProfile: state.parentOracleProfile,
+    setParentOracleProfile: state.setParentOracleProfile,
+    parentOracleSessions: state.parentOracleSessions,
+    setParentOracleSessions: state.setParentOracleSessions,
+    crewMembers: state.crewMembers,
+    setCrewMembers: state.setCrewMembers,
+    crewCheckIns: state.crewCheckIns,
+    setCrewCheckIns: state.setCrewCheckIns,
+    parentCrewMembers: state.parentCrewMembers,
+    setParentCrewMembers: state.setParentCrewMembers,
+    parentCrewCheckIns: state.parentCrewCheckIns,
+    setParentCrewCheckIns: state.setParentCrewCheckIns,
     saveParentPageEntry,
     saveParentCirclePost,
     reactToParentPost,
     completeParentOracleSession,
+    teenGender,
+    resetApp,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -8,13 +8,19 @@ import {
   type SekretMemory,
 } from '../services/sekretMemory';
 import { extractOracleSignals, loadOracleRecord } from '../services/oracleProfile';
+import {
+  learnTeenRelationshipStyle,
+  loadTeenRelationshipProfile,
+  relationshipProfileToOracleNote,
+  saveTeenRelationshipProfile,
+} from '../services/oracleRelationship';
 import { buildSekretPresence, normalizeSekretPersonality } from '../services/sekretPresence';
 import { COMPANION_CURRICULUM, type CompanionId } from '../src/config/companionCurriculum';
 import type { CompanionActivityInput, CompanionLevel, CompanionState, MemorySummary } from '../types/sekretCompanion';
 
 const PERSONALITY_LABELS = {
-  raylene: 'Raylene',
-  rylane: 'Rylane',
+  suhana: 'Suhana',
+  sy: 'Sy',
   cloud: 'Cloud',
   night: 'Night',
 } as const;
@@ -35,11 +41,11 @@ const EMPTY_LEVEL: CompanionLevel = {
 const DEFAULT_STATE: CompanionState = {
   memorySummary: EMPTY_SUMMARY,
   companionLevel: EMPTY_LEVEL,
-  greeting: COMPANION_CURRICULUM.raylene.greeting,
+  greeting: COMPANION_CURRICULUM.suhana.greeting,
   presenceMessage: 'You do not have to act fine with me.',
   checkIn: null,
   lastUpdated: '',
-  personality: 'Raylene',
+  personality: 'Suhana',
 };
 
 function buildLevel(summary: MemorySummary): CompanionLevel {
@@ -58,19 +64,38 @@ function buildLevel(summary: MemorySummary): CompanionLevel {
   };
 }
 
-function buildGreeting(voice: CompanionId, summary: MemorySummary): string {
+function buildGreeting(voice: CompanionId, summary: MemorySummary, relationshipNote: string): string {
   const familiar = summary.conversations >= 3;
-  if (!familiar) return COMPANION_CURRICULUM[voice].greeting;
+  const dislikesNicknames = relationshipNote.includes('nickname comfort: dislikes');
 
-  if (voice === 'rylane') return 'Aight, you back. Run it back for me—what’s really up?';
+  if (!familiar) {
+    if (dislikesNicknames && voice === 'suhana') return 'Okay. What really happened?';
+    if (dislikesNicknames && voice === 'sy') return 'Run it back. What really happened?';
+    return COMPANION_CURRICULUM[voice].greeting;
+  }
+
+  if (voice === 'sy') return dislikesNicknames
+    ? 'You’re back. What’s really up?'
+    : 'Aight, you back. Run it back for me—what’s really up?';
   if (voice === 'cloud') return 'You’re back. We can keep it small and gentle again.';
   if (voice === 'night') return 'You found me again. Are we reflecting, planning, creating, or resetting tonight?';
-  return 'Girl, you’re back. Tell me the part you keep trying to make sound smaller.';
+  return dislikesNicknames
+    ? 'You’re back. Tell me the part you keep trying to make sound smaller.'
+    : 'Girl, you’re back. Tell me the part you keep trying to make sound smaller.';
+}
+
+function latestRelationshipText(input: CompanionActivityInput): string {
+  if (input.journalText?.trim()) return input.journalText.trim();
+  const latestJournal = input.journalEntries?.[input.journalEntries.length - 1]?.text;
+  if (latestJournal?.trim()) return latestJournal.trim();
+  const latestCircle = input.circlePosts?.[input.circlePosts.length - 1]?.text;
+  return latestCircle?.trim() || '';
 }
 
 function snapshot(
   memory: SekretMemory,
   input: CompanionActivityInput,
+  relationshipNote: string,
   oracleSignals?: { personalityNote?: string; growthEdge?: string },
 ): CompanionState {
   const memorySummary = summarizeSekretMemory(memory);
@@ -78,14 +103,14 @@ function snapshot(
   const personality = PERSONALITY_LABELS[voice];
   const curriculum = COMPANION_CURRICULUM[voice];
   const curriculumSignal = {
-    personalityNote: [oracleSignals?.personalityNote, curriculum.coreIdentity].filter(Boolean).join(' '),
+    personalityNote: [oracleSignals?.personalityNote, curriculum.coreIdentity, relationshipNote].filter(Boolean).join(' '),
     growthEdge: [oracleSignals?.growthEdge, curriculum.hiddenTeachingGoals.slice(0, 3).join(', ')].filter(Boolean).join(' | '),
   };
 
   return {
     memorySummary,
     companionLevel: buildLevel(memorySummary),
-    greeting: buildGreeting(voice, memorySummary),
+    greeting: buildGreeting(voice, memorySummary, relationshipNote),
     presenceMessage: buildSekretPresence(memorySummary, personality, input.screen, curriculumSignal),
     checkIn: buildSekretCheckIn(memorySummary, personality, input.mood, input.isLateNight, input, memory),
     lastUpdated: memory.lastUpdated,
@@ -101,13 +126,24 @@ export function useSekretCompanion(input: CompanionActivityInput) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [loaded, oracleRecord] = await Promise.all([
+      const [loaded, oracleRecord, relationshipProfile] = await Promise.all([
         loadSekretMemory(),
         loadOracleRecord('teen'),
+        loadTeenRelationshipProfile(),
       ]);
+
+      const relationshipText = latestRelationshipText(input);
+      const learnedRelationship = relationshipText
+        ? learnTeenRelationshipStyle(relationshipText, relationshipProfile)
+        : relationshipProfile;
+
+      if (relationshipText) await saveTeenRelationshipProfile(learnedRelationship);
+
+      const relationshipNote = relationshipProfileToOracleNote(learnedRelationship);
       const oracleSignals = extractOracleSignals(oracleRecord);
       const updated = await updateSekretMemory(input, loaded);
-      const nextState = snapshot(updated, input, oracleSignals);
+      const nextState = snapshot(updated, input, relationshipNote, oracleSignals);
+
       if (nextState.checkIn) {
         updated.lastCheckIn = new Date().toISOString();
         await saveSekretMemory(updated);

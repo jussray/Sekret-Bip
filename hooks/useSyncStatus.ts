@@ -26,7 +26,7 @@
  */
 
 import { useCallback, useState } from 'react';
-import { getSupabase } from '../utils/supabase';
+import { getSupabase } from '@/utils/supabase';
 import type { SyncStatus } from '../components/SyncBadge';
 
 export function useSyncStatus() {

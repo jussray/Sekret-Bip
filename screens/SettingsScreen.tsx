@@ -2,15 +2,17 @@
 // Se'kret Bip — Vibe Lab
 // Choosing the emotional atmosphere of your room.
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
-  Text, TouchableOpacity, ScrollView, ImageBackground,
-  View, Image, StyleSheet, Platform, Dimensions, Alert,
+  Text, TextInput, TouchableOpacity, ScrollView, ImageBackground,
+  View, Image, StyleSheet, Platform, Dimensions, Alert, Clipboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IMAGES } from '../constants/theme';
 import type { SleepWindow } from '../hooks/useSleepGuard';
+import { createParentLink, redeemParentLink } from '@/utils/sync';
+import { reportProblem } from '@/services/userReports';
 
 const { width: W } = Dimensions.get('window');
 
@@ -21,12 +23,12 @@ const VIBE_CONFIG: Record<string, {
   previewBg: any; glow: string; gtop: string; gbot: string;
 }> = {
   raylene: {
-    name: "Raylene's Room",  tagline: 'lavender · fairy lights · cozy bedroom',
+    name: "Suhana's Room",  tagline: 'lavender · fairy lights · cozy bedroom',
     emoji: '💜', previewBg: IMAGES.bgRayleneRoomEvening,
     glow: '#e879f9', gtop: 'rgba(80,0,80,0.55)',  gbot: 'rgba(20,0,45,0.90)',
   },
   rylane: {
-    name: "Rylane's Space",  tagline: 'midnight blue · city lights · chill night',
+    name: "Sy's Space",  tagline: 'midnight blue · city lights · chill night',
     emoji: '⚡', previewBg: IMAGES.bgRylaneRoomNight,
     glow: '#4DA3FF', gtop: 'rgba(0,20,70,0.55)',  gbot: 'rgba(0,8,30,0.90)',
   },
@@ -58,12 +60,12 @@ const SEKRET_PROFILES: Record<string, {
   name: string; emoji: string; title: string; tagline: string; avatar: any; accent: string;
 }> = {
   soft:   {
-    name: 'Raylene', emoji: '💜', title: 'Big Sis',
+    name: 'Suhana', emoji: '💜', title: 'Big Sis',
     tagline: 'warm, protective, emotionally real',
     avatar: IMAGES.rayleneNeutral, accent: '#e879f9',
   },
   rylane: {
-    name: 'Rylane',  emoji: '⚡', title: 'Loyal Bro',
+    name: 'Sy',  emoji: '⚡', title: 'Loyal Bro',
     tagline: 'street smart, down to earth, no cap',
     avatar: IMAGES.rylaneNeutral, accent: '#4DA3FF',
   },
@@ -111,6 +113,53 @@ export function SettingsScreen({
   setScreen, BottomNav,
   sleepWindow, setSleepWindow,
 }: SettingsScreenProps) {
+
+  const [inviteCode,    setInviteCode]    = useState('');
+  const [isGenerating,  setIsGenerating]  = useState(false);
+  const [codeInput,     setCodeInput]     = useState('');
+  const [redeemStatus,  setRedeemStatus]  = useState<'idle' | 'ok' | 'not_found' | 'error'>('idle');
+  const [isRedeeming,   setIsRedeeming]   = useState(false);
+
+  const [reportNote,    setReportNote]    = useState('');
+  const [reportStatus,  setReportStatus]  = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [reportMessage, setReportMessage] = useState('');
+
+  const handleGenerateCode = useCallback(async () => {
+    setIsGenerating(true);
+    const code = await createParentLink();
+    setIsGenerating(false);
+    if (code) setInviteCode(code);
+  }, []);
+
+  const handleCopyCode = useCallback(() => {
+    if (!inviteCode) return;
+    Clipboard.setString(inviteCode);
+    Alert.alert('Copied!', `Share this code with your parent:\n\n${inviteCode}`);
+  }, [inviteCode]);
+
+  const handleRedeemCode = useCallback(async () => {
+    if (!codeInput.trim()) return;
+    setIsRedeeming(true);
+    setRedeemStatus('idle');
+    const result = await redeemParentLink(codeInput.trim());
+    setIsRedeeming(false);
+    setRedeemStatus(result);
+    if (result === 'ok') setCodeInput('');
+  }, [codeInput]);
+
+  const handleSubmitReport = useCallback(async () => {
+    if (!reportNote.trim() || reportStatus === 'sending') return;
+    setReportStatus('sending');
+    const result = await reportProblem(reportNote, 'Settings');
+    if (result.reported) {
+      setReportStatus('sent');
+      setReportMessage(result.message === 'already reported' ? "You've already flagged this — thank you." : 'Thanks — this was sent to the team.');
+      setReportNote('');
+    } else {
+      setReportStatus('error');
+      setReportMessage(result.message || 'Something went wrong — try again in a moment.');
+    }
+  }, [reportNote, reportStatus]);
 
   const handleClearLocalData = () => {
     Alert.alert(
@@ -405,6 +454,106 @@ export function SettingsScreen({
           </TouchableOpacity>
         </View>
 
+        {/* ── REPORT A PROBLEM ── */}
+        <Text style={styles.sectionLabel}>Report a Problem</Text>
+        <View style={glass({ gap: 10 })}>
+          <Text style={styles.privacyText}>
+            Something feel broken or off? Tell us what happened — it goes straight to the team, private and just from you.
+          </Text>
+          <TextInput
+            style={[styles.noteInput, { borderColor: glow + '66', color: '#fff' }]}
+            placeholder="what happened?"
+            placeholderTextColor="#7c6899"
+            multiline
+            numberOfLines={3}
+            maxLength={240}
+            value={reportNote}
+            onChangeText={v => { setReportNote(v); if (reportStatus !== 'sending') setReportStatus('idle'); }}
+          />
+          {reportStatus === 'sent' && (
+            <Text style={[styles.privacyText, { color: '#34d399' }]}>✓ {reportMessage}</Text>
+          )}
+          {reportStatus === 'error' && (
+            <Text style={[styles.privacyText, { color: '#f87171' }]}>{reportMessage}</Text>
+          )}
+          <TouchableOpacity
+            onPress={handleSubmitReport}
+            disabled={reportStatus === 'sending' || !reportNote.trim()}
+            style={[styles.sideBtn, { borderColor: glow + '88', backgroundColor: glow + '20', opacity: reportNote.trim() ? 1 : 0.5 }]}
+          >
+            <Text style={[styles.sideBtnLabel, { color: glow }]}>
+              {reportStatus === 'sending' ? 'sending…' : '📨 send report'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── PARENT LINK (teen side) ── */}
+        {userSide === 'teen' && (
+          <>
+            <Text style={styles.sectionLabel}>Connect to a Parent</Text>
+            <View style={glass({ gap: 12 })}>
+              <Text style={styles.privacyText}>
+                Generate a 6-letter code and share it with your parent. They enter it on their side to create a private link.
+              </Text>
+              {inviteCode ? (
+                <TouchableOpacity onPress={handleCopyCode} style={[styles.codeBox, { borderColor: glow + '88' }]}>
+                  <Text style={[styles.codeText, { color: glow }]}>{inviteCode}</Text>
+                  <Text style={[styles.codeCopyHint, { color: glow + 'bb' }]}>tap to copy</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  onPress={handleGenerateCode}
+                  disabled={isGenerating}
+                  style={[styles.sideBtn, { borderColor: glow + '88', backgroundColor: glow + '20' }]}
+                >
+                  <Text style={[styles.sideBtnLabel, { color: glow }]}>
+                    {isGenerating ? 'generating…' : '🔗 generate code'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        )}
+
+        {/* ── PARENT LINK (parent side) ── */}
+        {userSide === 'parent' && (
+          <>
+            <Text style={styles.sectionLabel}>Connect to Your Teen</Text>
+            <View style={glass({ gap: 12 })}>
+              <Text style={styles.privacyText}>
+                Ask your teen to generate a code in their settings, then enter it here to create a private link.
+              </Text>
+              <TextInput
+                style={[styles.codeInput, { borderColor: glow + '66', color: '#fff' }]}
+                placeholder="enter 6-letter code"
+                placeholderTextColor="#7c6899"
+                autoCapitalize="characters"
+                maxLength={6}
+                value={codeInput}
+                onChangeText={v => { setCodeInput(v); setRedeemStatus('idle'); }}
+              />
+              {redeemStatus === 'ok' && (
+                <Text style={[styles.privacyText, { color: '#34d399' }]}>✓ Linked! You're now connected.</Text>
+              )}
+              {redeemStatus === 'not_found' && (
+                <Text style={[styles.privacyText, { color: '#f87171' }]}>Code not found or already used — check with your teen.</Text>
+              )}
+              {redeemStatus === 'error' && (
+                <Text style={[styles.privacyText, { color: '#f87171' }]}>Something went wrong — try again in a moment.</Text>
+              )}
+              <TouchableOpacity
+                onPress={handleRedeemCode}
+                disabled={isRedeeming || !codeInput.trim()}
+                style={[styles.sideBtn, { borderColor: glow + '88', backgroundColor: glow + '20', opacity: codeInput.trim() ? 1 : 0.5 }]}
+              >
+                <Text style={[styles.sideBtnLabel, { color: glow }]}>
+                  {isRedeeming ? 'linking…' : '🔗 link to teen'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
         {/* ── DONE ── */}
         <TouchableOpacity
           style={[
@@ -480,6 +629,13 @@ const styles = StyleSheet.create({
   sideBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 13, borderRadius: 18, borderWidth: 1 },
   sideBtnIcon: { fontSize: 18 },
   sideBtnLabel:{ fontSize: 13, fontWeight: '700' },
+
+  // Parent link
+  codeBox:      { alignItems: 'center', paddingVertical: 16, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed' },
+  codeText:     { fontSize: 32, fontWeight: '900', letterSpacing: 6 },
+  codeCopyHint: { fontSize: 11, marginTop: 4, fontWeight: '600' },
+  codeInput:    { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 20, fontWeight: '700', letterSpacing: 4, textAlign: 'center', backgroundColor: 'rgba(20,10,40,0.5)' },
+  noteInput:    { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, lineHeight: 19, textAlign: 'left', textAlignVertical: 'top', minHeight: 72, backgroundColor: 'rgba(20,10,40,0.5)' },
 
   // Done
   doneBtn:     { marginTop: 8, marginBottom: 4, paddingVertical: 16, borderRadius: 24, borderWidth: 1.5, alignItems: 'center', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 6 },

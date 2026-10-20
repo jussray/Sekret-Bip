@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0.0",
+  "repository": "jussray/Sekret-Bip",
+  "role": "privacy-first teen and family Expo product",
+  "figmaMode": "mobile_and_responsive_web_product",
+  "runtime": ["Expo Router", "React Native", "TypeScript", "Expo web", "Supabase", "Cloudflare Workers"],
+  "designTargets": ["teen screens", "parent screens", "onboarding", "settings", "Parent Bridge", "companion and room states", "founder preview"],
+  "implementationTargets": ["app/**/*.tsx", "src/components/**/*.tsx", "src/services/**/*.ts", "shared TypeScript types"],
+  "requiredSkills": ["figma-use", "figma-generate-library"],
+  "conditionalSkills": ["figma-generate-design", "figma-code-connect", "product-design-design-qa"],
+  "prohibitedData": ["real teen data", "real parent data", "journal content", "voice transcripts", "private messages", "safety signals", "identifiers", "tokens", "service keys"],
+  "codeConnectPolicy": "published_components_and_node_specific_urls_only",
+  "verification": ["repository contract tests", "TypeScript", "Expo web/build checks", "Playwright for web", "Maestro or controlled device proof for native-critical flows"],
+  "truthBoundary": "Figma is an editable specification, not runtime, consent, auth, RLS, migration, or deployment proof."
+}

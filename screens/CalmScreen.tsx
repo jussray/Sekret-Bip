@@ -17,8 +17,10 @@
 // Previous fixes preserved: A1/A2/A3, B1/B2/B3/B4/B5, C1/C2/C3, D1/D2
 
 import React, { useState, useEffect, useRef } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
-import { IMAGES, getRoomBg, type TimeOfDay } from '../constants/theme';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { IMAGES, getRoomBg, normalizeCharacterKey, type TimeOfDay } from '../constants/theme';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import { MOOD_GLOW } from '../constants/moodGlow';
 import {
@@ -51,16 +53,23 @@ const TIME_BADGE: Record<TimeOfDay, string> = {
   night:   '🌙 night',
 };
 
+const CALM_COMPANION_META = {
+  raylene: { label: 'Suhana', emoji: '💜' },
+  rylane: { label: 'Sy', emoji: '⚡' },
+  cloud: { label: 'Cloud', emoji: '☁️' },
+  night: { label: 'Night', emoji: '🌙' },
+} as const;
+
 // ── Constants ──────────────────────────────────────────────────────────────
 const COMFORT_MESSAGES = [
-  { emoji: '🌙', text: 'You’ve survived every hard day so far. That matters.' },
+  { emoji: '🌙', text: "You've survived every hard day so far. That matters." },
   { emoji: '☁️', text: 'Rest is productive too. You are allowed to pause.' },
-  { emoji: '💙', text: 'Someone is glad you’re still here tonight.' },
+  { emoji: '💙', text: "Someone is glad you're still here tonight." },
   { emoji: '🌧️', text: 'Bad moments are real. So is your strength.' },
-  { emoji: '✨', text: 'You don’t need to be perfect to be loved.' },
+  { emoji: '✨', text: "You don't need to be perfect to be loved." },
   { emoji: '🫶', text: 'Your feelings are allowed here.' },
   { emoji: '🕯️', text: 'Soft moment. Slow breath. Stay with me.' },
-  { emoji: '💜', text: 'Rest is productive, too. You don’t have to earn peace. I’m proud of you for choosing you tonight.' },
+  { emoji: '💜', text: "Rest is productive, too. You don't have to earn peace. I'm proud of you for choosing you tonight." },
 ];
 
 const MOOD_CHIPS = [
@@ -75,22 +84,15 @@ const MOOD_CHIPS = [
 const CALM_TOOLS = [
   { emoji: '💜', label: 'Breathe\nwith me', sub: '1–5 min',         action: 'breathe' },
   { emoji: '🌿', label: 'Ground\nYourself',  sub: '3–7 min',         action: 'mindReset' },
+  { emoji: '☁️', label: 'Cloud\nThoughts',  sub: 'say what\'s heavy',    action: 'cloud' },
   { emoji: '📝', label: 'Release\nIt Out',   sub: 'write + let go',       action: 'pages' },
-  { emoji: '🌙', label: 'Sleep\nBetter',     sub: 'stories + sounds',     action: null },
+  { emoji: '🌙', label: 'Sleep\nBetter',     sub: 'stories + sounds',     action: 'breathe' },
   { emoji: '🚨', label: 'SOS\nCalm Now',     sub: '30 sec reset',         action: 'comfort' },
-];
-
-const CALM_PICKS = [
-  { emoji: '🌧️', label: 'late night\nrain',   duration: '20 min' },
-  { emoji: '🌊', label: 'deep sleep\nwaves',   duration: '30 min' },
-  { emoji: '🎹', label: 'soft piano\n+ heart', duration: '25 min' },
-  { emoji: '📖', label: 'bedtime\nstory',      duration: '15 min' },
-  { emoji: '✨', label: 'healing\nfrequency',  duration: '20 min' },
 ];
 
 const DEFAULT_PLAN = [
   { id: 1, label: 'Breathe for 2 minutes',      time: '7:30 PM', done: false },
-  { id: 2, label: 'Write down what’s heavy', time: '7:40 PM', done: false },
+  { id: 2, label: "Write down what's heavy", time: '7:40 PM', done: false },
   { id: 3, label: 'Listen to a comfort sound',  time: '',        done: false },
   { id: 4, label: 'Affirm something kind',      time: '',        done: false },
 ];
@@ -122,11 +124,14 @@ interface CalmScreenProps {
   setScreen:       (screen: string) => void;
   BottomNav:       React.ReactNode;
   selectedSekret?: string;
+  onOpenBreathe?:  () => void;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────
+const PLAN_KEY = '@bip/calm_plan';
+
 export function CalmScreen({
-  t, mood, setMood, setScreen, BottomNav, selectedSekret = 'raylene',
+  t, mood, setMood, setScreen, BottomNav, selectedSekret = 'raylene', onOpenBreathe,
 }: CalmScreenProps) {
 
   const breatheAnim = useRef(new Animated.Value(1)).current;
@@ -135,6 +140,7 @@ export function CalmScreen({
   const [showBreathe, setShowBreathe] = useState(false);
   const [breatheStep, setBreatheStep] = useState(0);
   const [breatheRunning, setBreatheRunning] = useState(false);
+  const reduceMotion = useReducedMotion();
 
   const scrollRef = useRef<ScrollView>(null);
   const moodRowY  = useRef(0);
@@ -142,10 +148,10 @@ export function CalmScreen({
   // Character / time / mood ─────────────────────────────────────────────────
   const hour       = new Date().getHours();
   const timeOfDay  = getTimeOfDay(hour);
-  const isRylane   = selectedSekret === 'rylane';
-  const character  = isRylane ? 'rylane' : 'raylene';
-  const charLabel  = isRylane ? 'rylane' : 'raylene';
-  const charEmoji  = isRylane ? '⚡' : '💜';
+  const character  = normalizeCharacterKey(selectedSekret);
+  const isRylane   = character === 'rylane';
+  const charLabel  = CALM_COMPANION_META[character].label;
+  const charEmoji  = CALM_COMPANION_META[character].emoji;
   const heroArt    = getRoomBg(character, timeOfDay);
   const moodKey    = mood?.toLowerCase?.() ?? mood;
   const moodGlow   = MOOD_GLOW[moodKey] ?? MOOD_GLOW[mood] ?? MOOD_GLOW.Neutral;
@@ -157,6 +163,10 @@ export function CalmScreen({
 
   // Animations ──────────────────────────────────────────────────────────────
   useEffect(() => {
+    breatheAnim.stopAnimation();
+    breatheAnim.setValue(1);
+    if (reduceMotion) return undefined;
+
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(breatheAnim, { toValue: 1.18, duration: 4000, useNativeDriver: true }),
@@ -165,7 +175,7 @@ export function CalmScreen({
     );
     loop.start();
     return () => loop.stop();
-  }, [breatheAnim]);
+  }, [breatheAnim, reduceMotion]);
 
   // Box breathing step ticker
   useEffect(() => {
@@ -176,17 +186,36 @@ export function CalmScreen({
     return () => clearInterval(timer);
   }, [breatheRunning]);
 
+  // Persist Calm Plan to AsyncStorage
+  useEffect(() => {
+    AsyncStorage.getItem(PLAN_KEY).then(saved => {
+      if (saved) setPlan(JSON.parse(saved));
+    }).catch(() => {});
+  }, []);
+  useEffect(() => {
+    AsyncStorage.setItem(PLAN_KEY, JSON.stringify(plan)).catch(() => {});
+  }, [plan]);
+
   // Companion presence breath
   const pillBreath = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.loop(
+    pillBreath.stopAnimation();
+    pillBreath.setValue(0);
+    if (reduceMotion) return undefined;
+
+    const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pillBreath, { toValue: 1, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
         Animated.timing(pillBreath, { toValue: 0, duration: 1800, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
       ])
-    ).start();
-  }, []);
-  const pillStyle = {
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [pillBreath, reduceMotion]);
+  const pillStyle = reduceMotion ? {
+    opacity: 1,
+    transform: [{ scale: 1 }],
+  } : {
     opacity: pillBreath.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] }),
     transform: [{ scale: pillBreath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.03] }) }],
   };
@@ -194,14 +223,25 @@ export function CalmScreen({
   // Staggered card entrance
   const cards = useRef([0, 0, 0, 0].map(() => new Animated.Value(0))).current;
   useEffect(() => {
-    Animated.stagger(140, cards.map(v =>
+    cards.forEach(value => {
+      value.stopAnimation();
+      value.setValue(reduceMotion ? 1 : 0);
+    });
+    if (reduceMotion) return undefined;
+
+    const entrance = Animated.stagger(140, cards.map(v =>
       Animated.timing(v, { toValue: 1, duration: 380, easing: Easing.out(Easing.cubic), useNativeDriver: true })
-    )).start();
-  }, []);
-  const cardAnim = (i: number) => ({
+    ));
+    entrance.start();
+    return () => entrance.stop();
+  }, [cards, reduceMotion]);
+  const cardAnim = (i: number) => reduceMotion ? {
+    opacity: 1,
+    transform: [{ translateY: 0 }],
+  } : {
     opacity: cards[i],
     transform: [{ translateY: cards[i].interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
-  });
+  };
 
   const togglePlanItem = (id: number) => {
     setPlan(prev => prev.map(item => item.id === id ? { ...item, done: !item.done } : item));
@@ -253,7 +293,11 @@ export function CalmScreen({
 
         <Text style={[styles.sectionTitle, { color: '#fff' }]}>More Breathing Exercises</Text>
         {MORE_BREATHING.map(item => (
-          <View key={item.label} style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}>
+          <TouchableOpacity
+            key={item.label}
+            style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}
+            onPress={() => onOpenBreathe ? onOpenBreathe() : Alert.alert('Breathing exercises', 'Open the full breathing screen to choose this exercise.')}
+          >
             <Image source={CLOUD_HEADPHONES} style={styles.listRowIcon} resizeMode="contain" />
             <View style={{ flex: 1 }}>
               <Text style={[styles.listRowTitle, { color: '#fff' }]}>{item.label}</Text>
@@ -261,13 +305,17 @@ export function CalmScreen({
             </View>
             <Text style={[styles.listRowDur, { color: t.soft }]}>{item.duration}</Text>
             <Text style={{ color: t.soft }}>›</Text>
-          </View>
+          </TouchableOpacity>
         ))}
 
         <Text style={[styles.sectionTitle, { color: '#fff' }]}>Calm Playlist ✦</Text>
         <Text style={[styles.sectionSub, { color: t.soft }]}>music + sounds to relax</Text>
         {CALM_PLAYLIST.map(item => (
-          <View key={item.label} style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}>
+          <TouchableOpacity
+            key={item.label}
+            style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}
+            onPress={() => onOpenBreathe ? onOpenBreathe() : Alert.alert('Audio library', 'Open the full breathing screen to use available calm tools.')}
+          >
             <Text style={styles.playlistEmoji}>{item.emoji}</Text>
             <View style={{ flex: 1 }}>
               <Text style={[styles.listRowTitle, { color: '#fff' }]}>{item.label}</Text>
@@ -275,7 +323,7 @@ export function CalmScreen({
             </View>
             <Text style={[styles.listRowDur, { color: t.soft }]}>{item.duration}</Text>
             <Text style={{ color: t.soft }}>›</Text>
-          </View>
+          </TouchableOpacity>
         ))}
 
         <View style={[styles.reminderCard, { backgroundColor: t.card, borderColor: t.accent }]}>
@@ -283,7 +331,7 @@ export function CalmScreen({
           <Text style={[styles.reminderSub, { color: t.soft }]}>set a gentle reminder to breathe</Text>
           <TouchableOpacity
             style={[styles.addReminderBtn, { borderColor: t.accent }]}
-            onPress={() => Alert.alert('Breathe Reminder', 'Reminder set. You’ll get a gentle nudge to breathe. 💜')}
+            onPress={() => onOpenBreathe ? onOpenBreathe() : Alert.alert('Breathe Reminder', 'Open the full breathing screen to schedule a reminder.')}
           >
             <Text style={[styles.addReminderText, { color: t.soft }]}>+ Add Reminder</Text>
           </TouchableOpacity>
@@ -334,15 +382,15 @@ export function CalmScreen({
           </View>
 
           {/* Companion presence pill */}
-          <Animated.View style={[styles.presencePill, pillStyle]} pointerEvents="none">
+          <Animated.View testID="calm-presence-pill" style={[styles.presencePill, pillStyle]} pointerEvents="none">
             <Text style={styles.presenceText}>
-              {charLabel}’s here · weighted blanket mode
+              {charLabel}'s here · weighted blanket mode
             </Text>
           </Animated.View>
 
           <View style={styles.heroOverlay} pointerEvents="none">
             <Text style={[styles.heroTitle, { color: '#fff', textShadowColor: moodGlow + '99' }]}>
-              Se’kret Calm 💜
+              Se'kret Calm 💜
             </Text>
             <Text style={[styles.heroLines, { color: t.soft }]}>
               your calm.{'\n'}your reset.{'\n'}your safe place.
@@ -351,7 +399,7 @@ export function CalmScreen({
         </View>
 
         {/* Personalized greeting + check-in button */}
-        <Animated.View style={[styles.greetRow, { backgroundColor: t.card, shadowColor: moodGlow }, cardAnim(0)]}>
+        <Animated.View testID="calm-greeting-card" style={[styles.greetRow, { backgroundColor: t.card, shadowColor: moodGlow }, cardAnim(0)]}>
           <View style={{ flex: 1 }}>
             <Text style={[styles.greetTitle, { color: '#fff' }]}>{greetCopy.title}</Text>
             <Text style={[styles.greetSub, { color: t.soft }]}>{greetCopy.sub}</Text>
@@ -404,7 +452,10 @@ export function CalmScreen({
                 key={tool.label}
                 style={[styles.toolCard, { backgroundColor: t.card, borderColor: t.accent }]}
                 onPress={() => {
-                  if (tool.action === 'breathe') { setShowBreathe(true); return; }
+                  if (tool.action === 'breathe') {
+                    if (onOpenBreathe) { onOpenBreathe(); return; }
+                    setShowBreathe(true); return;
+                  }
                   if (tool.action) setScreen(tool.action);
                 }}
               >
@@ -419,9 +470,9 @@ export function CalmScreen({
         {/* Today's Calm Plan */}
         <Animated.View style={cardAnim(3)}>
           <View style={styles.toolsHeader}>
-            <Text style={[styles.sectionTitle, { color: t.accent }]}>Today’s Calm Plan 💜</Text>
-            <TouchableOpacity>
-              <Text style={[styles.seeAll, { color: t.soft }]}>edit plan ✏️</Text>
+            <Text style={[styles.sectionTitle, { color: t.accent }]}>Today's Calm Plan 💜</Text>
+            <TouchableOpacity onPress={() => setPlan(DEFAULT_PLAN.map(item => ({ ...item, done: false })))}>
+              <Text style={[styles.seeAll, { color: t.soft }]}>reset plan ↺</Text>
             </TouchableOpacity>
           </View>
           <Text style={[styles.sectionSub, { color: t.soft }]}>small steps. big difference.</Text>
@@ -449,8 +500,8 @@ export function CalmScreen({
         </Animated.View>
 
         {/* ── Breathing circle teaser ── */}
-        <TouchableOpacity style={styles.circleWrap} onPress={() => setShowBreathe(true)}>
-          <Animated.View style={[
+        <TouchableOpacity style={styles.circleWrap} onPress={() => onOpenBreathe ? onOpenBreathe() : setShowBreathe(true)}>
+          <Animated.View testID="calm-breathe-pulse" style={[
             styles.circle,
             {
               transform: [{ scale: breatheAnim }],
@@ -466,26 +517,6 @@ export function CalmScreen({
           </Animated.View>
           <Text style={[styles.circleHint, { color: t.soft }]}>tap to open breathing</Text>
         </TouchableOpacity>
-
-        {/* Calm Picks */}
-        <View style={styles.toolsHeader}>
-          <Text style={[styles.sectionTitle, { color: t.accent }]}>Calm Picks for You ✦</Text>
-          <TouchableOpacity>
-            <Text style={[styles.seeAll, { color: t.soft }]}>see all</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={[styles.sectionSub, { color: t.soft }]}>we picked these just for your vibe</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.picksScroll}>
-          {CALM_PICKS.map(pick => (
-            <View key={pick.label} style={[styles.pickCard, { backgroundColor: t.card, borderColor: t.accent }]}>
-              <View style={styles.pickPlayCircle}>
-                <Text style={styles.pickPlayIcon}>▶</Text>
-              </View>
-              <Text style={[styles.pickLabel, { color: '#fff' }]}>{pick.label}</Text>
-              <Text style={[styles.pickDur, { color: t.soft }]}>{pick.duration}</Text>
-            </View>
-          ))}
-        </ScrollView>
 
         {/* Character says ── */}
         <Text style={[styles.sectionTitle, { color: t.accent }]}>{charLabel} says {charEmoji}</Text>
@@ -592,14 +623,6 @@ const styles = StyleSheet.create({
   circleImg:         { width: 90, height: 90 },
   circleTextSmall:   { color: '#fff', fontSize: 16, marginTop: 6, fontWeight: 'bold' },
   circleHint:        { fontSize: 12, marginTop: 10 },
-
-  // Calm picks
-  picksScroll:       { paddingLeft: 16, marginBottom: 16 },
-  pickCard:          { borderWidth: 1, borderRadius: 18, padding: 12, marginRight: 10, width: 110, alignItems: 'center' },
-  pickPlayCircle:    { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.12)', justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
-  pickPlayIcon:      { color: '#fff', fontSize: 16 },
-  pickLabel:         { fontSize: 11, fontWeight: '700', textAlign: 'center', marginBottom: 3 },
-  pickDur:           { fontSize: 10, textAlign: 'center' },
 
   // Se'kret says
   sekretSaysCard:    {

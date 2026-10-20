@@ -5,6 +5,13 @@
  * Import via: import type { JournalEntry } from '@/types';
  */
 
+export * from './identity';
+export * from './verification';
+export * from './safety';
+export * from './doorbell';
+export * from './notifications';
+export * from './companions';
+
 export interface JournalEntry {
   id: number;
   text: string;
@@ -15,8 +22,11 @@ export interface JournalEntry {
   entryMode?: string;
   moodTag?: string;
   imageUri?: string;
+  mediaType?: 'photo' | 'video';
   sekretReply?: string;
+  sekretAvatarState?: string;
   locked?: boolean;
+  pinned?: boolean;
   activeTab?: string;
 }
 
@@ -88,7 +98,7 @@ export interface ParentProfile {
   setupComplete: boolean;
 }
 
-export type PersonalityId = 'raylene' | 'rylane' | 'cloud' | 'night' | 'oracle';
+export type PersonalityId = 'raylene' | 'rylane' | 'cloud' | 'night' | 'oracle' | 'parentCoach';
 
 export type ScreenKey =
   | 'home'
