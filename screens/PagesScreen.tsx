@@ -13,6 +13,7 @@ import * as ImagePicker from 'expo-image-picker';
 import type { JournalEntry, MoodEntry, VoiceNote } from '../types';
 import { getParentRoomBg } from '../constants/theme';
 import { OracleDiscoveryPanel } from '../components/OracleDiscoveryPanel';
+import { PrivacyLabel } from '../components/PrivacyLabel';
 import { MiniAvatarSticker } from '../components/MiniAvatarSticker';
 import type { MiniAvatarCharacter } from '../components/MiniAvatarSticker';
 import type { OracleProfile, OracleSessionSummary } from '../services/oracleDiscovery';
@@ -437,6 +438,7 @@ function PagesWorkspace({
                 {tabEntries.map(entry => (
                   <View key={String(entry.id)} style={styles.entryCard}>
                     <Text style={styles.entryMeta}>{formatEntryMeta(entry)}</Text>
+                    <PrivacyLabel shared={false} compact />
                     {entry.text ? <Text style={styles.entryText}>{entry.text}</Text> : null}
                     {entry.imageUri
                       ? <Image source={{ uri: entry.imageUri }} style={styles.savedImage as any} />

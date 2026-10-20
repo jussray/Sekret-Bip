@@ -34,7 +34,7 @@ export function AgeGate({ children, onResolved }: Props) {
   }, []);
 
   const choose = async (next: AgeGateStatus) => {
-    try { await AsyncStorage.setItem(AGE_GATE_KEY, next); } catch {}
+    try { await AsyncStorage.setItem(AGE_GATE_KEY, next); } catch { /* persist-fail-safe: in-memory status already set */ }
     setStatus(next);
     onResolved?.(next);
   };

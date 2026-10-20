@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { Analytics } from '../components/Analytics';
 
 // ── Screens ────────────────────────────────────────────────────────────────
@@ -644,7 +644,12 @@ function AppContent() {
   if (screen === 'splash') return <SplashScreen setScreen={setScreen} userSide={userSide} />;
 
   // ── Loading guard ─────────────────────────────────────────────────────────
-  if (isLoading) return null;
+  if (isLoading) return (
+    <View style={styles.loadingRoot}>
+      <ActivityIndicator color="#c4b5fd" />
+      <Text style={styles.loadingText}>just a sec… 💜</Text>
+    </View>
+  );
 
   // Sleep guardrail: block normal wandering during the configured sleep
   // window, but Comfort (and its sub-screens) always stays reachable.
@@ -1070,4 +1075,6 @@ const styles = StyleSheet.create({
   navIcon:       { fontSize: 20, marginBottom: 3 },
   navText:       { color: '#94A3B8', fontSize: 11 },
   activeNavText: { color: '#fff', fontWeight: 'bold' },
+  loadingRoot:   { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#080611' },
+  loadingText:   { color: '#b9afc5', fontSize: 13, marginTop: 14, textAlign: 'center' },
 });

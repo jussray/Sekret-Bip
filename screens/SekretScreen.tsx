@@ -184,6 +184,14 @@ export function SekretScreen({
   const breathOpacity = breath.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1   ] });
 
   // ── Send handler ───────────────────────────────────────────────────────────
+  const OFFLINE_REPLIES: Record<string, string> = {
+    rylane: "That got cut off. Say it again — I'm still here.",
+    raylene: "That got cut off. Say it again — I'm still here.",
+    cloud:  "Something disconnected. No rush — try again when you're ready.",
+    night:  "We got cut off. I'm still here.",
+    soft:   "Something got a little disconnected. I'm not going anywhere — try again. 💜",
+  };
+
   const handleSend = async () => {
     const text = sekretMessage.trim();
     if (!text) return;
@@ -193,9 +201,14 @@ export function SekretScreen({
     setIsSekretTyping(true);
     setSekretReply('');
 
-    const reply = await fetchSekretReply(text, 'chat', mood, selectedProfile, undefined, privateProfile, userSide);
-    setSekretReply(reply);
-    setIsSekretTyping(false);
+    try {
+      const reply = await fetchSekretReply(text, 'chat', mood, selectedProfile, undefined, privateProfile, userSide);
+      setSekretReply(reply || OFFLINE_REPLIES[selectedProfile] ?? OFFLINE_REPLIES.soft);
+    } catch {
+      setSekretReply(OFFLINE_REPLIES[selectedProfile] ?? OFFLINE_REPLIES.soft);
+    } finally {
+      setIsSekretTyping(false);
+    }
   };
 
   // ── Parent side (preserved) ─────────────────────────────────────────────

@@ -227,7 +227,7 @@ export async function loadOracleRecord(mode: OracleMode): Promise<OracleRecord> 
 export async function saveOracleRecord(record: OracleRecord): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEY[record.mode], JSON.stringify(record));
-  } catch {}
+  } catch { /* persist-fail-safe: caller treats void as success; next load returns stale or empty */ }
 }
 
 // ─── Question Selection ───────────────────────────────────────────────────────

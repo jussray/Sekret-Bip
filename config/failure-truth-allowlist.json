@@ -1,0 +1,185 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "path": "app/index.tsx",
+      "contains": "Storage read failure",
+      "classification": "truthful-fallback",
+      "reason": "Bootstrap storage failure falls back to app defaults; user still reaches the app. No success state is set."
+    },
+    {
+      "path": "components/AgeGate.tsx",
+      "contains": "persist-fail-safe: in-memory status already set",
+      "classification": "truthful-fallback",
+      "reason": "AsyncStorage write failure for age-gate key — in-memory state already updated; silent persist failure is safe."
+    },
+    {
+      "path": "hooks/useSleepGuard.ts",
+      "contains": "Malformed",
+      "classification": "truthful-fallback",
+      "reason": "Malformed sleep-window data falls back to no restriction — safe direction (more open, not more closed)."
+    },
+    {
+      "path": "hooks/useSyncStatus.ts",
+      "contains": "setSyncStatus('failed')",
+      "classification": "failure",
+      "reason": "Cloud sync failure is explicitly surfaced as 'failed' status. Local save already happened."
+    },
+    {
+      "path": "screens/BridgeScreen.tsx",
+      "contains": "Local-only fallback",
+      "classification": "truthful-fallback",
+      "reason": "Bridge note send failure — teen sees note as sent (local), but comment explains cloud failed. No false success state."
+    },
+    {
+      "path": "screens/CircleScreen.tsx",
+      "contains": "void 0",
+      "classification": "truthful-fallback",
+      "reason": "Haptics failure is silently swallowed — no user-visible state change, purely optional sensory feedback."
+    },
+    {
+      "path": "screens/ParentBridgeScreen.tsx",
+      "contains": "Could not send",
+      "classification": "failure",
+      "reason": "Send failure shown to user via Alert — honest failure communication."
+    },
+    {
+      "path": "screens/ParentCircleScreen.tsx",
+      "contains": "void 0",
+      "classification": "truthful-fallback",
+      "reason": "Haptics failure is silently swallowed — purely optional sensory feedback."
+    },
+    {
+      "path": "screens/PeriodCalendarScreen.tsx",
+      "contains": "setMarkedDays({})",
+      "classification": "truthful-fallback",
+      "reason": "Calendar data load failure resets to empty map — honest empty state, not a false success."
+    },
+    {
+      "path": "screens/S2TellScreen.tsx",
+      "contains": "Se'kret is listening",
+      "classification": "truthful-fallback",
+      "reason": "AI rewrite failure shows an honest retry prompt — not a success message."
+    },
+    {
+      "path": "screens/S2TellScreen.tsx",
+      "contains": "Storage failure — silent, state still updates for this session",
+      "classification": "truthful-fallback",
+      "reason": "Persistent storage write failure — in-session state is still correct. Comment is explicit about the failure."
+    },
+    {
+      "path": "screens/SekretScreen.tsx",
+      "contains": "OFFLINE_REPLIES[selectedProfile]",
+      "classification": "truthful-fallback",
+      "reason": "AI reply failure surfaces an honest disconnection message to the teen. setIsSekretTyping(false) is in finally, not the catch."
+    },
+    {
+      "path": "screens/SettingsScreen.tsx",
+      "contains": "Couldn't clear it",
+      "classification": "failure",
+      "reason": "Clear-data failure is surfaced as an Alert to the user — honest error communication."
+    },
+    {
+      "path": "screens/VoiceBipScreen.tsx",
+      "contains": "Something got disconnected",
+      "classification": "truthful-fallback",
+      "reason": "Voice bip AI reply failure shows honest disconnection message. Cleanup state (isThinking, markResponseReady) is in finally."
+    },
+    {
+      "path": "services/oracleProfile.ts",
+      "contains": "emptyRecord(mode)",
+      "classification": "truthful-fallback",
+      "reason": "Profile parse failure returns an empty record — honest empty state."
+    },
+    {
+      "path": "services/oracleProfile.ts",
+      "contains": "persist-fail-safe: caller treats void as success",
+      "classification": "truthful-fallback",
+      "reason": "AsyncStorage write failure — caller treats void return as success; next load handles stale/empty gracefully."
+    },
+    {
+      "path": "services/sekretMemory.ts",
+      "contains": "return []",
+      "classification": "truthful-fallback",
+      "reason": "JSON parse failure falls back to empty array — honest empty state, no false content shown."
+    },
+    {
+      "path": "services/sekretMemory.ts",
+      "contains": "Unable to load Sekret memory",
+      "classification": "telemetry-only",
+      "reason": "console.warn logs the error and falls back to normalizeMemory(undefined) — telemetry + honest fallback."
+    },
+    {
+      "path": "services/sekretMemory.ts",
+      "contains": "Unable to save Sekret memory",
+      "classification": "telemetry-only",
+      "reason": "console.warn logs save failure and returns false — caller receives explicit boolean failure result."
+    },
+    {
+      "path": "src/features/control-room/FounderOperatorPanel.tsx",
+      "contains": "setLocalAgentStatus('offline')",
+      "classification": "failure",
+      "reason": "Agent status set to 'offline' on fetch failure — honest failure state."
+    },
+    {
+      "path": "src/features/control-room/FounderOperatorPanel.tsx",
+      "contains": "operator_history_unreadable",
+      "classification": "failure",
+      "reason": "Error state set with explicit failure code — honest failure."
+    },
+    {
+      "path": "src/features/control-room/FounderOperatorPanel.tsx",
+      "contains": "plan_persistence_failed",
+      "classification": "failure",
+      "reason": "Error state set with explicit failure code — honest failure."
+    },
+    {
+      "path": "src/features/control-room/FounderOperatorPanel.tsx",
+      "contains": "operator_plan_failed",
+      "classification": "failure",
+      "reason": "Error state set with explicit failure code — honest failure."
+    },
+    {
+      "path": "src/features/control-room/FounderOperatorPanel.tsx",
+      "contains": "safe_mission_failed",
+      "classification": "failure",
+      "reason": "Error state set with explicit failure code + refreshAgent() recovery — honest failure with recovery attempt."
+    },
+    {
+      "path": "src/features/control-room/GuardianReviewsPanel.tsx",
+      "contains": "Unable to review this guardian account",
+      "classification": "failure",
+      "reason": "Error state surfaced to founder via setError — honest failure message."
+    },
+    {
+      "path": "src/features/control-room/WorkerPanel.tsx",
+      "contains": "error =",
+      "classification": "failure",
+      "reason": "Error captured into local variable for display — honest failure path."
+    },
+    {
+      "path": "src/screens/DevControlRoomWorkspace.tsx",
+      "contains": "setSaved([])",
+      "classification": "truthful-fallback",
+      "reason": "Saved views load failure resets to empty array — honest empty state."
+    },
+    {
+      "path": "src/screens/DevControlRoomWorkspace.tsx",
+      "contains": "persist-fail-safe: memo is optional",
+      "classification": "truthful-fallback",
+      "reason": "OODA memo load failure is silently swallowed — memo is optional UI state, not shown as loaded."
+    },
+    {
+      "path": "worker/sekret-reply.ts",
+      "contains": "Invalid JSON",
+      "classification": "failure",
+      "reason": "Malformed request body returns explicit 400 error response — honest failure to caller."
+    },
+    {
+      "path": "worker/sekret-reply.ts",
+      "contains": "Worker fetch error",
+      "classification": "telemetry-only",
+      "reason": "console.error logs the error; comment explains this is a silent fallback since client handles the response."
+    }
+  ]
+}

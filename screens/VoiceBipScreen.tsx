@@ -296,19 +296,24 @@ export function VoiceBipScreen({
 
     setIsThinking(true);
     presence.endListening();
-    const reply = await fetchSekretReply(
-      'I just recorded a voice bip. I had some feelings I needed to get out.',
-      'journal',
-      mood,
-      avatarKey,
-      undefined,
-      privateProfile,
-      profileSide,
-    );
-    setSekretReply(reply);
-    setIsThinking(false);
-    presence.markResponseReady();
-    setSelectedBipType(null);
+    try {
+      const reply = await fetchSekretReply(
+        'I just recorded a voice bip. I had some feelings I needed to get out.',
+        'journal',
+        mood,
+        avatarKey,
+        undefined,
+        privateProfile,
+        profileSide,
+      );
+      setSekretReply(reply);
+    } catch {
+      setSekretReply("Something got disconnected. Your bip was saved — try again when you're ready. 💜");
+    } finally {
+      setIsThinking(false);
+      presence.markResponseReady();
+      setSelectedBipType(null);
+    }
   };
 
   useEffect(() => {
