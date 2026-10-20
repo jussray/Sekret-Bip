@@ -62,3 +62,54 @@ test('approved Sy evening scrapbook check-in renders at 390x844 and hands off to
   await expect(page.getByText("SE'KRET PAGES", { exact: true })).toBeVisible();
   await expect(page.getByText('Sy', { exact: true }).first()).toBeVisible();
 });
+
+
+test('Sy scrapbook scene stays usable on a compact 320x568 phone', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.addInitScript(() => {
+    Object.defineProperty(Date.prototype, 'getHours', {
+      configurable: true,
+      value: () => 18,
+    });
+  });
+
+  await page.goto('/scrapbook-check-in?bipDevSide=teen&companion=sy', {
+    waitUntil: 'domcontentloaded',
+  });
+
+  const scene = page.getByTestId('scrapbook-companion-scene');
+  const note = page.getByText('you made it through today.', { exact: true });
+  const cta = page.getByTestId('scrapbook-bip-cta');
+
+  await expect(scene).toBeVisible({ timeout: 15_000 });
+  await expect(note).toBeVisible();
+  await expect(cta).toBeVisible();
+
+  const bounds = await page.evaluate(() => {
+    const sceneEl = document.querySelector('[data-testid="scrapbook-companion-scene"]');
+    const ctaEl = document.querySelector('[data-testid="scrapbook-bip-cta"]');
+    if (!sceneEl || !ctaEl) return null;
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const ctaRect = ctaEl.getBoundingClientRect();
+    return {
+      sceneRight: sceneRect.right,
+      ctaBottom: ctaRect.bottom,
+      ctaTop: ctaRect.top,
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+
+  expect(bounds).not.toBeNull();
+  expect(bounds!.sceneRight).toBeLessThanOrEqual(bounds!.viewportWidth + 1);
+  expect(bounds!.ctaBottom).toBeLessThanOrEqual(bounds!.viewportHeight + 1);
+  expect(bounds!.ctaTop).toBeGreaterThan(0);
+
+  const screenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
+  await fs.mkdir(VISUAL_DIR, { recursive: true });
+  await fs.writeFile(path.join(VISUAL_DIR, 'sy-evening-320x568.png'), screenshot);
+  await testInfo.attach('sy-evening-320x568.png', {
+    body: screenshot,
+    contentType: 'image/png',
+  });
+});
