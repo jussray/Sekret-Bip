@@ -305,7 +305,7 @@ export default function CompanionChatScreen() {
         {isTemporaryPagesChat ? (
           <View style={s.privacyNote}>
             <Text style={s.privacyNoteText}>
-              This chat isn't saved. Your journal stays in Pages unless you choose what to say here.
+              This Pages chat isn't added to local chat history. Your page and draft aren't attached.
             </Text>
           </View>
         ) : null}
