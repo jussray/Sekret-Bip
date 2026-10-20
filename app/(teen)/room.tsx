@@ -10,6 +10,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { UserRoomScreen } from '@screens/UserRoomScreen';
 import { VisualCanonAtmosphere } from '../../components/rooms/VisualCanonAtmosphere';
+import { ScrapbookCheckInLauncher } from '../../components/rooms/ScrapbookCompanionScene';
 import { BipReturnOverlay } from '../../components/retention/BipReturnOverlay';
 import { DailyIntentionsCard } from '../../components/intentions/DailyIntentionsCard';
 import { useAppContext } from '@/context/AppContext';
@@ -70,26 +71,49 @@ export default function TeenRoomRoute() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#09031c' }}>
-      <UserRoomScreen
-        mood={mood}
-        selectedSekret={selectedSekret}
-        setSelectedSekret={setSelectedSekret}
-        setScreen={handleScreen}
-        t={t}
-        vibe={vibe}
-        BottomNav={null}
-        sekretMode={selectedSekret}
-        updateRoomMemory={updateRoomMemory}
-      />
-      <VisualCanonAtmosphere />
-      <DailyIntentionsCard
-        mood={mood}
-        companionKey={companionKey}
-        entries={entries}
-        comfortSessions={comfortSessions}
-        voiceNotes={voiceNotes}
-        isLoading={isLoading}
-      />
+      <View style={{ flex: 1 }}>
+        <UserRoomScreen
+          mood={mood}
+          selectedSekret={selectedSekret}
+          setSelectedSekret={setSelectedSekret}
+          setScreen={handleScreen}
+          t={t}
+          vibe={vibe}
+          BottomNav={null}
+          sekretMode={selectedSekret}
+          updateRoomMemory={updateRoomMemory}
+        />
+        <VisualCanonAtmosphere />
+        <DailyIntentionsCard
+          mood={mood}
+          companionKey={companionKey}
+          entries={entries}
+          comfortSessions={comfortSessions}
+          voiceNotes={voiceNotes}
+          isLoading={isLoading}
+        />
+      </View>
+
+      <View
+        testID="scrapbook-check-in-footer"
+        style={{
+          alignItems: 'center',
+          backgroundColor: '#09031c',
+          paddingHorizontal: 18,
+          paddingTop: 8,
+          paddingBottom: 10,
+        }}
+      >
+        <ScrapbookCheckInLauncher
+          companion={selectedSekret}
+          rainOverride={vibe === 'rain'}
+          onPress={() => router.push({
+            pathname: TEEN_ROUTES.scrapbookCheckIn,
+            params: { companion: companionKey },
+          } as never)}
+        />
+      </View>
+
       <BipReturnOverlay onNavigate={handleScreen} />
     </View>
   );
