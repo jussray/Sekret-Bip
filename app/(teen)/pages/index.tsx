@@ -40,7 +40,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AmbientWeatherOverlay } from '../../../components/AmbientWeatherOverlay';
 import { useAppContext } from '@/context/AppContext';
@@ -247,11 +247,27 @@ export default function TeenPagesRoute() {
     patchJournalEntry,
     teenGender,
   } = useAppContext();
+  const { companion: companionParam } = useLocalSearchParams<{ companion?: string | string[] }>();
+  const requestedCompanion = Array.isArray(companionParam) ? companionParam[0] : companionParam;
 
   // ── Companion state ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<CompanionId>(() =>
     (COMPANIONS.some(c => c.id === selectedSekret) ? selectedSekret : 'raylene') as CompanionId,
   );
+
+  // Pages is a mounted tab route, so navigating back to it with a new companion
+  // parameter must resync the active tab instead of keeping the prior companion.
+  useEffect(() => {
+    if (!requestedCompanion) return;
+    const nextCompanion = COMPANIONS.some(c => c.id === requestedCompanion)
+      ? requestedCompanion as CompanionId
+      : null;
+    if (!nextCompanion) return;
+
+    if (activeTab !== nextCompanion) setActiveTab(nextCompanion);
+    if (selectedSekret !== nextCompanion) setSelectedSekret(nextCompanion);
+  }, [activeTab, requestedCompanion, selectedSekret, setSelectedSekret]);
+
   const [avatarState, setAvatarState] = useState<SekretAvatarState>('neutral');
   const { total: totalPoints } = usePoints();
 
