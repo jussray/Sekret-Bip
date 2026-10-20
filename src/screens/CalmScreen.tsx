@@ -324,7 +324,7 @@ export function CalmScreen({
                 onPress={() => handleTool(tool)}
                 activeOpacity={0.8}
                 accessibilityRole="button"
-                accessibilityLabel={`${tool.label.replace('\n', ' ')}. ${tool.sub}`}
+                accessibilityLabel={`${tool.label.replace(/\n/g, ' ')}. ${tool.sub}`}
               >
                 <LinearGradient
                   colors={['rgba(168,85,247,0.18)', 'rgba(109,40,217,0.08)']}

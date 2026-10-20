@@ -27,6 +27,13 @@ export function configFromEnv(env = process.env) {
   };
 }
 
+// Workflow logs on this public repository are public: never print the full destination inbox.
+export function maskEmail(email) {
+  const [local = '', domain = ''] = String(email || '').split('@');
+  if (!local || !domain) return '[redacted]';
+  return `${local[0]}***@${domain}`;
+}
+
 export function buildWorkerRule(alias, config = configFromEnv({})) {
   const address = `${alias}@${config.zoneName}`;
   return {
@@ -181,16 +188,16 @@ async function ensureVerifiedDestination(config) {
       body: { email: config.destinationEmail },
     });
     destination = created?.result;
-    console.log(`DESTINATION_CREATED email=${config.destinationEmail}`);
+    console.log('DESTINATION_CREATED');
   }
 
   if (!destination?.verified) {
     throw new Error(
-      `DESTINATION_VERIFICATION_REQUIRED: open ${config.destinationEmail} and approve Cloudflare's verification email, then rerun this workflow.`,
+      `DESTINATION_VERIFICATION_REQUIRED: open ${maskEmail(config.destinationEmail)} and approve Cloudflare's verification email, then rerun this workflow.`,
     );
   }
 
-  console.log(`DESTINATION_VERIFIED email=${config.destinationEmail}`);
+  console.log('DESTINATION_VERIFIED');
   return destination;
 }
 
@@ -405,7 +412,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         mode: apply ? 'apply' : 'plan',
         zone: config.zoneName,
         worker: config.workerName,
-        destination: config.destinationEmail,
+        destination: maskEmail(config.destinationEmail),
         aliases: EMAIL_ALIASES.map((alias) => `${alias}@${config.zoneName}`),
         deletes: false,
         catchAllDesired: 'disabled',
