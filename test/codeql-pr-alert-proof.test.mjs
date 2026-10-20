@@ -104,6 +104,36 @@ test('waivers are exact, bounded, expiring, and stale waivers fail closed', () =
   assert.match(expired.waiverErrors[0], /expired/);
 });
 
+test('retired CodeQL waivers remain archival evidence and are not applied as active suppressions', () => {
+  const retiredWaiver = {
+    id: 'retired-static-assertion',
+    language: 'javascript-typescript',
+    ruleId: 'js/example',
+    path: 'test/example.test.mjs',
+    messageIncludes: 'assertion',
+    maxMatches: 1,
+    expiresAt: '2027-01-01T00:00:00Z',
+    rationale: 'Historical waiver retained after the underlying finding disappeared.',
+  };
+
+  const classified = applyFindingWaivers([], {
+    schemaVersion: 1,
+    waivers: [],
+    retiredWaivers: [{
+      waiver: retiredWaiver,
+      retiredAt: '2026-10-20',
+      retiredReason: 'Finding no longer exists; preserve history without an active suppression.',
+    }],
+  }, {
+    language: 'javascript-typescript',
+    now: new Date('2026-10-20T00:00:00Z'),
+  });
+
+  assert.equal(classified.waiverErrors.length, 0);
+  assert.equal(classified.waivedFindings.length, 0);
+  assert.equal(classified.waiverReceipts.length, 0);
+});
+
 test('local CodeQL proof preserves exact-head, waiver, and evidence boundaries', () => {
   assert.match(workflow, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   assert.match(workflow, /persist-credentials:\s*false/);
