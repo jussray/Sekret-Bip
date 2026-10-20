@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
   type ImageSourcePropType,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -138,12 +139,14 @@ export function ScrapbookCompanionScene({
   const phase = useScrapbookPhase(rainOverride);
   const phaseCopy = PHASE_COPY[phase];
   const roomArt = useMemo(() => getRoomScene(character, phase), [character, phase]);
+  const { height: viewportHeight } = useWindowDimensions();
+  const compact = viewportHeight < 700;
 
   return (
     <ImageBackground
       source={roomArt}
       resizeMode="cover"
-      style={styles.root}
+      style={[styles.root, compact && styles.rootCompact]}
       testID="scrapbook-companion-scene"
     >
       <LinearGradient
@@ -167,7 +170,7 @@ export function ScrapbookCompanionScene({
         <Text style={styles.rightDoodleCopy}>same you…{`\n`}brighter days ♡</Text>
       </View>
 
-      <View style={styles.topRow}>
+      <View style={[styles.topRow, compact && styles.topRowCompact]}>
         {onBack ? (
           <Pressable
             accessibilityRole="button"
@@ -189,8 +192,8 @@ export function ScrapbookCompanionScene({
       <View style={styles.sceneStack}>
         <View style={styles.polaroidWrap}>
           <View style={styles.tapeLeft} pointerEvents="none" />
-          <View style={styles.polaroid}>
-            <View style={styles.photoWell}>
+          <View style={[styles.polaroid, compact && styles.polaroidCompact]}>
+            <View style={[styles.photoWell, compact && styles.photoWellCompact]}>
               <LinearGradient
                 colors={['rgba(30, 14, 61, 0.28)', 'rgba(8, 5, 22, 0.82)']}
                 style={StyleSheet.absoluteFill}
@@ -204,20 +207,20 @@ export function ScrapbookCompanionScene({
                 accessibilityLabel={`${displayName} companion`}
               />
             </View>
-            <View style={styles.polaroidCaptionRow}>
-              <Text style={styles.polaroidCaption}>{displayName}</Text>
-              <Text style={[styles.captionHeart, { color: phaseCopy.accent }]}>♡</Text>
+            <View style={[styles.polaroidCaptionRow, compact && styles.polaroidCaptionRowCompact]}>
+              <Text style={[styles.polaroidCaption, compact && styles.polaroidCaptionCompact]}>{displayName}</Text>
+              <Text style={[styles.captionHeart, compact && styles.captionHeartCompact, { color: phaseCopy.accent }]}>♡</Text>
             </View>
           </View>
           <View style={styles.tapeRight} pointerEvents="none" />
         </View>
 
-        <View style={styles.notePaper}>
+        <View style={[styles.notePaper, compact && styles.notePaperCompact]}>
           <View style={styles.paperLineOne} pointerEvents="none" />
           <View style={styles.paperLineTwo} pointerEvents="none" />
-          <Text style={styles.noteText}>{phaseCopy.note}</Text>
-          <Text style={[styles.noteHeart, { color: phaseCopy.accent }]}>♡</Text>
-          <Text style={styles.arrow}>↘</Text>
+          <Text style={[styles.noteText, compact && styles.noteTextCompact]}>{phaseCopy.note}</Text>
+          <Text style={[styles.noteHeart, compact && styles.noteHeartCompact, { color: phaseCopy.accent }]}>♡</Text>
+          <Text style={[styles.arrow, compact && styles.arrowCompact]}>↘</Text>
         </View>
       </View>
 
@@ -227,14 +230,15 @@ export function ScrapbookCompanionScene({
         onPress={onBipPress}
         style={({ pressed }) => [
           styles.cta,
+          compact && styles.ctaCompact,
           { backgroundColor: phaseCopy.accent },
           pressed && styles.pressed,
         ]}
         testID="scrapbook-bip-cta"
       >
-        <Text style={styles.ctaStar}>☆</Text>
-        <Text style={styles.ctaText}>Bip with {displayName}</Text>
-        <Text style={styles.ctaArrow}>→</Text>
+        <Text style={[styles.ctaStar, compact && styles.ctaStarCompact]}>☆</Text>
+        <Text style={[styles.ctaText, compact && styles.ctaTextCompact]}>Bip with {displayName}</Text>
+        <Text style={[styles.ctaArrow, compact && styles.ctaArrowCompact]}>→</Text>
       </Pressable>
     </ImageBackground>
   );
@@ -288,6 +292,11 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 24,
     justifyContent: 'space-between',
+  },
+  rootCompact: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   doodles: {
     position: 'absolute',
@@ -348,6 +357,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     justifyContent: 'space-between',
     zIndex: 5,
+  },
+  topRowCompact: {
+    minHeight: 50,
   },
   backScrap: {
     minHeight: 44,
@@ -415,6 +427,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 10 },
     elevation: 8,
   },
+  polaroidCompact: {
+    padding: 9,
+    paddingBottom: 10,
+  },
   photoWell: {
     height: 345,
     maxHeight: '52%',
@@ -422,6 +438,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#0b0718',
     overflow: 'hidden',
     justifyContent: 'flex-end',
+  },
+  photoWellCompact: {
+    height: 185,
+    minHeight: 160,
+    maxHeight: 185,
   },
   photoGlow: {
     position: 'absolute',
@@ -444,15 +465,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingTop: 8,
   },
+  polaroidCaptionRowCompact: {
+    minHeight: 30,
+    paddingTop: 5,
+  },
   polaroidCaption: {
     color: '#2f2537',
     fontFamily: handwritingFont,
     fontSize: 19,
     fontWeight: '700',
   },
+  polaroidCaptionCompact: {
+    fontSize: 16,
+  },
   captionHeart: {
     fontFamily: handwritingFont,
     fontSize: 28,
+  },
+  captionHeartCompact: {
+    fontSize: 22,
   },
   tapeLeft: {
     position: 'absolute',
@@ -490,6 +521,13 @@ const styles = StyleSheet.create({
     zIndex: 1,
     overflow: 'hidden',
   },
+  notePaperCompact: {
+    width: '82%',
+    minHeight: 74,
+    marginTop: -2,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+  },
   paperLineOne: {
     position: 'absolute',
     left: 0,
@@ -514,11 +552,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '700',
   },
+  noteTextCompact: {
+    fontSize: 16,
+    lineHeight: 20,
+  },
   noteHeart: {
     alignSelf: 'center',
     marginTop: 3,
     fontFamily: handwritingFont,
     fontSize: 25,
+  },
+  noteHeartCompact: {
+    marginTop: 1,
+    fontSize: 18,
   },
   arrow: {
     position: 'absolute',
@@ -528,6 +574,10 @@ const styles = StyleSheet.create({
     fontFamily: handwritingFont,
     fontSize: 30,
     transform: [{ rotate: '8deg' }],
+  },
+  arrowCompact: {
+    right: 10,
+    fontSize: 22,
   },
   cta: {
     minHeight: 60,
@@ -546,11 +596,20 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 7 },
     transform: [{ rotate: '-0.7deg' }],
   },
+  ctaCompact: {
+    minHeight: 48,
+    marginTop: 4,
+    paddingHorizontal: 14,
+  },
   ctaStar: {
     color: '#24152c',
     fontFamily: handwritingFont,
     fontSize: 22,
     marginRight: 10,
+  },
+  ctaStarCompact: {
+    fontSize: 18,
+    marginRight: 8,
   },
   ctaText: {
     flexShrink: 1,
@@ -559,11 +618,18 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '800',
   },
+  ctaTextCompact: {
+    fontSize: 16,
+  },
   ctaArrow: {
     color: '#24152c',
     fontFamily: handwritingFont,
     fontSize: 25,
     marginLeft: 10,
+  },
+  ctaArrowCompact: {
+    fontSize: 20,
+    marginLeft: 8,
   },
   pressed: {
     opacity: 0.76,
