@@ -717,7 +717,8 @@ export default function App() {
       BottomNav={nav}
       selectedSekret={selectedSekret}
       mood={mood}
-      privateProfile={oracleProfile}
+      privateProfile={userSide === 'parent' ? parentOracleProfile : oracleProfile}
+      profileSide={userSide}
     />
   );
 
