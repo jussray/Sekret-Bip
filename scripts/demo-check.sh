@@ -48,7 +48,7 @@ fi
 # ── Step 3: Live deployment health checks ────────────────────────────
 header "Step 3 — Live Deployment Health"
 
-WORKER_URL="https://sekret-backend.mcgill-raylene.workers.dev/health"
+# wrangler.toml sets workers_dev=false. Only the canonical custom domain is live.
 CUSTOM_URL="https://api.sekretbip.net/health"
 RELEASE_URL="https://sekretbip.net/release.json"
 
@@ -66,7 +66,6 @@ check_url() {
   fi
 }
 
-check_url "$WORKER_URL" "Worker health (.workers.dev)"
 check_url "$CUSTOM_URL" "Worker health (api.sekretbip.net)"
 check_url "$RELEASE_URL" "Pages release marker"
 
