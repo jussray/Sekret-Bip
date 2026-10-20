@@ -10,8 +10,9 @@
 //     params: { companion: selectedSekret, surface: ‘journal’ },
 //   });
 //
-// History is keyed per companion + surface so conversations never bleed:
-//   sekret:chat:history:{companionKey}:{surface}
+// Existing chat history uses the legacy companion/surface cache.
+// Pages-launched chats are temporary and deliberately never write to that cache.
+// A separate opt-in, account-scoped memory design is required before persistence.
 //
 // Safety integration (Phase 3):
 //   - Pre-flight: checkTextBeforePost before every send
@@ -121,9 +122,13 @@ export default function CompanionChatScreen() {
 
   // Resolve profile — fall back to 'raylene' for legacy keys
   const profileKey = companionKey in SEKRET_PROFILES ? companionKey : 'soft';
-  const profile    = SEKRET_PROFILES[profileKey];
+  const companionId = toCompanionId(companionKey);
+  // Oracle is the compatibility name for the canonical Se'kret engine.
+  // Do not silently fall back to Suhana when Oracle is selected in Pages.
+  const profile = companionId === 'sekret'
+    ? { ...COMPANION_PROFILES.sekret, name: 'Oracle (Ja)' }
+    : SEKRET_PROFILES[profileKey];
   const charKey: Character = normalizeCharacterKey(profileKey);
-  const companionId = toCompanionId(profileKey);
 
   // Accent colour from COMPANION_PROFILES so ChatBubble can tint correctly.
   const accentColor = COMPANION_PROFILES[companionId]?.accentColor ?? '#a78bfa';
@@ -140,6 +145,11 @@ export default function CompanionChatScreen() {
     () => buildHistoryKey(profileKey, surface),
     [profileKey, surface],
   );
+  const isTemporaryPagesChat = surface === 'pages';
+
+  async function persistConversation(next: ChatMsg[]): Promise<void> {
+    if (!isTemporaryPagesChat) await persistHistory(storageKey, next);
+  }
 
   // ── State ──────────────────────────────────────────────────────────────────────
   const [msgs, setMsgs]                           = useState<ChatMsg[]>([]);
@@ -169,23 +179,30 @@ export default function CompanionChatScreen() {
     });
   }, []);
 
-  // Load history on mount; show companion greeting if empty
+  // The Pages entry point never reads or persists chat history by default.
   useEffect(() => {
-    loadHistory(storageKey).then((saved) => {
+    let mounted = true;
+    const welcome: ChatMsg = {
+      id: 'welcome',
+      from: 'companion',
+      text: profile.greeting,
+      time: nowTime(),
+    };
+    if (isTemporaryPagesChat) {
+      setMsgs([welcome]);
+      return;
+    }
+    loadHistory(storageKey).then(saved => {
+      if (!mounted) return;
       if (saved.length === 0) {
-        const welcome: ChatMsg = {
-          id:   'welcome',
-          from: 'companion',
-          text: profile.greeting,
-          time: nowTime(),
-        };
         setMsgs([welcome]);
-        persistHistory(storageKey, [welcome]);
+        void persistHistory(storageKey, [welcome]);
       } else {
         setMsgs(saved);
       }
     });
-  }, [storageKey]);
+    return () => { mounted = false; };
+  }, [isTemporaryPagesChat, storageKey, profile.greeting]);
 
   // ── Send ──────────────────────────────────────────────────────────────────────────
   const handleSend = async (text: string) => {
@@ -207,7 +224,7 @@ export default function CompanionChatScreen() {
     const withUser = [...msgs, userMsg];
     setMsgs(withUser);
     setLoading(true);
-    await persistHistory(storageKey, withUser);
+    await persistConversation(withUser);
 
     try {
       const result = await sendCompanionMessage({
@@ -236,7 +253,7 @@ export default function CompanionChatScreen() {
 
       const final = [...withUser, companionMsg];
       setMsgs(final);
-      await persistHistory(storageKey, final);
+      await persistConversation(final);
 
       // Update question budget from backend.
       if (typeof result.questionBudget === 'number') {
@@ -262,7 +279,7 @@ export default function CompanionChatScreen() {
       };
       const final = [...withUser, errMsg];
       setMsgs(final);
-      await persistHistory(storageKey, final);
+      await persistConversation(final);
     } finally {
       setLoading(false);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
@@ -285,6 +302,13 @@ export default function CompanionChatScreen() {
           portrait={portrait}
           onBack={() => router.back()}
         />
+        {isTemporaryPagesChat ? (
+          <View style={s.privacyNote}>
+            <Text style={s.privacyNoteText}>
+              This chat isn't saved. Your journal stays in Pages unless you choose what to say here.
+            </Text>
+          </View>
+        ) : null}
 
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -379,6 +403,8 @@ const s = StyleSheet.create({
   root:    { flex: 1 },
   safe:    { flex: 1 },
   flex:    { flex: 1 },
+  privacyNote: { marginHorizontal: 16, marginVertical: 6, padding: 10, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.07)' },
+  privacyNoteText: { color: '#e2dbee', fontSize: 12, lineHeight: 18 },
   msgList: { paddingHorizontal: 16, paddingVertical: 12, paddingBottom: 8 },
 
   fallbackRow: {
