@@ -218,9 +218,29 @@ const BLOCKED_REPLY_LANGUAGE = [
   /\bi'm here to support you\b/i,
   /\bbased on what you've shared\b/i,
   /\boracle\b/i,
-  /\b(?:profile|assessment|analysis|analyzed|dimension|hidden context)\b/i,
-  /\bhow are you (?:feeling|doing)\b/i,
-  /\bwhat(?:'s| is) (?:wrong|bothering you|on your mind)\b/i,
+  // Oracle/profiling leak phrasing — compound and specific, not bare topic
+  // words. "profile", "analysis", "dimension" etc. alone also matched
+  // ordinary conversation (a school profile essay, analyzing a song) and
+  // were discarding good in-character replies; the actual leak risk is the
+  // companion revealing it is tracking/profiling the teen, which these
+  // compound phrases target directly.
+  /\byour profile shows\b/i,
+  /\bbased on your (?:patterns|profile|analysis)\b/i,
+  /\byour assessment\b/i,
+  /\bhidden context\b/i,
+  // Narrowed to the clinical framing only — "how are you doing" and "what's
+  // wrong"/"what's on your mind" are ordinary friend openers a companion can
+  // say in character; "how are you feeling" and "what's bothering you" read
+  // as the therapist-speak this guard exists to catch.
+  /\bhow are you feeling\b/i,
+  /\bwhat(?:'s| is) bothering you\b/i,
+  // Left unchanged from here down — these phrases are load-bearing for
+  // test/reply-guard-safety-behavior.test.mjs, which uses "I'm here for
+  // you" to prove the raw guard blocks clinical phrasing even when the
+  // reply carries a crisis-resource marker, independent of the safety
+  // bypass layer (shouldBypassReplyGuard) that decides whether to let it
+  // through anyway.
+  /\bwhat(?:'s| is) (?:wrong|on your mind)\b/i,
   /\bwould you like to (?:talk|share|tell me)\b/i,
   /\bi(?:'m| am) here (?:for you|to listen|to help|to support)\b/i,
   /\bgreat question\b/i,
