@@ -138,7 +138,8 @@ export default function CompanionChatScreen() {
   const bgSource  = useMemo(() => getRoomBg(charKey, roomPhase), [charKey, roomPhase]);
 
   // Companion portrait for header
-  const portrait = AVATARS[charKey]?.neutral ?? AVATARS[charKey]?.fullbody ?? null;
+  // Oracle has no approved portrait in this asset registry; never show Suhana as Oracle.
+  const portrait = companionId === 'sekret' ? null : (AVATARS[charKey]?.neutral ?? AVATARS[charKey]?.fullbody ?? null);
 
   // Per-companion + per-surface history key
   const storageKey = useMemo(
