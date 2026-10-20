@@ -125,7 +125,10 @@ export default function LoginScreen() {
               access_token: parsed.accessToken,
               refresh_token: parsed.refreshToken,
             });
-            if (sessionError) return;
+            if (sessionError) {
+              setError('We could not finish confirming your email. You can sign in manually or request a new confirmation link.');
+              return;
+            }
           }
         }
 

@@ -7,9 +7,9 @@ import { BodyWorkoutFlow } from '@/features/reset/ResetFlows';
 import { getWorkoutRoutine } from '@/features/reset/catalog';
 
 const CHARACTER_NAMES: Record<string, string> = {
-  raylene: 'Raylene',
-  soft: 'Raylene',
-  rylane: 'Rylane',
+  raylene: 'Suhana',
+  soft: 'Suhana',
+  rylane: 'Sy',
   cloud: 'Cloud',
   night: 'Night',
 };
@@ -19,7 +19,7 @@ export default function BodyWorkoutRoute() {
   const { theme, selectedSekret } = useAppContext();
   const t = THEME_PACKS[theme] ?? THEME_PACKS.neon;
   const routine = getWorkoutRoutine(routineId);
-  const companionName = CHARACTER_NAMES[selectedSekret] ?? 'Raylene';
+  const companionName = CHARACTER_NAMES[selectedSekret] ?? 'Suhana';
 
   const returnToBodyReset = () => {
     router.replace({

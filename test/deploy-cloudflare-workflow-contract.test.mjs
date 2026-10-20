@@ -75,22 +75,27 @@ test('production verification job remains fail-closed on dependency drift but st
 });
 
 test('production verification preserves independent evidence after current-main trust while keeping release identity load-bearing', () => {
-  const schema = workflowStepBlock('Verify exact Supabase production schema contract');
+  const schema = workflowStepBlock('Verify exact Supabase runtime and schema contracts');
   const transport = workflowStepBlock('Record safe frontend and backend transport evidence');
   const backend = workflowStepBlock('Verify backend health');
-  const supabaseHealth = workflowStepBlock('Verify Supabase runtime contracts');
   const chromium = workflowStepBlock('Install Chromium');
   const browserObservation = workflowStepBlock('Observe public production browser journeys independently');
   const cloudflare = workflowStepBlock('Wait for exact frontend and backend Worker checks plus release marker');
   const releaseIdentity = workflowStepBlock('Verify exact deployed release identity with Playwright');
 
-  for (const block of [schema, transport, backend, supabaseHealth, chromium]) {
+  for (const block of [schema, transport, backend, chromium]) {
     assert.match(
       block,
       /if: \$\{\{ !cancelled\(\) && steps\.trusted_current_main\.outcome == 'success' \}\}/u,
       'independent proof planes must continue observing after exact-current-main trust is established',
     );
   }
+  assert.match(schema, /id: supabase_schema/u);
+  assert.match(
+    schema,
+    /run: node scripts\/verify-supabase-runtime-contract-health\.mjs/u,
+    'the Supabase proof plane must still verify live runtime contract health',
+  );
 
   assert.match(
     browserObservation,
@@ -113,10 +118,9 @@ test('production verification preserves independent evidence after current-main 
   );
 
   for (const [name, block] of [
-    ['schema', schema],
+    ['supabase runtime and schema', schema],
     ['transport', transport],
     ['backend', backend],
-    ['supabase runtime', supabaseHealth],
     ['chromium', chromium],
     ['browser observation', browserObservation],
     ['cloudflare', cloudflare],
@@ -152,10 +156,9 @@ test('all production steps are bounded with reserved time for evidence publicati
     ['Set up Node', 5],
     ['Install repository dependencies', 10],
     ['Revalidate current main before Production secret use', 5],
-    ['Verify exact Supabase production schema contract', 5],
+    ['Verify exact Supabase runtime and schema contracts', 5],
     ['Record safe frontend and backend transport evidence', 5],
     ['Verify backend health', 5],
-    ['Verify Supabase runtime contracts', 5],
     ['Install Chromium', 15],
     ['Observe public production browser journeys independently', 30],
     ['Wait for exact frontend and backend Worker checks plus release marker', 35],
