@@ -3,7 +3,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const PRODUCTION_PROJECT_REF = 'tbsevonvegdnlyjgplmm';
-export const PRODUCTION_LEDGER_OBSERVED_AT = '2026-09-13';
+export const PRODUCTION_LEDGER_OBSERVED_AT = '2026-10-06';
 export const PRODUCTION_MIGRATION_VERSIONS = Object.freeze([
   '0001',
   '0002',
@@ -188,6 +188,15 @@ export const PRODUCTION_MIGRATION_VERSIONS = Object.freeze([
   '20260901000535',
   '20260905213248',
   '20260905213434',
+  '20260915180126',
+  '20260917195220',
+  '20260919190000',
+  '20260919190500',
+  '20260919190800',
+  '20260919191000',
+  '20260927185000',
+  '20261004215523',
+  '20261006031559',
 ]);
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
@@ -242,9 +251,9 @@ export function inspectProductionMigrationCoverage({
 }
 
 export function assertProductionMigrationCoverage(options = {}) {
-  if (PRODUCTION_MIGRATION_VERSIONS.length !== 183) {
+  if (PRODUCTION_MIGRATION_VERSIONS.length !== 192) {
     throw new Error(
-      `Pinned production migration ledger must contain exactly 183 versions; observed ${PRODUCTION_MIGRATION_VERSIONS.length}.`,
+      `Pinned production migration ledger must contain exactly 192 versions; observed ${PRODUCTION_MIGRATION_VERSIONS.length}.`,
     );
   }
 

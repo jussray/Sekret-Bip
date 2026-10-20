@@ -38,6 +38,9 @@ function ParentTabs() {
         <Tabs.Screen name="dashboard" options={{ href: null }} />
         <Tabs.Screen name="circle/[id]" options={{ href: null }} />
         <Tabs.Screen name="circle/weather" options={{ href: null }} />
+        <Tabs.Screen name="circle/feed" options={{ href: null }} />
+        <Tabs.Screen name="bip-jr" options={{ href: null }} />
+        <Tabs.Screen name="teen-verification" options={{ href: null }} />
         <Tabs.Screen name="calm" options={{ href: null }} />
         <Tabs.Screen name="voicebip" options={{ href: null }} />
         <Tabs.Screen name="settings" options={{ href: null }} />
@@ -50,6 +53,7 @@ function ParentTabs() {
         <Tabs.Screen name="growth" options={{ href: null }} />
         <Tabs.Screen name="resources" options={{ href: null }} />
         <Tabs.Screen name="approvals" options={{ href: null }} />
+        <Tabs.Screen name="bip-jr-study" options={{ href: null }} />
       </Tabs>
       <SideSafeBackButton side="parent" />
     </View>
@@ -66,6 +70,12 @@ export default function ParentLayout() {
   const pathname = usePathname();
 
   useEffect(() => {
+    // Duplicate web URLs can resolve through the parent route group first.
+    // When exact-head browser proof explicitly selects Teen, route there
+    // before touching Parent account state. The Teen layout still enforces
+    // its normal session/profile boundary, so this does not grant access.
+    if (devSideOverride === 'teen') return;
+
     let active = true;
     setEntryState(null);
     setProfessionalBridgeAvailable(null);
@@ -97,12 +107,12 @@ export default function ParentLayout() {
     return () => {
       active = false;
     };
-  }, [attempt]);
+  }, [attempt, devSideOverride]);
 
   // Split View and exact-head browser proof can land on the parent copy of a
-  // duplicate web URL first. Honor the explicit side before Founder Preview
-  // renders so /(teen) and /(parent) remain deterministic in development.
-  if (founderPreview && devSideOverride === 'teen') {
+  // duplicate web URL first. Honor the explicit side even outside Founder
+  // Preview so route disambiguation happens before Parent provider reads.
+  if (devSideOverride === 'teen') {
     return <Redirect href={`/(teen)${pathname}` as never} />;
   }
 
