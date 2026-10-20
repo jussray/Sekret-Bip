@@ -169,6 +169,7 @@ export default function CompanionChatScreen() {
 
   // Load teen gender from profile so companions can tailor their responses
   useEffect(() => {
+    if (isTemporaryPagesChat) return;
     AsyncStorage.getItem('teen_profile_data').then(raw => {
       if (!raw) return;
       try {
@@ -178,7 +179,7 @@ export default function CompanionChatScreen() {
         }
       } catch { /* ignore */ }
     });
-  }, []);
+  }, [isTemporaryPagesChat]);
 
   // The Pages entry point never reads or persists chat history by default.
   useEffect(() => {
