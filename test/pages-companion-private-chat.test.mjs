@@ -38,7 +38,7 @@ test('Pages-initiated chat bypasses automatic history reads and writes', () => {
   assert.match(chat, /if \(isTemporaryPagesChat\) \{\s*setMsgs\(\[welcome\]\);\s*return;/);
   assert.match(chat, /await persistConversation\(withUser\)/);
   assert.match(chat, /await persistConversation\(final\)/);
-  assert.match(chat, /This chat isn't saved/);
+  assert.match(chat, /This Pages chat isn't added to local chat history/);
 });
 
 test('Oracle (Ja) routes to canonical Se\'kret engine, not Suhana', () => {
