@@ -461,6 +461,15 @@ export default function App() {
     setParentPagesEntries(current => [entry, ...current]);
   };
 
+  // ── Oracle session completion ─────────────────────────────────────────────
+  const completeTeenOracleSession = (_profile: OracleProfile, _session: OracleSessionSummary) => {
+    setOracleProfile(prev => ({ ...prev, sessionCount: prev.sessionCount + 1, updatedAt: new Date().toISOString() }));
+  };
+
+  const completeParentOracleSession = (_profile: OracleProfile, _session: OracleSessionSummary) => {
+    setParentOracleProfile(prev => ({ ...prev, sessionCount: prev.sessionCount + 1, updatedAt: new Date().toISOString() }));
+  };
+
   // ── Circle (Teen) ────────────────────────────────────────────────────────
   const saveCirclePost = (extra?: Partial<CirclePost>) => {
     const textToSave = extra?.text ?? circlePostText;
