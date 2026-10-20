@@ -12,7 +12,7 @@ import 'react-native-url-polyfill/auto';
 import { AppState, Platform } from 'react-native';
 import { createClient, processLock, type SupabaseClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PASSWORD_RECOVERY_PATH } from '@/features/auth/passwordRecovery';
+import { PASSWORD_RECOVERY_PATH } from '../features/auth/passwordRecovery';
 import { SUPABASE_URL, SUPABASE_ANON, isSupabaseReady } from './env';
 
 export const isSupabaseConfigured = isSupabaseReady;
