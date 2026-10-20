@@ -61,6 +61,10 @@ test('approved Sy evening scrapbook check-in renders at 390x844 and hands off to
   await expect(page).toHaveURL(/\/pages(?:\/|\?|$)/);
   await expect(page.getByText("SE'KRET PAGES", { exact: true })).toBeVisible();
   await expect(page.getByText('Sy', { exact: true }).first()).toBeVisible();
+
+  // The handoff query is one-shot: Pages consumes it so normal companion tabs
+  // are not pinned back to Sy after arrival.
+  await expect.poll(() => new URL(page.url()).searchParams.get('companion') ?? '').toBe('');
 });
 
 
