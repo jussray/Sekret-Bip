@@ -126,7 +126,7 @@ export default function CompanionChatScreen() {
   // Oracle is the compatibility name for the canonical Se'kret engine.
   // Do not silently fall back to Suhana when Oracle is selected in Pages.
   const profile = companionId === 'sekret'
-    ? { ...COMPANION_PROFILES.sekret, name: 'Oracle (Ja)' }
+    ? { ...COMPANION_PROFILES.sekret, name: 'Ja' }
     : SEKRET_PROFILES[profileKey];
   const charKey: Character = normalizeCharacterKey(profileKey);
 
@@ -135,7 +135,7 @@ export default function CompanionChatScreen() {
 
   // Room background, time-of-day aware
   const roomPhase = useMemo(() => getRoomPhase(), []);
-  const bgSource  = useMemo(() => getRoomBg(charKey, roomPhase), [charKey, roomPhase]);
+  const bgSource  = useMemo(() => companionId === 'sekret' ? undefined : getRoomBg(charKey, roomPhase), [companionId, charKey, roomPhase]);
 
   // Companion portrait for header
   // Oracle has no approved portrait in this asset registry; never show Suhana as Oracle.
@@ -275,7 +275,7 @@ export default function CompanionChatScreen() {
       const errMsg: ChatMsg = {
         id:   String(Date.now() + 1),
         from: 'companion',
-        text: `${profile.name} is still here — the connection was shaky but your message was saved 💜`,
+        text: `${profile.name} couldn't connect right now. Your message is still visible here; you can try again. 💜`,
         time: nowTime(),
       };
       const final = [...withUser, errMsg];
