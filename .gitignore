@@ -10,9 +10,10 @@ node_modules/
 #  Testing 
 .coverage/
 
-#  Production / Build 
+#  Production / Build
 build/
 dist/
+assets/generated/
 .expo/
 .expo-shared/
 
