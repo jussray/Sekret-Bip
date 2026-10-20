@@ -1,0 +1,104 @@
+name: Pre-Push Checks
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  prepush:
+    name: Type-Check + Lint + Archive Verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout (with LFS)
+        id: checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          lfs: true
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Hydrate LFS assets
+        id: lfs_pull
+        run: git lfs pull
+
+      - name: Setup Node
+        id: setup_node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install dependencies
+        id: npm_ci
+        run: npm ci --ignore-scripts
+
+      - name: Type-check
+        id: type_check
+        run: npm run type-check
+
+      - name: Lint
+        id: lint
+        run: npm run lint
+
+      - name: Audit runtime assets
+        id: audit_assets
+        run: npm run audit:runtime-assets
+
+      - name: Verify room archives
+        id: verify_archives
+        run: |
+          cp -f assets/images/bg-*.png assets/images/archive/
+          npm run verify:room-archives
+
+      - name: ✅ All checks passed
+        if: success()
+        run: echo "✅ Type-check, lint, asset audit, and archive verify all passed."
+
+      - name: ❌ Pre-push check FAILED
+        if: failure()
+        run: |
+          echo ""
+          echo "╔══════════════════════════════════════════════════════════╗"
+          echo "║  ❌  PRE-PUSH CHECK FAILED                               ║"
+          echo "╚══════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "  Step conclusions:"
+          echo "    checkout        → ${{ steps.checkout.conclusion }}"
+          echo "    lfs_pull        → ${{ steps.lfs_pull.conclusion }}"
+          echo "    setup_node      → ${{ steps.setup_node.conclusion }}"
+          echo "    npm_ci          → ${{ steps.npm_ci.conclusion }}"
+          echo "    type_check      → ${{ steps.type_check.conclusion }}"
+          echo "    lint            → ${{ steps.lint.conclusion }}"
+          echo "    audit_assets    → ${{ steps.audit_assets.conclusion }}"
+          echo "    verify_archives → ${{ steps.verify_archives.conclusion }}"
+          echo ""
+          echo "  Fix the failing step above and re-run."
+          echo "  Archive failures: see docs/ASSET_BACKUP_RULES.md"
+
+  report:
+    name: Pre-Push — Result
+    needs: [prepush]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: On success
+        if: needs.prepush.result == 'success'
+        run: echo "✅ All pre-push checks passed."
+
+      - name: On failure
+        if: needs.prepush.result == 'failure'
+        run: |
+          echo "❌ Pre-push checks FAILED — see the prepush job log above."
+          exit 1
+
+      - name: On skipped
+        if: needs.prepush.result == 'skipped'
+        run: |
+          echo "⚠️  prepush was SKIPPED — it did not run on this path."
+          echo "   Trigger manually: gh workflow run prepush.yml"

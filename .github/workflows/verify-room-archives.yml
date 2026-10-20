@@ -1,0 +1,104 @@
+name: Verify Room Archives
+
+on:
+  workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  verify-archives:
+    name: Archive Integrity Check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout (with LFS)
+        id: checkout
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 1
+
+      - name: Hydrate LFS assets
+        id: lfs_pull
+        run: git lfs pull
+
+      - name: Confirm live files are real PNGs
+        id: live_check
+        run: |
+          echo "── Live bg-*.png sizes ──"
+          ls -lh assets/images/bg-*.png
+          STUBS=$(find assets/images -maxdepth 1 -name 'bg-*.png' -size -1k | wc -l)
+          if [ "$STUBS" -gt 0 ]; then
+            echo "❌ $STUBS live file(s) are under 1 KB — LFS pull may have failed."
+            exit 1
+          fi
+          echo "✅ All live files are real PNGs."
+
+      - name: Setup Node
+        id: setup_node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        id: npm_ci
+        run: npm ci --ignore-scripts
+
+      - name: Verify archive files match live files
+        id: verify_archives
+        run: node scripts/verify-room-archives.js --strict-match
+
+      - name: ✅ Archive check passed
+        if: success()
+        run: echo "✅ All archive checks passed — Phase 2 may proceed."
+
+      - name: ❌ Archive check FAILED
+        if: failure()
+        run: |
+          echo ""
+          echo "╔══════════════════════════════════════════════════════════╗"
+          echo "║  ❌  ARCHIVE CHECK FAILED                                ║"
+          echo "╚══════════════════════════════════════════════════════════╝"
+          echo ""
+          echo "  Step conclusions:"
+          echo "    checkout        → ${{ steps.checkout.conclusion }}"
+          echo "    lfs_pull        → ${{ steps.lfs_pull.conclusion }}"
+          echo "    live_check      → ${{ steps.live_check.conclusion }}"
+          echo "    setup_node      → ${{ steps.setup_node.conclusion }}"
+          echo "    npm_ci          → ${{ steps.npm_ci.conclusion }}"
+          echo "    verify_archives → ${{ steps.verify_archives.conclusion }}"
+          echo ""
+          echo "  ── Repair commands (run locally, not in CI) ──────────────"
+          echo "    git lfs pull"
+          echo "    cp -f assets/images/bg-*.png assets/images/archive/"
+          echo "    git add assets/images/archive/"
+          echo "    git commit -m 'fix: replace LFS stub archive copies with real PNG bytes'"
+          echo "    git push"
+          echo ""
+          echo "  See docs/ASSET_BACKUP_RULES.md for full repair guidance."
+
+  report:
+    name: Archive Check — Result
+    needs: [verify-archives]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: On success
+        if: needs.verify-archives.result == 'success'
+        run: echo "✅ verify-archives passed."
+
+      - name: On failure
+        if: needs.verify-archives.result == 'failure'
+        run: |
+          echo "❌ verify-archives FAILED — see the verify-archives job log above."
+          exit 1
+
+      - name: On skipped
+        if: needs.verify-archives.result == 'skipped'
+        run: |
+          echo "⚠️  verify-archives was SKIPPED — it did not run on this path."
+          echo "   Trigger manually: gh workflow run verify-room-archives.yml"
+          echo "   Or check your branch protection rules to ensure this workflow is required."
