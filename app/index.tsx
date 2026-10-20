@@ -460,12 +460,14 @@ export default function App() {
   };
 
   // ── Oracle session completion ─────────────────────────────────────────────
-  const completeTeenOracleSession = (profile: OracleProfile, _session: OracleSessionSummary) => {
+  const completeTeenOracleSession = (profile: OracleProfile, session: OracleSessionSummary) => {
     setOracleProfile(profile);
+    setOracleSessions(prev => [session, ...prev]);
   };
 
-  const completeParentOracleSession = (profile: OracleProfile, _session: OracleSessionSummary) => {
+  const completeParentOracleSession = (profile: OracleProfile, session: OracleSessionSummary) => {
     setParentOracleProfile(profile);
+    setParentOracleSessions(prev => [session, ...prev]);
   };
 
   // ── Circle (Teen) ────────────────────────────────────────────────────────
