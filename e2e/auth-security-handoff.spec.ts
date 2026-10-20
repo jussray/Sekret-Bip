@@ -2,8 +2,8 @@ import { expect, test } from '@playwright/test';
 
 test.describe('auth security handoff routes', () => {
   test('forgot password route exposes reset request UI', async ({ page }) => {
-    // The first Expo web route can cold-build before the reset UI becomes interactive.
-    test.setTimeout(90_000);
+    // Allow a cold Expo web build without altering browser timer behavior.
+    test.slow();
     await page.goto('/forgot-password', { waitUntil: 'domcontentloaded' });
     await expect(page.getByText('Forgot password?')).toBeVisible();
     await expect(page.getByRole('button', { name: /send password reset email|send reset link/i })).toBeVisible();
