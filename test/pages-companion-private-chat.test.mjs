@@ -56,3 +56,18 @@ test('existing teen route guard continues wrapping both Pages and companion-chat
   assert.match(layout, /profileComplete/);
   assert.match(layout, /if \(effectiveUserSide !== 'teen'\)/);
 });
+
+test('temporary Pages conversation does not read or write stored personal context', () => {
+  const engine = readFileSync('src/features/sekret/companionEngine.ts', 'utf8');
+  const builder = readFileSync('src/services/ai/buildReplyRequest.ts', 'utf8');
+  assert.match(engine, /ephemeral:\s*input\.surface === 'pages'/);
+  assert.match(builder, /ctx\.ephemeral\s*\? \[DEFAULT_TEEN_RELATIONSHIP_PROFILE,/);
+  assert.match(builder, /if \(!ctx\.ephemeral\) await saveTeenRelationshipProfile\(relationship\)/);
+  assert.match(builder, /const memory: Record<string, unknown> = ctx\.ephemeral \? \{\} : \{/);
+  assert.match(chat, /if \(isTemporaryPagesChat\) return;\s*AsyncStorage\.getItem\('teen_profile_data'\)/);
+});
+
+test('companion failure remains auditable and never reports a saved message incorrectly', () => {
+  assert.match(chat, /console\.warn\('Companion reply unavailable; delivery not confirmed'\)/);
+  assert.doesNotMatch(chat, /message was saved/);
+});
