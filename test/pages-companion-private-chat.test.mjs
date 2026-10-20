@@ -13,7 +13,7 @@ test('Pages offers the five companion choices with the existing points gate', ()
     assert.match(pages, new RegExp("id: '"+id+"'"));
   }
   assert.match(pages, /COMPANIONS\.filter\(c => c\.id !== 'me'\)\.map/);
-  assert.match(pages, /c\.id === 'oracle' \? 'Oracle \(Ja\)'/);
+  assert.match(pages, /\{ id: 'oracle',\s+name: 'Ja'/);
   assert.match(pages, /totalPoints >= COMPANION_UNLOCK_PTS\[c\.id\]/);
   assert.match(pages, /disabled=\{!unlocked\}/);
 });
@@ -41,11 +41,13 @@ test('Pages-initiated chat bypasses automatic history reads and writes', () => {
   assert.match(chat, /This Pages chat isn't added to local chat history/);
 });
 
-test('Oracle (Ja) routes to canonical Se\'kret engine, not Suhana', () => {
+test('Ja uses the legacy oracle id and canonical Se\'kret engine, not Suhana', () => {
   assert.match(chat, /const companionId = toCompanionId\(companionKey\)/);
   assert.match(chat, /companionId === 'sekret'/);
-  assert.match(chat, /name: 'Oracle \(Ja\)'/);
+  assert.match(chat, /name: 'Ja'/);
   assert.match(chat, /const portrait = companionId === 'sekret' \? null/);
+  assert.match(chat, /companionId === 'sekret' \? undefined : getRoomBg/);
+  assert.doesNotMatch(chat, /message was saved/);
 });
 
 test('existing teen route guard continues wrapping both Pages and companion-chat', () => {
