@@ -61,11 +61,12 @@ test('Bip renderer rejects unapproved source media', async () => {
   assert.match(result.message, /SOURCE_COUNT/);
 });
 
-test('Bip independently renders approved shots into a verified MP4', { timeout: 60000 }, async (t) => {
-  if (!probeBipVideoRenderer().available) {
-    t.skip('ffmpeg/ffprobe unavailable');
-    return;
-  }
+test('Bip independently renders approved shots into a verified MP4', { timeout: 60000 }, async () => {
+  assert.equal(
+    probeBipVideoRenderer().available,
+    true,
+    'FFmpeg and FFprobe are mandatory for this executable video contract; install both before running the suite',
+  );
 
   const dir = await mkdtemp(join(tmpdir(), 'bip-video-'));
   try {

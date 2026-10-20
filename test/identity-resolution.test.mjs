@@ -36,6 +36,13 @@ test('normalizeCharacter returns rylane for "rylane"', () => {
   assert.equal(normalizeCharacter('rylane'), 'rylane');
 });
 
+test('normalizeCharacter accepts canonical Suhana and Sy from the outer Worker', () => {
+  assert.equal(normalizeCharacter('suhana'), 'raylene');
+  assert.equal(normalizeCharacter('SUHANA'), 'raylene');
+  assert.equal(normalizeCharacter('sy'), 'rylane');
+  assert.equal(normalizeCharacter('SY'), 'rylane');
+});
+
 test('normalizeCharacter returns cloud for "cloud"', () => {
   assert.equal(normalizeCharacter('cloud'), 'cloud');
 });

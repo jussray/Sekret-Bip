@@ -296,7 +296,7 @@ export async function fetchSekretReply(
   avatarKey?: string,
   _extra1?: unknown,
   privateProfile?: unknown,
-  profileSide?: string,
+  _profileSide?: string,
   history?: unknown[],
 ): Promise<string> {
   const surface: SekretSurface = context === 'voiceBip' || context === 'comfort' || context === 'circle' || context === 'parentBridge' || context === 'selfDiscovery' ? context : 'journal';
@@ -317,7 +317,6 @@ export async function fetchSekretReply(
     mood,
     userText: text,
     memory,
-    parentSharingEnabled: profileSide === 'parent',
     history: normalizeHistory(history),
     isFirstCompanionChat: !history || history.length === 0,
   });

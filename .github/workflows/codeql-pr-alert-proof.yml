@@ -20,6 +20,8 @@ on:
       - '.github/workflows/product-design-playwright-proof.yml'
       - '.github/workflows/codeql-pr-alert-proof.yml'
       - '.github/workflows/pr-continuity.yml'
+      - '.github/workflows/pr-continuity-rollover.yml'
+      - '.github/workflows/pr-continuity-metadata.yml'
 
 permissions:
   contents: read

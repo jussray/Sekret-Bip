@@ -6,6 +6,8 @@
  * or OpenAI path is unavailable, and it keeps AI identity clear when asked.
  */
 
+import { isCrisisText } from '../../../services/crisisPolicy';
+
 export type NaturalFallbackCharacterId = 'suhana' | 'sy' | 'cloud' | 'night' | 'sekret';
 export type NaturalFallbackAvatarState = 'neutral' | 'listening' | 'thinking' | 'comforting' | 'happy' | 'concerned' | 'responding';
 
@@ -37,7 +39,6 @@ export interface NaturalFallbackResponse {
 export const NATURAL_FALLBACK_PACK_VERSION = 'fallback-natural-v1.0.0';
 export const NATURAL_FALLBACK_VARIANTS_PER_COMPANION = 500;
 
-const SAFETY_PATTERN = /\b(suicidal|self[- ]?harm|not safe|abuse|danger)\b/i;
 const IDENTITY_PATTERN = /\b(are you real|are you human|you human|robot|ai|artificial|sentient|alive|real friend|real person)\b/i;
 
 const BANNED_HUMAN_CLAIMS = [
@@ -166,7 +167,7 @@ function safeReply(style: CompanionFallbackStyle, baseSeed: number, recentReplie
 
 function getSafetyFallback(): NaturalFallbackResponse {
   return {
-    reply: "I'm an AI companion, not emergency help. If you are in immediate danger or not safe, contact a trusted adult or local emergency support now.",
+    reply: "Your safety comes first. I'm an AI companion, not emergency help. If you are in immediate danger, call 911 or local emergency services. In the U.S., call or text 988, or text HOME to 741741 for Crisis Text Line. Reach out to a trusted adult now.",
     tone: 'supportive-safety',
     avatarState: 'concerned',
     safetyFlag: true,
@@ -182,7 +183,7 @@ export function createNaturalFallbackResponse(input: NaturalFallbackInput): Natu
   const userText = normalizeText(input.userText);
   const style = FALLBACK_STYLES[input.characterId];
 
-  if (SAFETY_PATTERN.test(userText)) return getSafetyFallback();
+  if (isCrisisText(userText)) return getSafetyFallback();
 
   if (IDENTITY_PATTERN.test(userText)) {
     return {

@@ -5,6 +5,8 @@ import {
   buildSkipObservation,
   emitSkipObservation,
   parseNodeTapSkip,
+  parseNodeTapTodo,
+  parseNodeTapTotals,
   resolveHeadSha,
   writeSkipReport,
 } from './control-room-test-skips.mjs';
@@ -43,6 +45,7 @@ console.log(`Discovered ${tests.length} unit test file${tests.length === 1 ? '' 
 const command = `node --test --test-reporter=tap ${tests.map((file) => path.relative(root, file)).join(' ')}`;
 const observations = [];
 const seenTap = new Set();
+const tapTotals = {tests: null, pass: null, fail: null, skipped: null, todo: null};
 let bufferedStdout = '';
 
 function consumeStdout(chunk) {
@@ -51,12 +54,15 @@ function consumeStdout(chunk) {
   const lines = bufferedStdout.split(/\r?\n/);
   bufferedStdout = lines.pop() || '';
   for (const line of lines) {
-    const parsed = parseNodeTapSkip(line);
+    const total = parseNodeTapTotals(line);
+    if (total) tapTotals[total.field] = total.count;
+    const parsed = parseNodeTapSkip(line) ?? parseNodeTapTodo(line);
     if (!parsed) continue;
     const key = `${parsed.testId}\u0000${parsed.reason}`;
     if (seenTap.has(key)) continue;
     seenTap.add(key);
     observations.push(buildSkipObservation({
+      classification: /#\s*TODO\b/i.test(line) ? 'todo_unexecuted' : null,
       runner: 'node_test',
       command,
       testId: parsed.testId,
@@ -91,11 +97,20 @@ child.on('close', (status) => {
       head_sha: headSha,
       command,
       exit_code: typeof status === 'number' ? status : 1,
+      tap_totals: tapTotals,
     },
   });
   console.log(`CONTROL_ROOM_TEST_SKIP_SUMMARY count=${observations.length} report=${path.relative(root, reportPath)}`);
   if (observations.length > 0) {
-    console.warn('CONTROL_ROOM_TEST_SKIPS_REQUIRE_INVESTIGATION: skipped tests do not satisfy complete proof.');
+    console.error('CONTROL_ROOM_TEST_SKIPS_REQUIRE_INVESTIGATION: skipped and TODO tests block complete proof.');
+    console.error('CONTROL_ROOM_NO_SKIPS_GATE_FAILED: all discovered tests must execute and pass.');
   }
-  process.exit(typeof status === 'number' ? status : 1);
+  const complete = Object.values(tapTotals).every((value) => Number.isSafeInteger(value));
+  const fullyExecuted = complete && tapTotals.tests > 0 && tapTotals.pass === tapTotals.tests
+    && tapTotals.fail === 0 && tapTotals.skipped === 0 && tapTotals.todo === 0;
+  if (!fullyExecuted) {
+    console.error('CONTROL_ROOM_TAP_EXECUTION_INCOMPLETE: expected every discovered test to execute and pass.', tapTotals);
+  }
+  // A passing Node process or absent skip receipts cannot override incomplete TAP totals.
+  process.exit(typeof status === 'number' && status !== 0 ? status : (!fullyExecuted || observations.length > 0) ? 1 : (status ?? 1));
 });

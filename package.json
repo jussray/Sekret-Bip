@@ -71,7 +71,7 @@
     "control-room:mission:launch-bip": "node scripts/control-room-agent.mjs launch-bip",
     "control-room:mission:verify-local": "node scripts/control-room-agent.mjs verify-local",
     "control-room:mission:verify-frontend": "node scripts/control-room-agent.mjs verify-frontend",
-    "test:contract:supabase-worker": "node --test test/supabase-worker-ai-reply-contract.test.mjs",
+    "test:contract:supabase-worker": "node --test integration/supabase-worker-ai-reply-contract.test.mjs",
     "test:founder-operator": "node --test test/control-room-founder-operator-contract.test.mjs test/control-room-founder-operator-server.test.mjs test/control-room-founder-operator.test.mjs",
     "control-room:github-failures:scan": "node scripts/control-room-ingest-github-failures.mjs",
     "control-room:github-failures:ingest": "CONTROL_ROOM_GITHUB_INGEST=1 node scripts/control-room-ingest-github-failures.mjs",

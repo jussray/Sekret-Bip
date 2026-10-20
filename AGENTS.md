@@ -329,6 +329,12 @@ Preserve these boundaries:
 - Do not add environment variables or bindings unless unavoidable.
 - Document every required environment variable/binding in the same change.
 
+## Founder zero-skipped-check policy
+
+No skipped checks are accepted as completed evidence. For every applicable test or exact-head CI lane, require real execution and a passing result. `skipped`, `neutral`, `TODO`, `pending`, `not-run`, missing, stale-head, or unknown is not green and blocks a claim that the required verification is complete. Preserve the provider's original conclusion, check identity, reason, and fingerprint in the failure receipt. Never delete a test, weaken an assertion, reinterpret a skip as success, or bypass branch protection to make a check appear green.
+
+An event-specific workflow that truly does not apply should not schedule an irrelevant job. Split conditional jobs by event rather than hiding skips. Production migrations, credential use, releases, privileged previews, and guardian/teen safety probes remain separately authorized; zero-skips is not permission to run unsafe jobs just to turn every badge green. Fix the actual test prerequisite, or keep the overall gate blocked. This applies to future branches and all Juss & Co. integrations as a founder instruction, while each repository still needs its own verified enforcement.
+
 ## Merge authority
 
 Merge when it is the correct evidence-backed integration step, not merely because a PR exists or a badge looks green.

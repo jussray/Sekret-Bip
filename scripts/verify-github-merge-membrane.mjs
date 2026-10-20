@@ -13,6 +13,7 @@ export const ALWAYS_REQUIRED_CHECKS = Object.freeze([
   'repository-truth',
   'PR Continuity Exact-Head Gate',
   'Verify test-ledger contract',
+  'Local Postgres REST and actual Worker HTTP round-trip',
 ]);
 
 export const CONDITIONAL_CHECK_SCOPES = Object.freeze([

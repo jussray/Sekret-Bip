@@ -149,6 +149,20 @@ test('path parser understands the current proof workflow contracts', () => {
   assert.ok(shieldPaths.includes('.github/workflows/founder-shield.yml'));
 });
 
+test('isolated HTTP/PostgREST contract is mandatory even for docs-only changes', () => {
+  const name = 'Local Postgres REST and actual Worker HTTP round-trip';
+  assert.ok(ALWAYS_REQUIRED_CHECKS.includes(name), 'isolated Worker contract must not be optional');
+  const expected = expectedChecksForChangedFiles(['docs/note.md'], {});
+  assert.ok(expected.includes(name));
+  const missing = evaluateExpectedChecks({
+    expectedChecks: expected,
+    checkRuns: expected.filter(value => value !== name).map(value => run(value)),
+    expectedSha: SHA,
+  });
+  assert.equal(missing.ready, false);
+  assert.ok(missing.missing.includes(name));
+});
+
 test('docs-only changes require the universal machine membrane without inventing Playwright work', () => {
   const expected = expectedChecksForChangedFiles(['docs/example.md'], {
     '.github/workflows/product-design-playwright-proof.yml': ['src/**'],
@@ -365,10 +379,7 @@ test('merge-membrane never evaluates or accepts checks while mergeability is unk
 
 test('PR continuity evaluates the live head with trusted base code', () => {
   const source = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
-  const exactHeadJob = source.slice(
-    source.indexOf('  exact-head-audit:'),
-    source.indexOf('  metadata-receipt:'),
-  );
+  const exactHeadJob = source.slice(source.indexOf('  exact-head-audit:'));
 
   assert.match(exactHeadJob, /Check out trusted PR base evaluator/);
   assert.match(

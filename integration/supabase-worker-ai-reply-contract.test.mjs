@@ -18,8 +18,10 @@ import test from 'node:test';
  *     fixture/mocked AI reply mode; the test rejects openai replies.
  *   - paid: explicitly permits a paid AI-backed Worker reply.
  *
- * Missing env vars skip the test clearly. Paid AI is never called by default:
- * the Worker request is skipped unless AI_REPLY_CONTRACT_WORKER_MODE is set.
+ * Missing integration credentials are explicit failures, never skipped tests.
+ * Use only a separately authorized isolated test target, not the live child-data
+ * project. Paid AI is never called by default; setting a paid mode requires
+ * separate authorization and cannot be used as a test shortcut.
  */
 
 const SAFE_EVENT_TYPE = 'control_room_contract_ai_reply_fixture';
@@ -51,7 +53,11 @@ function missingEnv() {
 }
 
 async function supabaseRequest(baseUrl, serviceRoleKey, pathname, init = {}) {
-  const response = await fetch(`${baseUrl.replace(/\/$/, '')}${pathname}`, {
+  // Supabase's hosted API gateway adds /rest/v1. The isolated local
+  // PostgREST service exposes the same table operations at its root; keep
+  // this explicit so the test never claims to verify the hosted gateway.
+  const localPostgrestPath = pathname.replace(/^\/rest\/v1(?=\/)/, '');
+  const response = await fetch(`${baseUrl.replace(/\/$/, '')}${localPostgrestPath}`, {
     ...init,
     headers: {
       apikey: serviceRoleKey,
@@ -97,11 +103,22 @@ function assertReplyShape(data, workerMode) {
   }
 }
 
-test('Supabase fixture write/read boundary reaches Worker reply-shaped response', async (t) => {
+test('Supabase fixture write/read boundary reaches Worker reply-shaped response', async () => {
   const config = missingEnv();
-  if (config.missing.length > 0) {
-    t.skip(`contract test skipped; missing env: ${config.missing.join(', ')}`);
-    return;
+  assert.deepEqual(config.missing, [],
+    'Isolated Supabase/Worker integration prerequisites are mandatory: ' + config.missing.join(', '));
+  assert.equal(
+    env('AI_REPLY_CONTRACT_ISOLATED_TEST_TARGET'),
+    'true',
+    'Live child-data or production API targets are prohibited; explicitly bind an isolated test target',
+  );
+  // The opt-in flag alone is not evidence of isolation. Never let a developer
+  // accidentally run write/delete fixtures against the live child-data API.
+  for (const [label, endpoint] of [['Supabase', config.supabaseUrl], ['Worker', config.workerUrl]]) {
+    const target = new URL(endpoint);
+    assert.ok(['localhost', '127.0.0.1', '[::1]'].includes(target.hostname),
+      `${label} integration target must be loopback-only; production and shared remote projects are prohibited`);
+    assert.equal(target.protocol, 'http:', `${label} local integration target must use HTTP on loopback`);
   }
 
   const correlationId = `contract-${Date.now()}-${Math.random().toString(16).slice(2)}`;
