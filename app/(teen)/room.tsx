@@ -92,6 +92,7 @@ export default function TeenRoomRoute() {
           voiceNotes={voiceNotes}
           isLoading={isLoading}
         />
+        <BipReturnOverlay onNavigate={handleScreen} />
       </View>
 
       <View
@@ -114,7 +115,6 @@ export default function TeenRoomRoute() {
         />
       </View>
 
-      <BipReturnOverlay onNavigate={handleScreen} />
     </View>
   );
 }
