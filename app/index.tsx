@@ -555,6 +555,7 @@ export default function App() {
         vibe={vibeKey}
         companion={companion}
         sekretMode={selectedSekret}
+        oracleProfile={oracleProfile}
         BottomNav={nav}
       />
     );

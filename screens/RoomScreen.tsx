@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IMAGES, AVATARS as THEME_AVATARS, THEME_PACKS, getRoomPhase, getRoomScene, type Character, type RoomPhase, type VibeKey } from '../constants/theme';
 import type { CompanionState } from '../types/sekretCompanion';
+import type { OracleProfile } from '../services/oracleDiscovery';
 
 const { width, height } = Dimensions.get('window');
 
@@ -316,7 +317,18 @@ const getTimeOfDay = (): TimeOfDay => {
   return 'night';
 };
 
-const getPresenceLine = (character: Character, timeOfDay: TimeOfDay): string => {
+const getPresenceLine = (character: Character, timeOfDay: TimeOfDay, oracleProfile?: OracleProfile | null): string => {
+  const sessions = oracleProfile?.sessionCount ?? 0;
+  if (sessions > 0) {
+    if (character === 'night') {
+      if (sessions >= 3) return timeOfDay === 'night'
+        ? 'Night is here. feels different when someone actually knows you.'
+        : 'Night is watching. still thinking about what you said.';
+      return 'Night is here. learning how you carry things.';
+    }
+    if (character === 'cloud' && sessions >= 2) return 'Cloud is drifting. thinking about what you shared.';
+    if (character === 'raylene' && sessions >= 2) return 'Raylene is nearby. she remembers.';
+  }
   if (character === 'cloud') return 'Cloud is drifting nearby.';
   if (character === 'night') return timeOfDay === 'night' ? 'Night is here. Just us awake.' : 'Night is watching over.';
   if (timeOfDay === 'night') return 'Cloud is floating around.';
@@ -456,6 +468,7 @@ interface RoomScreenProps {
   BottomNav: React.ReactNode;
   companion?: CompanionState;
   sekretMode?: string;
+  oracleProfile?: OracleProfile | null;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -471,6 +484,7 @@ export function RoomScreen({
   BottomNav,
   companion,
   sekretMode,
+  oracleProfile,
 }: RoomScreenProps) {
 
   // ─── Derived ────────────────────────────────────────────────────────────
@@ -691,7 +705,7 @@ export function RoomScreen({
       if (character === 'cloud')   return 'Cloud is floating';
       return 'Night is here with you';
     }
-    return getPresenceLine(character, timeOfDay);
+    return getPresenceLine(character, timeOfDay, oracleProfile);
   };
 
   const timeBadge = `${vibePack.emoji} ${vibePack.feeling}`;
