@@ -116,6 +116,9 @@ export function MoreScreen({
         <TouchableOpacity style={btn()} onPress={() => setScreen('comfort')}>
           <Text style={styles.buttonText}>✨ Comfort</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={btn()} onPress={() => setScreen('meaning')}>
+          <Text style={styles.buttonText}>🌟 Meaning</Text>
+        </TouchableOpacity>
 
         <View style={{ height: 32 }} />
       </ScrollView>
