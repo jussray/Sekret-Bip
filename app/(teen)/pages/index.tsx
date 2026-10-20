@@ -88,7 +88,7 @@ const COMPANIONS = [
   { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure' },
   { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady'    },
   { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages'     },
-  { id: 'oracle',  name: 'Joseema', accent: '#c7b87a', vibe: 'guided discovery'  },
+  { id: 'oracle',  name: 'Ja', accent: '#c7b87a', vibe: 'guided discovery'  },
 ] as const;
 
 type CompanionId = (typeof COMPANIONS)[number]['id'];
@@ -818,7 +818,7 @@ export default function TeenPagesRoute() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.talkRail}>
             {COMPANIONS.filter(c => c.id !== 'me').map(c => {
               const unlocked = totalPoints >= COMPANION_UNLOCK_PTS[c.id];
-              const label = c.id === 'oracle' ? 'Oracle (Ja)' : c.name;
+              const label = c.name;
               return (
                 <TouchableOpacity
                   key={c.id}
