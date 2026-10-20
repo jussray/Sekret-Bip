@@ -45,6 +45,7 @@ test('Oracle (Ja) routes to canonical Se\'kret engine, not Suhana', () => {
   assert.match(chat, /const companionId = toCompanionId\(companionKey\)/);
   assert.match(chat, /companionId === 'sekret'/);
   assert.match(chat, /name: 'Oracle \(Ja\)'/);
+  assert.match(chat, /const portrait = companionId === 'sekret' \? null/);
 });
 
 test('existing teen route guard continues wrapping both Pages and companion-chat', () => {
