@@ -32,6 +32,7 @@ import { FURNISH_CATALOG, type FurnishCategory } from '../constants/furnishingCa
 import { BareRoomRenderer } from '../components/rooms/BareRoomRenderer';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import { getCompanionRuntime } from '@/config/companionRuntimeRegistry';
+import type { OracleProfile } from '../services/oracleDiscovery';
 
 const { width, height } = Dimensions.get('window');
 
@@ -274,8 +275,21 @@ const getTimeOfDay = (): TimeOfDay => {
   return 'night';
 };
 
-const getPresenceLine = (companion: Character, tod: TimeOfDay): string => {
+const getPresenceLine = (companion: Character, tod: TimeOfDay, oracleProfile?: OracleProfile | null): string => {
   const displayName = getCompanionRuntime(companion).label;
+  const sessions = oracleProfile?.sessionCount ?? 0;
+  if (sessions > 0) {
+    if (companion === 'night') {
+      if (sessions >= 3) return tod === 'night'
+        ? `${displayName} is here. feels different when someone actually knows you.`
+        : `${displayName} is watching. still thinking about what you said.`;
+      return `${displayName} is here. learning how you carry things.`;
+    }
+    if (companion === 'cloud') {
+      if (sessions >= 2) return `${displayName} is drifting. thinking about what you shared.`;
+    }
+    if (companion === 'raylene' && sessions >= 2) return `${displayName} is nearby. she remembers.`;
+  }
   if (companion === 'cloud') return `${displayName} is drifting nearby.`;
   if (companion === 'night') return tod === 'night' ? `${displayName} is here. Just us awake.` : `${displayName} is watching over.`;
   if (companion === 'raylene') return `${displayName} is nearby.`;
@@ -669,6 +683,7 @@ interface UserRoomScreenProps {
   sekretMode?: string;
   updateRoomMemory?: (patch: Record<string, any>) => void;
   companion?: any;
+  oracleProfile?: OracleProfile | null;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -681,6 +696,7 @@ export function UserRoomScreen({
   vibe,
   BottomNav,
   updateRoomMemory,
+  oracleProfile,
 }: UserRoomScreenProps) {
 
   // Derive initial companion from selectedSekret so first load feels right
@@ -1040,7 +1056,7 @@ export function UserRoomScreen({
             },
           ]}
         />
-        <Text style={s.presenceText}>{getPresenceLine(cId, timeOfDay)}</Text>
+        <Text style={s.presenceText}>{getPresenceLine(cId, timeOfDay, oracleProfile)}</Text>
       </Animated.View>
 
       {/* ── VibeLab edit button ───────────────────────────────────────── */}

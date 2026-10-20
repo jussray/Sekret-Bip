@@ -40,6 +40,7 @@ export default function TeenRoomRoute() {
     comfortSessions,
     voiceNotes,
     isLoading,
+    oracleProfile,
   } = useAppContext();
   const t = THEME_PACKS[theme] ?? THEME_PACKS.raylene;
   const vibe = resolveRoomVibe(theme);
@@ -80,6 +81,7 @@ export default function TeenRoomRoute() {
         BottomNav={null}
         sekretMode={selectedSekret}
         updateRoomMemory={updateRoomMemory}
+        oracleProfile={oracleProfile}
       />
       <VisualCanonAtmosphere />
       <DailyIntentionsCard
