@@ -272,6 +272,8 @@ export default function CompanionChatScreen() {
         setComfortNudge(result.suggestedComfortTool);
       }
     } catch {
+      // No private text or token details in logs; failure must remain visible to auditing.
+      console.warn('Companion reply unavailable; delivery not confirmed');
       const errMsg: ChatMsg = {
         id:   String(Date.now() + 1),
         from: 'companion',
