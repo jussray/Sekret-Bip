@@ -89,25 +89,28 @@ test('Sy scrapbook scene stays usable on a compact 320x568 phone', async ({ page
   await expect(note).toBeVisible();
   await expect(cta).toBeVisible();
 
-  const bounds = await page.evaluate(() => {
-    const sceneEl = document.querySelector('[data-testid="scrapbook-companion-scene"]');
-    const ctaEl = document.querySelector('[data-testid="scrapbook-bip-cta"]');
-    if (!sceneEl || !ctaEl) return null;
-    const sceneRect = sceneEl.getBoundingClientRect();
-    const ctaRect = ctaEl.getBoundingClientRect();
-    return {
-      sceneRight: sceneRect.right,
-      ctaBottom: ctaRect.bottom,
-      ctaTop: ctaRect.top,
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-    };
-  });
+  // ImageBackground's web test node may expose the source image's intrinsic
+  // dimensions, so validate real page overflow plus the visible interactive
+  // geometry instead of treating that intrinsic image box as layout width.
+  const viewport = await page.evaluate(() => ({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight,
+  }));
+  const ctaBox = await cta.boundingBox();
+  const noteBox = await note.boundingBox();
 
-  expect(bounds).not.toBeNull();
-  expect(bounds!.sceneRight).toBeLessThanOrEqual(bounds!.viewportWidth + 1);
-  expect(bounds!.ctaBottom).toBeLessThanOrEqual(bounds!.viewportHeight + 1);
-  expect(bounds!.ctaTop).toBeGreaterThan(0);
+  expect(viewport.scrollWidth).toBeLessThanOrEqual(viewport.width + 1);
+  expect(ctaBox).not.toBeNull();
+  expect(noteBox).not.toBeNull();
+
+  for (const box of [ctaBox!, noteBox!]) {
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+  }
 
   const screenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
   await fs.mkdir(VISUAL_DIR, { recursive: true });
