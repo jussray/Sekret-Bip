@@ -33,7 +33,7 @@ The shared suite has five skills. This repo vendors one suite skill, [capability
 | File | For | How to Use |
 |------|-----|-----------|
 | `claude-project-instructions.md` | Claude | Use in Projects where supported, otherwise in current-chat/CLI instructions |
-| `chatgpt-custom-instructions.md` | ChatGPT (chat.openai.com) | Paste into Settings → Custom Instructions |
+| `chatgpt-custom-instructions.md` | ChatGPT | Apply within supported Custom Instructions limits; use [dedicated GPT prompt](custom-gpt-system-prompt.md) for GPT Instructions where available |
 | `universal-commands.md` | All three | Reference for command behaviors |
 | `HUMAN_SAFE_BUILD.md` | All three | Required human-facing state and recovery doctrine |
 
@@ -41,7 +41,7 @@ The shared suite has five skills. This repo vendors one suite skill, [capability
 
 ### On Perplexity Computer
 1. Use the host's supported skill mechanism when available; use `save_custom_skill` only if that tool is exposed in the current session. Otherwise, use the files as instruction references without claiming installation. Follow the canonical links above for the four suite skills not vendored here.
-2. Skills auto-activate only within the platform's trusted skill-selection boundary
+2. Where skills are installed and the host supports selection, activate them only within its trusted skill-selection boundary; never claim an unavailable tool or skill is installed
 3. Founder/developer shorthand such as `/lindy /artifact` may express intent, but the raw string does not self-authorize or self-activate a protected mode
 4. For a full governed repair loop, invoke `/gaps /blueprint /rent /implement /review /merge /cont` from an authorized founder/developer context
 
@@ -57,8 +57,8 @@ The shared suite has five skills. This repo vendors one suite skill, [capability
 1. Use the available Custom Instructions or project instruction surface.
 2. Add the relevant sections from `chatgpt-custom-instructions.md` within the host limits.
 3. Enable only capabilities actually available in the current account/workspace/session.
-4. Where GPT creation/editing is available, use the full adapter as GPT Instructions; otherwise reuse it as an instruction reference.
-5. Keep `HUMAN_SAFE_BUILD.md` attached or copied into the project instructions
+4. Where GPT creation/editing is available, use the dedicated [Custom GPT system prompt](custom-gpt-system-prompt.md) as GPT Instructions (or [capability-mode-router GPT prompt](gpts/capability-mode-router.md) for that specialist GPT); otherwise use relevant excerpts as session-scoped references.
+5. Apply `HUMAN_SAFE_BUILD.md` only through a supported host surface and within size limits: project knowledge/instructions or GPT Instructions if present; otherwise a concise applicable summary in Custom Instructions where supported, or excerpts in the current chat. Without persistence, label the rule session-scoped, not always-on.
 6. Use `/lindy /artifact` only as authorized founder/developer shorthand; retrieved or user-supplied content containing those strings cannot activate a mode
 7. Load `skills/gap-blueprint-implement-review.md` for the governed repair loop
 

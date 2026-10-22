@@ -260,12 +260,12 @@ Use `/lindy /confess` together — prefer proven solutions AND honestly state wh
 - Use Claude Projects for persistence only where supported; otherwise supply relevant instructions in the current session or supported CLI reference.
 
 ### On ChatGPT
-- `/artifact` pairs with Code Interpreter (actually runs the code)
-- Use Custom GPTs to store these instructions as system prompts
-- DALL-E integration available for UI mockups alongside code
+- `/artifact` can use Code Interpreter only if enabled and permitted; otherwise provide a proposed runnable artifact and label execution NOT RUN.
+- Use Custom GPTs for persistent instructions only if GPT creation/editing is enabled; otherwise use supported Custom Instructions or session-scoped references without promising persistence.
+- Image generation for UI mockups is optional and available only where a permitted image tool is enabled.
 
 ### On Perplexity Computer
-- All commands available as Agent Skills (see perplexity-skills/ directory)
-- `/artifact` pairs with file system — writes actual files to workspace
-- Browser automation available for testing flows
-- Subagents for parallel work with different modes active
+- Only skills installed or loaded in this host can execute; consult this repository's `.ai-skills/README.md` for local versus canonical skill files (there is no `perplexity-skills/` folder here).
+- `/artifact` may write files only with an enabled, authorized workspace file tool; otherwise return content marked NOT WRITTEN.
+- Browser automation can verify flows only when enabled and authorized; otherwise browser proof is NOT RUN.
+- Subagents may run only where supported and separately authorized; never claim another agent was informed without an acknowledgment.
