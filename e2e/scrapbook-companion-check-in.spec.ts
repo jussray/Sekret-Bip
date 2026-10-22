@@ -64,6 +64,10 @@ test('approved Sy evening scrapbook check-in renders at 390x844 and hands off to
   await expect(page.getByTestId('pages-cloud-sprite')).toBeVisible();
   await expect(page.getByTestId('pages-cloud-aura')).toBeVisible();
   await expect(page.getByTestId('pages-ja-card-star')).toBeVisible();
+  await expect(page.getByTestId('pages-night-journal-backdrop')).toBeVisible();
+  const syCardBox = await page.getByTestId('pages-companion-card-rylane').boundingBox();
+  expect(syCardBox, 'Sy card should be present').not.toBeNull();
+  expect(syCardBox!.height).toBeLessThanOrEqual(145);
   const pagesPortraitWitness = await page.screenshot({ fullPage: false, animations: 'disabled' });
   await fs.mkdir(VISUAL_DIR, { recursive: true });
   await fs.writeFile(path.join(VISUAL_DIR, 'pages-five-companions-390x844.png'), pagesPortraitWitness);

@@ -411,9 +411,9 @@ const styles = StyleSheet.create({
   },
   photoWell: {
     height: 345,
-    maxHeight: '52%',
     minHeight: 270,
-    backgroundColor: '#0b0718',
+    // A percentage maxHeight can clip the nested actor to nearly nothing on web.
+    backgroundColor: '#1c1030',
     overflow: 'hidden',
     justifyContent: 'flex-end',
   },
@@ -424,7 +424,10 @@ const styles = StyleSheet.create({
     bottom: '-12%',
     height: '58%',
     borderRadius: 999,
-    backgroundColor: 'rgba(241, 103, 187, 0.08)',
+    backgroundColor: 'rgba(241, 103, 187, 0.24)',
+    shadowColor: '#ecb5ff',
+    shadowOpacity: 0.58,
+    shadowRadius: 24,
   },
   // Cloud is a luminous character, not a flat sticker. Keep the glow behind
   // the existing real Cloud actor artwork and inside the Polaroid photo well.

@@ -661,7 +661,7 @@ export default function TeenPagesRoute() {
 
   // ── Top avatar strip ───────────────────────────────────────────────────────
   const renderAvatarStrip = () => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabRail}>
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabRailViewport} contentContainerStyle={s.tabRail}>
       {PAGES_VISUAL_COMPANION_ORDER.map(id => {
         const c = COMPANIONS.find(entry => entry.id === id)!;
         const active = c.id === activeTab;
@@ -669,6 +669,7 @@ export default function TeenPagesRoute() {
         return (
           <TouchableOpacity
             key={c.id}
+            testID={`pages-companion-card-${c.id}`}
             onPress={() => unlocked ? chooseTab(c.id as CompanionId) : undefined}
             activeOpacity={unlocked ? 0.7 : 1}
             style={[s.tab, active && { borderColor: c.accent, backgroundColor: `${c.accent}18` }, !unlocked && s.tabLocked]}
@@ -822,15 +823,18 @@ export default function TeenPagesRoute() {
   // ── Main render ────────────────────────────────────────────────────────────
   return (
     <View style={s.root}>
+      {/* Keep the approved journal atmosphere visible through frosted panels. */}
+      <Image source={IMAGES.bgJournal} style={StyleSheet.absoluteFill} resizeMode="cover" pointerEvents="none" testID="pages-night-journal-backdrop" />
+      <LinearGradient colors={['rgba(16, 9, 27, 0.68)', 'rgba(23, 16, 36, 0.64)', 'rgba(9, 7, 17, 0.84)']} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <AmbientWeatherOverlay />
-      <LinearGradient colors={['#10091b', '#171024', '#090711']} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
         {/* Header */}
         <View style={s.header}>
           <View>
             <Text style={[s.kicker, { color: companion.accent }]}>SE'KRET PAGES</Text>
-            <Text style={s.title}>{companion.name}</Text>
+            <Text style={s.title}>Se’kret Pages ♡</Text>
+            <Text style={s.headerSubtitle}>your thoughts live here</Text>
           </View>
           <View style={s.headerRight}>
             <TouchableOpacity
@@ -958,7 +962,8 @@ const s = StyleSheet.create({
 
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 4, paddingBottom: 8 },
   kicker: { fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  title: { color: '#fff', fontSize: 22, fontWeight: '800', marginTop: 2 },
+  title: { color: '#fff0ff', fontSize: 26, fontWeight: '800', marginTop: 2, textShadowColor: '#b966d0', textShadowRadius: 13 },
+  headerSubtitle: { color: '#f5d4ed', fontSize: 11, marginTop: 3, letterSpacing: 0.25 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   headerAvatar: { width: 54, height: 54 },
   headerModeIcon: { width: 54, textAlign: 'center', fontSize: 34 },
@@ -969,9 +974,11 @@ const s = StyleSheet.create({
 
   // Five compact vertical Polaroid-like portraits fit the first mobile strip.
   // The sixth "Me" diary tab remains swipeable without leaking journal data.
-  tabRail: { gap: 4, paddingHorizontal: 7, paddingBottom: 12 },
+  // Prevent web from stretching the strip to the remaining screen height.
+  tabRailViewport: { flexGrow: 0, flexShrink: 0, height: 146, maxHeight: 146 },
+  tabRail: { gap: 4, paddingHorizontal: 7, paddingBottom: 6, paddingTop: 3, alignItems: 'flex-start' },
   tab: {
-    width: 68, minHeight: 130, borderRadius: 16, borderWidth: 1,
+    width: 68, height: 132, minHeight: 132, borderRadius: 16, borderWidth: 1,
     borderColor: 'rgba(255, 235, 255, 0.36)',
     backgroundColor: 'rgba(35, 20, 54, 0.47)', alignItems: 'center',
     justifyContent: 'flex-start', paddingHorizontal: 3, paddingTop: 5, paddingBottom: 6,

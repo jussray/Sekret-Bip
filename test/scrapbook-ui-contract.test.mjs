@@ -81,6 +81,10 @@ test('Pages keeps Sy a boy and Cloud a glowing cloud, not a human substitute', (
   assert.match(pages, /id: 'cloud',\s+name: 'Cloud'/);
   assert.match(pages, /neutral:\s*IMAGES\.cloudAvatarNeutral/); 
   assert.match(pages, /pages-cloud-aura/);
+  assert.match(pages, /tabRailViewport:/);
+  assert.match(pages, /height: 146, maxHeight: 146/);
+  assert.match(pages, /pages-night-journal-backdrop/);
+  assert.match(pages, /Se’kret Pages ♡/);
   assert.match(pages, /pages-cloud-sprite/);
   assert.match(theme, /cloudAvatarNeutral\s*=\s*cloud;/);
   assert.match(pages, /pages-ja-card-star/);
@@ -90,6 +94,7 @@ test('Pages keeps Sy a boy and Cloud a glowing cloud, not a human substitute', (
 
 test('approved scrapbook visual grammar and time-of-day behavior remain wired', () => {
   assert.match(component, /getRoomPhase\(new Date\(\)\)/);
+  assert.doesNotMatch(component, /maxHeight: '52%'/);
   assert.match(component, /getRoomScene\(character, phase\)/);
   assert.match(component, /you made it through today\./);
   assert.match(component, /scrapbook-companion-scene/);
