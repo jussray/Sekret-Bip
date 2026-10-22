@@ -29,6 +29,11 @@ test('approved Sy evening scrapbook check-in renders at 390x844 and hands off to
   await expect(scene).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('EVENING CHECK-IN', { exact: true })).toBeVisible();
   await expect(page.getByText('Sy', { exact: true })).toBeVisible();
+  const syActor = page.getByTestId('scrapbook-sy-actor');
+  await expect(syActor).toBeVisible();
+  const syActorBox = await syActor.boundingBox();
+  expect(syActorBox, 'Sy portrait must have measurable height').not.toBeNull();
+  expect(syActorBox!.height).toBeGreaterThanOrEqual(260);
   await expect(page.getByText('you made it through today.', { exact: true })).toBeVisible();
   await expect(cta).toBeVisible();
   await expect(cta).toHaveAccessibleName('Bip with Sy');

@@ -17,6 +17,7 @@ import {
   type Character,
   type RoomPhase,
 } from '../../constants/theme';
+import { getTeenCompanionAsset } from '../../src/utils/companions';
 
 // Ja is the current display identity for the legacy Oracle entry. Do not
 // create a second model identity or promote an ensemble screenshot to avatar canon.
@@ -30,12 +31,13 @@ const DISPLAY_NAMES: Record<ScrapbookIdentity, string> = {
   ja: 'Ja',
 };
 
-// Use actor assets that sit cleanly inside the Polaroid. Sy intentionally uses
-// the existing full-body profile asset rather than the neutral portrait that
-// carries a pale card/background in browser evidence.
+// Use actor assets that sit cleanly inside the Polaroid.
+// The old 7.5 KB rylaneProfile/fullbody alias is not the production Sy actor:
+// the existing teen image registry has the proper separate 617 KB neutral asset.
+// Reuse that existing registry instead of inventing or duplicating artwork.
 const AVATARS: Record<Character, ImageSourcePropType> = {
   raylene: IMAGES.rayleneFullbody,
-  rylane: IMAGES.rylaneProfile,
+  rylane: getTeenCompanionAsset('rylane', 'neutral') ?? IMAGES.rylaneProfile,
   cloud: IMAGES.cloudAvatarNeutral,
   night: IMAGES.nightFullbody,
 };
@@ -200,6 +202,7 @@ export function ScrapbookCompanionScene({
                   resizeMode="contain"
                   style={styles.avatar}
                   accessibilityLabel={`${displayName} companion`}
+                  testID={character === 'rylane' ? 'scrapbook-sy-actor' : undefined}
                 />
               )}
             </View>

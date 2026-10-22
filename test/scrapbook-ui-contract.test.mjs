@@ -41,6 +41,8 @@ test('scrapbook scene reuses the current companion and existing Pages destinatio
 test('Ja is the single visible alias of legacy Oracle, never a substitute actor', () => {
   assert.match(component, /raylene:\s*'Suhana'/);
   assert.match(component, /rylane:\s*'Sy'/);
+  assert.match(component, /getTeenCompanionAsset\('rylane', 'neutral'\)/);
+  assert.match(component, /scrapbook-sy-actor/);
   assert.match(component, /cloud:\s*'Cloud'/);
   assert.match(component, /night:\s*'Night'/);
   assert.doesNotMatch(component, /['"`]Raylene['"`]/);
@@ -128,5 +130,6 @@ test('Product Design proof captures the actual Sy evening scrapbook route at 390
   assert.match(e2e, /cloud-glow-390x844/);
   assert.match(e2e, /scrapbook-cloud-aura/);
   assert.match(e2e, /toHaveAccessibleName\('Bip with Sy'\)/);
+  assert.match(e2e, /syActorBox!\.height/);
   assert.match(e2e, /toHaveURL\(\/\\\/pages/);
 });
