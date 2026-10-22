@@ -257,7 +257,7 @@ Use `/lindy /confess` together — prefer proven solutions AND honestly state wh
 ### On Claude
 - `/artifact` pairs with Claude's Artifacts feature (interactive code preview)
 - Long context window means you can paste entire files with the command
-- Use Claude Projects to store these instructions persistently
+- Use Claude Projects for persistence only where supported; otherwise supply relevant instructions in the current session or supported CLI reference.
 
 ### On ChatGPT
 - `/artifact` pairs with Code Interpreter (actually runs the code)

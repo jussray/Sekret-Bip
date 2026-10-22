@@ -94,7 +94,7 @@ When working across ChatGPT + Claude + Perplexity:
 2. Build with Claude (long context, Artifacts)
 3. Iterate with ChatGPT (Code Interpreter, quick prototyping)
 4. Verify with Perplexity
-5. Ship from whichever tool has the most current working state
-6. Sync via GitHub — commit from each tool, pull before starting
+5. Ship — only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
+6. Sync use GitHub only with authorized repo access/writes; recheck branch and exact head before commit or pull
 
 Every cross-tool handoff preserves the exact repository, branch/PR, head SHA, evidence labels, rollback, and next authority gate. Tool switching never resets the gap ledger or turns missing evidence into success.
