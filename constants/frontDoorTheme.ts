@@ -25,6 +25,8 @@ export const FRONT_DOOR_THEME = {
     heart: '#ED63CE',
     pinkLight: '#FFC0EC',
     lilacLight: '#F3E8FF',
+    mintLight: '#C8FFE3',
+    emeraldRim: 'rgba(100,235,166,0.39)',
     border: 'rgba(255,255,255,0.15)',
     borderStrong: 'rgba(232,215,255,0.30)',
     surfaceSoft: 'rgba(255,255,255,0.055)',
@@ -42,6 +44,14 @@ export const FRONT_DOOR_THEME = {
   gradient: {
     wordmark: ['#FF83D7', '#A66CFF', '#5A7DFF'] as const,
     action: ['#6D43F2', '#A55CFF', '#E95FCA'] as const,
+    juniorAction: ['#C6FFE0', '#69DEAC', '#25B17D'] as const,
+    diagonalRipple: [
+      'rgba(144,255,202,0.00)',
+      'rgba(144,255,202,0.12)',
+      'rgba(51,218,148,0.36)',
+      'rgba(10,131,94,0.12)',
+      'rgba(144,255,202,0.00)',
+    ] as const,
     cinematicBackdrop: ['#030109', '#120628', '#060318'] as const,
     cinematicWash: [
       'rgba(46,123,255,0.12)',

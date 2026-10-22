@@ -241,9 +241,9 @@ export function WebWelcomeScreen({
   const copy = isBipJr
     ? {
         eyebrow: 'YOUR FAMILY. YOUR SPACE.',
-        title: 'A softer doorway for growing together.',
+        title: 'Little worlds.\nBig possibilities.',
         lead: 'Bip Jr. + Family',
-        subtitle: 'A calm family space for younger kids, with a grown-up beside them.',
+        subtitle: 'A brighter adventure for Bip Jr kids—with a grown-up beside them and their own protected space.',
         hero: BIP_JR_HERO,
         heroLabel: 'The Bip Jr family welcome artwork',
         cues: [
@@ -261,8 +261,8 @@ export function WebWelcomeScreen({
       }
     : {
         eyebrow: 'PUBLIC PREVIEW',
-        title: 'Your people.\nYour peace.',
-        lead: 'A safe little world where kids, teens, and parents can stay close—without losing their own space.',
+        title: 'Two worlds.\nOne magical beginning.',
+        lead: 'Two welcoming worlds: Se’kret Bip for teens and Bip Jr for kids, together at the doorway but separate inside.',
         subtitle: 'Come on in.',
         hero: TEEN_HERO,
         heroLabel: 'Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together',
@@ -302,6 +302,17 @@ export function WebWelcomeScreen({
         accessibilityLabel={isBipJr ? 'Bip Jr welcome' : "Se'kret Bip teen welcome"}
         style={[styles.shell, { height: shellHeight }, compact && styles.shellCompact]}
       >
+        <Animated.View
+          pointerEvents="none"
+          testID="web-welcome-diagonal-emerald-ripples"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          style={[styles.rippleLayer, ambientMotionStyle]}
+        >
+          <LinearGradient colors={FRONT_DOOR_THEME.gradient.diagonalRipple} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.ombreRibbon, styles.rippleOne]} />
+          <LinearGradient colors={FRONT_DOOR_THEME.gradient.diagonalRipple} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.ombreRibbon, styles.rippleTwo]} />
+          <LinearGradient colors={FRONT_DOOR_THEME.gradient.diagonalRipple} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.ombreRibbon, styles.rippleThree]} />
+        </Animated.View>
         <View
           pointerEvents="none"
           accessible={false}
@@ -398,13 +409,31 @@ export function WebWelcomeScreen({
               ]}
             >
               <Animated.View style={[styles.heroGlow, ambientMotionStyle]} />
-              <Image
-                testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
-                source={copy.hero}
-                resizeMode="contain"
-                style={[styles.hero, isBipJr && styles.heroBipJr]}
-                accessibilityLabel={copy.heroLabel}
-              />
+              <View style={styles.ensembleStage} testID="web-welcome-both-worlds-on-screen">
+                <View style={styles.ensembleMainArtwork}>
+                  <Image
+                    testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
+                    source={copy.hero}
+                    resizeMode="contain"
+                    style={[styles.hero, isBipJr && styles.heroBipJr]}
+                    accessibilityLabel={copy.heroLabel}
+                  />
+                </View>
+                <View style={styles.ensembleCompanionCard} testID="web-welcome-cross-world-cameo">
+                  <Image
+                    source={isBipJr ? TEEN_HERO : BIP_JR_HERO}
+                    resizeMode="cover"
+                    style={styles.ensembleCompanionImage}
+                    accessibilityLabel={isBipJr
+                      ? 'The Se’kret Bip teen family in their own separate world'
+                      : 'Bip Jr kids and family artwork in a separate child-appropriate world'}
+                  />
+                  <LinearGradient colors={['rgba(9,34,27,0.00)', 'rgba(8,24,20,0.96)']} style={styles.ensembleImageCaption}>
+                    <Text style={styles.ensembleImageLabel}>{isBipJr ? 'TEEN WORLD' : 'BIP JR. KIDS'}</Text>
+                    <Text style={styles.ensembleImageSubhead}>{isBipJr ? 'Your story awaits' : 'Little adventures, big wonder'}</Text>
+                  </LinearGradient>
+                </View>
+              </View>
             </Animated.View>
           </View>
 
@@ -446,6 +475,25 @@ export function WebWelcomeScreen({
               </LinearGradient>
             )}
           </Pressable>
+
+          {!isBipJr && (
+            <Pressable
+              testID="web-welcome-jr-entry"
+              accessibilityRole="button"
+              accessibilityLabel="Explore Bip Jr with a grown-up — continue to age-appropriate family setup"
+              onPress={() => onEnter('parent')}
+              style={({ pressed }) => [styles.jrEntryWrap, pressed && styles.enterPressed]}
+            >
+              <LinearGradient
+                colors={FRONT_DOOR_THEME.gradient.juniorAction}
+                start={{ x: 0, y: 0.4 }}
+                end={{ x: 1, y: 0.6 }}
+                style={styles.jrEntry}
+              >
+                <Text style={styles.jrEntryText}>Explore Bip Jr. + Family ↗</Text>
+              </LinearGradient>
+            </Pressable>
+          )}
 
           {showSignIn && (
             <Pressable
@@ -543,13 +591,13 @@ const styles = StyleSheet.create({
   },
   shell: {
     width: '100%',
-    maxWidth: 430,
+    maxWidth: 1150,
     maxHeight: 900,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: color.border,
     borderRadius: RADIUS.xxl + SPACE[2],
-    backgroundColor: '#0D071E',
+    backgroundColor: '#09091B',
     boxShadow: FRONT_DOOR_THEME.shadow.shell as never,
   },
   shellCompact: {
@@ -582,6 +630,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
     paddingBottom: SPACE[5],
+    paddingHorizontal: SPACE[3],
   },
   topBar: {
     minHeight: 78,
@@ -697,12 +746,12 @@ const styles = StyleSheet.create({
   title: {
     color: color.textHigh,
     fontFamily: 'Georgia',
-    fontSize: 52,
-    lineHeight: 50,
+    fontSize: 58,
+    lineHeight: 60,
     fontWeight: '400',
     letterSpacing: -2.2,
     marginTop: SPACE[2],
-    maxWidth: 360,
+    maxWidth: 900,
     textAlign: 'center',
     textShadowColor: 'rgba(153,119,255,0.26)',
     textShadowRadius: 24,
@@ -720,7 +769,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 23,
     fontWeight: '400',
-    maxWidth: 346,
+    maxWidth: 790,
     marginTop: SPACE[3],
     textAlign: 'center',
   },
@@ -737,7 +786,7 @@ const styles = StyleSheet.create({
     fontSize: TYPE.sm,
     lineHeight: 20,
     fontWeight: '700',
-    maxWidth: 350,
+    maxWidth: 790,
     marginTop: SPACE[2],
     textAlign: 'center',
   },
@@ -780,6 +829,41 @@ const styles = StyleSheet.create({
     height: '100%',
     alignSelf: 'center',
     transform: [{ translateX: 0 }],
+  },
+  ensembleStage: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+    height: '100%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: 'stretch',
+  },
+  ensembleMainArtwork: {
+    flex: 1.65,
+    overflow: 'hidden',
+    borderRadius: 24,
+    backgroundColor: 'rgba(111,87,198,0.07)',
+  },
+  ensembleCompanionCard: {
+    flex: 1,
+    overflow: 'hidden',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: color.emeraldRim,
+    backgroundColor: '#11271E',
+    boxShadow: '0 12px 45px rgba(54,200,134,0.18)' as never,
+  },
+  ensembleCompanionImage: { width: '100%', height: '100%' },
+  ensembleImageCaption: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 12, paddingTop: 38, paddingBottom: 15,
+  },
+  ensembleImageLabel: {
+    color: color.mintLight, fontSize: 10, letterSpacing: 2, fontWeight: '900',
+  },
+  ensembleImageSubhead: {
+    color: color.textHigh, fontSize: 12, fontWeight: '700', marginTop: 4,
   },
   heroBipJr: {
     width: '100%',
@@ -892,4 +976,21 @@ const styles = StyleSheet.create({
     fontSize: TYPE.sm,
     fontWeight: '700',
   },
+  rippleLayer: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden',
+  },
+  ombreRibbon: {
+    position: 'absolute', height: 130, width: '138%', left: '-19%',
+    borderRadius: 80, transform: [{ rotate: '-22deg' }],
+  },
+  rippleOne: { top: 108, opacity: 0.56 },
+  rippleTwo: { top: 282, opacity: 0.35 },
+  rippleThree: { top: 478, opacity: 0.22 },
+  jrEntryWrap: { marginHorizontal: SPACE[5], marginTop: SPACE[2] },
+  jrEntry: {
+    minHeight: 52, borderRadius: RADIUS.lg,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 1, borderColor: color.emeraldRim,
+  },
+  jrEntryText: { color: '#071F16', fontWeight: '900', fontSize: TYPE.base },
 });
