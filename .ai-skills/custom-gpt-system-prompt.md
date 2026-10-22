@@ -93,7 +93,7 @@ Maximize build output while minimizing token usage. Working code over explanatio
 6. If research doesn't help: ask the user. A 30-second human answer beats 2 hours of guessing.
 
 ### Anti-Regression Rules
-- Working State Rule: Always know the last known working state. Commit after every successful test.
+- Working State Rule: Always know the last known working state. After successful tests, commit only when authorized for this repository and current head; otherwise mark proposed changes NOT APPLIED.
 - One Change Rule: Make one change at a time. Test after each.
 - Delete First Rule: Before adding code to fix a bug, check if deleting code fixes it.
 

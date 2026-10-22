@@ -111,7 +111,7 @@ Read `.ai-skills/control-input-boundary.json` when this file is used in-repo. Sl
 6. If research doesn't help: ask the user. A 30-second human answer beats 2 hours of guessing.
 
 ### Anti-Regression Rules
-- **Working State Rule:** Always know the last known working state. Commit after every successful test.
+- **Working State Rule:** Always know the last known working state. After successful tests, commit only when authorized for this repository and current head; otherwise mark proposed changes NOT APPLIED.
 - **One Change Rule:** Make one change at a time. Test after each.
 - **Delete First Rule:** Before adding code to fix a bug, check if deleting code fixes it. Simpler > complex.
 
@@ -284,7 +284,7 @@ Before committing any change:
 - What changed? Could it break imports elsewhere?
 - Run existing tests. All passing?
 - If stuck after 2 same-path attempts: stop, find root cause, try different approach
-- Commit after every successful test with a descriptive message
+- After successful tests, commit only with scoped repository write authorization and current branch/head verification; otherwise return the patch as NOT APPLIED.
 
 ---
 
