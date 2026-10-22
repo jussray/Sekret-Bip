@@ -57,6 +57,13 @@ test('Ja is the single visible alias of legacy Oracle, never a substitute actor'
   assert.match(teenPages, /id: 'oracle',\s+name: 'Ja'/);
   assert.match(teenPages, /requested === 'ja' \? 'oracle' : requested/);
   assert.match(legacyPages, /id: 'oracle', label: 'Ja'/);
+  const history = readFileSync('app/(teen)/pages/history.tsx', 'utf8');
+  const entry = readFileSync('app/(teen)/pages/[id].tsx', 'utf8');
+  const discover = readFileSync('app/(teen)/discover.tsx', 'utf8');
+  assert.match(history, /oracle:\s*\{ label: 'Ja'/);
+  assert.match(entry, /oracle:\s*\{ label: 'Ja'/);
+  assert.match(discover, /'night', 'oracle'/);
+  assert.match(discover, /id === 'oracle'/);
 });
 
 test('approved scrapbook visual grammar and time-of-day behavior remain wired', () => {

@@ -62,7 +62,7 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'teen-more', title: 'More', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Teen feature drawer and account tools.', route: '/(teen)/more' },
 
   // Teen companions and expression
-  { key: 'companions', title: 'All Se’kret Companions', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Suhana, Sy, Cloud, and Night open without waiting for point thresholds.', route: '/(teen)/discover' },
+  { key: 'companions', title: 'All Se’kret Companions', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Suhana, Sy, Cloud, Night, and Ja are listed; Ja opens the existing guided Pages mode.', route: '/(teen)/discover' },
   { key: 'companion-picker', title: 'Companion Picker', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Choose a companion before entering chat.', route: '/(teen)/chat' },
   { key: 'raylene-chat', title: 'Suhana Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Suhana conversation. Complete AI replies require the configured Worker and model provider.', route: '/(teen)/chat/raylene' },
   { key: 'rylane-chat', title: 'Sy Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Sy conversation with preview point gating removed.', route: '/(teen)/chat/rylane' },
