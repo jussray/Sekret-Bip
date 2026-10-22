@@ -56,6 +56,9 @@ test('approved scrapbook visual grammar and time-of-day behavior remain wired', 
   assert.match(component, /scrapbook-companion-scene/);
   assert.match(component, /scrapbook-bip-cta/);
   assert.match(component, /scrapbook-check-in-launcher/);
+  assert.match(component, /character === 'cloud' && styles\.photoGlowCloud/);
+  assert.match(component, /scrapbook-cloud-aura/);
+  assert.match(component, /shadowColor: '#b7f4ff'/);
 
   for (const motif of ['sketchbook-paper', 'masking-tape', 'Polaroid', 'doodles', 'cozy dark-mode', 'time-of-day']) {
     assert.match(canon, new RegExp(motif, 'i'));

@@ -168,7 +168,11 @@ export function ScrapbookCompanionScene({
                 style={StyleSheet.absoluteFill}
                 pointerEvents="none"
               />
-              <View style={styles.photoGlow} pointerEvents="none" />
+              <View
+                style={[styles.photoGlow, character === 'cloud' && styles.photoGlowCloud]}
+                pointerEvents="none"
+                testID={character === 'cloud' ? 'scrapbook-cloud-aura' : undefined}
+              />
               <Image
                 source={AVATARS[character]}
                 resizeMode="contain"
@@ -398,6 +402,21 @@ const styles = StyleSheet.create({
     height: '58%',
     borderRadius: 999,
     backgroundColor: 'rgba(241, 103, 187, 0.08)',
+  },
+  // Cloud is a luminous character, not a flat sticker. Keep the glow behind
+  // the existing real Cloud actor artwork and inside the Polaroid photo well.
+  photoGlowCloud: {
+    left: '4%',
+    right: '4%',
+    bottom: '4%',
+    height: '84%',
+    borderRadius: 999,
+    backgroundColor: 'rgba(123, 216, 255, 0.36)',
+    shadowColor: '#b7f4ff',
+    shadowOpacity: 0.84,
+    shadowRadius: 42,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 7,
   },
   avatar: {
     width: '100%',
