@@ -257,3 +257,61 @@ test('branch hygiene classifies prohibited duplicate naming without deleting ref
     else process.env.GITHUB_HEAD_REF = previousHeadRef;
   }
 });
+
+
+// A GitHub "skipped" conclusion can mean a correct least-privilege event
+// guard. Regressions here execute on the exact PR head in Repository Truth Gate.
+// They do not turn privileged metadata or rollover jobs into PR execution.
+function continuityJobSkipContract(source, jobName) {
+  const marker = '\n  ' + jobName + ':\n';
+  const index = source.indexOf(marker);
+  assert.notEqual(index, -1, 'Missing continuity job: ' + jobName);
+  const rest = source.slice(index + marker.length);
+  const next = rest.search(/\n  [A-Za-z_][\w-]*:\s*\n/);
+  return next < 0 ? rest : rest.slice(0, next);
+}
+function continuityWorkflowSkipContract() {
+  return fs.readFileSync(path.join(repositoryRoot, '.github/workflows/pr-continuity.yml'), 'utf8');
+}
+test('CI-SKIP BIP01 a skipped PR-target exact-head audit has a PR-event counterpart', () => {
+  const source = continuityWorkflowSkipContract();
+  const audit = continuityJobSkipContract(source, 'exact-head-audit');
+  assert.match(audit, /if: github\.event_name == 'pull_request'/);
+  assert.match(audit, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(audit, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(audit, /node scripts\/pr-continuity\.mjs audit/);
+});
+test('CI-SKIP BIP02 privileged metadata runs only on PR-target trusted checkout', () => {
+  const metadata = continuityJobSkipContract(continuityWorkflowSkipContract(), 'metadata-receipt');
+  assert.match(metadata, /if: github\.event_name == 'pull_request_target'/);
+  assert.match(metadata, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(metadata, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(metadata, /pull-requests: write/);
+});
+test('CI-SKIP BIP03 rollover is explicit dispatch on main, never auto-triggered by a PR or push', () => {
+  const source = continuityWorkflowSkipContract();
+  const rollover = continuityJobSkipContract(source, 'rollover');
+  assert.match(rollover, /github\.ref == 'refs\/heads\/main' && github\.event_name == 'workflow_dispatch'/);
+  assert.doesNotMatch(source, /\n\s{2}push:\s*\n/);
+  assert.match(rollover, /contents: write/);
+  assert.match(rollover, /node scripts\/pr-continuity\.mjs rollover/);
+});
+test('CI-SKIP BIP04 skipped continuity event does not mask missing exact-head repository proof', () => {
+  const repositoryTruth = fs.readFileSync(
+    path.join(repositoryRoot, '.github/workflows/repository-truth-gate.yml'),
+    'utf8',
+  );
+  assert.match(repositoryTruth, /pull_request:\n\s+branches: \[main\]/);
+  assert.match(repositoryTruth, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(repositoryTruth, /ref: \$\{\{ env\.EXPECTED_HEAD_SHA \}\}/);
+  assert.match(repositoryTruth, /node --test test\/repository-truth-gates\.test\.mjs/);
+});
+test('CI-SKIP BIP05 widening a privileged job condition is detected as a regression', () => {
+  const source = continuityWorkflowSkipContract();
+  const modified = source.replace("if: github.event_name == 'pull_request_target'", 'if: always()');
+  assert.notEqual(modified, source);
+  assert.doesNotMatch(
+    continuityJobSkipContract(modified, 'metadata-receipt'),
+    /if: github\.event_name == 'pull_request_target'/,
+  );
+});
