@@ -71,6 +71,7 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'cloud-thoughts', title: 'Cloud Thoughts', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Quiet release space for thoughts that need somewhere soft to land.', route: '/(teen)/cloud' },
   { key: 'comfort', title: 'Emergency Comfort', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Immediate comfort cards and grounding support.', route: '/(teen)/comfort' },
   { key: 'discover', title: 'Discover', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Companion and quick-tool discovery surface.', route: '/(teen)/discover' },
+  { key: 'scrapbook-check-in', title: 'Scrapbook Companion Check-In', group: 'Teen · Companions', side: 'teen', status: 'ui_preview', detail: 'Reusable time-of-day companion scene with paper, tape, doodles, Polaroid framing, and the existing Pages handoff. It adds no new persistence or sharing boundary.', route: '/(teen)/scrapbook-check-in' },
 
   // Teen growth and rewards
   { key: 'retention', title: 'Bip Story Return Loop', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Meaningful-action receipts, active-day History, and the intentional Bip Energy fade.', route: '/(teen)/room' },
