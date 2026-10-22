@@ -150,16 +150,6 @@
       "maxMatches": 2,
       "expiresAt": "2027-01-10T00:00:00Z",
       "rationale": "Static source assertions that worker/provider-runtime.ts contains the fixed provider endpoint literals. They do not validate or authorize any runtime URL. Replacing them with String.includes trips js/incomplete-url-substring-sanitization instead."
-    },
-    {
-      "id": "live-signup-mailbox-evidence-and-env",
-      "language": "javascript-typescript",
-      "ruleId": "js/http-to-file-access",
-      "path": "scripts/live-signup-mailbox.mjs",
-      "messageIncludes": "Write to file system depends on",
-      "maxMatches": 2,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "Writes mailbox-provider values to $GITHUB_ENV and to fixed artifacts/ receipt names. Every GITHUB_ENV write goes through scripts/github-env-line.mjs, which refuses CR/LF values and non-identifier names (test/github-env-line.test.mjs), so a provider response cannot inject variables; artifact file names are string literals."
     }
   ]
 }
