@@ -57,7 +57,7 @@ test('Supabase fresh replay uses immutable workflow dependencies and no checkout
 test('Supabase fresh replay retries only transient registry pull failures', () => {
   const content = workflow('supabase-fresh-replay.yml');
 
-  assert.match(content, /for attempt in 1 2 3/);
+  assert.match(content, /for attempt in 1 2 3 4 5/);
   assert.match(content, /PIPESTATUS\[0\]/);
   assert.match(content, /toomanyrequests\|too many requests\|rate\.\?limit/);
   assert.match(content, /failed to pull docker image/);
@@ -65,4 +65,12 @@ test('Supabase fresh replay retries only transient registry pull failures', () =
   assert.match(content, /exit "\$status"/);
   assert.match(content, /supabase stop --no-backup \|\| true/);
   assert.match(content, /sleep "\$\(\(attempt \* 20\)\)"/);
+});
+
+
+test('Supabase fresh replay serializes container-heavy PR proof across the repository', () => {
+  const content = workflow('supabase-fresh-replay.yml');
+
+  assert.match(content, /group: supabase-fresh-replay-\$\{\{ github\.repository \}\}/);
+  assert.match(content, /cancel-in-progress: false/);
 });
