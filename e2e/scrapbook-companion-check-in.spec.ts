@@ -60,3 +60,26 @@ test('approved Sy evening scrapbook check-in renders at 390x844 and hands off to
   await cta.click();
   await expect(page).toHaveURL(/\/pages(?:\/|\?|$)/);
 });
+
+test('Cloud glow is rendered in the real scrapbook browser scene at 390x844', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/scrapbook-check-in?bipDevSide=teen&companion=cloud', { waitUntil: 'domcontentloaded' });
+
+  const scene = page.getByTestId('scrapbook-companion-scene');
+  const aura = page.getByTestId('scrapbook-cloud-aura');
+  await expect(scene).toBeVisible({ timeout: 15_000 });
+  await expect(aura).toBeVisible();
+  await expect(aura).toHaveCSS('background-color', 'rgba(123, 216, 255, 0.36)');
+  await expect(page.getByTestId('scrapbook-bip-cta')).toHaveAccessibleName('Bip with Cloud');
+
+  const metrics = await page.evaluate(() => ({
+    innerWidth: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.innerWidth + 1);
+
+  const screenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
+  await fs.mkdir(VISUAL_DIR, { recursive: true });
+  await fs.writeFile(path.join(VISUAL_DIR, 'cloud-glow-390x844.png'), screenshot);
+  await testInfo.attach('cloud-glow-390x844.png', { body: screenshot, contentType: 'image/png' });
+});

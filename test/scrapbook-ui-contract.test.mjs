@@ -81,6 +81,8 @@ test('Product Design proof captures the actual Sy evening scrapbook route at 390
   assert.match(e2e, /EVENING CHECK-IN/);
   assert.match(e2e, /you made it through today\./);
   assert.match(e2e, /sy-evening-390x844\.png/);
+  assert.match(e2e, /cloud-glow-390x844/);
+  assert.match(e2e, /scrapbook-cloud-aura/);
   assert.match(e2e, /toHaveAccessibleName\('Bip with Sy'\)/);
   assert.match(e2e, /toHaveURL\(\/\\\/pages/);
 });
