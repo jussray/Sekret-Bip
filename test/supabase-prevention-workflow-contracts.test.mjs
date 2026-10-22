@@ -64,7 +64,7 @@ test('Supabase fresh replay retries only transient registry pull failures', () =
   assert.match(content, /error pulling image configuration/);
   assert.match(content, /exit "\$status"/);
   assert.match(content, /supabase stop --no-backup \|\| true/);
-  assert.match(content, /sleep "\$\(\(attempt \* 20\)\)"/);
+  assert.match(content, /sleep "\$\(\(attempt \* 30\)\)"/);
 });
 
 
