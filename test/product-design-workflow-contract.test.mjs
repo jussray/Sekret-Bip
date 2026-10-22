@@ -32,6 +32,20 @@ test('production browser-proof workflow changes trigger exact-head Product Desig
   );
 });
 
+test('scrapbook Product Design contract changes always trigger browser proof', () => {
+  const pullRequest = sectionBetween('  pull_request:', '  push:');
+  assert.match(
+    pullRequest,
+    /- 'test\/scrapbook-ui-contract\.test\.mjs'/,
+    'scrapbook contract-only changes must still schedule exact-head Product Design proof',
+  );
+  assert.match(
+    pullRequest,
+    /- 'e2e\/scrapbook-companion-check-in\.spec\.ts'/,
+    'scrapbook browser witness changes must schedule exact-head Product Design proof',
+  );
+});
+
 test('Product Design proof remains exact-head and failure-preserving', () => {
   for (const required of [
     'EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}',
