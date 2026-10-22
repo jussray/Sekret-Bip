@@ -90,7 +90,8 @@ test('Ja alias reaches the existing Oracle-guided Pages tab without a duplicate 
   await expect(page.getByTestId('scrapbook-companion-scene')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('scrapbook-ja-presence')).toBeVisible();
   await expect(page.getByTestId('scrapbook-bip-cta')).toHaveAccessibleName('Bip with Ja');
-  await expect(page.getByText('Ja', { exact: true })).toBeVisible();
+  // Ja appears in both the Polaroid portrait treatment and its caption.
+  await expect(page.getByText('Ja', { exact: true }).first()).toBeVisible();
 
   const screenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
   await fs.mkdir(VISUAL_DIR, { recursive: true });
