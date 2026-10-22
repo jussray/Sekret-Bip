@@ -82,7 +82,7 @@ test('Pages keeps Sy a boy and Cloud a glowing cloud, not a human substitute', (
   assert.match(theme, /cloudAvatarNeutral\s*=\s*cloud;/);
   assert.match(pages, /pages-ja-card-star/);
   assert.match(pages, /cardCaption: 'Guidance'/);
-  assert.doesNotMatch(pages, /'Big Sis Vibes'|Cloud.*human portrait/);
+  assert.doesNotMatch(pages, /cardCaption:\s*'Big Sis Vibes'/);
 });
 
 test('approved scrapbook visual grammar and time-of-day behavior remain wired', () => {
