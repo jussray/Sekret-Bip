@@ -251,7 +251,7 @@ Use `/lindy /confess` together — proven solutions + honest uncertainty. No sta
 - **Long context window:** Paste entire files. Don't summarize before asking. Claude can read a full repo.
 - **Artifacts feature:** Use for interactive React/HTML/CSS components. Preview code before committing.
 - **XML-structured prompts:** Use `<task>`, `<constraints>`, `<format>` tags for complex multi-part requests.
-- **Claude Projects:** Store project context, repo structure, conventions. They persist across conversations.
+- **Claude Projects:** Persist context only where available; otherwise use active-chat or supported CLI references without claiming cross-session persistence.
 - **Claude Code (CLI):** Can read/write files directly, run terminal commands, execute tests. Use this for actual development work.
 
 ### When to Use Claude vs Other Tools
@@ -268,10 +268,10 @@ Use `/lindy /confess` together — proven solutions + honest uncertainty. No sta
 ```
 1. Perplexity: Research the API/library → Save findings to file in repo
 2. Claude: Generate code based on findings → Commit to GitHub
-3. ChatGPT: Test code in Code Interpreter → Fix issues, commit fixes
+3. ChatGPT: Test with enabled tools; propose or commit changes only when scoped repository write access is authorized
 4. Perplexity: Verify final output works in browser
-5. Any: Ship from wherever working code is most current
-6. Sync: git pull before starting, git commit before switching tools
+5. Any: Ship — only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
+6. Sync: use GitHub only with authorized repo access/writes; recheck branch and exact head before commit or pull
 ```
 
 Every relay preserves repository, branch/PR, exact head SHA, evidence labels, rollback, and next authority gate. A tool switch does not reset the governed repair state or authorize stale evidence.

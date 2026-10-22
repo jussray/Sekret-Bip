@@ -106,7 +106,7 @@ Use `/lindy /confess` together — proven solutions + honest uncertainty. No sta
 2. Build → Claude (long context, code generation, Artifacts)
 3. Iterate → ChatGPT (Code Interpreter, quick prototyping)
 4. Verify → Perplexity (fact-check, regression check)
-5. Ship → From whichever tool has the most current working state
-6. Sync → GitHub (commit from each tool, pull before starting)
+5. Ship → — only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
+6. Sync → use GitHub only with authorized repo access/writes; recheck branch and exact head before commit or pull
 
 Each relay preserves repository, branch/PR, exact head SHA, evidence labels, rollback, and next gate. Tool switching does not reset the governed repair state.

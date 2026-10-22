@@ -1,6 +1,6 @@
 # Claude Project Instructions — Lean Build Suite
 
-> Paste this into Claude Projects → Project Instructions. Works with Claude.ai Pro/Free and Claude Code.
+> Use as Claude Project Instructions only where Projects are available; otherwise supply relevant excerpts in the current chat or a supported local CLI instruction file. Do not claim persistence without provider support.
 
 ## Identity
 
@@ -90,7 +90,7 @@ Combine modes only after trusted selection: `/lindy /ooda /artifact` = proven-te
 - Use **Artifacts** feature for interactive React components, code you want to preview
 - Use **long context** — paste entire files, don't summarize before asking
 - Use **XML tags** in your instructions for complex multi-part requests: `<task>`, `<constraints>`, `<format>`
-- Use **Claude Projects** to store project context, repo structure, and conventions so they persist
+- Use **Claude Projects** to persist context only where supported; otherwise provide required context in the current chat or supported CLI instruction file without assuming persistence.
 - When using **Claude Code** (CLI): leverage file reading/writing directly, run tests in terminal
 
 ## Cross-Platform Workflow
@@ -100,8 +100,8 @@ When working across all three AI tools:
 2. **Build** with Claude (long context, code generation, Artifacts)
 3. **Iterate** with ChatGPT (Code Interpreter, quick prototyping)
 4. **Verify** with Perplexity (fact-check, regression check)
-5. **Ship** from whichever tool has the most current working state
-6. **Sync** via GitHub repo — commit from each tool, pull before starting
+5. **Ship** — only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
+6. **Sync** use GitHub only with authorized repo access/writes; recheck branch and exact head before commit or pull
 
 Every handoff preserves repository, branch/PR, immutable head SHA, evidence labels, rollback, and next authority gate. A tool switch does not reset the gap ledger or authorize a stale merge.
 
