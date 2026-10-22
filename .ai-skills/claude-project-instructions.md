@@ -112,7 +112,7 @@ Before committing any change:
 - What changed? Could it break imports elsewhere?
 - Run existing tests. All passing?
 - If stuck after 2 same-path attempts: stop, re-read error, find root cause
-- Commit after every successful test
+- After successful tests, commit only when authorized for this repository and current head; otherwise mark proposed changes NOT APPLIED
 
 ## Intent Parsing
 
