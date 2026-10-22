@@ -265,6 +265,19 @@ export default function TeenPagesRoute() {
   const [avatarState, setAvatarState] = useState<SekretAvatarState>('neutral');
   const { total: totalPoints } = usePoints();
 
+  // A Pages screen can stay mounted while navigation changes its companion
+  // query. Apply a new explicit deep link without overriding subsequent
+  // manual tab choices when the query stays unchanged.
+  useEffect(() => {
+    if (!requestedTab) return;
+    const incoming = COMPANIONS.find(c => c.id === requestedTab)?.id;
+    if (!incoming) return;
+    setActiveTab(incoming);
+    setAvatarState(isAiTab(incoming) ? 'listening' : 'neutral');
+  }, [requestedTab]);
+
+
+
   // ── Composer state ─────────────────────────────────────────────────────────
   const [locked, setLocked]     = useState(false);
   const [mediaUri, setMediaUri] = useState<string | undefined>();

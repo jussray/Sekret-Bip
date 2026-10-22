@@ -56,6 +56,9 @@ test('Ja is the single visible alias of legacy Oracle, never a substitute actor'
   const legacyPages = readFileSync('screens/PagesScreen.tsx', 'utf8');
   assert.match(teenPages, /id: 'oracle',\s+name: 'Ja'/);
   assert.match(teenPages, /requested === 'ja' \? 'oracle' : requested/);
+  // A reused Pages route must honor a NEW explicit companion deep link.
+  assert.match(teenPages, /const incoming = COMPANIONS\.find\(c => c\.id === requestedTab\)\?\.id/);
+  assert.match(teenPages, /useEffect\(\(\) => \{[\s\S]*?setActiveTab\(incoming\);[\s\S]*?\}, \[requestedTab\]\)/);
   assert.match(legacyPages, /id: 'oracle', label: 'Ja'/);
   const history = readFileSync('app/(teen)/pages/history.tsx', 'utf8');
   const entry = readFileSync('app/(teen)/pages/[id].tsx', 'utf8');
