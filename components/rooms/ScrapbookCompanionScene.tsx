@@ -18,11 +18,16 @@ import {
   type RoomPhase,
 } from '../../constants/theme';
 
-const DISPLAY_NAMES: Record<Character, string> = {
+// Ja is the current display identity for the legacy Oracle entry. Do not
+// create a second model identity or promote an ensemble screenshot to avatar canon.
+export type ScrapbookIdentity = Character | 'ja';
+
+const DISPLAY_NAMES: Record<ScrapbookIdentity, string> = {
   raylene: 'Suhana',
   rylane: 'Sy',
   cloud: 'Cloud',
   night: 'Night',
+  ja: 'Ja',
 };
 
 // Use actor assets that sit cleanly inside the Polaroid. Sy intentionally uses
@@ -73,7 +78,7 @@ const PHASE_COPY: Record<RoomPhase, { eyebrow: string; note: string; accent: str
   },
 };
 
-export function normalizeScrapbookCompanion(value?: string | null): Character {
+export function normalizeScrapbookCompanion(value?: string | null): ScrapbookIdentity {
   switch ((value ?? '').trim().toLowerCase()) {
     case 'sy':
     case 'rylane':
@@ -82,6 +87,10 @@ export function normalizeScrapbookCompanion(value?: string | null): Character {
       return 'cloud';
     case 'night':
       return 'night';
+    case 'ja':
+    case 'oracle':
+    case 'sekret':
+      return 'ja';
     case 'suhana':
     case 'soft':
     case 'raylene':
@@ -109,7 +118,9 @@ export function ScrapbookCompanionScene({
   const displayName = DISPLAY_NAMES[character];
   const phase = useMemo(() => getRoomPhase(new Date()), []);
   const phaseCopy = PHASE_COPY[phase];
-  const roomArt = useMemo(() => getRoomScene(character, phase), [character, phase]);
+  // Ja uses the existing journal atmosphere while isolated Ja character art
+  // awaits exact-identity approval. This background is never avatar authority.
+  const roomArt = useMemo(() => character === 'ja' ? IMAGES.bgJournal : getRoomScene(character, phase), [character, phase]);
 
   return (
     <ImageBackground
@@ -173,12 +184,24 @@ export function ScrapbookCompanionScene({
                 pointerEvents="none"
                 testID={character === 'cloud' ? 'scrapbook-cloud-aura' : undefined}
               />
-              <Image
-                source={AVATARS[character]}
-                resizeMode="contain"
-                style={styles.avatar}
-                accessibilityLabel={`${displayName} companion`}
-              />
+              {character === 'ja' ? (
+                <View
+                  style={styles.jaPresence}
+                  accessibilityLabel="Ja companion presence"
+                  testID="scrapbook-ja-presence"
+                >
+                  <Text style={styles.jaHalo} accessibilityElementsHidden>✧</Text>
+                  <Text style={styles.jaName}>Ja</Text>
+                  <Text style={styles.jaSubline}>some questions deserve their own page</Text>
+                </View>
+              ) : (
+                <Image
+                  source={AVATARS[character]}
+                  resizeMode="contain"
+                  style={styles.avatar}
+                  accessibilityLabel={`${displayName} companion`}
+                />
+              )}
             </View>
             <View style={styles.polaroidCaptionRow}>
               <Text style={styles.polaroidCaption}>{displayName}</Text>
@@ -417,6 +440,35 @@ const styles = StyleSheet.create({
     shadowRadius: 42,
     shadowOffset: { width: 0, height: 0 },
     elevation: 7,
+  },
+  // Decorative continuity symbol only, NOT a replacement for Ja's
+  // approved isolated human-character portrait. Keep design QA blocked.
+  jaPresence: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(31, 15, 48, 0.52)',
+    paddingHorizontal: 18,
+  },
+  jaHalo: {
+    color: '#ffe4a6',
+    fontSize: 112,
+    textShadowColor: 'rgba(255, 214, 147, 0.8)',
+    textShadowRadius: 36,
+  },
+  jaName: {
+    color: '#fff1cc',
+    fontSize: 38,
+    fontFamily: handwritingFont,
+    textShadowColor: 'rgba(255, 194, 130, 0.75)',
+    textShadowRadius: 18,
+  },
+  jaSubline: {
+    color: '#ffefde',
+    fontSize: 13,
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 19,
   },
   avatar: {
     width: '100%',

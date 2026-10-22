@@ -83,3 +83,21 @@ test('Cloud glow is rendered in the real scrapbook browser scene at 390x844', as
   await fs.writeFile(path.join(VISUAL_DIR, 'cloud-glow-390x844.png'), screenshot);
   await testInfo.attach('cloud-glow-390x844.png', { body: screenshot, contentType: 'image/png' });
 });
+
+test('Ja alias reaches the existing Oracle-guided Pages tab without a duplicate character', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/scrapbook-check-in?bipDevSide=teen&companion=ja', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('scrapbook-companion-scene')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByTestId('scrapbook-ja-presence')).toBeVisible();
+  await expect(page.getByTestId('scrapbook-bip-cta')).toHaveAccessibleName('Bip with Ja');
+  await expect(page.getByText('Ja', { exact: true })).toBeVisible();
+
+  const screenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
+  await fs.mkdir(VISUAL_DIR, { recursive: true });
+  await fs.writeFile(path.join(VISUAL_DIR, 'ja-identity-390x844.png'), screenshot);
+  await testInfo.attach('ja-identity-390x844.png', { body: screenshot, contentType: 'image/png' });
+
+  await page.getByTestId('scrapbook-bip-cta').click();
+  await expect(page).toHaveURL(/\/pages(?:\/|\?|$)/);
+  await expect(page.getByText('Ja', { exact: true }).first()).toBeVisible();
+});

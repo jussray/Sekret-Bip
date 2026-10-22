@@ -51,7 +51,7 @@ export const FOUNDER_PREVIEW_POINTS = 999;
 export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   // Teen core
   { key: 'teen-room', title: 'Room', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Companion home, mood atmosphere, feature hotspots, and Bip return receipts.', route: '/(teen)/room' },
-  { key: 'teen-pages', title: 'Pages', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Continuous journal with Suhana, Sy, Cloud, Night, Me, and Oracle tabs.', route: '/(teen)/pages' },
+  { key: 'teen-pages', title: 'Pages', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Continuous journal with Suhana, Sy, Cloud, Night, Me, and Ja (legacy oracle tab).', route: '/(teen)/pages' },
   { key: 'teen-pages-new', title: 'New Page', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Direct entry composer route.', route: '/(teen)/pages/new' },
   { key: 'teen-pages-history', title: 'Pages History', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Saved journal timeline and entry history.', route: '/(teen)/pages/history' },
   { key: 'teen-calm', title: 'Calm', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Comfort, grounding, regulation, and wind-down tools.', route: '/(teen)/calm' },

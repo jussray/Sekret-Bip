@@ -13,7 +13,7 @@
 //   ✓ AI reply voice playback via fetchSekretVoice
 //   ✓ Supabase sync via onSave / patchJournalEntry
 //   ✓ sekretReply persisted via patchJournalEntry(id, { sekretReply })
-//   ✓ Me = private non-AI journaling, Joseema = guided discovery (legacy id: oracle)
+//   ✓ Me = private non-AI journaling, Ja = guided discovery (legacy id: oracle)
 //   ✗ NO sekret:chat:history:* storage — entries are the only truth
 
 import React, {
@@ -40,7 +40,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AmbientWeatherOverlay } from '../../../components/AmbientWeatherOverlay';
 import { useAppContext } from '@/context/AppContext';
@@ -89,7 +89,7 @@ const COMPANIONS = [
   { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure' },
   { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady'    },
   { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages'     },
-  { id: 'oracle',  name: 'Joseema', accent: '#c7b87a', vibe: 'guided discovery'  },
+  { id: 'oracle',  name: 'Ja', accent: '#c7b87a', vibe: 'guided discovery'  },
 ] as const;
 
 type CompanionId = (typeof COMPANIONS)[number]['id'];
@@ -249,8 +249,12 @@ export default function TeenPagesRoute() {
   } = useAppContext();
 
   // ── Companion state ────────────────────────────────────────────────────────
+  const { companion: entryCompanion } = useLocalSearchParams<{ companion?: string | string[] }>();
+  const requested = Array.isArray(entryCompanion) ? entryCompanion[0] : entryCompanion;
+  const requestedTab = requested === 'ja' ? 'oracle' : requested;
   const [activeTab, setActiveTab] = useState<CompanionId>(() =>
-    (COMPANIONS.some(c => c.id === selectedSekret) ? selectedSekret : 'raylene') as CompanionId,
+    (COMPANIONS.some(c => c.id === requestedTab) ? requestedTab
+      : COMPANIONS.some(c => c.id === selectedSekret) ? selectedSekret : 'raylene') as CompanionId,
   );
   const [avatarState, setAvatarState] = useState<SekretAvatarState>('neutral');
   const { total: totalPoints } = usePoints();

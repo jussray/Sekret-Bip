@@ -18,7 +18,9 @@ export default function ScrapbookCheckInRoute() {
   const openPages = () => {
     router.push({
       pathname: TEEN_ROUTES.pages,
-      params: { companion: companionKey },
+      // The Pages tab's established persisted vocabulary is still `oracle`.
+      // Ja is its display name, not a new storage or backend identity.
+      params: { companion: companionKey === 'ja' ? 'oracle' : companionKey },
     } as never);
   };
 

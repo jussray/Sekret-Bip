@@ -34,6 +34,7 @@ Visible peer-companion names for this reusable character-scene system are canoni
 - **Sy**
 - **Cloud**
 - **Night**
+- **Ja** (legacy Oracle identifier)
 
 Legacy identifiers may remain only as internal compatibility aliases while the runtime is migrated:
 
@@ -44,7 +45,9 @@ rylane  -> Sy
 
 Do not surface `Raylene` or `Rylane` as current character copy.
 
-**Oracle/Se’kret remains part of the Bip world.** Existing project authority defines Oracle/Se’kret as the continuity presence rather than the same peer/voice-companion actor class as Suhana, Sy, Cloud, and Night. This slice therefore does not silently reclassify Oracle/Se’kret into a Polaroid peer-companion slot. A future scrapbook treatment for that presence should preserve its distinct continuity role instead of pretending it is missing or identical to the four peer companions.
+**Ja is Oracle.** The approved display name for the fifth companion is **Ja**. Existing teen Pages and other internal systems use `oracle` as an older route/tab identifier; their backend can normalize that to `sekret`. These are compatibility identifiers for the same continuity entry, **not** a sixth character. Do not show `Oracle (Ja)` or use the old `Joseema` display label in teen Pages.
+
+Ja has a distinct fifth scrapbook view, using the existing journal atmosphere and a golden continuity symbol **only while a founder-approved isolated Ja portrait is unavailable**. It is not an invented face, not character-authority evidence, and not visual sign-off on Ja's final real-human cinematic identity. The teen route delegates to the existing Pages `oracle` tab; no extra AI provider, chat history, parent visibility, or persistence is created. Internal reasoning safety/privacy boundaries remain unchanged.
 
 ## First approved scene
 

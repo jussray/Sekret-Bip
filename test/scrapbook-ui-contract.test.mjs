@@ -34,19 +34,29 @@ test('scrapbook scene reuses the current companion and existing Pages destinatio
   assert.match(route, /requestedCompanion \?\? selectedSekret/);
   assert.match(route, /normalizeScrapbookCompanion/);
   assert.match(route, /pathname:\s*TEEN_ROUTES\.pages/);
-  assert.match(route, /params:\s*\{ companion: companionKey \}/);
+  assert.match(route, /companionKey === 'ja' \? 'oracle' : companionKey/);
   assert.doesNotMatch(route, /companion-chat/);
 });
 
-test('visible peer companion canon stays Suhana, Sy, Cloud, and Night while Oracle remains a distinct continuity presence', () => {
+test('Ja is the single visible alias of legacy Oracle, never a substitute actor', () => {
   assert.match(component, /raylene:\s*'Suhana'/);
   assert.match(component, /rylane:\s*'Sy'/);
   assert.match(component, /cloud:\s*'Cloud'/);
   assert.match(component, /night:\s*'Night'/);
   assert.doesNotMatch(component, /['"`]Raylene['"`]/);
   assert.doesNotMatch(component, /['"`]Rylane['"`]/);
-  assert.match(canon, /Oracle\/Se’kret remains part of the Bip world/);
-  assert.match(canon, /continuity presence/);
+  assert.match(component, /ja:\s*'Ja'/);
+  assert.match(component, /case 'oracle':/);
+  assert.match(component, /case 'ja':/);
+  assert.match(component, /scrapbook-ja-presence/);
+  assert.match(component, /IMAGES\.bgJournal/);
+  assert.match(canon, /Ja is Oracle/);
+  assert.match(canon, /isolated Ja portrait/);
+  const teenPages = readFileSync('app/(teen)/pages/index.tsx', 'utf8');
+  const legacyPages = readFileSync('screens/PagesScreen.tsx', 'utf8');
+  assert.match(teenPages, /id: 'oracle',\s+name: 'Ja'/);
+  assert.match(teenPages, /requested === 'ja' \? 'oracle' : requested/);
+  assert.match(legacyPages, /id: 'oracle', label: 'Ja'/);
 });
 
 test('approved scrapbook visual grammar and time-of-day behavior remain wired', () => {
