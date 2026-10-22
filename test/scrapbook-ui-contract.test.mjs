@@ -66,6 +66,25 @@ test('Ja is the single visible alias of legacy Oracle, never a substitute actor'
   assert.match(discover, /id === 'oracle'/);
 });
 
+test('Pages keeps Sy a boy and Cloud a glowing cloud, not a human substitute', () => {
+  const pages = readFileSync('app/(teen)/pages/index.tsx', 'utf8');
+  const theme = readFileSync('constants/theme.base.ts', 'utf8');
+  assert.match(pages, /'rylane', 'raylene', 'cloud', 'night', 'oracle', 'me'/);
+  assert.match(pages, /id: 'rylane',\s+name: 'Sy'/);
+  assert.match(pages, /cardCaption: 'Big Bro Vibes'/);
+  assert.match(pages, /getTeenCompanionAsset\('rylane'/);
+  assert.match(pages, /pages-sy-boy-portrait/);
+  assert.match(theme, /rylaneProfile\s*=\s*rylaneFullbody/);
+  assert.match(pages, /id: 'cloud',\s+name: 'Cloud'/);
+  assert.match(pages, /neutral:\s*IMAGES\.cloudAvatarNeutral/); 
+  assert.match(pages, /pages-cloud-aura/);
+  assert.match(pages, /pages-cloud-sprite/);
+  assert.match(theme, /cloudAvatarNeutral\s*=\s*cloud;/);
+  assert.match(pages, /pages-ja-card-star/);
+  assert.match(pages, /cardCaption: 'Guidance'/);
+  assert.doesNotMatch(pages, /'Big Sis Vibes'|Cloud.*human portrait/);
+});
+
 test('approved scrapbook visual grammar and time-of-day behavior remain wired', () => {
   assert.match(component, /getRoomPhase\(new Date\(\)\)/);
   assert.match(component, /getRoomScene\(character, phase\)/);

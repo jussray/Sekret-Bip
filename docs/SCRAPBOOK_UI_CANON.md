@@ -36,6 +36,8 @@ Visible peer-companion names for this reusable character-scene system are canoni
 - **Night**
 - **Ja** (legacy Oracle identifier)
 
+The approved Se’kret Pages screenshot is **layout authority, not unconditional actor authority**. Its Cloud card incorrectly depicts a human. Cloud must always use the existing actual luminous cloud mascot asset, enhanced by a blue-white halo. **Sy is a boy**, and his card must use the approved boy actor keyed internally as `rylane` (not a girl silhouette). Suhana stays female; Night retains his individual darker style. Ja stays the silver-lavender-haired, gold-accented fifth identity; the current symbolic Ja preview is intentionally not a replacement for a reviewed isolated portrait. The Pages card order is **Sy, Suhana, Cloud, Night, Ja**, with Me available separately for private journaling.
+
 Legacy identifiers may remain only as internal compatibility aliases while the runtime is migrated:
 
 ```text

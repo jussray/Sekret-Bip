@@ -59,6 +59,18 @@ test('approved Sy evening scrapbook check-in renders at 390x844 and hands off to
 
   await cta.click();
   await expect(page).toHaveURL(/\/pages(?:\/|\?|$)/);
+  // Verify actual Pages artwork, not the inaccurate human Cloud in the mockup.
+  await expect(page.getByTestId('pages-sy-boy-portrait')).toBeVisible();
+  await expect(page.getByTestId('pages-cloud-sprite')).toBeVisible();
+  await expect(page.getByTestId('pages-cloud-aura')).toBeVisible();
+  await expect(page.getByTestId('pages-ja-card-star')).toBeVisible();
+  const pagesPortraitWitness = await page.screenshot({ fullPage: false, animations: 'disabled' });
+  await fs.mkdir(VISUAL_DIR, { recursive: true });
+  await fs.writeFile(path.join(VISUAL_DIR, 'pages-five-companions-390x844.png'), pagesPortraitWitness);
+  await testInfo.attach('pages-five-companions-390x844.png', {
+    body: pagesPortraitWitness,
+    contentType: 'image/png',
+  });
 });
 
 test('Cloud glow is rendered in the real scrapbook browser scene at 390x844', async ({ page }, testInfo) => {
