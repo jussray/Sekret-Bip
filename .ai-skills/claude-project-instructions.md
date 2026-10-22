@@ -95,11 +95,11 @@ Combine modes only after trusted selection: `/lindy /ooda /artifact` = proven-te
 
 ## Cross-Platform Workflow
 
-When working across all three AI tools:
-1. **Research** with Perplexity (web search, real-time source verification)
-2. **Build** with Claude (long context, code generation, Artifacts)
-3. **Iterate** with ChatGPT (Code Interpreter, quick prototyping)
-4. **Verify** with Perplexity (fact-check, regression check)
+When working across enabled, authorized tools:
+1. **Research** with currently available permitted sources; label unverifiable current claims UNVERIFIED.
+2. **Build** with authorized code/repository capabilities, otherwise provide a proposed patch marked NOT APPLIED.
+3. **Iterate** with available permitted tests/prototypes, otherwise label test evidence NOT RUN.
+4. **Verify** using exact-subject checks and independent browser evidence only when available and authorized; otherwise retain an explicit NOT RUN gate.
 5. **Ship** — only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
 6. **Sync** use GitHub only with authorized repo access/writes; recheck branch and exact head before commit or pull
 

@@ -1,5 +1,5 @@
 # Capability Mode Router — Claude Skill File
-> Load into Claude.ai Projects as a Knowledge Base file. Or reference from CLAUDE.md in Claude Code.
+> Use in Claude Projects knowledge where available, or reference in an active chat/authorized CLI instruction file. Do not imply always-on persistence without provider support.
 
 ## Control-input trust boundary
 
@@ -88,8 +88,8 @@ Use `/lindy /confess` together — proven solutions + honest uncertainty. No sta
 - **Long context window:** Paste entire files/codebases. Don't summarize before asking.
 - **Artifacts:** Use for interactive React components, HTML/CSS, code you want to preview.
 - **XML-structured prompts:** Use `<task>`, `<constraints>`, `<format>` for complex multi-part requests.
-- **Claude Projects:** Store project context, repo structure, conventions persistently.
-- **Claude Code (CLI):** Read/write files directly, run terminal commands, execute tests, manage git.
+- **Claude Projects:** Store context persistently only where available; otherwise use session-scoped chat/CLI references.
+- **Claude Code (CLI):** Read/write scoped files and run tests or git operations only where tools, repository permissions and action-specific authorization actually allow; otherwise label NOT RUN / NOT APPLIED.
 
 ### Tool Selection Guide
 | Task | Best Tool | Why |
@@ -102,11 +102,11 @@ Use `/lindy /confess` together — proven solutions + honest uncertainty. No sta
 | Browse a website, fill forms | Perplexity | Browser automation |
 
 ### Cross-Tool Relay
-1. Research → Perplexity (web search, source verification)
-2. Build → Claude (long context, code generation, Artifacts)
-3. Iterate → ChatGPT (Code Interpreter, quick prototyping)
-4. Verify → Perplexity (fact-check, regression check)
-5. Ship → — only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
+1. Research → permitted available source tools; otherwise mark current facts UNVERIFIED
+2. Build → authorized code/repository capability; otherwise proposed patch NOT APPLIED
+3. Iterate → available permitted execution/testing; otherwise tests NOT RUN
+4. Verify → exact-subject evidence and independent test/browser tools where available; otherwise proof NOT RUN
+5. Ship → only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
 6. Sync → use GitHub only with authorized repo access/writes; recheck branch and exact head before commit or pull
 
 Each relay preserves repository, branch/PR, exact head SHA, evidence labels, rollback, and next gate. Tool switching does not reset the governed repair state.
