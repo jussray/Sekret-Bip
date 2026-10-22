@@ -105,14 +105,18 @@ The human must be able to tell what the system is doing, what happened, whether 
 
 ## Cross-Tool Workflow
 
+Tool names are routing preferences, not proof of available capabilities or permission. Select only tools actually enabled and authorized for the task and session.
+
 ```
-Research → Perplexity (web search, source verification)
-Build   → Claude (long context, code generation, Artifacts)
-Iterate → ChatGPT (Code Interpreter, quick prototyping)
-Verify  → Perplexity (fact-check, regression check)
-Ship    → From whichever tool has the most current working state
-Sync    → GitHub repo (commit from each tool, pull before starting)
+Research → currently available permitted source tools; label unverified claims UNVERIFIED
+Build    → authorized repository/code capability; otherwise provide a proposed patch, NOT APPLIED
+Iterate  → permitted execution/prototyping capability; otherwise mark tests NOT RUN
+Verify   → exact-head tests or independent evidence appropriate to the claim
+Ship     → only after explicit action-specific approval and the required exact-state gates
+Sync     → GitHub only when repo access and write authorization exist
 ```
+
+At every handoff, preserve repository, branch/PR, base and head SHAs, evidence labels, rollback, and next approval gate. A newer working copy, a green build, or a mode label does not grant merge or deployment authority.
 
 Every handoff must preserve the authoritative repository, branch/PR, exact head SHA, evidence labels, rollback, and next authority gate. A tool switch does not reset the gap ledger or convert missing evidence into success.
 
