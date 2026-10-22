@@ -824,7 +824,7 @@ export default function TeenPagesRoute() {
   return (
     <View style={s.root}>
       {/* Keep the approved journal atmosphere visible through frosted panels. */}
-      <Image source={IMAGES.bgJournal} style={StyleSheet.absoluteFill} resizeMode="cover" pointerEvents="none" testID="pages-night-journal-backdrop" />
+      <Image source={IMAGES.bgJournal} style={StyleSheet.absoluteFill} resizeMode="cover" testID="pages-night-journal-backdrop" />
       <LinearGradient colors={['rgba(16, 9, 27, 0.68)', 'rgba(23, 16, 36, 0.64)', 'rgba(9, 7, 17, 0.84)']} style={StyleSheet.absoluteFill} pointerEvents="none" />
       <AmbientWeatherOverlay />
 
