@@ -86,9 +86,91 @@ Playwright paths that can currently skip tests load the Control Room skip report
 reports/control-room/playwright-test-skips-latest.json
 ```
 
+`npm run verify:local` records the current Git repository, exact HEAD, branch, whether **source work** was clean at verification start, and whether the result is eligible for cross-source correlation. It does not persist changed filenames or diff content merely to establish that identity.
+
+Source cleanliness deliberately excludes only the three local receipt files that this verification path itself rewrites:
+
+```text
+reports/control-room/latest.json
+reports/control-room/latest.md
+reports/control-room/test-skips-latest.json
+```
+
+Their dirty count is recorded separately as `generated_report_dirty_count`; they are not treated as source authority. No directory-wide ignore exists here. Any other modified or untracked path remains source dirtiness and blocks cross-source correlation.
+
+A local result is cross-source correlatable only when all of these are true:
+
+- the repository identity is valid;
+- the exact 40-character HEAD is known;
+- source work is clean after excluding only the three verifier-generated receipt files above.
+
+Dirty or unidentified source work remains useful local evidence, but it receives a source-local incident subject and can never impersonate a GitHub exact-head failure. Distinct non-correlatable local evidence gets a structural evidence fingerprint so unrelated dirty runs do not collapse into one incident.
+
+Before a local report is written, command output tails redact environment-held secret values and common credential shapes. Opt-in external ingestion deliberately omits raw stdout/stderr tails from issue metadata.
+
 `npm run verify:local` treats a successful required check containing a skip receipt as **warning/yellow**, not green. Warnings do not manufacture a code failure, but they make `demoReady` false and prevent the report from being described as complete proof.
 
 `npm run verify:local:ingest`, when separately authorized with server-side Supabase credentials, publishes each skipped witness under its own fingerprint instead of collapsing multiple skips into one issue.
+
+## Failure continuity law
+
+Executed failures use two related but deliberately different markers.
+
+### Incident fingerprint
+
+The incident fingerprint is source-neutral only for evidence that is eligible to correlate. It is derived from:
+
+```text
+juss-v10/test-failure-incident@v1
+repository
+exact head SHA
+canonical failure key
+```
+
+and is rendered as:
+
+```text
+test_failure:<sha256>
+```
+
+A source-clean local `unit-tests` failure and a GitHub `Run npm test` failure at the same repository and exact HEAD therefore converge on the same incident fingerprint. A head change creates a new incident. Dirty local source work never shares this source-neutral subject.
+
+Canonical aliases are intentionally narrow and repository-grounded. For example, current CI step names such as `Run npm test`, `Run npm run type-check`, `Run npm run lint`, `Run npm run test:oracle`, `Run npm run test:voice-intelligence`, `Run npm run audit:runtime-assets`, and `Run npm run verify:room-archives` map to the corresponding existing local verification check IDs. Unknown step names keep their own normalized key rather than being guessed into an unrelated incident.
+
+### Proof cookie
+
+Every local or GitHub witness gets its own source-specific proof cookie derived from:
+
+```text
+juss-v10/test-failure-proof@v1
+incident fingerprint
+source
+source-specific evidence identity
+```
+
+and rendered as:
+
+```text
+juss/proof-cookie@v1:<sha256>
+```
+
+Every failure identity retains:
+
+```text
+authority = false
+merge_authority = false
+proof_satisfied = false
+browser_cookie = false
+authorizing = false
+```
+
+The word “cookie” here means an evidence continuity marker only. It is never a browser cookie, session token, credential, approval, merge permission, or execution authority.
+
+### Distinct failure receipts
+
+A failed GitHub workflow is still preserved as one run-level record for compatibility, but it is no longer collapsed into one evidence receipt. Each failed step receives its own proof receipt. A failed job with no failed-step detail receives a job-level receipt. Startup/no-job failures receive one infrastructure receipt and remain non-code evidence.
+
+Multiple proof receipts may point to the same incident fingerprint when they are genuinely witnessing the same canonical failure on the same exact head. They remain separate receipts, so no witness disappears merely because another source observed the same incident.
 
 ## Covered failure scopes
 
@@ -98,7 +180,7 @@ The failure scanner supports three evidence paths:
 - failed pull-request workflow runs for open PRs or one selected PR;
 - completed failed `push` workflow runs on `main` or the configured main branch.
 
-Main-branch failures use a branch-scoped fingerprint instead of pretending a pull request exists.
+Main-branch failures use the same exact-head incident law and retain branch/run metadata without pretending a pull request exists.
 
 ## Failure classes
 
@@ -194,21 +276,11 @@ npm run control-room:github-failures:ingest
 
 ## Control Room issue identity
 
-Pull-request failures use:
+Executed local/GitHub failures use the `test_failure:<sha256>` incident contract above. `upsert_control_room_issue` uses that incident fingerprint as the issue identity. The proof cookie remains attached to the individual evidence event/metadata so separate witnesses are retained even when they converge on one incident.
 
-```text
-github_actions:<repository>:pr-<number>:<workflow-id>:<head-sha>
-```
+Skipped tests keep their separate skip continuity contract: a SHA-256 fingerprint over exact repository/head, runner, normalized command, test identity/file, reason, and skip class. A head, test, command, or reason change creates a new skip evidence subject instead of overwriting history.
 
-Branch failures use:
-
-```text
-github_actions:<repository>:branch-<branch>:<workflow-id>:<head-sha>
-```
-
-Skipped tests use a SHA-256 continuity fingerprint over the exact repository/head, runner, normalized command, test identity/file, reason, and skip class. A head, test, command, or reason change creates a new evidence subject instead of overwriting history.
-
-A rerun of the same failure workflow against the same exact head updates the same failure issue. A new head creates a new evidence record rather than overwriting history.
+A rerun of the same canonical failure against the same exact head may update the same incident issue while adding a new proof receipt. A new head creates a new incident instead of preserving false continuity.
 
 ## Required issue evidence
 
@@ -222,7 +294,10 @@ Every GitHub failure record must retain:
 - run ID, number, attempt, URL, and trigger event;
 - GitHub conclusion or failed-job conclusion;
 - Control Room failure classification;
-- job names, conclusions, step counts, and failed-step names when present;
+- canonical failure key;
+- incident fingerprint and source-specific proof cookie;
+- job identity and failed-step name/number when present;
+- `authority=false`, `merge_authority=false`, `proof_satisfied=false`, `browser_cookie=false`, and `authorizing=false`;
 - a recommended next action.
 
 Every skip record must retain the exact repository/head, runner, normalized command, test identity, sanitized reason, classification, fingerprint, proof cookie, observation surface, and `authority=false` state.
@@ -232,6 +307,7 @@ Every skip record must retain the exact repository/head, runner, normalized comm
 - GitHub tokens are read only from `GH_TOKEN` or `GITHUB_TOKEN` in a server-side shell.
 - Supabase service credentials are read only from server-side environment variables.
 - Tokens and keys must never enter React Native, Expo public variables, reports, audit metadata, PR comments, or committed files.
+- Local verification output is redacted before persistence; external failure ingestion never publishes raw stdout/stderr tails.
 - Test-skip sanitization strips common token/secret assignments and email addresses before a marker or report is written.
 - The scanners may read GitHub status/logs and write Control Room evidence. They cannot merge, deploy, modify source code, accept terms, or apply database migrations.
 - Workflow artifacts contain failure/skip evidence only, never credentials.
@@ -241,4 +317,4 @@ Every skip record must retain the exact repository/head, runner, normalized comm
 
 A green local Control Room result does not become GitHub Actions proof. A red zero-step GitHub run does not become code-failure proof. A skipped test does not become a passing witness.
 
-All three signals remain separately labeled until the exact required witness exists.
+A matching local/GitHub incident fingerprint means only that separate witnesses point to the same exact-head failure subject. It does not merge their authority, erase either receipt, or convert one witness into another.
