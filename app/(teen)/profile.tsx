@@ -8,8 +8,8 @@ type Gender = 'girl' | 'boy' | 'other';
 type TeenTab = 'identity' | 'circle' | 'memories';
 
 const GENDER_OPTIONS: { id: Gender; label: string; desc: string }[] = [
-  { id: 'girl',  label: '🌸 Girl',       desc: 'Start with Raylene' },
-  { id: 'boy',   label: '⚡ Boy',        desc: 'Start with Rylane'  },
+  { id: 'girl',  label: '🌸 Girl',       desc: 'Start with Sy' },
+  { id: 'boy',   label: '⚡ Boy',        desc: 'Start with Suhana'  },
   { id: 'other', label: '✨ My own way', desc: 'You choose first'   },
 ];
 
@@ -20,8 +20,8 @@ const COMPANION_FOR_GENDER: Record<Gender, 'raylene' | 'rylane'> = {
 };
 
 const ALL_OPTIONS = [
-  { id: 'raylene', label: 'Raylene', desc: 'Warm + protective'  },
-  { id: 'rylane',  label: 'Rylane',  desc: 'Direct + loyal'     },
+  { id: 'raylene', label: 'Sy', desc: 'Warm + protective'  },
+  { id: 'rylane',  label: 'Suhana',  desc: 'Direct + loyal'     },
   { id: 'cloud',   label: 'Cloud',   desc: 'Soft + no pressure' },
   { id: 'night',   label: 'Night',   desc: 'Quiet + steady'     },
 ] as const;
