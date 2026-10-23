@@ -1,0 +1,38 @@
+{
+  "schema": "juss/ai-crawler-contract@v1",
+  "project": "sekret-bip",
+  "canonical_origin": "https://sekretbip.net",
+  "policy": {
+    "search_discovery": "allow_bounded_public_paths",
+    "user_directed_retrieval": "allow_bounded_public_paths",
+    "model_training": "deny",
+    "bulk_dataset_collection": "deny",
+    "write_or_action_authority": "none"
+  },
+  "bots": {
+    "OAI-SearchBot": "allow_bounded_public_paths",
+    "ChatGPT-User": "allow_bounded_public_paths",
+    "GPTBot": "deny",
+    "Claude-SearchBot": "allow_bounded_public_paths",
+    "Claude-User": "allow_bounded_public_paths",
+    "ClaudeBot": "deny",
+    "Googlebot": "allow_bounded_public_paths",
+    "Google-Extended": "deny"
+  },
+  "public_paths": [
+    "/",
+    "/auth.md",
+    "/what-is-sekret-bip/",
+    "/how-it-works/",
+    "/privacy-and-safety/",
+    "/robots.txt",
+    "/sitemap.xml",
+    "/crawlers.json"
+  ],
+  "private_scope": "All application, authentication, onboarding, member, journal, message, mood, companion, parent, and other non-public routes remain outside crawler scope.",
+  "attribution": {
+    "requested": true,
+    "canonical_link_required_when_supported": true
+  },
+  "security_note": "Crawler policy does not replace authentication, authorization, privacy controls, or server-side access boundaries."
+}
