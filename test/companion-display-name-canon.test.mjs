@@ -160,13 +160,14 @@ test('founder preview uses canonical names while legacy route ids remain stable'
   assert.doesNotMatch(preview, /Raylene Chat|Rylane Chat/);
 });
 
-test('newer Joseema naming survives the companion-name reconciliation', () => {
+test('Ja is the visible Oracle alias across legacy Pages and configuration', () => {
   const pages = fs.readFileSync(path.join(root, 'app/(teen)/pages/history.tsx'), 'utf8');
   const personalities = fs.readFileSync(path.join(root, 'src/services/ai/personalities.ts'), 'utf8');
 
-  assert.match(pages, /oracle:\s*\{ label: 'Joseema'/);
-  assert.match(personalities, /name:\s*'Joseema'/);
-  assert.match(personalities, /You are Joseema/);
+  assert.match(pages, /oracle:\s*\{ label: 'Ja'/);
+  assert.match(personalities, /name:\s*'Ja'/);
+  assert.match(personalities, /You are Ja/);
+  assert.doesNotMatch(personalities, /name: 'Joseema'|You are Joseema/);
 });
 
 test('the Worker prompt names the canonical companions directly', () => {

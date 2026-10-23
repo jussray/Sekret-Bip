@@ -51,7 +51,7 @@ export const FOUNDER_PREVIEW_POINTS = 999;
 export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   // Teen core
   { key: 'teen-room', title: 'Room', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Companion home, mood atmosphere, feature hotspots, and Bip return receipts.', route: '/(teen)/room' },
-  { key: 'teen-pages', title: 'Pages', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Continuous journal with Suhana, Sy, Cloud, Night, Me, and Oracle tabs.', route: '/(teen)/pages' },
+  { key: 'teen-pages', title: 'Pages', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Continuous journal with Suhana, Sy, Cloud, Night, Me, and Ja (legacy oracle tab).', route: '/(teen)/pages' },
   { key: 'teen-pages-new', title: 'New Page', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Direct entry composer route.', route: '/(teen)/pages/new' },
   { key: 'teen-pages-history', title: 'Pages History', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Saved journal timeline and entry history.', route: '/(teen)/pages/history' },
   { key: 'teen-calm', title: 'Calm', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Comfort, grounding, regulation, and wind-down tools.', route: '/(teen)/calm' },
@@ -62,7 +62,7 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'teen-more', title: 'More', group: 'Teen · Core', side: 'teen', status: 'live', detail: 'Teen feature drawer and account tools.', route: '/(teen)/more' },
 
   // Teen companions and expression
-  { key: 'companions', title: 'All Se’kret Companions', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Suhana, Sy, Cloud, and Night open without waiting for point thresholds.', route: '/(teen)/discover' },
+  { key: 'companions', title: 'All Se’kret Companions', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Suhana, Sy, Cloud, Night, and Ja are listed; Ja opens the existing guided Pages mode.', route: '/(teen)/discover' },
   { key: 'companion-picker', title: 'Companion Picker', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Choose a companion before entering chat.', route: '/(teen)/chat' },
   { key: 'raylene-chat', title: 'Suhana Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Suhana conversation. Complete AI replies require the configured Worker and model provider.', route: '/(teen)/chat/raylene' },
   { key: 'rylane-chat', title: 'Sy Chat', group: 'Teen · Companions', side: 'teen', status: 'needs_setup', detail: 'Direct Sy conversation with preview point gating removed.', route: '/(teen)/chat/rylane' },
@@ -71,6 +71,7 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'cloud-thoughts', title: 'Cloud Thoughts', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Quiet release space for thoughts that need somewhere soft to land.', route: '/(teen)/cloud' },
   { key: 'comfort', title: 'Emergency Comfort', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Immediate comfort cards and grounding support.', route: '/(teen)/comfort' },
   { key: 'discover', title: 'Discover', group: 'Teen · Companions', side: 'teen', status: 'live', detail: 'Companion and quick-tool discovery surface.', route: '/(teen)/discover' },
+  { key: 'scrapbook-check-in', title: 'Scrapbook Companion Check-In', group: 'Teen · Companions', side: 'teen', status: 'ui_preview', detail: 'Reusable time-of-day companion scene with paper, tape, doodles, Polaroid framing, and the existing Pages handoff. It adds no new persistence or sharing boundary.', route: '/(teen)/scrapbook-check-in' },
 
   // Teen growth and rewards
   { key: 'retention', title: 'Bip Story Return Loop', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Meaningful-action receipts, active-day History, and the intentional Bip Energy fade.', route: '/(teen)/room' },
