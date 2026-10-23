@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import './reply-guard-safety.spec';
 
 test('installs the public-safe Se’kret Bip guardrail snapshot', async ({ page }) => {
   await page.goto('/');

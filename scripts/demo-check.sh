@@ -16,9 +16,9 @@ PASS=0
 FAIL=0
 WARN=0
 
-pass() { echo -e "${GREEN}✓${NC} $1"; ((PASS++)); }
-fail() { echo -e "${RED}✗${NC} $1"; ((FAIL++)); }
-warn() { echo -e "${YELLOW}⚠${NC} $1"; ((WARN++)); }
+pass() { echo -e "${GREEN}✓${NC} $1"; ((++PASS)); }
+fail() { echo -e "${RED}✗${NC} $1"; ((++FAIL)); }
+warn() { echo -e "${YELLOW}⚠${NC} $1"; ((++WARN)); }
 header() { echo -e "\n${BLUE}▶ $1${NC}"; }
 
 echo -e "${BLUE}"
@@ -48,14 +48,15 @@ fi
 # ── Step 3: Live deployment health checks ────────────────────────────
 header "Step 3 — Live Deployment Health"
 
-WORKER_URL="https://sekret-backend.mcgill-raylene.workers.dev/health"
+# wrangler.toml sets workers_dev=false. Only the canonical custom domain is live.
 CUSTOM_URL="https://api.sekretbip.net/health"
 RELEASE_URL="https://sekretbip.net/release.json"
 
 check_url() {
   local url="$1" label="$2"
   local status
-  status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" 2>/dev/null || echo "000")
+  status=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "$url" 2>/dev/null || true)
+  status=${status:-000}
   if [ "$status" = "200" ]; then
     pass "$label → HTTP $status"
   elif [ "$status" = "000" ]; then
@@ -65,7 +66,6 @@ check_url() {
   fi
 }
 
-check_url "$WORKER_URL" "Worker health (.workers.dev)"
 check_url "$CUSTOM_URL" "Worker health (api.sekretbip.net)"
 check_url "$RELEASE_URL" "Pages release marker"
 
@@ -100,13 +100,14 @@ run_check "lint" "ESLint"
 if npm run test --silent 2>/dev/null; then
   pass "Unit tests"
 else
-  warn "Unit tests failed or not configured"
+  fail "Unit tests failed or not configured — fix before demo"
 fi
 
 # ── Step 5: Custom domain status ─────────────────────────────────────
 header "Step 5 — Custom Domain (api.sekretbip.net)"
 
-CUSTOM_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://api.sekretbip.net/health" 2>/dev/null || echo "000")
+CUSTOM_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 "https://api.sekretbip.net/health" 2>/dev/null || true)
+CUSTOM_STATUS=${CUSTOM_STATUS:-000}
 if [ "$CUSTOM_STATUS" = "200" ]; then
   pass "api.sekretbip.net is live and routing correctly"
 else
@@ -121,8 +122,8 @@ if [ "$FAIL" -gt 0 ]; then
   echo -e "${RED}✗ NOT demo-ready. Fix $FAIL failing check(s) above.${NC}"
   exit 1
 elif [ "$WARN" -gt 0 ]; then
-  echo -e "${YELLOW}⚠ Demo-ready with $WARN warning(s). Review before investor meeting.${NC}"
-  exit 0
+  echo -e "${YELLOW}⚠ NOT FULLY VERIFIED. Resolve $WARN warning(s) before claiming readiness.${NC}"
+  exit 2
 else
   echo -e "${GREEN}✓ DEMO READY. All checks passed.${NC}"
   exit 0

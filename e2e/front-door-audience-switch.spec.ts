@@ -24,23 +24,43 @@ async function expectNoDocumentHorizontalOverflow(page: Page) {
 test('caveman visual teaches the doorway, stays contained, then clears for interaction', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 320, height: 568 });
+  // Capture the short-lived primer on animation frames. Sequential expect() polls
+  // can race its intentional unmount and misreport a complete animation as absent.
+  await page.addInitScript(() => {
+    type PrimerFrame = { text: string; label: string | null; x: number; right: number };
+    const evidence = window as typeof window & { __bipPrimerFrames?: PrimerFrame[] };
+    evidence.__bipPrimerFrames = [];
+    let count = 0;
+    const sample = () => {
+      const element = document.querySelector<HTMLElement>('[data-testid="web-welcome-caveman-visual"]');
+      if (element) {
+        const box = element.getBoundingClientRect();
+        evidence.__bipPrimerFrames!.push({
+          text: element.textContent || '',
+          label: element.getAttribute('aria-label'),
+          x: box.x,
+          right: box.right,
+        });
+      }
+      if (++count < 360) window.requestAnimationFrame(sample);
+    };
+    window.requestAnimationFrame(sample);
+  });
   await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('web-welcome-scene-settled')).toBeAttached({ timeout: 10_000 });
 
-  const primer = page.getByTestId('web-welcome-caveman-visual');
-  await expect(primer).toBeVisible({ timeout: 5_000 });
-  await expect(primer).toHaveAccessibleName('You. Your space. Enter.');
-  await expect(primer).toContainText('YOU');
-  await expect(primer).toContainText('YOUR SPACE');
-  await expect(primer).toContainText('ENTER');
-
-  const primerBox = await primer.boundingBox();
-  expect(primerBox).not.toBeNull();
-  expect(primerBox!.x).toBeGreaterThanOrEqual(0);
-  expect(primerBox!.x + primerBox!.width).toBeLessThanOrEqual(320);
-  await expectNoDocumentHorizontalOverflow(page);
-
-  await expect(page.getByTestId('web-welcome-scene-settled')).toBeAttached({ timeout: 5_000 });
-  await expect(primer).toHaveCount(0);
+  const frames = await page.evaluate(() => (
+    window as typeof window & {
+      __bipPrimerFrames?: Array<{ text: string; label: string | null; x: number; right: number }>;
+    }
+  ).__bipPrimerFrames || []);
+  expect(frames.length, 'primer appeared during the animated introduction').toBeGreaterThan(0);
+  expect(frames.some(frame => frame.label === 'You. Your space. Enter.')).toBe(true);
+  expect(frames.some(frame =>
+    frame.text.includes('YOU') && frame.text.includes('YOUR SPACE') && frame.text.includes('ENTER'),
+  )).toBe(true);
+  expect(frames.some(frame => frame.x >= -1 && frame.right <= 321)).toBe(true);
+  await expect(page.getByTestId('web-welcome-caveman-visual')).toHaveCount(0);
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible();
   await expectNoDocumentHorizontalOverflow(page);
 });
