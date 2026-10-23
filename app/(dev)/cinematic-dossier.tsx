@@ -7,13 +7,13 @@ import { SEKRET_PROFILES } from '@/constants/theme';
 import { getNightPoseAsset, type NightPose } from '@/config/nightRoomAssetRegistry';
 
 const NIGHT_SCENES = [
-  require('../../assets/images/resized-bg/bg-night-room-day.jpg'),
-  require('../../assets/images/resized-bg/bg-night-room-midday.jpg'),
-  require('../../assets/images/resized-bg/bg-night-room-afternoon.jpg'),
-  require('../../assets/images/resized-bg/bg-night-room-evening.jpg'),
-  require('../../assets/images/resized-bg/bg-night-room-night.jpg'),
-  require('../../assets/images/resized-bg/bg-night-room-deep-night.jpg'),
-  require('../../assets/images/resized-bg/bg-night-room-rain.jpg'),
+  require('../../assets/images/archive/bg-night-room-day.png'),
+  require('../../assets/images/archive/bg-night-room-midday.png'),
+  require('../../assets/images/archive/bg-night-room-afternoon.png'),
+  require('../../assets/images/archive/bg-night-room-evening.png'),
+  require('../../assets/images/archive/bg-night-room-night.png'),
+  require('../../assets/images/archive/bg-night-room-deep-night.png'),
+  require('../../assets/images/archive/bg-night-room-rain.png'),
 ] as const;
 
 const NIGHT_POSES: readonly NightPose[] = [
