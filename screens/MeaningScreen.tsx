@@ -127,7 +127,7 @@ export function MeaningScreen({
   // all other companions use the raylene (warm) track
 
   const charKey = isNight ? 'night' : isRylane ? 'rylane' : 'raylene';
-  const charName = isNight ? 'Night' : isRylane ? 'Rylane' : 'Raylene';
+  const charName = isNight ? 'Night' : isRylane ? 'Sy' : 'Suhana';
   const charEmoji = isNight ? '🌙' : isRylane ? '⚡' : '💜';
 
   const time     = useMemo(() => timeOfDay(), []);
@@ -229,8 +229,8 @@ export function MeaningScreen({
   const companionIntro = isNight
     ? `${charEmoji}  Night is here — no pressure, just honesty`
     : isRylane
-    ? `${charEmoji}  Rylane is in it with you — straight up`
-    : `${charEmoji}  Raylene is here — no judgment, just you`;
+    ? `${charEmoji}  Sy is in it with you — straight up`
+    : `${charEmoji}  Suhana is here — no judgment, just you`;
 
   const stickyLine = isNight
     ? "meaning isn't found. it's noticed over time."
