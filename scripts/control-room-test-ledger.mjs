@@ -393,10 +393,8 @@ export async function reconcileGithubActionsCheckRuns(checkRuns, {repository, to
         completed_at: clean(job?.completed_at) || run?.completed_at || null,
         _reconciledFromActionsJob: true,
       };
-    } catch (error) {
-      console.warn(
-        `Control Room ledger could not reconcile GitHub Actions job ${jobId}; preserving check-run state: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    } catch {
+      console.warn('Control Room ledger reconciliation unavailable; preserving check-run state.');
       return run;
     }
   }));
