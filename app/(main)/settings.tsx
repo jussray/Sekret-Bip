@@ -23,10 +23,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppContext } from '@/context/AppContext';
 import { THEME_PACKS } from '@constants/theme';
 import { getSupabase } from '@/utils/supabase';
+import { AccountDeletionControls } from '@/components/settings/AccountDeletionControls';
 
 const THEME_ORDER = Object.keys(THEME_PACKS) as (keyof typeof THEME_PACKS)[];
 
@@ -38,51 +38,22 @@ export default function SettingsScreen() {
     setNotificationsEnabled,
   } = useAppContext();
 
-  const [deletePending, setDeletePending] = useState(false);
   const [exportPending, setExportPending] = useState(false);
-
-  async function handleDeleteData() {
-    Alert.alert(
-      'Delete my account',
-      'This permanently deletes all your journal entries, mood history, voice notes, and conversations. This cannot be undone. Are you sure?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete everything',
-          style: 'destructive',
-          onPress: async () => {
-            setDeletePending(true);
-            try {
-              const sb = getSupabase();
-              if (sb) {
-                await sb.rpc('request_account_deletion');
-              }
-              // Clear local data regardless of Supabase result
-              await AsyncStorage.clear();
-              router.replace('/(auth)/age-gate');
-            } catch {
-              Alert.alert('Error', 'Could not process deletion. Please try again or contact support@sekretbip.com');
-              setDeletePending(false);
-            }
-          },
-        },
-      ]
-    );
-  }
 
   async function handleExportData() {
     setExportPending(true);
     try {
       const sb = getSupabase();
-      if (sb) {
-        await sb.rpc('request_data_export');
-      }
+      if (!sb) throw new Error('Account export service unavailable');
+      const { error } = await sb.rpc('request_data_export');
+      if (error) throw error;
       Alert.alert(
         'Export requested',
-        "We'll email you a download link within 48 hours. Check the email you used to sign in."
+        'Your export request was submitted. Check your account email for updates.'
       );
     } catch {
       Alert.alert('Error', 'Could not submit export request. Please try again.');
+      return false;
     } finally {
       setExportPending(false);
     }
@@ -161,18 +132,7 @@ export default function SettingsScreen() {
             : <Text style={styles.rowArrow}>\u203a</Text>
           }
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.row, styles.rowDanger]}
-          onPress={handleDeleteData}
-          disabled={deletePending}
-          activeOpacity={0.75}
-        >
-          <Text style={[styles.rowLabel, styles.rowLabelDanger]}>Delete my data</Text>
-          {deletePending
-            ? <ActivityIndicator size="small" color="#f87171" />
-            : <Text style={[styles.rowArrow, styles.rowLabelDanger]}>\u203a</Text>
-          }
-        </TouchableOpacity>
+        <AccountDeletionControls />
 
         {/* ── About ── */}
         <Text style={styles.sectionLabel}>About</Text>
