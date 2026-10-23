@@ -43,6 +43,19 @@ function checkKey(run) {
   return `${app}\u0000${clean(run?.name)}`;
 }
 
+export function githubActionsJobId(detailsUrl) {
+  const value = clean(detailsUrl);
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.hostname !== 'github.com') return null;
+    const match = url.pathname.match(/^\/[^/]+\/[^/]+\/actions\/runs\/\d+\/job\/(\d+)\/?$/u);
+    return match?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function supabaseProjectRef(detailsUrl) {
   const value = clean(detailsUrl);
   if (!value) return null;
@@ -349,6 +362,46 @@ export async function githubJson(url, token, options = {}) {
   throw new Error('GitHub check lookup exhausted retries without a response.');
 }
 
+export async function reconcileGithubActionsCheckRuns(checkRuns, {repository, token, fetchJob = null} = {}) {
+  const [owner, repo] = clean(repository).split('/');
+  if (!owner || !repo || !token) return Array.isArray(checkRuns) ? checkRuns : [];
+
+  const lookup = fetchJob ?? (async (jobId) => {
+    const url = new URL(`https://api.github.com/repos/${owner}/${repo}/actions/jobs/${jobId}`);
+    return githubJson(url, token);
+  });
+
+  return Promise.all((Array.isArray(checkRuns) ? checkRuns : []).map(async (run) => {
+    const app = clean(run?.app?.slug) || clean(run?.app?.name);
+    const status = clean(run?.status);
+    if (app !== 'github-actions' || !['queued', 'requested', 'waiting', 'in_progress', 'pending'].includes(status)) {
+      return run;
+    }
+
+    const jobId = githubActionsJobId(run?.details_url || run?.html_url);
+    if (!jobId) return run;
+
+    try {
+      const job = await lookup(jobId);
+      if (clean(job?.status) !== 'completed') return run;
+      const conclusion = clean(job?.conclusion);
+      if (!conclusion) return run;
+      return {
+        ...run,
+        status: 'completed',
+        conclusion,
+        completed_at: clean(job?.completed_at) || run?.completed_at || null,
+        _reconciledFromActionsJob: true,
+      };
+    } catch (error) {
+      console.warn(
+        `Control Room ledger could not reconcile GitHub Actions job ${jobId}; preserving check-run state: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return run;
+    }
+  }));
+}
+
 async function fetchAllCheckRuns({repository, sha, token}) {
   const [owner, repo] = clean(repository).split('/');
   if (!owner || !repo) throw new Error('GITHUB_REPOSITORY must use owner/repo format.');
@@ -404,7 +457,8 @@ export async function observeExactHeadChecks(env = process.env) {
 
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
-    checks = selectLatestChecks(runs, sha, observerCheckName);
+    const reconciledRuns = await reconcileGithubActionsCheckRuns(runs, {repository, token});
+    checks = selectLatestChecks(reconciledRuns, sha, observerCheckName);
     writeLedger(outputPath, buildTestLedger({runtimeState, repository, sha, branch, runId, checks}));
 
     const fingerprint = JSON.stringify(checks.map((check) => [
