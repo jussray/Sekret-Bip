@@ -12,9 +12,10 @@ test('teen layout centrally enforces Quiet Bip and hides engagement navigation',
   assert.match(layout, /useSleepGuard\(\)/);
   assert.match(layout, /isQuietRouteAllowed\(\{ pathname, companion \}\)/);
   assert.match(layout, /sleepActive && !quietRouteAllowed[\s\S]*Redirect href="\/\(teen\)\/quiet"/);
-  assert.match(layout, /tabBarStyle: quietActive[\s\S]*display: 'none'/);
-  assert.match(layout, /!quietActive && <SideSafeBackButton/);
-  assert.match(layout, /!quietActive && <GlobalMoodButton/);
+  assert.match(layout, /const hideGlobalChrome = quietActive \|\| immersive/);
+  assert.match(layout, /tabBarStyle: hideGlobalChrome[\s\S]*display: 'none'/);
+  assert.match(layout, /!hideGlobalChrome && <SideSafeBackButton/);
+  assert.match(layout, /!hideGlobalChrome && <GlobalMoodButton/);
   assert.match(layout, /Tabs\.Screen name="quiet" options=\{\{ href: null \}\}/);
 });
 
