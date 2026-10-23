@@ -25,6 +25,7 @@ test('live onboarding email smoke separates always-run readiness from explicit l
   assert.match(source, /shouldRunReadiness/);
   assert.match(source, /test\.skip\(!shouldRunReadiness/);
   assert.match(source, /test\.skip\(!shouldRunSignup/);
+  assert.match(source, /test\.skip\(!shouldRunUnverified/);
   assert.match(source, /test\.skip\(!shouldRunSignIn/);
   assert.match(source, /test\.skip\(!shouldRunInvite/);
   assert.match(workflow, /pull_request:/);
@@ -124,6 +125,20 @@ test('live onboarding email smoke proves returning-user authentication with boun
   assert.match(source, /not\.toHaveURL\(\/\\\/login/);
 });
 
+test('returning-user Playwright proof requires welcome email provider acceptance', () => {
+  const source = readText(specPath);
+  const workflow = readText(workflowPath);
+
+  assert.match(source, /send-welcome-email/);
+  assert.match(source, /welcome-email-response/);
+  assert.match(source, /await expect\.poll\(\(\) => welcomeResponses\.length/);
+  assert.match(source, /latestWelcome\?\.status\)\.toBe\(200\)/);
+  assert.match(source, /\['sent', 'already_sent'\]/);
+  assert.match(workflow, /src\/services\/auth\/welcomeEmail\.ts/);
+  assert.match(workflow, /supabase\/functions\/send-welcome-email\/\*\*/);
+  assert.match(workflow, /test\/welcome-email-contract\.test\.mjs/);
+});
+
 test('live signup proof uses one dedicated exact-target Playwright config for signup and family authority proof', () => {
   const config = readText(liveConfigPath);
   const workflow = readText(workflowPath);
@@ -193,6 +208,7 @@ test('live signup proof mailbox is disposable, non-personal, single-pass decoded
   const readinessStep = workflow.indexOf('Prove exact-preview browser readiness without account write');
   const mailboxStep = workflow.indexOf('Prepare disposable guest identity and mailbox');
   const signupStep = workflow.indexOf('Create disposable account through exact preview UI');
+  const unverifiedStep = workflow.indexOf('Prove unverified signup cannot sign in');
   const confirmStep = workflow.indexOf('Confirm disposable signup email');
   const signInStep = workflow.indexOf('Prove returning-user sign in');
   const familyStep = workflow.indexOf('Prove exact-preview family authority boundaries');
@@ -202,7 +218,8 @@ test('live signup proof mailbox is disposable, non-personal, single-pass decoded
       && previewStep < readinessStep
       && readinessStep < mailboxStep
       && mailboxStep < signupStep
-      && signupStep < confirmStep
+      && signupStep < unverifiedStep
+      && unverifiedStep < confirmStep
       && confirmStep < signInStep
       && signInStep < familyStep
       && familyStep < cleanupStep,
@@ -274,4 +291,22 @@ test('live onboarding email smoke proves provider acceptance, not just code gene
   assert.match(source, /\.email\?\.status\)\.toBe\('sent'\)/);
   assert.match(source, /\.email\?\.error_code \?\? null\)\.toBeNull\(\)/);
   assert.doesNotMatch(source, /code created, but email did not send[\s\S]*latestInvite\?\.status\)\.toBeLessThan\(500\)/);
+});
+
+test('negative auth proof is account-write gated and requires provider email_not_confirmed before confirmation', () => {
+  const source = readText(specPath);
+  const workflow = readText(workflowPath);
+
+  assert.match(source, /phase === 'unverified'/);
+  assert.match(source, /response\.status\(\)[\s\S]*toBeGreaterThanOrEqual\(400\)/);
+  assert.match(source, /email_not_confirmed/);
+  assert.match(source, /url\.pathname === '\/auth\/v1\/token'/);
+  assert.match(source, /server_rejected_unconfirmed_email/);
+  const start = workflow.indexOf('      - name: Prove unverified signup cannot sign in');
+  const end = workflow.indexOf('\n      - name:', start + 1);
+  const step = workflow.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(step, /if: steps\.opt_in\.outputs\.enabled == 'true'/);
+  assert.match(step, /LIVE_ONBOARDING_PHASE: unverified/);
+  assert.doesNotMatch(step, /SUPABASE_SERVICE_ROLE_KEY|sb_secret_|service_role/);
 });
