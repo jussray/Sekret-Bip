@@ -23,8 +23,6 @@ function fail(message) {
 // a PostgREST deployment defaulting to api queries the wrong namespace.
 export async function fetchExpiredPendingRequests({
   fetchImpl = fetch,
-  baseUrl = SUPABASE_URL,
-  serviceKey = SERVICE_ROLE_KEY,
   nowIso = new Date().toISOString(),
 } = {}) {
   const query = new URLSearchParams({
@@ -35,10 +33,10 @@ export async function fetchExpiredPendingRequests({
     limit: '500',
   });
 
-  const response = await fetchImpl(`${baseUrl}/rest/v1/account_deletion_requests?${query}`, {
+  const response = await fetchImpl(`${SUPABASE_URL}/rest/v1/account_deletion_requests?${query}`, {
     headers: {
-      apikey: serviceKey,
-      authorization: `Bearer ${serviceKey}`,
+      apikey: SERVICE_ROLE_KEY,
+      authorization: `Bearer ${SERVICE_ROLE_KEY}`,
       'Accept-Profile': 'public',
     },
   });
@@ -52,8 +50,13 @@ export async function fetchExpiredPendingRequests({
     }
     throw new Error(`list_failed:http=${response.status}:code=${code}; no deletions attempted`);
   }
-  const rows = body ? JSON.parse(body) : [];
-  return Array.isArray(rows) ? rows.map((row) => row.id).filter((id) => typeof id === 'string') : [];
+  let rows;
+  try { rows = JSON.parse(body); } catch { throw new Error('list_failed:invalid_json; no deletions attempted'); }
+  if (!Array.isArray(rows)) throw new Error('list_failed:not_an_array; no deletions attempted');
+  if (rows.some((row) => typeof row?.id !== 'string' || row.id.length === 0)) {
+    throw new Error('list_failed:invalid_request_id_shape; no deletions attempted');
+  }
+  return rows.map((row) => row.id);
 }
 
 async function processRequest(requestId) {
@@ -66,8 +69,8 @@ async function processRequest(requestId) {
     body: JSON.stringify({ requestId }),
   });
 
-  const body = await response.text();
-  return { requestId, ok: response.ok, status: response.status, body: body.slice(0, 500) };
+  // Do not retain raw provider body or account identifiers in sweep result objects.
+  return { ok: response.ok, status: response.status };
 }
 
 async function main() {
