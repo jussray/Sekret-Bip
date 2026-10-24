@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { fetchExpiredPendingRequests } from '../scripts/sweep-account-deletions.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
@@ -40,4 +41,44 @@ test('runbook rejects the stale duplicate implementation names', () => {
   assert.match(runbook, /Do not create a second `process-deletions` function/);
   assert.match(runbook, /duplicate `20260724_compliance_foundation\.sql` migration/);
   assert.match(runbook, /account-delete --no-verify-jwt/);
+});
+
+
+test('sweeper selects the public schema and reads pending IDs before any privileged processing', async () => {
+  const seen = [];
+  const ids = await fetchExpiredPendingRequests({
+    baseUrl: 'https://example.supabase.co',
+    serviceKey: 'test-service-key',
+    nowIso: '2026-10-24T12:00:00.000Z',
+    fetchImpl: async (url, init) => {
+      seen.push({ url, init });
+      return { ok: true, text: async () => JSON.stringify([{ id: 'request-one' }]) };
+    },
+  });
+  assert.deepEqual(ids, ['request-one']);
+  assert.equal(seen.length, 1);
+  assert.match(seen[0].url, /status=eq.pending/);
+  assert.equal(seen[0].init.headers['Accept-Profile'], 'public');
+});
+
+test('sweeper fails closed when public relation is unavailable, without echoing response contents', async () => {
+  await assert.rejects(
+    fetchExpiredPendingRequests({
+      baseUrl: 'https://example.supabase.co',
+      serviceKey: 'test-service-key',
+      fetchImpl: async () => ({
+        ok: false,
+        status: 404,
+        text: async () => JSON.stringify({
+          code: 'PGRST205',
+          message: 'private account identifier must not appear in CI logs',
+        }),
+      }),
+    }),
+    (error) => {
+      assert.match(error.message, /schema_public_unavailable:public.account_deletion_requests/);
+      assert.doesNotMatch(error.message, /private account identifier/);
+      return true;
+    },
+  );
 });
