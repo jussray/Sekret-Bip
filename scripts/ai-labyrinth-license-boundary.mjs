@@ -40,9 +40,7 @@ export function assessProposedLabyrinthLicenseRequest(request) {
 }
 
 export function externalLabyrinthExecutionIsEnabled() {
-  return policy.status === 'active'
-    && policy.launchControls.billingEnabled === true
-    && policy.launchControls.externalExecutionEnabled === true
-    && policy.launchControls.productionIntegrationEnabled === false
-    && policy.launchControls.userDataAccessEnabled === false;
+  // No config flag or receipt can activate this preflight. A future isolated
+  // server must independently prove identity, current license and permissions.
+  return false;
 }
