@@ -34,6 +34,7 @@ async function fetchExpiredPendingRequests() {
     headers: {
       apikey: SERVICE_ROLE_KEY,
       authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      'Accept-Profile': 'public', // Match the canonical public.account_deletion_requests schema.
     },
   });
 
