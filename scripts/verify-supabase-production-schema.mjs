@@ -187,8 +187,8 @@ export function buildReadOnlyQuery() {
       and 'authenticated' = any(p.roles)
       and p.qual like '%is_anonymous%'
       and p.with_check like '%is_anonymous%'
-      and p.qual like '%false%'
-      and p.with_check like '%false%'
+      and p.qual like '%IS FALSE%'
+      and p.with_check like '%IS FALSE%'
       and tbl.relrowsecurity
   ) as social_guard_policy_count
 from supabase_migrations.schema_migrations;`;
