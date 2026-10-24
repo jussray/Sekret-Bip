@@ -1,0 +1,61 @@
+{
+  "contract": "juss/council-model-capability-profile@v1",
+  "repository": "jussray/Sekret-Bip",
+  "defaultBranch": "main",
+  "preparedAgainstBaseSha": "9c7c91ecb408e6a694e9a2549d1b9f0950010798",
+  "authorityHost": "jussray/founder-control-room",
+  "providerExecutionHost": "jussray/founder-control-room",
+  "projectRole": "product_safety_runtime",
+  "activation": "trial_profile_only",
+  "runtimeActivation": false,
+  "restrictedContextAllowed": false,
+  "lanes": [
+    {
+      "model": "@cf/deepseek-ai/deepseek-v4.1-flash-1017",
+      "role": "reasoning_and_adversarial_challenge",
+      "notes": "Bounded reasoning/challenge; provider response is evidence input only.",
+      "status": "trial"
+    },
+    {
+      "model": "@cf/cloudflare/clairic",
+      "role": "structured_estimation_and_forecast",
+      "notes": "Typed extraction/estimate/forecast with confidence; never truth by itself.",
+      "status": "trial"
+    },
+    {
+      "model": "@cf/cloudflare/clef-omni",
+      "role": "multimodal_evidence_adjudication",
+      "notes": "Typed multimodal decisions/probabilities; never self-authorizing.",
+      "status": "trial"
+    },
+    {
+      "model": "@cf/daily-co/phonellm-mini-alpha-2",
+      "role": "voice_agent_fast_lane",
+      "notes": "Voice/conversation specialist; only after local privacy/runtime gates.",
+      "status": "trial"
+    }
+  ],
+  "authority": {
+    "selectionAuthority": false,
+    "executionAuthority": false,
+    "mergeAuthority": false,
+    "deployAuthority": false,
+    "publishAuthority": false,
+    "spendAuthority": false,
+    "providerMutationAuthority": false
+  },
+  "promotionGate": [
+    "fresh task-specific local receipts",
+    "provider evidence for the exact invocation",
+    "project-local focused tests",
+    "runtime proof for live claims",
+    "Playwright proof for user-facing flows"
+  ],
+  "projectGuards": [
+    "no restricted or private teen/guardian context to trial providers",
+    "age/guardian/privacy rules outrank model output",
+    "no diagnosis or clinical authority",
+    "voice lane requires project-local privacy and runtime proof"
+  ],
+  "rollback": "Remove this profile and any consumer mapping that references it; no secret or deployment state is stored here."
+}
