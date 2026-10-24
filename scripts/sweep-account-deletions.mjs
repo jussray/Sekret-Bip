@@ -93,8 +93,11 @@ async function main() {
     const result = await processRequest(requestId);
     results.push(result);
     // Do not put account request IDs or provider response bodies into public CI logs.
-    if (result.ok) console.log('SAUCE_GUARD_DELETE_REQUEST_PROCESSED');
-    else console.error('SAUCE_GUARD_DELETE_REQUEST_FAILED');
+    if (result.ok) {
+      console.log('SAUCE_GUARD_DELETE_REQUEST_PROCESSED');
+    } else {
+      console.error('SAUCE_GUARD_DELETE_REQUEST_FAILED');
+    }
   }
 
   const failures = results.filter((result) => !result.ok);
