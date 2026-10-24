@@ -204,7 +204,7 @@ export default function Index() {
         // Founder-status lookup is a routing convenience only; any failure
         // (including a signed-in account with no app_profiles row yet)
         // falls through to the ordinary teen/parent front door below.
-        console.warn('Founder-status lookup failed during front-door routing');
+        console.warn('FRONT_DOOR_FOUNDER_LOOKUP_FAILED');
       }
       if (!active) return;
 
