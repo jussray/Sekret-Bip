@@ -85,3 +85,28 @@ test('guard scans executable plugin sources but ignores string literals and comm
   assert.equal(auditAddedDiff(diff, { [path]: 'console.error(providerBody);' }).length, 1);
   assert.equal(auditAddedDiff('+++ b/scripts/test.mjs\n@@ -1,0 +1,1 @@\n+// console.log(secret)\n').length, 0);
 });
+
+test('rejects structured console object dumps and computed dynamic log calls', () => {
+  const file = 'src/privacy-check.ts';
+  for (const source of [
+    'console.dir(providerResponse);',
+    'console.table(customerRecords);',
+    "console['dir'](providerResponse);",
+    "console['table'](customerRecords);",
+    'console.trace(error);',
+    'console.assert(ok, privateUserId);',
+    'console.count(privateUserId);',
+    "logger['warn'](customerEmail);",
+    'console.dir("SAFE_EVENT");',
+  ]) {
+    const diff = '+++ b/' + file + '\n@@ -1,0 +1,1 @@\n+' + source + '\n';
+    assert.equal(auditAddedDiff(diff, { [file]: source }).length, 1, source);
+  }
+  for (const source of [
+    "console.log('SAUCE_GUARD_EVENT_OK');",
+    "console['error']('SAUCE_GUARD_EVENT_FAILED');",
+  ]) {
+    const diff = '+++ b/' + file + '\n@@ -1,0 +1,1 @@\n+' + source + '\n';
+    assert.equal(auditAddedDiff(diff, { [file]: source }).length, 0, source);
+  }
+});
