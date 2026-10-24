@@ -47,8 +47,6 @@ test('runbook rejects the stale duplicate implementation names', () => {
 test('sweeper selects the public schema and reads pending IDs before any privileged processing', async () => {
   const seen = [];
   const ids = await fetchExpiredPendingRequests({
-    baseUrl: 'https://example.supabase.co',
-    serviceKey: 'test-service-key',
     nowIso: '2026-10-24T12:00:00.000Z',
     fetchImpl: async (url, init) => {
       seen.push({ url, init });
@@ -64,9 +62,7 @@ test('sweeper selects the public schema and reads pending IDs before any privile
 test('sweeper fails closed when public relation is unavailable, without echoing response contents', async () => {
   await assert.rejects(
     fetchExpiredPendingRequests({
-      baseUrl: 'https://example.supabase.co',
-      serviceKey: 'test-service-key',
-      fetchImpl: async () => ({
+          fetchImpl: async () => ({
         ok: false,
         status: 404,
         text: async () => JSON.stringify({
