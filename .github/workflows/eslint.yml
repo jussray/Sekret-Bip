@@ -18,6 +18,9 @@ on:
   schedule:
     - cron: '30 10 * * 3'
 
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
 jobs:
   eslint:
     name: Run eslint scanning
@@ -29,6 +32,18 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node
         uses: actions/setup-node@v4
