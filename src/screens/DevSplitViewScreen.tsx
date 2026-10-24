@@ -12,20 +12,12 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { getCurrentFounderProfile, isFounderProfile, type FounderProfile } from '@/services/founderAudit';
-import { DEV_SPLIT_VIEW_SIDE_PARAM } from '@/utils/devSplitViewSide';
+import { withDevSide } from '@/utils/devSplitViewUrl';
 
 type PaneSide = 'teen' | 'parent';
 
-// Both panes load the same origin, which would otherwise share the founder's
-// real AsyncStorage userSide and race to the same room. Stamp each pane's
-// side onto its URL so the route gates (app/_layout.tsx, app/(teen)/_layout.tsx)
-// can render the correct side for that pane specifically.
-function withDevSide(path: string, side: PaneSide): string {
-  const [withoutHash, hash] = path.split('#');
-  const separator = withoutHash.includes('?') ? '&' : '?';
-  const stamped = `${withoutHash}${separator}${DEV_SPLIT_VIEW_SIDE_PARAM}=${side}`;
-  return hash ? `${stamped}#${hash}` : stamped;
-}
+// Both panes retain the founder's same-origin session but are pinned to the
+// chosen side. URL validation prevents untrusted iframe or popup destinations.
 
 interface QuickLink {
   label: string;
@@ -112,7 +104,7 @@ function Pane({ side, initialPath }: { side: PaneSide; initialPath: string }) {
             <TouchableOpacity
               style={s.goBtn}
               onPress={() => {
-                if (typeof window !== 'undefined') window.open(withDevSide(path, side), '_blank');
+                if (typeof window !== 'undefined') window.open(withDevSide(path, side), '_blank', 'noopener,noreferrer');
               }}
             >
               <Text style={s.goBtnText}>↗</Text>
