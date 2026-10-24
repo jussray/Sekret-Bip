@@ -40,7 +40,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AmbientWeatherOverlay } from '../../../components/AmbientWeatherOverlay';
 import { useAppContext } from '@/context/AppContext';
@@ -247,11 +247,32 @@ export default function TeenPagesRoute() {
     patchJournalEntry,
     teenGender,
   } = useAppContext();
+  const { companion: companionParam } = useLocalSearchParams<{ companion?: string | string[] }>();
+  const requestedCompanion = Array.isArray(companionParam) ? companionParam[0] : companionParam;
 
   // ── Companion state ────────────────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<CompanionId>(() =>
     (COMPANIONS.some(c => c.id === selectedSekret) ? selectedSekret : 'raylene') as CompanionId,
   );
+
+  // Pages is a mounted tab route, so scrapbook handoff must apply when Pages
+  // regains focus. Consume the query parameter immediately after applying it so
+  // normal companion tab changes are not permanently overridden by stale URL state.
+  useFocusEffect(useCallback(() => {
+    if (!requestedCompanion) return;
+    const nextCompanion = COMPANIONS.some(c => c.id === requestedCompanion)
+      ? requestedCompanion as CompanionId
+      : null;
+    if (!nextCompanion) {
+      router.setParams({ companion: '' });
+      return;
+    }
+
+    setActiveTab(nextCompanion);
+    setSelectedSekret(nextCompanion);
+    router.setParams({ companion: '' });
+  }, [requestedCompanion, setSelectedSekret]));
+
   const [avatarState, setAvatarState] = useState<SekretAvatarState>('neutral');
   const { total: totalPoints } = usePoints();
 

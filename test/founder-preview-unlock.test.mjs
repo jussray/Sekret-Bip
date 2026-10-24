@@ -76,7 +76,8 @@ test('route visibility opens in development while side and Quiet Bip safety boun
   assert.match(teenLayout, /if \(founderPreview\) \{/);
   assert.match(teenLayout, /if \(!sleepLoaded\) return <TeenLoadingSurface \/>/);
   assert.match(teenLayout, /if \(sleepActive && !quietRouteAllowed\) return <Redirect href="\/\(teen\)\/quiet" \/>/);
-  assert.match(teenLayout, /return <TeenTabs selectedSekret=\{selectedSekret \?\? 'raylene'\} quietActive=\{sleepActive\} \/>/);
+  assert.match(teenLayout, /const hideGlobalChrome = quietActive \|\| immersive/);
+  assert.match(teenLayout, /immersive=\{immersiveScrapbook\}/);
   assert.match(teenLayout, /SafetyExperienceSheet/);
   assert.match(teenLayout, /useSafetyCheck/);
   assert.match(parentLayout, /if \(founderPreview\) return <ParentTabs/);
