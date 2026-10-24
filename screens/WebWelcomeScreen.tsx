@@ -365,7 +365,9 @@ export function WebWelcomeScreen({
               accessibilityLabel="Se'kret Bip has separate Teen and Bip Jr welcome experiences. Account setup controls what each person can access."
               style={styles.aboutPanel}
             >
-              <Text style={styles.aboutTitle}>Two welcome worlds. One connected family.</Text>
+              <Text accessibilityRole="header" style={styles.aboutTitle}>
+                Two welcome worlds. One connected family.
+              </Text>
               <Text style={styles.aboutBody}>
                 Teen and Bip Jr use separate presentation paths. Account setup and age-appropriate permissions decide what each person can access.
               </Text>
@@ -379,7 +381,13 @@ export function WebWelcomeScreen({
             >
               {copy.eyebrow}
             </Text>
-            <Text style={[styles.title, isBipJr && styles.titleBipJr]}>{copy.title}</Text>
+            <Text
+              accessibilityRole="header"
+              accessibilityLabel={copy.title.replace('\n', ' ')}
+              style={[styles.title, isBipJr && styles.titleBipJr]}
+            >
+              {copy.title}
+            </Text>
             <Text style={[styles.lead, isBipJr && styles.leadBipJr]}>{copy.lead}</Text>
             <Text style={[styles.subtitle, isBipJr && styles.subtitleBipJr]}>{copy.subtitle}</Text>
           </View>
