@@ -49,10 +49,10 @@ test('Production Smoke runs live Playwright only after verified current producti
   assert.match(content, /UPSTREAM_HEAD_SHA !== process\.env\.WORKFLOW_HEAD_SHA/);
   assert.match(content, /WORKFLOW_HEAD_SHA !== process\.env\.CURRENT_MAIN/);
   assert.match(content, /name: Classify production smoke eligibility/);
-  assert.match(content, /should_run: \\$\\{\\{ steps\\.upstream\\.outputs\\.should_run \\$\\}\\}/);
+  assert.ok(content.includes('should_run: ${{ steps.upstream.outputs.should_run }}'));
   assert.match(content, /needs: classify/);
-  assert.match(content, /if: needs\\.classify\\.outputs\\.should_run == 'true'/);
-  assert.doesNotMatch(content, /if: steps\\.upstream\\.outputs\\.should_run == 'true'/);
+  assert.ok(content.includes("if: needs.classify.outputs.should_run == 'true'"));
+  assert.ok(!content.includes("if: steps.upstream.outputs.should_run == 'true'"));
   assert.match(content, /ref: \$\{\{ env\.EXPECTED_HEAD_SHA \}\}/);
   assert.match(content, /persist-credentials: false/);
   assert.match(content, /actual="\$\(git rev-parse HEAD\)"/);
