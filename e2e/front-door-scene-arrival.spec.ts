@@ -192,15 +192,18 @@ test('canonical teen front door reveals family artwork and switches to Bip Jr wi
   expect(teen.some(sample => sample.copy < 0.95)).toBe(true);
   expect(teen.some(sample => sample.hero < 0.95)).toBe(true);
   expect(teen.some(sample => sample.cues < 0.95)).toBe(true);
-  for (const value of ['copy', 'hero', 'cues'] as const) {
+  for (const value of ['copy', 'hero'] as const) {
     expect(teen.at(-1)![value]).toBeGreaterThanOrEqual(0.99);
   }
+  expect(teen.at(-1)!.cues).toBeGreaterThanOrEqual(0.61);
+  expect(teen.at(-1)!.cues).toBeLessThanOrEqual(0.63);
 
   await page.getByTestId('web-welcome-audience-switch').click();
   await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible();
   await page.waitForTimeout(1100);
   const jr = (await read()).filter(sample => sample.audience === 'bip-jr');
   expect(jr.length).toBeGreaterThan(4);
+  expect(jr[0]!.hero).toBeLessThan(0.5);
   expect(jr.some(sample => sample.hero < 0.95)).toBe(true);
   for (const value of ['copy', 'hero', 'cues'] as const) {
     expect(jr.at(-1)![value]).toBeGreaterThanOrEqual(0.99);
@@ -226,11 +229,39 @@ test('reduced motion renders both audience scenes still with working family acce
     return node ? Number.parseFloat(getComputedStyle(node).opacity) : null;
   }));
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible({ timeout: 30_000 });
-  expect(await opacity()).toEqual([1, 1, 1]);
+  expect(await opacity()).toEqual([1, 1, 0.62]);
   await page.getByTestId('web-welcome-audience-switch').click();
   await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible();
   expect(await opacity()).toEqual([1, 1, 1]);
   await page.waitForTimeout(450);
   expect(await opacity()).toEqual([1, 1, 1]);
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible();
+});
+
+
+test('cold Bip Jr artwork waits for image loading before hero and cues are revealed', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  let heldArtworkRequest = false;
+  await page.route(/parent-space-splash.*\\.png/i, async route => {
+    heldArtworkRequest = true;
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    await route.continue();
+  });
+
+  await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'domcontentloaded' });
+  const hero = page.getByTestId('web-welcome-hero-reveal');
+  const cues = page.getByTestId('web-welcome-world-cues');
+  await expect(hero).toBeAttached({ timeout: 30_000 });
+  await page.waitForTimeout(950);
+
+  expect(heldArtworkRequest, 'the cold image asset must be intercepted for this test to prove load gating').toBe(true);
+  const getOpacity = (target: typeof hero) => target.evaluate(node => Number.parseFloat(getComputedStyle(node).opacity));
+  expect(await getOpacity(hero)).toBeLessThan(0.05);
+  expect(await getOpacity(cues)).toBeLessThan(0.05);
+  await expect(page.getByTestId('web-welcome-enter')).toBeVisible();
+
+  await expect.poll(() => getOpacity(hero), { timeout: 15_000 }).toBeGreaterThanOrEqual(0.99);
+  await expect.poll(() => getOpacity(cues), { timeout: 15_000 }).toBeGreaterThanOrEqual(0.99);
 });
