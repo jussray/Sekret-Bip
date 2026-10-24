@@ -183,7 +183,7 @@ export function classifyObservation({checks, oldEnough, fingerprint, previousFin
   return 'observing';
 }
 
-export function buildTestLedger({
+export function buildTestLedger({runtimeState = null,
   repository,
   sha,
   branch,
@@ -199,6 +199,7 @@ export function buildTestLedger({
     commitSha: normalizeSha(sha),
     branch: clean(branch) || null,
     generatedAt: observedAt.toISOString(),
+    ...(runtimeState ? { runtimeState } : {}),
     source: {
       provider: 'github-check-runs',
       exactRef: 'commit-sha',
@@ -379,6 +380,15 @@ export async function observeExactHeadChecks(env = process.env) {
   const runId = clean(env.GITHUB_RUN_ID);
   const observerCheckName = clean(env.CONTROL_ROOM_LEDGER_SELF_CHECK || 'Publish exact-head test ledger');
   const outputPath = clean(env.CONTROL_ROOM_TEST_LEDGER_PATH) || 'artifacts/control-room-test-ledger.json';
+  const runtimeStatePath = clean(env.CONTROL_ROOM_RUNTIME_STATE_PATH);
+  const runtimeState = runtimeStatePath
+    ? JSON.parse(fs.readFileSync(runtimeStatePath, 'utf8'))
+    : null;
+  if (runtimeState) {
+    if (clean(runtimeState.repository) !== repository) throw new Error('Runtime-state receipt repository does not match the ledger repository.');
+    if (normalizeSha(runtimeState.sourceSha) !== sha) throw new Error('Runtime-state receipt sourceSha does not match the exact ledger head.');
+    if (!/^sha256:[0-9a-f]{64}$/u.test(clean(runtimeState?.trackedConfig?.sha256))) throw new Error('Runtime-state receipt is missing a valid tracked-config fingerprint.');
+  }
   const timeoutMs = Number(env.CONTROL_ROOM_LEDGER_TIMEOUT_MS || 20 * 60 * 1000);
   const pollMs = Number(env.CONTROL_ROOM_LEDGER_POLL_MS || 10_000);
   const minimumObservationMs = Number(env.CONTROL_ROOM_LEDGER_MINIMUM_MS || 30_000);
@@ -395,7 +405,7 @@ export async function observeExactHeadChecks(env = process.env) {
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
     checks = selectLatestChecks(runs, sha, observerCheckName);
-    writeLedger(outputPath, buildTestLedger({repository, sha, branch, runId, checks}));
+    writeLedger(outputPath, buildTestLedger({runtimeState, repository, sha, branch, runId, checks}));
 
     const fingerprint = JSON.stringify(checks.map((check) => [
       check.app,
@@ -412,7 +422,7 @@ export async function observeExactHeadChecks(env = process.env) {
     await sleep(pollMs);
   }
 
-  const ledger = buildTestLedger({
+  const ledger = buildTestLedger({runtimeState, 
     repository,
     sha,
     branch,

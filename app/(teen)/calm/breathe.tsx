@@ -18,7 +18,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useAudioPlayer } from '../../../hooks/useAudioPlayer';
 import { emitEvent } from '../../../src/features/activity/events';
 
 // ── Breathing patterns ────────────────────────────────────────────────────────
@@ -77,21 +76,12 @@ const PHASE_COLORS: Record<BreathPhase, string> = {
   out:  '#7c3aed',
 };
 
-// Playlist — replace URIs with real CDN audio before shipping
-const CALM_PLAYLIST = [
-  { id: 'rain',   emoji: '🌧️', label: 'night rain',  sub: 'soothing rain sounds', duration: '20:00', uri: '' },
-  { id: 'lofi',   emoji: '🎵', label: 'soft lo-fi',  sub: 'focus + unwind',       duration: '30:00', uri: '' },
-  { id: 'ocean',  emoji: '🌊', label: 'ocean waves', sub: 'reset your mind',      duration: '25:00', uri: '' },
-  { id: 'piano',  emoji: '🎹', label: 'soft piano',  sub: 'ease into stillness',  duration: '15:00', uri: '' },
-];
-
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function BreatheScreen() {
   const [patternKey, setPatternKey]   = useState<string>('box');
   const [stepIdx,    setStepIdx]      = useState(0);
   const [counter,    setCounter]      = useState(4);
   const [running,    setRunning]      = useState(false);
-  const [activeSong, setActiveSong]   = useState<string | null>(null);
   const [reminderSet, setReminderSet] = useState(false);
   const [showNudge,   setShowNudge]   = useState(false);
   const hasStartedRef  = useRef(false);
@@ -101,8 +91,6 @@ export default function BreatheScreen() {
   const glowOpacity  = useRef(new Animated.Value(0.4)).current;
   const glowScale    = useRef(new Animated.Value(1)).current;
   const animRef      = useRef<Animated.CompositeAnimation | null>(null);
-
-  const audio = useAudioPlayer();
 
   const pattern = PATTERNS[patternKey];
   const step    = pattern.steps[stepIdx % pattern.steps.length];
@@ -200,22 +188,6 @@ export default function BreatheScreen() {
     circleScale.setValue(1);
     glowScale.setValue(1);
     glowOpacity.setValue(0.4);
-  }
-
-  // ── Audio ─────────────────────────────────────────────────────────────────
-  async function handleSongPress(song: typeof CALM_PLAYLIST[number]) {
-    if (!song.uri) {
-      Alert.alert('Coming soon', 'Audio tracks will be available in the next update. 💜');
-      return;
-    }
-    if (activeSong === song.id) {
-      if (audio.state === 'playing') await audio.pause();
-      else await audio.play();
-      return;
-    }
-    setActiveSong(song.id);
-    await audio.load(song.uri);
-    await audio.play();
   }
 
   // ── Reminder ─────────────────────────────────────────────────────────────
@@ -372,40 +344,6 @@ export default function BreatheScreen() {
             </View>
           )}
 
-          {/* Calm Playlist */}
-          <Text style={s.sectionTitle}>Calm Playlist ✦</Text>
-          <Text style={s.sectionSub}>let the sound hold you</Text>
-          {CALM_PLAYLIST.map(song => {
-            const isActive = activeSong === song.id;
-            const isPlaying = isActive && audio.state === 'playing';
-            const isLoading = isActive && audio.state === 'loading';
-            return (
-              <TouchableOpacity
-                key={song.id}
-                style={[s.songRow, isActive && s.songRowActive]}
-                onPress={() => handleSongPress(song)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.songEmoji}>{song.emoji}</Text>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={s.songLabel}>{song.label}</Text>
-                  <Text style={s.songSub}>{song.sub}</Text>
-                  {isActive && audio.durationMs > 0 && (
-                    <View style={s.progressTrack}>
-                      <View style={[s.progressFill, { width: `${audio.progress * 100}%` as any }]} />
-                    </View>
-                  )}
-                </View>
-                <Text style={s.songDur}>{song.duration}</Text>
-                <View style={s.playBtn}>
-                  <Text style={s.playBtnIcon}>
-                    {isLoading ? '⏳' : isPlaying ? '⏸' : '▶'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-
           {/* Breathe Reminder */}
           <View style={s.reminderCard}>
             <Text style={s.reminderTitle}>Breathe Reminder</Text>
@@ -479,20 +417,6 @@ const s = StyleSheet.create({
   startBtn: { marginHorizontal: 40, paddingVertical: 14, borderRadius: 28, backgroundColor: '#a855f7', alignItems: 'center', marginBottom: 28, shadowColor: '#a855f7', shadowOffset: { width: 0, height: 0 }, shadowRadius: 16, shadowOpacity: 0.5, elevation: 8 },
   startBtnRunning: { backgroundColor: '#7c3aed' },
   startBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
-
-  sectionTitle: { color: '#a855f7', fontSize: 16, fontWeight: '800', marginHorizontal: 16, marginBottom: 4 },
-  sectionSub: { color: '#5a3e72', fontSize: 12, marginHorizontal: 16, marginBottom: 12 },
-
-  songRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginBottom: 8, backgroundColor: 'rgba(168,85,247,0.06)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(168,85,247,0.18)', padding: 12 },
-  songRowActive: { backgroundColor: 'rgba(168,85,247,0.14)', borderColor: 'rgba(168,85,247,0.5)' },
-  songEmoji: { fontSize: 28, width: 36, textAlign: 'center' },
-  songLabel: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  songSub: { color: '#7c5a9e', fontSize: 11 },
-  songDur: { color: '#5a3e72', fontSize: 11, marginRight: 4 },
-  playBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(168,85,247,0.25)', alignItems: 'center', justifyContent: 'center' },
-  playBtnIcon: { color: '#fff', fontSize: 14 },
-  progressTrack: { height: 3, backgroundColor: 'rgba(168,85,247,0.2)', borderRadius: 2, marginTop: 4, overflow: 'hidden' },
-  progressFill: { height: 3, backgroundColor: '#a855f7', borderRadius: 2 },
 
   reminderCard: { marginHorizontal: 16, marginTop: 20, marginBottom: 12, backgroundColor: 'rgba(168,85,247,0.08)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)', padding: 18 },
   reminderTitle: { color: '#a855f7', fontSize: 16, fontWeight: '800', marginBottom: 4 },

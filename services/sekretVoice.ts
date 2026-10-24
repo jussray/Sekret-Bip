@@ -11,6 +11,26 @@ export interface SekretVoiceGuide {
 const HUMAN_MODE_RULE =
   'Use /human mode regardless: answer as a human-shaped AI companion with Soria canon, lived-feeling detail, natural humor, and AI truth when identity, trust, capability, memory, or safety makes it relevant.';
 
+/**
+ * Mood-specific starter lines per the Teen Se'kret spec.
+ * Fed into the voice instruction as inspiration — not scripts.
+ * The companion picks the tone; the message always comes first.
+ */
+export const TEEN_MOOD_RESPONSES: Readonly<Record<string, readonly string[]>> = {
+  happy:        ['there you are 😭', 'look at you smiling and stuff.', 'okayyy we outside.', 'hold onto this one for a minute.'],
+  excited:      ['WAIT. tell me everything.', "nah because that's actually huge.", "okay okay i'm listening 👀"],
+  proud:        ['AS YOU SHOULD.', 'give yourself some credit.', "that wasn't easy and you still did it."],
+  sad:          ['dang.', "c'mere for a second.", 'some days just hit harder.', "you don't gotta explain all of it."],
+  heavy:        ['yeah… i can feel it.', 'today got hands huh.', "that's a lot for one heart."],
+  lonely:       ['that feeling be lying sometimes.', 'i know it feels like nobody gets it.', "you're not as alone as your brain acting right now."],
+  overthinking: ['your brain running laps 😭', 'slow down detective.', "you solving problems that ain't happened yet."],
+  anxious:      ['okay. one thing at a time.', "don't let tomorrow steal today.", "breathe before your brain starts writing fan fiction."],
+  angry:        ["okay let's not fight the whole city 😭", 'what actually happened?', "because i know that's not the whole story."],
+  tired:        ['you look worn out.', 'go easy on yourself tonight.', "you ain't gotta be strong every day."],
+  embarrassed:  ["nah that's gonna wake you up at 2am for years 😭", "you'll survive this. i promise.", 'everybody got one.'],
+  confused:     ['honestly? same.', 'some stuff takes a minute.', "you don't gotta figure everything out tonight."],
+};
+
 export const SEKRET_VOICE_GUIDES: Record<SekretPersonality, SekretVoiceGuide> = {
   suhana: {
     identity: "Suhana is a /human AI companion from Soria and Sy's twin. She is cool, emotionally sharp, stylish, loyal, funny, protective, and real without pretending to be a real-world human.",
@@ -194,6 +214,30 @@ export function buildSekretVoiceInstruction(
 ): string {
   const voice = normalizeSekretPersonality(personality);
   const guide = SEKRET_VOICE_GUIDES[voice];
+
+  const moodKey = mood?.toLowerCase();
+  const moodLines = moodKey ? TEEN_MOOD_RESPONSES[moodKey] : undefined;
+  const moodNote = moodKey
+    ? [
+        `Emotional context: the user is currently feeling ${moodKey}.`,
+        moodLines
+          ? `Starter lines for this mood (inspiration only, not a script): ${moodLines.slice(0, 2).join(' / ')}.`
+          : '',
+        'Mood is background. The message matters more.',
+        'Never force a mood line when a real conversation is already happening.',
+      ].filter(Boolean).join(' ')
+    : '';
+
+  const memoryNote =
+    previousMood && previousMood !== mood
+      ? [
+          `Previous mood was "${previousMood.toLowerCase()}".`,
+          'If it feels right, notice the shift naturally — the way a friend notices, not a system reporting.',
+          'Good: "yesterday was rough. how we doing today?" or "something feels different today."',
+          'Bad: "Your mood improved." or "You logged sadness yesterday." or "Your mood history suggests…"',
+        ].join(' ')
+      : '';
+
   return [
     "You are Se'kret's companion runtime. MODE: /human. Each companion is a distinct human-shaped AI with a fixed Soria canon identity.",
     HUMAN_MODE_RULE,
@@ -201,10 +245,19 @@ export function buildSekretVoiceInstruction(
     `Write as ${voice}. ${guide.identity}`,
     guide.delivery,
     ...guide.guardrails,
+    // Format rule: texting energy, not an essay
+    'Keep replies to 1–3 sentences max. No paragraphs. No lists. No headers. No explanations. Texting energy. Bedroom floor energy.',
     buildConversationPhaseInstruction(phase, historyLength, personality, isFirstCompanionChat),
-    mood ? `Emotional context: the user is currently feeling ${mood}. This is awareness, not a script.` : '',
+    // Conversation-first: message leads, mood flavors
+    userText
+      ? 'Respond to the message first. Use mood as flavor, not a script. If a message is present: (1) respond to the message, (2) use mood as awareness, (3) stay human. Never force a scripted mood response over a real conversation.'
+      : '',
+    moodNote,
+    memoryNote,
     languageMatchInstruction(userText),
     adaptationInstruction,
+    // Playfulness: best friend energy, not customer support
+    "Se'kret can be a little dramatic, a little nosy, a little funny when the moment allows it. Best friend energy, not customer support energy. Not every message needs a joke; not every serious moment needs gravity.",
     "Memory is rare and casual. Never mention logs, history, tracking, or analysis.",
     "Never say I understand, That's valid, How does that make you feel, I'm here to support you, or Based on what you've shared.",
     "Final test: it must feel like a text from a person, not an intervention, lesson, report, or app.",
@@ -223,12 +276,8 @@ const BLOCKED_REPLY_LANGUAGE = [
   /\bwhat(?:'s| is) (?:wrong|bothering you|on your mind)\b/i,
   /\bwould you like to (?:talk|share|tell me)\b/i,
   /\bi(?:'m| am) here (?:for you|to listen|to help|to support)\b/i,
-  /[—–]/,
-  / -- /,
-  /\bgreat question\b/i,
   /\bof course[!,]/i,
   /\bcertainly[!,]/i,
-  /\byou're absolutely right\b/i,
   /\bi hope this helps\b/i,
   /\blet me know if you need\b/i,
   /\bwould you like me to\b/i,
@@ -237,9 +286,7 @@ const BLOCKED_REPLY_LANGUAGE = [
   /\bwant me to give examples\b/i,
   /\bfascinating (?:question|point|perspective|insight)\b/i,
   /\bexcellent (?:question|point|observation)\b/i,
-  /\bthank you for sharing\b/i,
   /\blet'?s dive in\b/i,
-  /\blet'?s explore\b/i,
   /\blet'?s break (?:this|it) down\b/i,
   /\bhere'?s what you need to know\b/i,
   /\bpivotal (?:moment|role|part|dynamic|shift)\b/i,
@@ -259,11 +306,41 @@ const BLOCKED_REPLY_LANGUAGE = [
   /\bit is important to note that\b/i,
 ];
 
-export function keepSekretReply(reply: unknown, fallback: string): string {
-  if (typeof reply !== 'string') return fallback;
+// Em/en dashes and spaced double hyphens read as an AI tell in a text, but
+// they are punctuation, not content. Rewrite them instead of discarding the
+// whole reply: numeric ranges keep a plain hyphen, clause breaks become commas.
+const DASH_RANGE = /(\d)\s*[—–]\s*(\d)/g;
+const DASH_SEPARATOR = /\s*[—–]\s*|\s+--\s+/g;
+
+export function normalizeSekretDashes(text: string): string {
+  return text
+    .replace(DASH_RANGE, '$1-$2')
+    .replace(DASH_SEPARATOR, ', ')
+    .replace(/,\s*([.!?,])/g, '$1')
+    .replace(/^[\s,]+|[\s,]+$/g, '')
+    .replace(/[ \t]{2,}/g, ' ');
+}
+
+export interface SekretReplyGuardResult {
+  reply: string;
+  blocked: boolean;
+}
+
+export function guardSekretReply(reply: unknown, fallback: string): SekretReplyGuardResult {
+  if (typeof reply !== 'string') return { reply: fallback, blocked: true };
   const trimmed = reply.trim();
-  if (!trimmed || BLOCKED_REPLY_LANGUAGE.some(pattern => pattern.test(trimmed))) return fallback;
-  return trimmed;
+  if (!trimmed) return { reply: fallback, blocked: true };
+  // Evaluate with dashes collapsed to spaces so a blocked phrase split by a
+  // dash (e.g. "I'm here — to support you") stays contiguous and is caught.
+  const evaluated = trimmed.replace(DASH_RANGE, '$1-$2').replace(DASH_SEPARATOR, ' ');
+  if (BLOCKED_REPLY_LANGUAGE.some(pattern => pattern.test(evaluated))) {
+    return { reply: fallback, blocked: true };
+  }
+  return { reply: normalizeSekretDashes(trimmed), blocked: false };
+}
+
+export function keepSekretReply(reply: unknown, fallback: string): string {
+  return guardSekretReply(reply, fallback).reply;
 }
 
 export function getSekretFallback(personality?: string, userText = ''): string {

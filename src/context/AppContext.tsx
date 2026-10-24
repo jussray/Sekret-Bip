@@ -14,6 +14,8 @@ import { useStreak } from '@/hooks/useStreak';
 import { useSyncStatus } from '../../hooks/useSyncStatus';
 import { initPointLedger } from '@/features/activity/ledger';
 import { upsertJournalEntry } from '@/features/journal/journalRepository';
+import { useVerificationContext } from '@/context/VerificationContext';
+import { consentService } from '@/services/consentService';
 import {
   syncMood,
   syncParentCirclePost,
@@ -142,10 +144,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [teenGender, setTeenGender] = useState<'girl' | 'boy' | 'other' | null>(null);
   const breatheAnim = useRef(new Animated.Value(1)).current;
+  const { session } = useVerificationContext();
+  const authenticatedUserId = session && !session.user.is_anonymous ? session.user.id : null;
+  const previousAuthenticatedUserId = useRef<string | null>(null);
 
-  const state = useSekretState();
+  const state = useSekretState(authenticatedUserId);
   const { streakDays } = useStreak();
   const { syncStatus, withSyncWrap } = useSyncStatus();
+
+  useEffect(() => {
+    const previousUserId = previousAuthenticatedUserId.current;
+    if (previousUserId && previousUserId !== authenticatedUserId) {
+      state.resetAllState();
+      setJournalText('');
+      setNotificationsEnabled(false);
+      setTeenGender(null);
+      consentService.reset();
+    }
+    previousAuthenticatedUserId.current = authenticatedUserId;
+    // State reset is intentionally account-transition driven. The individual
+    // setters are stable React state controls and must not retrigger this gate.
+  }, [authenticatedUserId]);
 
   useEffect(() => {
     AsyncStorage.getItem('teen_profile_data').then(raw => {
@@ -328,6 +347,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     state.resetAllState();
     setJournalText('');
     setNotificationsEnabled(false);
+    setTeenGender(null);
+    consentService.reset();
   }
 
   const value: AppContextValue = {

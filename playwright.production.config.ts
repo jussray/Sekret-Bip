@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { resolvePlaywrightExecutablePath } from './scripts/playwright-executable.mjs';
 
@@ -7,6 +8,7 @@ import { resolvePlaywrightExecutablePath } from './scripts/playwright-executable
 // normal parent, teen, or anonymous visitor can actually use.
 const BASE_URL = process.env.PRODUCTION_BASE_URL || 'https://app.sekretbip.net';
 const executablePath = resolvePlaywrightExecutablePath();
+const controlRoomSkipReporter = path.resolve('./scripts/control-room-playwright-skip-reporter.mjs');
 
 export default defineConfig({
   testDir: './e2e',
@@ -23,8 +25,8 @@ export default defineConfig({
   retries: 2,
   workers: 1,
   reporter: process.env.CI
-    ? [['line'], ['html', { open: 'never', outputFolder: 'playwright-report-production' }]]
-    : 'html',
+    ? [['line'], ['html', { open: 'never', outputFolder: 'playwright-report-production' }], [controlRoomSkipReporter]]
+    : [['html'], [controlRoomSkipReporter]],
   use: {
     baseURL: BASE_URL,
     trace: 'on-first-retry',

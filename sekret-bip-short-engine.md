@@ -2,7 +2,7 @@
 
 Status: **CANONICAL PRODUCTION CONTRACT**
 
-This engine turns approved canon into short-form episode assets without spending video credits to discover whether the characters are correct.
+This engine turns approved canon into episode assets without spending video credits to discover whether the characters are correct.
 
 Read with:
 - `sekret-bip-world-bible.md`
@@ -122,28 +122,36 @@ For each shot, video becomes eligible only after a still has:
 - no accidental text/logo baked into the frame unless requested;
 - founder or designated canon-review status `APPROVED`.
 
-For Episode 001, `season-01/01-the-bridge-that-listens.md` is the shot-cast authority. In particular, Shots 5, 6, and 7 require Night, Suhana, Sy, **and Cloud**. A still or animation missing Cloud in those shots is not approved source evidence for the final episode.
+For Episode 001, `season-01/01-the-bridge-that-listens.md` is the shot-cast authority. Shots 5 through 10 that call for the full group require Night, Suhana, Sy, **and Cloud** exactly as specified in the episode carrier. A still or animation missing a required character is not approved source evidence for the final episode.
 
 ```text
 if still_status != APPROVED:
     VIDEO_ALLOWED = false
 ```
 
+## Visual provider boundary
+
+Visual providers are execution lanes, not canon authorities.
+
+Google Gemini image models, including Nano Banana-family models, may be used for world/keyframe generation when the active shot binds the correct authority references. If a named character appears, the exact approved character reference must be supplied to the provider. A Gemini render may not invent or promote identity, change cast count, reinterpret world-only imagery as character authority, or bypass still review.
+
+Gemini video models may be evaluated as animation canaries under the same provider membrane as other animation systems. They are not required for Episode 001 and do not become production-eligible merely because a render completed.
+
 ## Episode keyframe gate
 
 For Episode 001:
-- create one portal/world keyframe first;
-- that world keyframe fulfills storyboard Shot 3 (`portal opens`);
-- then create the six remaining shot keyframes for Shots 1, 2, 4, 5, 6, and 7;
-- review all seven final shot keyframes before animating any of them.
+- create the world/portal keyframe first;
+- create the remaining shot keyframes against the final ten-shot storyboard;
+- review all ten final shot keyframes before treating the episode as fully animation-eligible;
+- an existing approved motion clip may satisfy a shot only if its cast, action, tone, framing, and continuity still match the current Episode 001 authority.
 
-This interprets the production brief’s “one portal/world keyframe + six episode keyframes” against its seven-shot final storyboard without dropping a shot.
+The current Episode 001 carrier is a **64-second, 16:9 YouTube episode**. Legacy 25-second vertical evidence may remain useful as source footage, but it cannot by itself prove the current master.
 
 ## Animation provider routing
 
 Animation providers are interchangeable execution lanes, not canon authorities. The machine-readable provider contract is `production/video-providers/registry.json`.
 
-The existing Higgsfield route remains the default production route. Hugging Face is an additional canary lane so the production system is not locked to one provider.
+The existing Higgsfield route remains the default production route when it is available. Hugging Face is an additional canary lane so the production system is not locked to one provider. Gemini may also be evaluated as an external-service canary when the registry marks that candidate eligible.
 
 A provider is eligible only when it preserves the existing gate:
 
@@ -164,7 +172,7 @@ Provider rules:
 - a provider cannot invent or promote character identity;
 - text-only character identity is forbidden when an approved character reference/fingerprint exists;
 - provider choice cannot override cast count, character fingerprints, world authority, shot action, or the episode rule;
-- Hugging Face models begin `productionEligible: false` and must pass an exact Bip identity canary before promotion;
+- canary providers begin `productionEligible: false` and must pass an exact Bip identity canary before promotion;
 - models with unresolved license/usage status remain ineligible even if technically capable;
 - every generation lane requires cost/allowance preflight before paid or metered execution;
 - a successful model render is not a shot approval and cannot issue final continuity approval by itself.
@@ -176,11 +184,11 @@ node scripts/verify-video-provider-registry.mjs
 node scripts/verify-video-provider-registry.mjs --select-canary
 ```
 
-The first Hugging Face canary candidate is selected from the registry, not hard-coded into episode canon. Changing models later must remain a provider-policy change rather than a character/world-canon rewrite.
+Changing providers later must remain a provider-policy change rather than a character/world-canon rewrite.
 
 ## Animation gate
 
-Only animate an approved keyframe.
+Only animate an approved keyframe or reuse an already approved motion source that still matches the active shot contract.
 
 Animation must preserve:
 - cast identity and count;
@@ -189,15 +197,16 @@ Animation must preserve:
 - portal/bridge rule;
 - shot action;
 - camera intent;
-- emotional cause-and-effect.
+- emotional cause-and-effect;
+- the child-safe tone specified by the episode authority.
 
-If animation mutates identity, introduces a person, drops a required character, or breaks the world rule, reject the clip rather than repairing the mistake by generating unrelated replacements.
+If animation mutates identity, introduces a person, drops a required character, breaks the world rule, or turns curiosity into menace, reject the clip rather than repairing the mistake with unrelated replacements.
 
 ## Post-production boundary
 
 Add exact title, captions, logo, and closing line in post-production, not by asking the image/video generator to typeset them into the world.
 
-`browser-use/video-use` is an approved **post-production adapter**, not a canon or character-generation authority. It may assemble already-approved source clips, trim, mix audio, add captions/graphics, and render the master. It must not regenerate character identity, substitute cast, invent a missing shot, or reinterpret a world-only reference as character authority.
+`browser-use/video-use` is an approved **post-production adapter**, not a canon or character-generation authority. It may assemble already-approved source clips, trim, mix audio, add captions/graphics, reframe approved source footage without changing identity, and render the master. It must not regenerate character identity, substitute cast, invent a missing shot, or reinterpret a world-only reference as character authority.
 
 For Episode 001 the machine-readable contract is `production/video-use/episode-001.json`.
 
@@ -209,19 +218,21 @@ approved shot clips + shot approval evidence
 → MP4/H.264 master render
 → ffprobe metadata verification
 → Playwright playback proof
-→ continuity review
+→ continuity + tone + audio review
 → final continuity approval
 ```
 
-Shot approval evidence records that the source shot already passed the existing still/animation canon gates; it does not create a new authority object. An editor export alone is not proof. A metadata pass alone is not browser proof. Playwright playback proof must show that Chromium decoded the actual master and that playback time advanced. Final approval remains ineligible until continuity review also passes.
+Shot approval evidence records that the source shot already passed the existing still/animation canon gates; it does not create a new authority object. An editor export alone is not proof. A metadata pass alone is not browser proof. Playwright playback proof must show that Chromium decoded the actual master and that playback time advanced. Final approval remains ineligible until continuity, tone, and audio review also pass.
 
-Master target:
+Master target for Episode 001:
 
 ```text
-1080 × 1920
-9:16 vertical
+1920 × 1080 minimum
+16:9 widescreen
 30 fps
+64 seconds ± 0.5 seconds
 MP4 / H.264
+YouTube-ready
 ```
 
 Repository verification commands:
@@ -233,12 +244,15 @@ npm run verify:video:playback -- --manifest production/video-use/episode-001.jso
 
 ## Final proof-of-canon gate
 
-A finished short passes only if a viewer can understand:
+A finished Episode 001 passes only if a viewer can understand:
 - these characters belong together;
 - the world has consistent visual rules;
-- the portal responds to emotion;
+- the portal responds to discovery;
 - the bridge has a meaningful rule;
 - cooperation changes the environment;
-- the closing line expresses what just happened.
+- the adventure remains curious, magical, playful, exciting, and reassuring;
+- the mystery cut creates curiosity rather than fear;
+- the bright goodbye leaves the child safe, happy, curious, and included;
+- the closing line and Se’kret Bip end mark are understandable.
 
-Beautiful but causally meaningless magic is a failure.
+Beautiful but causally meaningless magic is a failure. A technically valid MP4 that violates the episode goal is also a failure.
