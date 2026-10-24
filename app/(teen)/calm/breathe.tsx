@@ -213,7 +213,7 @@ export default function BreatheScreen() {
       Alert.alert('Reminder set 💜', 'You\'ll get a gentle nudge every hour to breathe.');
     } catch {
       setReminderSet(false);
-      console.warn('Failed to schedule breathing reminder');
+      console.warn('BREATHE_REMINDER_SCHEDULE_FAILED');
       Alert.alert(
         'Reminder not set',
         'We could not schedule the reminder. Check notification settings and try again.'
