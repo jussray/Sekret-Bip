@@ -7,9 +7,6 @@
 //   SUPABASE_SECRET_KEY (legacy SUPABASE_SERVICE_ROLE_KEY accepted during migration)
 //   ACCOUNT_DELETION_PROCESS_SECRET
 
-import { resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
-
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').replace(/\/$/, '');
 const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 const PROCESS_SECRET = process.env.ACCOUNT_DELETION_PROCESS_SECRET || '';
@@ -97,7 +94,7 @@ async function main() {
   console.log(`sweep-account-deletions: processed ${results.length} request(s) successfully.`);
 }
 
-// Safe to import in contract tests without triggering a privileged deletion sweep.
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+// Node 24 entry-point guard: importing this helper for tests must never run a sweep.
+if (import.meta.main) {
   main().catch((error) => fail(error instanceof Error ? error.message : String(error)));
 }
