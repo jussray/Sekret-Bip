@@ -56,6 +56,9 @@ test('production witness reads exactly the intended 14 RLS policies without user
   assert.match(query, /tbl\.relrowsecurity/);
   assert.match(query, /p\.qual like '%is_anonymous%'/);
   assert.match(query, /p\.with_check like '%is_anonymous%'/);
+  assert.match(query, /p\.qual like '%IS FALSE%'/);
+  assert.match(query, /p\.with_check like '%IS FALSE%'/);
+  assert.doesNotMatch(query, /p\.(?:qual|with_check) like '%false%'/, 'a COALESCE fallback alone does not prove anonymous denial');
   assert.match(query, /from supabase_migrations\.schema_migrations/);
   assert.doesNotMatch(query, /\b(insert|update|delete|alter|drop|create|grant|revoke)\b/i);
 });
