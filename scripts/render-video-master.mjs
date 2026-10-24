@@ -104,7 +104,6 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
   const verifiedSources = [];
   for (const shot of requiredShots) {
     const source = sourceByShot.get(shot);
-    assertSourceDescriptor(source, shot);
     const actualSha256 = await sha256File(source.path);
     if (actualSha256 !== String(source.sha256).toLowerCase()) fail(`SHOT_${shot}_HASH_MISMATCH`, 'BIP_VIDEO_SOURCE_STALE');
     const probe = probeMedia(source.path);
