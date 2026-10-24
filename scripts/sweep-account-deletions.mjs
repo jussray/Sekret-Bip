@@ -12,7 +12,16 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE
 const PROCESS_SECRET = process.env.ACCOUNT_DELETION_PROCESS_SECRET || '';
 
 function fail(message) {
-  console.error(`sweep-account-deletions: ${message}`);
+  // Never log untrusted provider/HTTP/network error text. Only fixed event codes.
+  if (typeof message === 'string' && message.startsWith('schema_public_unavailable:')) {
+    console.error('SAUCE_GUARD_DELETE_SCHEMA_UNAVAILABLE');
+  } else if (typeof message === 'string' && message.startsWith('list_failed:')) {
+    console.error('SAUCE_GUARD_DELETE_QUEUE_READ_FAILED');
+  } else if (typeof message === 'string' && message.startsWith('missing ')) {
+    console.error('SAUCE_GUARD_DELETE_CONFIG_MISSING');
+  } else {
+    console.error('SAUCE_GUARD_DELETE_SWEEP_FAILED');
+  }
   process.exit(1);
 }
 
@@ -75,23 +84,24 @@ async function main() {
   if (!SERVICE_ROLE_KEY) fail('missing SUPABASE_SECRET_KEY (legacy SUPABASE_SERVICE_ROLE_KEY accepted during migration)');
   if (!PROCESS_SECRET) fail('missing ACCOUNT_DELETION_PROCESS_SECRET');
   const requestIds = await fetchExpiredPendingRequests();
-  console.log(`sweep-account-deletions: found ${requestIds.length} expired pending request(s).`);
+  console.log('SAUCE_GUARD_DELETE_QUEUE_SCANNED');
 
   const results = [];
-  for (const [index, requestId] of requestIds.entries()) {
+  for (const requestId of requestIds) {
     // Sequential on purpose: each call deletes an Auth user and storage
     // objects, and there is no reason to parallelize destructive admin work.
     const result = await processRequest(requestId);
     results.push(result);
     // Do not put account request IDs or provider response bodies into public CI logs.
-    console.log(`  ${result.ok ? 'ok' : 'FAILED'} request_index=${index + 1} http=${result.status}`);
+    if (result.ok) console.log('SAUCE_GUARD_DELETE_REQUEST_PROCESSED');
+    else console.error('SAUCE_GUARD_DELETE_REQUEST_FAILED');
   }
 
   const failures = results.filter((result) => !result.ok);
   if (failures.length > 0) {
     fail(`${failures.length} of ${results.length} deletion request(s) failed; see log above.`);
   }
-  console.log(`sweep-account-deletions: processed ${results.length} request(s) successfully.`);
+  console.log('SAUCE_GUARD_DELETE_SWEEP_COMPLETE');
 }
 
 // Node 24 entry-point guard: importing this helper for tests must never run a sweep.
