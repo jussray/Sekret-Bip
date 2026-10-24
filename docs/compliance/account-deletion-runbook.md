@@ -33,6 +33,24 @@ supabase secrets set ACCOUNT_DELETION_PROCESS_SECRET='<generated-secret>'
 
 The scheduled GitHub workflow also requires repository or production-environment secrets with the same three names.
 
+## 2026-10-24 production incident — schema profile mismatch
+
+The scheduled job received `PGRST205` for `api.account_deletion_requests`, although
+the canonical migration creates `public.account_deletion_requests`. The sweeper
+now explicitly sends `Accept-Profile: public` when listing expired requests.
+This fixes selection when the API exposes public but defaults to api; it does
+**not** install a missing migration, change schema grants, or trigger a sweep.
+
+Before re-enabling/dispatching the deletion workflow, have the production
+database owner verify **read-only** that the exact intended project has the
+canonical table, that `public` is included in Data API exposed schemas, and
+that an administrative GET using `Accept-Profile: public` works. `PGRST205`
+means the relation is absent from the selected schema cache; `PGRST106`
+means the requested schema is not exposed. Both remain fail-closed.
+Do not create an `api` duplicate or grant teen data access to anon to quiet the job.
+If migration parity or API schema exposure is missing, treat it as a separate
+reviewed production operation. Never execute a deletion sweep as a diagnostic.
+
 ## Verification gates
 
 Do not mark the technical lane complete until all gates are evidenced:
