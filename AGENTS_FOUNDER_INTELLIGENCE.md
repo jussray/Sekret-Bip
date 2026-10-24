@@ -1,5 +1,13 @@
 # Founder Intelligence Agent Entry Point
 
+## Mandatory Sauce Guard — founder-owned canonical skill
+
+Every contributor, AI agent (ChatGPT, Claude, Codex, Perplexity, and later assistants), reviewer, automation, or delegated writer touching this repository must follow the founder-owned `sauce-guard` skill **before any outward-facing communication** drawn from internal product work. Canonical source: `jussray/founder-control-room/.agents/skills/sauce-guard/SKILL.md`. Use the current canonical skill; this is a reference, not a replacement implementation or an approval to publish.
+
+Enforce: evidence before claims; classify each material claim CURRENT / HISTORICAL / STALE / SUPERSEDED / UNKNOWN; remove raw diffs, provider payloads, proprietary prompts/architecture, credentials, private teen/parent/customer content, and unapproved metrics; obtain **Current You**'s exact-copy approval; have FCR revalidate at publication; require provider readback for publication claims. Missing or inaccessible skill / absent approval means HOLD, never publish or share externally.
+
+**Separate machine-enforced log safety:** public posts and CI/job logs are different egress channels. Use the repository `scripts/audit-sauce-guard-logging.mjs` changed-line gate and fixed-event-code logs for any auth, account deletion, payment, teen, parent, safety, or provider interaction. Never log untrusted error messages, tokens, raw response bodies, identifiers, prompts, messages, or request payloads. A green log gate is not proof that Sauce Guard reviewed a public communication. Do not edit or bypass these rules to silence a scanner; resolve and review the finding.
+
 Every AI agent working in this repository must read and apply [`docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md`](docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md) before material planning, implementation, review, automation, publishing, deployment, migration, or cross-repository coordination.
 
 For every nontrivial implementation, audit, review, repair, merge, deployment, migration, or cross-system integration, agents must also load and apply [`.agents/skills/founder-dev-flow/SKILL.md`](.agents/skills/founder-dev-flow/SKILL.md). That skill is the executable engineering loop for the founder stack and is required even when the task-specific skill is narrower.
