@@ -5,6 +5,7 @@
  * parsing; no network request is made.
  */
 const PREVIEW_ORIGIN = 'https://split-view.invalid';
+export const DEV_SPLIT_VIEW_SIDE_PARAM = 'bipDevSide';
 
 export type SplitViewSide = 'teen' | 'parent';
 
@@ -25,6 +26,6 @@ export function withDevSide(rawPath: string, side: SplitViewSide): string {
   }
 
   // An existing query parameter must not override the trusted pane's side.
-  target.searchParams.set('bipDevSide', side);
+  target.searchParams.set(DEV_SPLIT_VIEW_SIDE_PARAM, side);
   return `${target.pathname}${target.search}${target.hash}`;
 }
