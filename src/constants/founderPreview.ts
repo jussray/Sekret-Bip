@@ -117,6 +117,7 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'parent-settings', title: 'Parent Settings', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Privacy, notifications, and account controls.', route: '/(parent)/settings' },
   { key: 'parent-resources', title: 'Parent Resources', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Guides, support, and legal information.', route: '/(parent)/resources' },
   { key: 'parent-bip-jr', title: 'Bip Jr', group: 'Parent · Account', side: 'parent', status: 'needs_setup', detail: 'Supervised child profiles require verified guardian authority. Bip Jr stays separate from Teen accounts and Bridge.', route: '/(parent)/bip-jr' },
+  { key: 'parent-bip-jr-study', title: 'Bip Jr Study Buddy', group: 'Parent · Account', side: 'parent', status: 'live', detail: 'Adult-supervised scripted practice for ages 5–12. No AI calls, no classmates; progress stays on the device.', route: '/(parent)/bip-jr-study' },
   { key: 'parent-teen-verification', title: 'Teen Verification', group: 'Parent · Connection', side: 'parent', status: 'needs_setup', detail: 'A verified guardian can explicitly confirm age assurance for an active linked 13–17 Teen without gaining access to the Teen’s private account.', route: '/(parent)/teen-verification' },
 
   // Founder/developer tools
