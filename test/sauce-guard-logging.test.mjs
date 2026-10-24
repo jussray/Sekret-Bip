@@ -54,3 +54,34 @@ test('privileged scheduled deletion route prints only approved fixed event codes
   }
   assert.doesNotMatch(source, /console\.[a-z]+\([^\n]*(?:requestId|result\.body|error\.message|response\.text)/);
 });
+
+test('guard inspects multiline calls, argument-only edits, and split method names', () => {
+  for (const source of [
+    'console\n  .log(privateUserId);',
+    'console.log(\n  privateUserId\n);',
+    'logger.error(\n  providerBody\n);',
+  ]) {
+    const lines = source.split('\n');
+    const diff = '+++ b/scripts/proof.mjs\n@@ -1,0 +2,1 @@\n+' + lines[1] + '\n';
+    const found = auditAddedDiff(diff, { 'scripts/proof.mjs': source });
+    assert.equal(found.length, 1, source);
+    assert.equal(JSON.stringify(found).includes('privateUserId'), false);
+  }
+});
+
+test('guard permits harmless inline control-flow or trailing comments', () => {
+  for (const source of [
+    "if (!ok) console.error('SAUCE_GUARD_REQUEST_FAILED'); // opaque",
+    "console.log(\n  'SAUCE_GUARD_REQUEST_FAILED'\n);",
+  ]) {
+    const diff = '+++ b/src/auth.ts\n@@ -1,0 +1,1 @@\n+' + source.split('\n')[0] + '\n';
+    assert.deepEqual(auditAddedDiff(diff, { 'src/auth.ts': source }), []);
+  }
+});
+
+test('guard scans executable plugin sources but ignores string literals and comments', () => {
+  const path = 'plugins/proofmode/src/github-client.js';
+  const diff = '+++ b/' + path + '\n@@ -1,0 +1,1 @@\n+console.error(providerBody);\n';
+  assert.equal(auditAddedDiff(diff, { [path]: 'console.error(providerBody);' }).length, 1);
+  assert.equal(auditAddedDiff('+++ b/scripts/test.mjs\n@@ -1,0 +1,1 @@\n+// console.log(secret)\n').length, 0);
+});
