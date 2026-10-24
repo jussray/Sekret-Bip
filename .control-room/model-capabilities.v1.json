@@ -2,7 +2,7 @@
   "contract": "juss/council-model-capability-profile@v1",
   "repository": "jussray/Sekret-Bip",
   "defaultBranch": "main",
-  "preparedAgainstBaseSha": "9c7c91ecb408e6a694e9a2549d1b9f0950010798",
+  "preparedAgainstBaseSha": "ec4bc92e41b8a59cbd6ce8314294cd6c2fd265bd",
   "authorityHost": "jussray/founder-control-room",
   "providerExecutionHost": "jussray/founder-control-room",
   "projectRole": "product_safety_runtime",
