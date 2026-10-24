@@ -244,7 +244,7 @@ test('cold Bip Jr artwork waits for image loading before hero and cues are revea
   await page.setViewportSize({ width: 390, height: 844 });
 
   let heldArtworkRequest = false;
-  await page.route(/parent-space-splash.*\\.png/i, async route => {
+  await page.route(/parent-space-splash.*\.png/i, async route => {
     heldArtworkRequest = true;
     await new Promise(resolve => setTimeout(resolve, 2000));
     await route.continue();
