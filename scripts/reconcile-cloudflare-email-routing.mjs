@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { cloudflareRequestFailure, safeCloudflareErrorReason } from './cloudflare-provider-error.mjs';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const EVIDENCE_PATH = 'artifacts/cloudflare-email-routing-evidence.json';
@@ -44,13 +45,7 @@ export function buildWorkerRule(alias, config = configFromEnv({})) {
   };
 }
 
-function errorText(payload, fallback) {
-  const messages = payload?.errors?.map((error) => {
-    const code = error?.code === undefined ? '' : `code=${error.code} `;
-    return `${code}${error?.message || ''}`.trim();
-  }).filter(Boolean);
-  return messages?.length ? messages.join('; ') : fallback;
-}
+
 
 async function cfRequest(config, path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -64,9 +59,7 @@ async function cfRequest(config, path, options = {}) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success === false) {
-    throw new Error(
-      `Cloudflare ${options.method || 'GET'} ${path} failed: ${errorText(payload, response.statusText)}`,
-    );
+    throw cloudflareRequestFailure(payload, response.status);
   }
   return payload;
 }
@@ -89,7 +82,7 @@ async function verifyToken(config) {
       }
       attempts.push(`${path}: status=${status || 'unknown'}`);
     } catch (error) {
-      attempts.push(error instanceof Error ? error.message : String(error));
+      attempts.push(safeCloudflareErrorReason(error));
     }
   }
 
@@ -105,7 +98,7 @@ async function verifyToken(config) {
     }
     attempts.push(`zone-access: ${config.zoneName} was not returned`);
   } catch (error) {
-    attempts.push(error instanceof Error ? error.message : String(error));
+    attempts.push(safeCloudflareErrorReason(error));
   }
 
   throw new Error(`CLOUDFLARE_API_TOKEN_INVALID_OR_UNSCOPED: ${attempts.join(' | ')}`);
@@ -430,7 +423,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
 const invokedDirectly = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 if (invokedDirectly) {
   main().catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
+    console.error('CLOUDFLARE_EMAIL_ROUTING_RECONCILIATION_FAILED');
     process.exitCode = 1;
   });
 }
