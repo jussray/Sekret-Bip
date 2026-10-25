@@ -28,14 +28,6 @@ jobs:
       - name: Run DevSkim scanner
         uses: microsoft/DevSkim-Action@734c6ed89671b1c7a5211ed334c79db261e3f221 # v1
 
-      # Keep the scanner and its SARIF upload unchanged. Log only sanitized
-      # rule IDs and recognized source paths needed to investigate PR #1193.
-      # Never echo raw scanner messages, snippets, or suspected credentials.
-      - name: Report bounded DevSkim finding locations
-        run: |
-          node --test test/devskim-diagnostics.test.mjs
-          node scripts/report-devskim-diagnostics.mjs devskim-results.sarif
-
       - name: Upload DevSkim scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
