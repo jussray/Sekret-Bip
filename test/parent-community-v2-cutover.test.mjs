@@ -22,10 +22,15 @@ function functionBlock(sql, name, nextName) {
   return sql.slice(start, end === -1 ? sql.length : end);
 }
 
-test('parent reaction enum values are additive and isolated in a prior migration', () => {
-  for (const reaction of ['beenThere', 'solidarity', 'reminder', 'needed', 'strength']) {
+test('hidden V2 interaction baseline is reconciled without replacing production objects', () => {
+  assert.match(enumMigration, /if not exists \([\s\S]*t\.typname = 'reaction_kind'[\s\S]*create type public\.reaction_kind as enum/i);
+  for (const reaction of ['felt', 'comfort', 'proud', 'stay', 'beenThere', 'solidarity', 'reminder', 'needed', 'strength']) {
     assert.match(enumMigration, new RegExp("alter type public\\.reaction_kind add value if not exists '" + reaction + "'"));
   }
+  assert.match(enumMigration, /if to_regclass\('public\.post_reactions'\) is null then/i);
+  assert.match(enumMigration, /if to_regclass\('public\.post_comments'\) is null then/i);
+  assert.match(enumMigration, /revoke all on table public\.post_reactions from anon, authenticated/i);
+  assert.match(enumMigration, /revoke all on table public\.post_comments from anon, authenticated/i);
 });
 
 test('guardian verification requires a permanent account before verified-guardian state', () => {
