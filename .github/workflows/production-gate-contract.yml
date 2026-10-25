@@ -7,6 +7,9 @@ on:
       - 'app.config.ts'
       - '.github/workflows/deploy-cloudflare.yml'
       - '.github/workflows/deploy-supabase-migrations.yml'
+      - '.github/workflows/apply-social-rls-single-migration.yml'
+      - 'supabase/probes/social_rls_single_migration_witness.sql'
+      - 'test/social-rls-single-migration-operator.test.mjs'
       - '.github/workflows/production-gate-contract.yml'
       - 'config/supabase-targets.json'
       - 'e2e/production-smoke.spec.ts'
@@ -95,6 +98,7 @@ jobs:
           test/supabase-target-identity.test.mjs
           test/supabase-production-schema-witness.test.mjs
           test/supabase-social-rls-runtime-witness.test.mjs
+          test/social-rls-single-migration-operator.test.mjs
           test/supabase-verifier-legacy-receipts.test.mjs
           test/supabase-production-blocker-evidence.test.mjs
           test/supabase-production-migration-workflow.test.mjs
