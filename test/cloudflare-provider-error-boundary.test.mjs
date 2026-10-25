@@ -56,7 +56,16 @@ test('provider reconciliation entrypoints do not echo raw provider errors or run
     'scripts/reconcile-cloudflare-workers-build-trigger.mjs',
   ]) {
     const source = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-    assert.match(source, /cloudflareRequestFailure\(payload, response\.status\)/, path);
+    if (path.endsWith('reconcile-cloudflare-workers-build-trigger.mjs')) {
+      assert.match(source,
+        /cloudflareRequestFailure\(payload, response\.status, safeWorkerRequestOperation\(requestPath\)\)/,
+        path);
+      assert.match(source, /return 'token-verify'/);
+      assert.match(source, /return 'workers-scripts-read'/);
+      assert.match(source, /return 'workers-ci-read'/);
+    } else {
+      assert.match(source, /cloudflareRequestFailure\(payload, response\.status\)/, path);
+    }
     assert.doesNotMatch(source, /errorText\(payload|response\.statusText/, path);
   }
   const app = readFileSync(new URL('../scripts/reconcile-cloudflare-app-domain.mjs', import.meta.url), 'utf8');
