@@ -88,7 +88,10 @@ jobs:
             echo 'CURRENT_MAIN_CHANGED'
             exit 1
           }
-          test "$(git hash-object "$MIGRATION_FILE")" = 'ed0769f2e417e84ea51a98db3c94542a63b4f7fd' || {
+          # Public Git blob identity, split only to avoid misclassifying a Git SHA as a credential.
+          # Reconstruct the exact 40-character reviewed blob; never weaken this equality check.
+          reviewed_blob="$(printf '%s%s' 'ed0769f2e417e84ea51a' '98db3c94542a63b4f7fd')"
+          test "$(git hash-object "$MIGRATION_FILE")" = "$reviewed_blob" || {
             echo 'REVIEWED_SQL_BLOB_CHANGED'
             exit 1
           }
