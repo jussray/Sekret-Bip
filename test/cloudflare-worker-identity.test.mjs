@@ -79,8 +79,13 @@ test('production Worker exposes baked runtime SHA independently of provider vers
 });
 
 test('production web and native clients use the canonical backend custom domain', () => {
-  assert.ok(productionEnv.includes(`EXPO_PUBLIC_BACKEND_URL=${PRODUCTION_WORKER_URL}`));
-  assert.equal(productionEnv.includes(LEGACY_WORKERS_DEV_URL), false);
+  // Require one complete canonical environment assignment, not a substring
+  // inside an attacker-controlled or unrelated URL.
+  const backends = productionEnv.split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('EXPO_PUBLIC_BACKEND_URL='));
+  assert.deepEqual(backends, [`EXPO_PUBLIC_BACKEND_URL=${PRODUCTION_WORKER_URL}`]);
+  assert.equal(backends.some((line) => line === `EXPO_PUBLIC_BACKEND_URL=${LEGACY_WORKERS_DEV_URL}`), false);
 
   for (const [profileName, profile] of Object.entries(eas.build)) {
     const expected = ALPHA_ROUTED_PROFILES.has(profileName) ? ALPHA_WORKER_URL : PRODUCTION_WORKER_URL;
