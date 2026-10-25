@@ -259,12 +259,13 @@ function assertCatchAllSafe(catchAll) {
   console.log('CATCH_ALL_SAFE enabled=false');
 }
 
-async function writeEvidence({ config, phase, dns, destination, rules, catchAll }) {
-  await mkdir('artifacts', { recursive: true });
-  const evidence = {
+export function buildSafeEmailRoutingReceipt({
+  config, phase, dns, destination, rules = [], catchAll, now = () => new Date(),
+}) {
+  return {
     schemaVersion: 1,
     phase,
-    generatedAt: new Date().toISOString(),
+    generatedAt: now().toISOString(),
     zone: config.zoneName,
     worker: config.workerName,
     destination: destination
@@ -289,6 +290,11 @@ async function writeEvidence({ config, phase, dns, destination, rules, catchAll 
       };
     }),
   };
+}
+
+async function writeEvidence(args) {
+  await mkdir('artifacts', { recursive: true });
+  const evidence = buildSafeEmailRoutingReceipt(args);
   await writeFile(EVIDENCE_PATH, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
   console.log(`EVIDENCE_WRITTEN phase=${phase} path=${EVIDENCE_PATH}`);
 }
