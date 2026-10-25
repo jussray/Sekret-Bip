@@ -191,6 +191,22 @@ function probeLooksLikeCloudflareAccess(probe) {
   return body.includes('cloudflare access') && (body.includes('login') || body.includes('sign in'));
 }
 
+/**
+ * Return a fixed classification instead of persisting arbitrary public-page
+ * HTML, Cloudflare Access content, session details, or an error payload.
+ */
+export function safeRuntimeBodyFingerprint(body) {
+  const normalized = String(body || '').toLowerCase();
+  if (normalized.includes('cloudflare access')
+      && (normalized.includes('login') || normalized.includes('sign in'))) {
+    return 'cloudflare access login';
+  }
+  if (/"error"\s*:\s*"method not allowed"/i.test(String(body || ''))) {
+    return '"error":"Method not allowed"';
+  }
+  return 'unclassified';
+}
+
 async function runtimeProbe(url) {
   const response = await fetch(url, { redirect: 'follow' });
   const body = await response.text();
@@ -201,7 +217,7 @@ async function runtimeProbe(url) {
     redirected: response.redirected === true,
     status: response.status,
     contentType: response.headers.get('content-type') || '',
-    bodyFingerprint: body.replace(/[\r\n]+/g, '').slice(0, 240),
+    bodyFingerprint: safeRuntimeBodyFingerprint(body),
   };
 }
 
