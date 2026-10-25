@@ -37,11 +37,11 @@ select
      where p.policyname = e.tablename || '_permanent_accounts_only'),
   (select count(*) from supabase_migrations.schema_migrations
      where version = '20261006040000'),
-  (select md5(coalesce(
+  (select encode(sha256(convert_to(coalesce(
      string_agg(
        concat_ws('~', p.tablename, p.policyname, p.permissive, array_to_string(p.roles, ','),
                  p.cmd, coalesce(p.qual, ''), coalesce(p.with_check, '')),
-       E'\n' order by p.tablename, p.policyname), 'none'))
+       E'\n' order by p.tablename, p.policyname), 'none'), 'UTF8')), 'hex')
      from pg_policies p
      join expected e on e.tablename = p.tablename
      where p.schemaname = 'public'
