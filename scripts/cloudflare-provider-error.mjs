@@ -14,15 +14,24 @@ function httpStatus(status) {
   return Number.isInteger(status) && status >= 100 && status <= 599 ? status : null;
 }
 
-export function cloudflareRequestFailure(payload, status) {
+const SAFE_OPERATIONS = new Set([
+  'token-verify',
+  'workers-scripts-read',
+  'workers-ci-read',
+]);
+
+export function cloudflareRequestFailure(payload, status, operation = null) {
   const codes = providerCodes(payload);
   const safeStatus = httpStatus(status);
+  const safeOperation = SAFE_OPERATIONS.has(operation) ? operation : null;
   const summary = `CLOUDFLARE_PROVIDER_REQUEST_FAILED status=${safeStatus ?? 'unknown'}`
-    + (codes.length ? ` codes=${codes.join(',')}` : '');
+    + (codes.length ? ` codes=${codes.join(',')}` : '')
+    + (safeOperation ? ` operation=${safeOperation}` : '');
   const error = new Error(summary);
   error.auditCode = 'CLOUDFLARE_PROVIDER_REQUEST_FAILED';
   error.providerStatus = safeStatus;
   error.providerCodes = codes;
+  error.providerOperation = safeOperation;
   return error;
 }
 
@@ -41,5 +50,6 @@ export function safeCloudflareErrorReason(error) {
     .slice(0, 8);
   return reason
     + (status === null ? '' : ` status=${status}`)
-    + (codes.length ? ` codes=${codes.join(',')}` : '');
+    + (codes.length ? ` codes=${codes.join(',')}` : '')
+    + (SAFE_OPERATIONS.has(error?.providerOperation) ? ` operation=${error.providerOperation}` : '');
 }
