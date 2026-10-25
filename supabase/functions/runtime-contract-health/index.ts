@@ -11,9 +11,9 @@ const REQUIRED_CONTRACTS = [
 const SCHEMA_WITNESS = Object.freeze({
   contractVersion: '20260927185000',
   authorityFloorVersion: '20260805170500',
-  expectedHistorySha256: 'f187b6741a15c51970f68ff0b6aa7de02407ada8d72af4330eeb7d210429b3a3',
-  expectedLiveMaxVersion: '20260927185000',
-  expectedHistoryCount: 32,
+  expectedHistorySha256: 'a9d821c9dc9a545f21c33fe550ad7f2f2a858c1e0e14fade618b1623732f59f0',
+  expectedLiveMaxVersion: '20261020075835',
+  expectedHistoryCount: 35,
   expectedPgjwtInstalled: true,
   expectedPgjwtVersion: '0.2.0',
 });
