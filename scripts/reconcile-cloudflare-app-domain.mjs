@@ -184,6 +184,7 @@ export function isCloudflareAccessUrl(value) {
 }
 
 function probeLooksLikeCloudflareAccess(probe) {
+  if (probe?.accessRedirect === true) return true;
   const finalUrl = probe?.finalUrl || probe?.url || '';
   if (isCloudflareAccessUrl(finalUrl)) return true;
 
@@ -207,13 +208,31 @@ export function safeRuntimeBodyFingerprint(body) {
   return 'unclassified';
 }
 
-async function runtimeProbe(url) {
-  const response = await fetch(url, { redirect: 'follow' });
+/**
+ * The evidence receipt needs origin identity, not credential-bearing URL paths,
+ * auth redirects, URL usernames/passwords, query strings or fragments.
+ * Invalid or non-HTTP(S) URLs retain no attacker-supplied bytes.
+ */
+export function safeProbeUrl(value) {
+  try {
+    const parsed = new URL(String(value || ''));
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+      ? parsed.origin
+      : 'unverified-url';
+  } catch {
+    return 'unverified-url';
+  }
+}
+
+export async function runtimeProbe(url, fetchImpl = fetch) {
+  const response = await fetchImpl(url, { redirect: 'follow' });
   const body = await response.text();
+  const finalUrl = response.url || url;
   return {
-    url,
-    requestedUrl: url,
-    finalUrl: response.url || url,
+    url: safeProbeUrl(url),
+    requestedUrl: safeProbeUrl(url),
+    finalUrl: safeProbeUrl(finalUrl),
+    accessRedirect: isCloudflareAccessUrl(finalUrl),
     redirected: response.redirected === true,
     status: response.status,
     contentType: response.headers.get('content-type') || '',
@@ -244,7 +263,7 @@ async function verifyBackend(config) {
   }
 
   return {
-    url: config.apiHealthUrl,
+    url: safeProbeUrl(config.apiHealthUrl),
     status: response.status,
     contentType: response.headers.get('content-type') || '',
     ok: true,
@@ -508,8 +527,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
         hostname: config.hostname,
         pagesProject: config.pagesProject,
         backendWorker: config.workerName,
-        appUrl: config.appUrl,
-        apiHealthUrl: config.apiHealthUrl,
+        appUrl: safeProbeUrl(config.appUrl),
+        apiHealthUrl: safeProbeUrl(config.apiHealthUrl),
         deleteScope: 'exact-host Worker domain/route only',
         wildcardPolicy: 'fail-closed for every broad route regardless of owner',
         pagesPrecondition: 'target domain must already be active on canonical Pages project',
