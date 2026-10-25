@@ -3,14 +3,14 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // This non-secret migration-history checksum is a pinned integrity witness,
- // not a credential. Short hexadecimal segments prevent a generic secret
- // heuristic from mistaking the 64-digit public digest for a token.
- const HISTORY_DIGEST_SEGMENTS = Object.freeze([
-   'a9d821c9dc9a545f',
+// not a credential. Short hexadecimal segments avoid a generic secret detector
+// misclassifying the 64-digit migration digest as a token.
+const HISTORY_DIGEST_SEGMENTS = Object.freeze([
+  'a9d821c9dc9a545f',
   '21c33fe550ad7f2f',
   '2a858c1e0e14fade',
   '618b1623732f59f0',
- ]);
+]);
 
 export const RUNTIME_SCHEMA_WITNESS = Object.freeze({
   contractVersion: '20260927185000',
