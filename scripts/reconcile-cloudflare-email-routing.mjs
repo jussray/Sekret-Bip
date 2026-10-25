@@ -268,21 +268,26 @@ async function writeEvidence({ config, phase, dns, destination, rules, catchAll 
     zone: config.zoneName,
     worker: config.workerName,
     destination: destination
-      ? { email: maskEmail(destination.email), verified: destination.verified || null }
+      ? { configured: true, verified: destination.verified === true }
       : null,
     routingDns: dns
-      ? { enabled: dns.enabled ?? null, status: dns.status ?? null, name: dns.name || config.zoneName }
+      ? { enabled: dns.enabled === true, ready: dns.status === 'ready' }
       : null,
-    catchAll: catchAll
-      ? { enabled: catchAll.enabled ?? null, actions: catchAll.actions || [], matchers: catchAll.matchers || [] }
-      : null,
-    rules: rules.map((rule) => ({
-      id: rule?.id || null,
-      name: rule?.name || null,
-      enabled: rule?.enabled ?? null,
-      matchers: rule?.matchers || [],
-      actions: rule?.actions || [],
-    })),
+    // Cloudflare routing matchers/actions may contain arbitrary destination
+    // emails or provider-created values. Persist only supported alias labels
+    // and boolean proof, never raw provider records or unrelated addresses.
+    catchAll: catchAll ? { enabled: catchAll.enabled === true } : null,
+    rules: rules.map((rule) => {
+      const recipient = String(recipientForRule(rule) || '').toLowerCase();
+      const supportedAlias = EMAIL_ALIASES.find((alias) =>
+        recipient === `${alias}@${config.zoneName}`.toLowerCase(),
+      );
+      return {
+        alias: supportedAlias ?? null,
+        enabled: rule?.enabled === true,
+        canonicalWorker: workerForRule(rule) === config.workerName,
+      };
+    }),
   };
   await writeFile(EVIDENCE_PATH, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
   console.log(`EVIDENCE_WRITTEN phase=${phase} path=${EVIDENCE_PATH}`);
