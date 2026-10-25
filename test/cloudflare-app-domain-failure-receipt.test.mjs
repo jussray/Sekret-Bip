@@ -78,7 +78,14 @@ test('wrapper delegates authority to the reconciler exact-host binding proof and
 
   assert.match(reconciler, /FOREIGN_APP_DOMAIN_BINDING/);
   assert.match(reconciler, /BROAD_WORKER_ROUTE_REQUIRES_MANUAL_REVIEW/);
-  assert.match(reconciler, /target domain must already be active on canonical Pages project/);
+  // Require the actual Pages precondition before mutation, not a removed
+  // dynamic CLI log sentence (the CLI now emits a fixed Sauce Guard event).
+  assert.match(reconciler, /PAGES_DOMAIN_NOT_ATTACHED/);
+  assert.match(reconciler, /PAGES_DOMAIN_NOT_ACTIVE/);
+  const preconditionIndex = reconciler.indexOf('assertPagesOwnership(pagesDomains, resolved)');
+  const mutationIndex = reconciler.indexOf('for (const domain of preClassification.ownedDomains)');
+  assert.ok(preconditionIndex >= 0 && mutationIndex > preconditionIndex);
+  assert.match(reconciler, /console\.log\('CLOUDFLARE_APP_DOMAIN_PLAN_READY'\)/);
   assert.match(reconciler, /exact-host Worker domain\/route only/);
   assert.match(reconciler, /bounded workflow_dispatch or one-shot parent-bound repository approval/);
   assert.doesNotMatch(reconciler, /workflow_dispatch with apply=true only/);
