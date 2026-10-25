@@ -296,7 +296,7 @@ async function writeEvidence(args) {
   await mkdir('artifacts', { recursive: true });
   const evidence = buildSafeEmailRoutingReceipt(args);
   await writeFile(EVIDENCE_PATH, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
-  console.log(`EVIDENCE_WRITTEN phase=${phase} path=${EVIDENCE_PATH}`);
+  console.log('CLOUDFLARE_EMAIL_ROUTING_EVIDENCE_WRITTEN');
 }
 
 async function ensureWorkerRules(config) {
