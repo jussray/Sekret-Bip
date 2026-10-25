@@ -13,6 +13,7 @@ import {
   safeProbeUrl,
   safeRuntimeBodyFingerprint,
 } from '../scripts/reconcile-cloudflare-app-domain.mjs';
+import { buildSafeEmailRoutingReceipt } from '../scripts/reconcile-cloudflare-email-routing.mjs';
 
 const providerSecret = 'fake-only-provider-secret-DO-NOT-LOG';
 const privateEmail = 'private.fixture@example.invalid';
@@ -110,6 +111,56 @@ test('probe receipts retain origins only and preserve Cloudflare Access redirect
   }));
   assert.equal(appProbeIsFrontend(sameOrigin), true);
   assert.doesNotMatch(JSON.stringify(sameOrigin), /token=|fixture-private/);
+
+  const missingFinalUrl = await runtimeProbe('https://app.sekretbip.net/', async () => ({
+    url: '',
+    redirected: true,
+    status: 200,
+    headers: { get: () => 'text/html' },
+    text: async () => '<html>Unverifiable redirect</html>',
+  }));
+  assert.equal(missingFinalUrl.finalUrl, 'unverified-url');
+  assert.equal(appProbeIsFrontend(missingFinalUrl), false);
+});
+
+test('email-routing receipt excludes raw provider recipient, catch-all and action data', () => {
+  const fixtureSecret = 'fixture-private-recipient@example.invalid';
+  const receipt = buildSafeEmailRoutingReceipt({
+    config: { zoneName: 'sekretbip.net', workerName: 'sekret-backend' },
+    phase: 'pre-apply',
+    now: () => new Date('2026-10-24T00:00:00.000Z'),
+    dns: { enabled: true, status: 'ready', name: fixtureSecret },
+    destination: { email: fixtureSecret, verified: true },
+    catchAll: {
+      enabled: false,
+      matchers: [{ type: 'literal', value: fixtureSecret }],
+      actions: [{ type: 'forward', value: [fixtureSecret] }],
+    },
+    rules: [
+      {
+        id: fixtureSecret,
+        name: fixtureSecret,
+        enabled: true,
+        matchers: [{ type: 'literal', field: 'to', value: 'hello@sekretbip.net' }],
+        actions: [{ type: 'worker', value: ['sekret-backend'] }],
+      },
+      {
+        id: fixtureSecret,
+        name: fixtureSecret,
+        enabled: true,
+        matchers: [{ type: 'literal', field: 'to', value: fixtureSecret }],
+        actions: [{ type: 'forward', value: [fixtureSecret] }],
+      },
+    ],
+  });
+  assert.deepEqual(receipt.destination, { configured: true, verified: true });
+  assert.deepEqual(receipt.catchAll, { enabled: false });
+  assert.deepEqual(receipt.rules, [
+    { alias: 'hello', enabled: true, canonicalWorker: true },
+    { alias: null, enabled: true, canonicalWorker: false },
+  ]);
+  assert.deepEqual(receipt.routingDns, { enabled: true, ready: true });
+  assert.doesNotMatch(JSON.stringify(receipt), /fixture-private-recipient|example\\.invalid|matchers|actions/);
 });
 
 test('provider reconciliation entrypoints do not echo raw provider errors or runtime response snippets', () => {
