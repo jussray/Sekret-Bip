@@ -22,15 +22,18 @@ test('production operator is only manual, exact-main, production-gated and requi
   assert.match(workflow, /test "\$\(git rev-parse FETCH_HEAD\)" = "\$TARGET_SHA"/);
   assert.match(workflow, /REVIEWED_SQL_BLOB_CHANGED/);
   assert.match(workflow, /supabase-target-identity\.mjs/);
+  assert.match(workflow, /PGSSLMODE: require/);
+  assert.match(workflow, /PGPASSWORD: \$\{\{ secrets\.SUPABASE_DB_PASSWORD \}\}/);
+  assert.doesNotMatch(workflow, /SUPABASE_DB_URL|db_url=/);
 });
 
 test('only the existing canonical policy migration may execute, never a blanket migration push', () => {
   assert.match(workflow, /MIGRATION_FILE: supabase\/migrations\/20261006040000_social_surfaces_permanent_accounts_only\.sql/);
-  assert.match(workflow, /psql "\$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -f "\$MIGRATION_FILE"/);
-  assert.equal((workflow.match(/psql "\$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -f "\$MIGRATION_FILE"/g) || []).length, 1);
+  assert.match(workflow, /psql -X -q -v ON_ERROR_STOP=1 -f "\$MIGRATION_FILE"/);
+  assert.equal((workflow.match(/psql -X -q -v ON_ERROR_STOP=1 -f "\$MIGRATION_FILE"/g) || []).length, 1);
   assert.doesNotMatch(workflow, /^\s+supabase db push\b/m);
   assert.doesNotMatch(workflow, /^\s+supabase migration up\b/m);
-  assert.match(workflow, /supabase migration repair "\$MIGRATION_VERSION" --status applied --db-url "\$SUPABASE_DB_URL"/);
+  assert.match(workflow, /supabase migration repair "\$MIGRATION_VERSION" --status applied --linked/);
   assert.doesNotMatch(workflow, /--status reverted/);
   assert.match(workflow, /POST_DDL_POLICY_OR_HISTORY_MISMATCH_NO_REPAIR_PERFORMED/);
   assert.match(workflow, /FINAL_AUTHORIZATION_OR_HISTORY_WITNESS_FAILED/);
@@ -45,6 +48,8 @@ test('database witness observes only metadata and all 14 live guarded targets', 
   assert.match(witness, /p\.permissive = 'RESTRICTIVE'/);
   assert.match(witness, /p\.qual like '%IS FALSE%'/);
   assert.match(witness, /p\.with_check like '%IS FALSE%'/);
+  assert.match(witness, /sha256\(convert_to/);
+  assert.doesNotMatch(witness, /\bmd5\s*\(/i);
   assert.match(witness, /20261006040000/);
   assert.doesNotMatch(witness, /\b(insert|update|delete|alter|drop|create|grant|revoke|truncate)\b/i);
 });
