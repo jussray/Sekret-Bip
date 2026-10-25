@@ -213,6 +213,17 @@ export function safeRuntimeBodyFingerprint(body) {
  * auth redirects, URL usernames/passwords, query strings or fragments.
  * Invalid or non-HTTP(S) URLs retain no attacker-supplied bytes.
  */
+/**
+ * Persist a fixed media type category, never arbitrary response header fields
+ * that could carry credentials or user-originated bytes.
+ */
+export function safeProbeContentType(value) {
+  const mediaType = String(value || '').split(';', 1)[0].trim().toLowerCase();
+  if (mediaType === 'text/html') return 'text/html';
+  if (mediaType === 'application/json') return 'application/json';
+  return 'other';
+}
+
 export function safeProbeUrl(value) {
   try {
     const parsed = new URL(String(value || ''));
@@ -236,7 +247,7 @@ export async function runtimeProbe(url, fetchImpl = fetch) {
     accessRedirect: isCloudflareAccessUrl(finalUrl),
     redirected: response.redirected === true,
     status: response.status,
-    contentType: response.headers.get('content-type') || '',
+    contentType: safeProbeContentType(response.headers.get('content-type')),
     bodyFingerprint: safeRuntimeBodyFingerprint(body),
   };
 }
@@ -266,7 +277,7 @@ async function verifyBackend(config) {
   return {
     url: safeProbeUrl(config.apiHealthUrl),
     status: response.status,
-    contentType: response.headers.get('content-type') || '',
+    contentType: safeProbeContentType(response.headers.get('content-type')),
     ok: true,
     worker: config.workerName,
   };
@@ -310,14 +321,14 @@ function assertSafeBindings(classification, config) {
 }
 
 export function appProbeIsFrontend(probe) {
-  if (!probe || probe.status < 200 || probe.status >= 400) return false;
+  if (!probe || probe.status < 200 || probe.status >= 300) return false;
   if (probeLooksLikeCloudflareAccess(probe)) return false;
-  // An unrelated 200 HTML redirect does not prove the canonical Pages origin.
+  // An unrelated HTML redirect does not prove the canonical Pages origin.
   const requestedOrigin = safeProbeUrl(probe.requestedUrl || probe.url);
   const observedOrigin = safeProbeUrl(probe.finalUrl || probe.url);
   if (requestedOrigin === 'unverified-url' || observedOrigin !== requestedOrigin) return false;
-  if (probe.contentType.toLowerCase().startsWith('application/json')) return false;
-  return !probe.bodyFingerprint.includes('"error":"Method not allowed"');
+  if (safeProbeContentType(probe.contentType) !== 'text/html') return false;
+  return !String(probe.bodyFingerprint || '').includes('"error":"Method not allowed"');
 }
 
 async function waitForFrontend(config, attempts = 24, delayMs = 5000) {
