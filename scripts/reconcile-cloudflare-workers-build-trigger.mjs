@@ -156,7 +156,7 @@ async function selectActiveUserScopedToken(config, fetchImpl) {
     : config.token
       ? [{ source: 'configured-token', token: config.token }]
       : [];
-  const failures = [];
+  let lastProviderFailure = null;
 
   for (const candidate of candidates) {
     const candidateConfig = {
@@ -168,8 +168,10 @@ async function selectActiveUserScopedToken(config, fetchImpl) {
       await verifyUserScopedToken(candidateConfig, fetchImpl);
       return candidateConfig;
     } catch (verifyError) {
+      if (verifyError?.auditCode === 'CLOUDFLARE_PROVIDER_REQUEST_FAILED') {
+        lastProviderFailure = verifyError;
+      }
       if (!canFallbackFromVerifyFailure(verifyError)) {
-        failures.push(`${candidate.source}: ${errorMessage(verifyError)}`);
         continue;
       }
 
@@ -177,14 +179,23 @@ async function selectActiveUserScopedToken(config, fetchImpl) {
         await proveWorkersBuildsReadCapability(candidateConfig, fetchImpl);
         return candidateConfig;
       } catch (capabilityError) {
-        failures.push(`${candidate.source}: ${errorMessage(capabilityError)}`);
+        if (capabilityError?.auditCode === 'CLOUDFLARE_PROVIDER_REQUEST_FAILED') {
+          lastProviderFailure = capabilityError;
+        }
       }
     }
   }
 
-  throw new Error(
-    `CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED: ${failures.join('; ') || 'no token candidates configured'}`,
-  );
+  // Retain a bounded provider code/status from the last failed candidate, never
+  // the candidate's label, token, provider message, or thrown exception text.
+  const selectionError = new Error('CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED');
+  selectionError.auditCode = 'CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED';
+  if (lastProviderFailure) {
+    selectionError.providerStatus = lastProviderFailure.providerStatus;
+    selectionError.providerCodes = lastProviderFailure.providerCodes;
+    selectionError.providerOperation = lastProviderFailure.providerOperation;
+  }
+  throw selectionError;
 }
 
 export function selectWorkerScript(scripts, workerName) {
@@ -218,9 +229,11 @@ export function selectProductionTrigger(triggers) {
     .filter((trigger) => !trigger?.deleted_on && explicitlyIncludesMain(trigger));
 
   if (candidates.length !== 1) {
-    throw new Error(
+    const failure = new Error(
       `PRODUCTION_TRIGGER_SELECTION_FAILED: expected one explicit main trigger, found ${candidates.length}.`,
     );
+    failure.auditCode = 'PRODUCTION_TRIGGER_SELECTION_FAILED';
+    throw failure;
   }
 
   const trigger = candidates[0];
@@ -235,9 +248,11 @@ export function selectPreviewTrigger(triggers, productionTrigger) {
     .filter((trigger) => !trigger?.deleted_on && clean(trigger?.trigger_uuid) !== productionUuid);
 
   if (candidates.length > 1) {
-    throw new Error(
+    const failure = new Error(
       `NON_PRODUCTION_TRIGGER_SELECTION_FAILED: expected at most one active preview trigger, found ${candidates.length}.`,
     );
+    failure.auditCode = 'NON_PRODUCTION_TRIGGER_SELECTION_FAILED';
+    throw failure;
   }
   const preview = candidates[0] ?? null;
   if (preview && !clean(preview?.trigger_uuid)) {

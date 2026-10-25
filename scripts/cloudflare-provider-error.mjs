@@ -20,6 +20,13 @@ const SAFE_OPERATIONS = new Set([
   'workers-ci-read',
 ]);
 
+// Only fixed, locally assigned audit codes can be retained; never trust Error.message.
+const SAFE_LOCAL_FAILURES = new Set([
+  'CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED',
+  'PRODUCTION_TRIGGER_SELECTION_FAILED',
+  'NON_PRODUCTION_TRIGGER_SELECTION_FAILED',
+]);
+
 export function cloudflareRequestFailure(payload, status, operation = null) {
   const codes = providerCodes(payload);
   const safeStatus = httpStatus(status);
@@ -43,7 +50,9 @@ export function safeCloudflareErrorReason(error) {
   // Never parse Error.message: even uppercase-looking tokens can be secret.
   const reason = error?.auditCode === 'CLOUDFLARE_PROVIDER_REQUEST_FAILED'
     ? 'CLOUDFLARE_PROVIDER_REQUEST_FAILED'
-    : 'CLOUDFLARE_OPERATION_FAILED';
+    : SAFE_LOCAL_FAILURES.has(error?.auditCode)
+      ? error.auditCode
+      : 'CLOUDFLARE_OPERATION_FAILED';
   const status = httpStatus(error?.providerStatus);
   const codes = (Array.isArray(error?.providerCodes) ? error.providerCodes : [])
     .filter((code) => Number.isInteger(code) && code >= 0 && code <= 999999)
