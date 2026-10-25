@@ -84,6 +84,17 @@ function errorMessage(error) {
   return safeCloudflareErrorReason(error);
 }
 
+function safeWorkerRequestOperation(requestPath) {
+  if (requestPath === '/user/tokens/verify') return 'token-verify';
+  if (/^\/accounts\/[^/]+\/workers\/scripts(?:\?|$)/.test(requestPath)) {
+    return 'workers-scripts-read';
+  }
+  if (/^\/accounts\/[^/]+\/builds\/workers\/[^/]+\/triggers(?:\?|$)/.test(requestPath)) {
+    return 'workers-ci-read';
+  }
+  return null;
+}
+
 async function cfRequest(config, requestPath, options = {}, fetchImpl = fetch) {
   const response = await fetchImpl(`${API_BASE}${requestPath}`, {
     method: options.method || 'GET',
@@ -96,7 +107,7 @@ async function cfRequest(config, requestPath, options = {}, fetchImpl = fetch) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success === false) {
-    throw cloudflareRequestFailure(payload, response.status);
+    throw cloudflareRequestFailure(payload, response.status, safeWorkerRequestOperation(requestPath));
   }
   return payload;
 }
