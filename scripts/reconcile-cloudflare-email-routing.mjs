@@ -268,7 +268,7 @@ async function writeEvidence({ config, phase, dns, destination, rules, catchAll 
     zone: config.zoneName,
     worker: config.workerName,
     destination: destination
-      ? { email: destination.email, verified: destination.verified || null }
+      ? { email: maskEmail(destination.email), verified: destination.verified || null }
       : null,
     routingDns: dns
       ? { enabled: dns.enabled ?? null, status: dns.status ?? null, name: dns.name || config.zoneName }
