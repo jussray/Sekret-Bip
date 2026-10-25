@@ -43,13 +43,14 @@ function normalizeReactionCounts(value: unknown): ParentCommunityReactionCounts 
 
 function mapFeedRow(row: ParentCommunityFeedRow): ParentCirclePost {
   const createdAt = new Date(row.created_at);
+  const validCreatedAt = !Number.isNaN(createdAt.getTime());
   return {
     id: row.post_id,
     text: row.post_text,
-    date: Number.isNaN(createdAt.getTime()) ? undefined : createdAt.toLocaleDateString(),
-    time: Number.isNaN(createdAt.getTime())
-      ? undefined
-      : createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    date: validCreatedAt ? createdAt.toLocaleDateString() : row.created_at,
+    time: validCreatedAt
+      ? createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '',
     circleTag: row.circle_tag ?? undefined,
     anonymousName: 'anonymous parent',
     quietRepliesCount: Number(row.quiet_reply_count ?? 0),

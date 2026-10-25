@@ -300,7 +300,7 @@ begin
     v_tag,
     false
   )
-  returning id, public.posts.created_at
+  returning id, created_at
     into v_post_id, v_created_at;
 
   return query
@@ -458,7 +458,7 @@ begin
     raise exception 'parent_community_post_not_found' using errcode = 'P0002';
   end if;
 
-  insert into public.reported_posts (
+  insert into public.reported_posts as rp (
     reporter_id,
     post_id,
     post_type,
@@ -471,7 +471,7 @@ begin
     nullif(trim(coalesce(p_reason, '')), '')
   )
   on conflict (reporter_id, post_id, post_type)
-  do update set reason = coalesce(excluded.reason, public.reported_posts.reason);
+  do update set reason = coalesce(excluded.reason, rp.reason);
 
   return true;
 end;

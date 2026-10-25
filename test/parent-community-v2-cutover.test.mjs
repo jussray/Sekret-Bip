@@ -11,6 +11,7 @@ const route = read('app/(parent)/circle/feed.tsx');
 const detail = read('app/(parent)/circle/[id].tsx');
 const screen = read('screens/ParentCircleScreen.tsx');
 const legacySync = read('src/utils/sync.ts');
+const sharedTypes = read('src/types/index.ts');
 
 function functionBlock(sql, name, nextName) {
   const start = sql.indexOf('create or replace function public.' + name);
@@ -124,6 +125,8 @@ test('active Parent Circle route replaces legacy self-history with V2 community 
 });
 
 test('Parent Circle UI is UUID-safe and preview samples never masquerade as production community posts', () => {
+  assert.match(sharedTypes, /export interface ParentCirclePost \{[\s\S]*?id: string \| number;/);
+  assert.match(sharedTypes, /quietRepliesCount\?: number;/);
   assert.doesNotMatch(route, /Number\(id\)/);
   assert.doesNotMatch(detail, /Number\(post/);
   assert.match(detail, /replyToParentCommunityPost\(String\(post!\.id\), text\)/);
