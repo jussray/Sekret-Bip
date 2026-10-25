@@ -11,6 +11,7 @@ import {
   appProbeIsFrontend,
   runtimeProbe,
   safeProbeUrl,
+  safeProbeContentType,
   safeRuntimeBodyFingerprint,
 } from '../scripts/reconcile-cloudflare-app-domain.mjs';
 import { buildSafeEmailRoutingReceipt } from '../scripts/reconcile-cloudflare-email-routing.mjs';
@@ -106,7 +107,7 @@ test('probe receipts retain origins only and preserve Cloudflare Access redirect
     url: 'https://app.sekretbip.net/welcome?token=fixture-private',
     redirected: true,
     status: 200,
-    headers: { get: () => 'text/html' },
+    headers: { get: () => 'text/html; charset=UTF-8; marker=fixture-private' },
     text: async () => '<html>Valid frontend page</html>',
   }));
   assert.equal(appProbeIsFrontend(sameOrigin), true);
@@ -121,6 +122,28 @@ test('probe receipts retain origins only and preserve Cloudflare Access redirect
   }));
   assert.equal(missingFinalUrl.finalUrl, 'unverified-url');
   assert.equal(appProbeIsFrontend(missingFinalUrl), false);
+});
+
+test('Pages readiness requires 2xx HTML and redacts arbitrary MIME header parameters', () => {
+  assert.equal(safeProbeContentType('text/html; charset=UTF-8; token=fixture-private'), 'text/html');
+  assert.equal(safeProbeContentType('application/json; token=fixture-private'), 'application/json');
+  assert.equal(safeProbeContentType('text/plain; token=fixture-private'), 'other');
+  assert.equal(safeProbeContentType(''), 'other');
+
+  const proof = {
+    url: 'https://app.sekretbip.net',
+    requestedUrl: 'https://app.sekretbip.net',
+    finalUrl: 'https://app.sekretbip.net',
+    accessRedirect: false,
+    status: 200,
+    contentType: 'text/html',
+    bodyFingerprint: 'unclassified',
+  };
+  assert.equal(appProbeIsFrontend(proof), true);
+  assert.equal(appProbeIsFrontend({ ...proof, status: 302 }), false);
+  assert.equal(appProbeIsFrontend({ ...proof, status: 204, contentType: 'other' }), false);
+  assert.equal(appProbeIsFrontend({ ...proof, contentType: 'text/plain' }), false);
+  assert.equal(appProbeIsFrontend({ ...proof, contentType: 'application/json' }), false);
 });
 
 test('email routing evidence writer retains fixed Sauce Guard logging', () => {
