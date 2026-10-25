@@ -22,7 +22,7 @@ select
   (select count(*) from expected e
      join pg_class c on c.relname = e.tablename and c.relkind in ('r', 'p')
      join pg_namespace n on n.oid = c.relnamespace and n.nspname = 'public'
-     where c.relrowsecurity),
+     where c.relrowsecurity) as rls_enabled_tables,
   (select count(*) from expected e
      join pg_policies p on p.schemaname = 'public' and p.tablename = e.tablename
      where p.policyname = e.tablename || '_permanent_accounts_only'
@@ -31,12 +31,12 @@ select
        and p.qual like '%is_anonymous%'
        and p.with_check like '%is_anonymous%'
        and p.qual like '%IS FALSE%'
-       and p.with_check like '%IS FALSE%'),
+       and p.with_check like '%IS FALSE%') as effective_guard_policies,
   (select count(*) from expected e
      join pg_policies p on p.schemaname = 'public' and p.tablename = e.tablename
-     where p.policyname = e.tablename || '_permanent_accounts_only'),
+     where p.policyname = e.tablename || '_permanent_accounts_only') as named_guard_policies,
   (select count(*) from supabase_migrations.schema_migrations
-     where version = '20261006040000'),
+     where version = '20261006040000') as migration_receipts,
   (select encode(sha256(convert_to(coalesce(
      string_agg(
        concat_ws('~', p.tablename, p.policyname, p.permissive, array_to_string(p.roles, ','),
@@ -46,4 +46,4 @@ select
      join expected e on e.tablename = p.tablename
      where p.schemaname = 'public'
        and p.policyname <> p.tablename || '_permanent_accounts_only'
-  );
+  ) as other_policies_sha256;
