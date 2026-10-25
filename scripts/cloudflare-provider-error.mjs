@@ -20,6 +20,7 @@ export function cloudflareRequestFailure(payload, status) {
   const summary = `CLOUDFLARE_PROVIDER_REQUEST_FAILED status=${safeStatus ?? 'unknown'}`
     + (codes.length ? ` codes=${codes.join(',')}` : '');
   const error = new Error(summary);
+  error.auditCode = 'CLOUDFLARE_PROVIDER_REQUEST_FAILED';
   error.providerStatus = safeStatus;
   error.providerCodes = codes;
   return error;
@@ -30,11 +31,10 @@ export function cloudflareHasErrorCode(error, code) {
 }
 
 export function safeCloudflareErrorReason(error) {
-  // Project-owned codes can be retained without their dynamic message text.
-  const match = typeof error?.message === 'string'
-    ? /^([A-Z][A-Z0-9_]{3,95})(?=\b|[\s.:]|$)/.exec(error.message)
-    : null;
-  const reason = match?.[1] || 'CLOUDFLARE_OPERATION_FAILED';
+  // Never parse Error.message: even uppercase-looking tokens can be secret.
+  const reason = error?.auditCode === 'CLOUDFLARE_PROVIDER_REQUEST_FAILED'
+    ? 'CLOUDFLARE_PROVIDER_REQUEST_FAILED'
+    : 'CLOUDFLARE_OPERATION_FAILED';
   const status = httpStatus(error?.providerStatus);
   const codes = (Array.isArray(error?.providerCodes) ? error.providerCodes : [])
     .filter((code) => Number.isInteger(code) && code >= 0 && code <= 999999)
