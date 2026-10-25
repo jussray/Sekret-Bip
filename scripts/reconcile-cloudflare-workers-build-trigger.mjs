@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { cloudflareRequestFailure, cloudflareHasErrorCode, safeCloudflareErrorReason } from './cloudflare-provider-error.mjs';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const SHA_PATTERN = /^[0-9a-f]{40}$/i;
@@ -77,18 +78,10 @@ export function configFromEnv(env = process.env) {
   };
 }
 
-function errorText(payload, fallback) {
-  const messages = payload?.errors
-    ?.map((error) => {
-      const code = error?.code === undefined ? '' : `code=${error.code} `;
-      return `${code}${error?.message || ''}`.trim();
-    })
-    .filter(Boolean);
-  return messages?.length ? messages.join('; ') : fallback;
-}
+
 
 function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
+  return safeCloudflareErrorReason(error);
 }
 
 async function cfRequest(config, requestPath, options = {}, fetchImpl = fetch) {
@@ -103,9 +96,7 @@ async function cfRequest(config, requestPath, options = {}, fetchImpl = fetch) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success === false) {
-    throw new Error(
-      `Cloudflare ${options.method || 'GET'} ${requestPath} failed: ${errorText(payload, response.statusText)}`,
-    );
+    throw cloudflareRequestFailure(payload, response.status);
   }
   return payload;
 }
@@ -119,7 +110,7 @@ async function verifyUserScopedToken(config, fetchImpl) {
 }
 
 function canFallbackFromVerifyFailure(error) {
-  return /Cloudflare GET \/user\/tokens\/verify failed:.*\bcode=6003\b/i.test(errorMessage(error));
+  return cloudflareHasErrorCode(error, 6003);
 }
 
 async function discoverWorker(config, fetchImpl) {
