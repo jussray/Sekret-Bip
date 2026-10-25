@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { cloudflareRequestFailure } from './cloudflare-provider-error.mjs';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const EVIDENCE_PATH = 'artifacts/cloudflare-app-domain-routing-evidence.json';
@@ -18,15 +19,7 @@ export function configFromEnv(env = process.env) {
   };
 }
 
-function errorText(payload, fallback) {
-  const messages = payload?.errors
-    ?.map((error) => {
-      const code = error?.code === undefined ? '' : `code=${error.code} `;
-      return `${code}${error?.message || ''}`.trim();
-    })
-    .filter(Boolean);
-  return messages?.length ? messages.join('; ') : fallback;
-}
+
 
 async function cfRequest(config, path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -40,9 +33,7 @@ async function cfRequest(config, path, options = {}) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success === false) {
-    throw new Error(
-      `Cloudflare ${options.method || 'GET'} ${path} failed: ${errorText(payload, response.statusText)}`,
-    );
+    throw cloudflareRequestFailure(payload, response.status);
   }
 
   return payload;
