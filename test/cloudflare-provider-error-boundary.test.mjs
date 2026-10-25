@@ -7,7 +7,12 @@ import {
   cloudflareRequestFailure,
   safeCloudflareErrorReason,
 } from '../scripts/cloudflare-provider-error.mjs';
-import { safeRuntimeBodyFingerprint } from '../scripts/reconcile-cloudflare-app-domain.mjs';
+import {
+  appProbeIsFrontend,
+  runtimeProbe,
+  safeProbeUrl,
+  safeRuntimeBodyFingerprint,
+} from '../scripts/reconcile-cloudflare-app-domain.mjs';
 
 const providerSecret = 'fake-only-provider-secret-DO-NOT-LOG';
 const privateEmail = 'private.fixture@example.invalid';
@@ -46,6 +51,43 @@ test('runtime frontend probes retain classifications, never page HTML or private
   assert.equal(safeRuntimeBodyFingerprint(`Cloudflare Access Sign in ${providerSecret}`), 'cloudflare access login');
   assert.equal(safeRuntimeBodyFingerprint(`{"error" : "Method not allowed", "token":"${providerSecret}"}`),
     '"error":"Method not allowed"');
+});
+
+
+test('probe receipts retain origins only and preserve Cloudflare Access redirect detection', async () => {
+  const requested = 'https://reader:private-password@app.sekretbip.net/welcome?session=fixture-private#secret';
+  const final = 'https://tenant.cloudflareaccess.com/cdn-cgi/access/login?state=fixture-private&code=123';
+  assert.equal(safeProbeUrl(requested), 'https://app.sekretbip.net');
+  assert.equal(safeProbeUrl('file:///private/fixture-secret'), 'unverified-url');
+  assert.equal(safeProbeUrl('unparseable-credential-fixture'), 'unverified-url');
+
+  const probe = await runtimeProbe(requested, async (url, options) => {
+    assert.equal(url, requested);
+    assert.deepEqual(options, { redirect: 'follow' });
+    return {
+      url: final,
+      redirected: true,
+      status: 200,
+      headers: { get: () => 'text/html; charset=UTF-8' },
+      text: async () => '<html>generic page without an Access label</html>',
+    };
+  });
+  assert.equal(probe.requestedUrl, 'https://app.sekretbip.net');
+  assert.equal(probe.finalUrl, 'https://tenant.cloudflareaccess.com');
+  assert.equal(probe.accessRedirect, true);
+  assert.equal(appProbeIsFrontend(probe), false);
+  assert.doesNotMatch(JSON.stringify(probe), /fixture-private|private-password|state=|code=123/);
+
+  const sameHostAccess = await runtimeProbe('https://app.sekretbip.net/', async () => ({
+    url: 'https://app.sekretbip.net/cdn-cgi/access/login?state=fixture-private',
+    redirected: true,
+    status: 200,
+    headers: { get: () => 'text/html' },
+    text: async () => '<main>generic redirect</main>',
+  }));
+  assert.equal(sameHostAccess.accessRedirect, true);
+  assert.equal(appProbeIsFrontend(sameHostAccess), false);
+  assert.doesNotMatch(JSON.stringify(sameHostAccess), /fixture-private|cdn-cgi/);
 });
 
 test('provider reconciliation entrypoints do not echo raw provider errors or runtime response snippets', () => {
