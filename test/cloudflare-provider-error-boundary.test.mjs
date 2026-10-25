@@ -88,6 +88,28 @@ test('probe receipts retain origins only and preserve Cloudflare Access redirect
   assert.equal(sameHostAccess.accessRedirect, true);
   assert.equal(appProbeIsFrontend(sameHostAccess), false);
   assert.doesNotMatch(JSON.stringify(sameHostAccess), /fixture-private|cdn-cgi/);
+
+  const offOrigin = await runtimeProbe('https://app.sekretbip.net/welcome?state=fixture-private', async () => ({
+    url: 'https://unrelated.example.invalid/any-page?state=fixture-private',
+    redirected: true,
+    status: 200,
+    headers: { get: () => 'text/html' },
+    text: async () => '<html>Generic HTML that must not prove Pages readiness</html>',
+  }));
+  assert.equal(offOrigin.accessRedirect, false);
+  assert.equal(offOrigin.finalUrl, 'https://unrelated.example.invalid');
+  assert.equal(appProbeIsFrontend(offOrigin), false);
+  assert.doesNotMatch(JSON.stringify(offOrigin), /state=|fixture-private/);
+
+  const sameOrigin = await runtimeProbe('https://app.sekretbip.net/health?token=fixture-private', async () => ({
+    url: 'https://app.sekretbip.net/welcome?token=fixture-private',
+    redirected: true,
+    status: 200,
+    headers: { get: () => 'text/html' },
+    text: async () => '<html>Valid frontend page</html>',
+  }));
+  assert.equal(appProbeIsFrontend(sameOrigin), true);
+  assert.doesNotMatch(JSON.stringify(sameOrigin), /token=|fixture-private/);
 });
 
 test('provider reconciliation entrypoints do not echo raw provider errors or runtime response snippets', () => {
