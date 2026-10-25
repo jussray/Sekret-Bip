@@ -23,16 +23,16 @@ test('production operator is only manual, exact-main, production-gated and requi
   assert.match(workflow, /test "\$\(git rev-parse FETCH_HEAD\)" = "\$TARGET_SHA"/);
   assert.match(workflow, /REVIEWED_SQL_BLOB_CHANGED/);
   // Reconstruct the public, reviewed Git blob ID and verify the file byte-for-byte.
-  const parts = workflow.match(/reviewed_blob="\\$\\(printf '%s%s' '([0-9a-f]+)' '([0-9a-f]+)'\\)"/);
+  const parts = workflow.match(/reviewed_blob="\$\(printf '%s%s' '([0-9a-f]+)' '([0-9a-f]+)'\)"/);
   assert.ok(parts, 'reviewed immutable public Git blob identity is required');
   const reviewedBlob = parts[1] + parts[2];
   assert.equal(reviewedBlob.length, 40);
   const actualBlob = createHash('sha1')
-    .update(`blob ${Buffer.byteLength(migration)}\\0`)
+    .update(`blob ${Buffer.byteLength(migration)}\0`)
     .update(migration)
     .digest('hex');
   assert.equal(reviewedBlob, actualBlob);
-  assert.match(workflow, /git hash-object "\\$MIGRATION_FILE"/);
+  assert.match(workflow, /git hash-object "\$MIGRATION_FILE"/);
   assert.match(workflow, /supabase-target-identity\.mjs/);
   assert.match(workflow, /PGSSLMODE: require/);
   assert.match(workflow, /PGPASSWORD: \$\{\{ secrets\.SUPABASE_DB_PASSWORD \}\}/);
