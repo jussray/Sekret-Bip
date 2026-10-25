@@ -76,7 +76,7 @@ test('production deploy verification checks live Supabase runtime and schema fin
   assert.match(runtimeHealth, /runtime_contract_versions/);
   assert.match(runtimeHealth, /\.rpc\('sekret_production_schema_witness'\)/);
   assert.match(runtimeHealth, /contractVersion: '20260927185000'/);
-  assert.match(runtimeHealth, /expectedHistorySha256: HISTORY_DIGEST_SEGMENTS\\.join\\(''\\)/);
+  assert.ok(runtimeHealth.includes("expectedHistorySha256: HISTORY_DIGEST_SEGMENTS.join('')"));
   assert.match(runtimeHealth, /expectedLiveMaxVersion: '20261020075835'/);
   assert.match(runtimeHealth, /expectedHistoryCount: 35/);
   // Both consumers must reconstruct the same precise 64-digit non-secret
