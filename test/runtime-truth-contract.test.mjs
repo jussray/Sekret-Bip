@@ -76,7 +76,19 @@ test('production deploy verification checks live Supabase runtime and schema fin
   assert.match(runtimeHealth, /runtime_contract_versions/);
   assert.match(runtimeHealth, /\.rpc\('sekret_production_schema_witness'\)/);
   assert.match(runtimeHealth, /contractVersion: '20260927185000'/);
-  assert.match(runtimeHealth, /expectedHistorySha256: 'f187b6741a15c51970f68ff0b6aa7de02407ada8d72af4330eeb7d210429b3a3'/);
+  assert.match(runtimeHealth, /expectedHistorySha256: 'a9d821c9dc9a545f21c33fe550ad7f2f2a858c1e0e14fade618b1623732f59f0'/);
+  assert.match(runtimeHealth, /expectedLiveMaxVersion: '20261020075835'/);
+  assert.match(runtimeHealth, /expectedHistoryCount: 35/);
+  // Hosted Edge Function and local GitHub verifier must pin the same
+  // independently observed bounded history, never divergent snapshots.
+  for (const field of [
+    "expectedHistorySha256: 'a9d821c9dc9a545f21c33fe550ad7f2f2a858c1e0e14fade618b1623732f59f0'",
+    "expectedLiveMaxVersion: '20261020075835'",
+    'expectedHistoryCount: 35',
+  ]) {
+    assert.ok(runtimeHealth.includes(field), `missing Edge witness: ${field}`);
+    assert.ok(runtimeSchemaVerifier.includes(field), `missing verifier witness: ${field}`);
+  }
   assert.match(runtimeHealth, /healthy = missing\.length === 0 && schemaVerified/);
   assert.match(runtimeSchemaVerifier, /SUPABASE_RUNTIME_SCHEMA_WITNESS_DRIFT/);
   assert.match(runtimeSchemaVerifier, /expectedHistorySha256/);
