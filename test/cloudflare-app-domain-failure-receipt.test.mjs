@@ -86,8 +86,14 @@ test('wrapper delegates authority to the reconciler exact-host binding proof and
   const mutationIndex = reconciler.indexOf('for (const domain of preClassification.ownedDomains)');
   assert.ok(preconditionIndex >= 0 && mutationIndex > preconditionIndex);
   assert.match(reconciler, /console\.log\('CLOUDFLARE_APP_DOMAIN_PLAN_READY'\)/);
-  assert.match(reconciler, /exact-host Worker domain\/route only/);
-  assert.match(reconciler, /bounded workflow_dispatch or one-shot parent-bound repository approval/);
+  // The removed plan logger formerly carried these prose strings. Inspect
+  // executable bounded route-selection and explicit apply authority instead.
+  assert.match(reconciler, /for \(const domain of preClassification\.ownedDomains\)/);
+  assert.match(reconciler, /for \(const route of preClassification\.ownedExactRoutes\)/);
+  assert.match(reconciler, /assertSafeBindings\(preClassification, resolved\)/);
+  assert.doesNotMatch(reconciler, /for \(const route of preClassification\.broadRoutes\)/);
+  assert.match(reconciler, /const apply = argv\.includes\('--apply'\)/);
+  assert.match(reconciler, /if \(!apply\) return;/);
   assert.doesNotMatch(reconciler, /workflow_dispatch with apply=true only/);
 });
 
