@@ -311,6 +311,10 @@ function assertSafeBindings(classification, config) {
 export function appProbeIsFrontend(probe) {
   if (!probe || probe.status < 200 || probe.status >= 400) return false;
   if (probeLooksLikeCloudflareAccess(probe)) return false;
+  // An unrelated 200 HTML redirect does not prove the canonical Pages origin.
+  const requestedOrigin = safeProbeUrl(probe.requestedUrl || probe.url);
+  const observedOrigin = safeProbeUrl(probe.finalUrl || probe.url);
+  if (requestedOrigin === 'unverified-url' || observedOrigin !== requestedOrigin) return false;
   if (probe.contentType.toLowerCase().startsWith('application/json')) return false;
   return !probe.bodyFingerprint.includes('"error":"Method not allowed"');
 }
