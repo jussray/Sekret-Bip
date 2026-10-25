@@ -264,8 +264,18 @@ jobs:
 
           function classify(receipt) {
             const message = String(receipt?.error || '');
-            // Sanitized provider failures do not retain endpoint paths or messages.
-            if (/^CLOUDFLARE_PROVIDER_REQUEST_FAILED(?:\\s|$)/.test(message)) {
+            // Fixed internal operation tags retain the three diagnostic classes
+            // without retaining Cloudflare paths, response bodies or messages.
+            if (message.startsWith('CLOUDFLARE_PROVIDER_REQUEST_FAILED ')) {
+              if (message.includes('operation=token-verify')) {
+                return 'token-verify-failed';
+              }
+              if (message.includes('operation=workers-scripts-read')) {
+                return 'workers-scripts-read-failed';
+              }
+              if (message.includes('operation=workers-ci-read')) {
+                return 'workers-ci-read-failed';
+              }
               return 'provider-request-failed';
             }
             if (/PRODUCTION_TRIGGER_SELECTION_FAILED/i.test(message)) return 'production-trigger-selection-failed';
