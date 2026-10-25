@@ -123,6 +123,12 @@ test('probe receipts retain origins only and preserve Cloudflare Access redirect
   assert.equal(appProbeIsFrontend(missingFinalUrl), false);
 });
 
+test('email routing evidence writer retains fixed Sauce Guard logging', () => {
+  const source = readFileSync(new URL('../scripts/reconcile-cloudflare-email-routing.mjs', import.meta.url), 'utf8');
+  assert.match(source, /console\.log\('CLOUDFLARE_EMAIL_ROUTING_EVIDENCE_WRITTEN'\)/);
+  assert.doesNotMatch(source, /console\.log\(`EVIDENCE_WRITTEN phase=/);
+});
+
 test('email-routing receipt excludes raw provider recipient, catch-all and action data', () => {
   const fixtureSecret = 'fixture-private-recipient@example.invalid';
   const receipt = buildSafeEmailRoutingReceipt({
