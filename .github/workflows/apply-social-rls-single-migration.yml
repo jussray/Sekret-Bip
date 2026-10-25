@@ -34,7 +34,11 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
   SUPABASE_PROJECT_REF: tbsevonvegdnlyjgplmm
   SUPABASE_TARGET: sekret-bip-production
-  SUPABASE_POOLER_HOST: aws-1-us-east-1.pooler.supabase.com
+  PGHOST: aws-1-us-east-1.pooler.supabase.com
+  PGUSER: postgres.tbsevonvegdnlyjgplmm
+  PGDATABASE: postgres
+  PGPORT: '5432'
+  PGSSLMODE: require
   MIGRATION_VERSION: '20261006040000'
   MIGRATION_FILE: supabase/migrations/20261006040000_social_surfaces_permanent_accounts_only.sql
   WITNESS_FILE: supabase/probes/social_rls_single_migration_witness.sql
@@ -109,32 +113,26 @@ jobs:
         with:
           version: 2.113.0
 
-      - name: Connect to exact production project
+      - name: Link exact production project via protected CLI identity
         shell: bash
         env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           command -v psql >/dev/null || { echo 'PSQL_UNAVAILABLE'; exit 1; }
           test -n "$SUPABASE_DB_PASSWORD" || { echo 'MISSING_DATABASE_CREDENTIAL'; exit 1; }
-          encoded_password="$(python3 - <<'PY'
-          import os
-          import urllib.parse
-          print(urllib.parse.quote(os.environ['SUPABASE_DB_PASSWORD'], safe=''))
-          PY
-          )"
-          db_url="postgresql://postgres.$SUPABASE_PROJECT_REF:$encoded_password@$SUPABASE_POOLER_HOST:5432/postgres?sslmode=require"
-          echo "::add-mask::$encoded_password"
-          echo "::add-mask::$db_url"
-          printf 'SUPABASE_DB_URL=%s\n' "$db_url" >> "$GITHUB_ENV"
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
       - name: Metadata-only RLS and migration history preflight
         shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          snapshot="$(psql "$SUPABASE_DB_URL" -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
           IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
-          [[ "$enabled" == 14 && "$fingerprint" =~ ^[0-9a-f]{32}$ ]] || {
+          [[ "$enabled" == 14 && "$fingerprint" =~ ^[0-9a-f]{64}$ ]] || {
             echo 'TARGET_TABLES_RLS_OR_FINGERPRINT_MISMATCH'
             exit 1
           }
@@ -156,29 +154,34 @@ jobs:
         shell: bash
         env:
           TARGET_SHA: ${{ inputs.target_sha }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin main
           test "$(git rev-parse FETCH_HEAD)" = "$TARGET_SHA" || { echo 'SOURCE_DRIFT_BEFORE_WRITE'; exit 1; }
-          snapshot="$(psql "$SUPABASE_DB_URL" -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
           test "$snapshot" = "$BASELINE_SNAPSHOT" || { echo 'DATABASE_DRIFT_BEFORE_WRITE'; exit 1; }
 
       - name: Execute only reviewed canonical SQL
         if: ${{ inputs.mode == 'apply' && env.NEEDS_APPLY == 'yes' }}
         shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           # The reviewed migration has an explicit BEGIN/COMMIT and changes policies only.
           # No supabase db push, extra migrations, or application data.
-          psql "$SUPABASE_DB_URL" -X -q -v ON_ERROR_STOP=1 -f "$MIGRATION_FILE"
+          psql -X -q -v ON_ERROR_STOP=1 -f "$MIGRATION_FILE"
           echo 'canonical_sql_executed=yes' >> artifacts/social-rls-single-migration-receipt.txt
 
       - name: Verify all guards before recording migration identity
         if: ${{ inputs.mode == 'apply' && env.NEEDS_APPLY == 'yes' }}
         shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          snapshot="$(psql "$SUPABASE_DB_URL" -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
           IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
           IFS='|' read -r original_enabled original_effective original_named original_ledger baseline_hash <<< "$BASELINE_SNAPSHOT"
           [[ "$enabled" == 14 && "$effective" == 14 && "$named" == 14 && "$ledger" == 0 &&
@@ -190,18 +193,23 @@ jobs:
       - name: Record original migration identity with supported CLI
         if: ${{ inputs.mode == 'apply' && env.NEEDS_APPLY == 'yes' }}
         shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           # Only after the effective RLS policies were checked. The CLI records history, not SQL.
-          supabase migration repair "$MIGRATION_VERSION" --status applied --db-url "$SUPABASE_DB_URL"
+          supabase migration repair "$MIGRATION_VERSION" --status applied --linked
           echo 'canonical_migration_receipt_recorded=yes' >> artifacts/social-rls-single-migration-receipt.txt
 
       - name: Verify exact post-apply RLS state and migration ledger
         if: ${{ inputs.mode == 'apply' }}
         shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          snapshot="$(psql "$SUPABASE_DB_URL" -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
           IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
           IFS='|' read -r original_enabled original_effective original_named original_ledger baseline_hash <<< "$BASELINE_SNAPSHOT"
           [[ "$enabled" == 14 && "$effective" == 14 && "$named" == 14 && "$ledger" == 1 &&
