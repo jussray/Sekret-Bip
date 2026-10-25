@@ -6,6 +6,8 @@ on:
     paths:
       - 'wrangler.toml'
       - 'scripts/reconcile-cloudflare-workers-build-trigger.mjs'
+      - 'scripts/cloudflare-provider-error.mjs'
+      - 'test/cloudflare-provider-error-boundary.test.mjs'
       - 'scripts/run-with-normalized-cloudflare-token.mjs'
       - 'test/cloudflare-workers-build-trigger-control-plane.test.mjs'
       - 'test/cloudflare-workers-build-trigger-approval.test.mjs'
@@ -19,6 +21,8 @@ on:
     paths:
       - 'wrangler.toml'
       - 'scripts/reconcile-cloudflare-workers-build-trigger.mjs'
+      - 'scripts/cloudflare-provider-error.mjs'
+      - 'test/cloudflare-provider-error-boundary.test.mjs'
       - 'scripts/run-with-normalized-cloudflare-token.mjs'
       - 'test/cloudflare-workers-build-trigger-control-plane.test.mjs'
       - 'test/cloudflare-workers-build-trigger-approval.test.mjs'
@@ -88,6 +92,7 @@ jobs:
           test/cloudflare-workers-release-identity-trigger.test.mjs
           test/cloudflare-workers-build-trigger-workflow-contract.test.mjs
           test/cloudflare-workers-build-watch-path-observation.test.mjs
+          test/cloudflare-provider-error-boundary.test.mjs
 
   reconcile:
     name: Reconcile native Workers Builds trigger
@@ -259,14 +264,9 @@ jobs:
 
           function classify(receipt) {
             const message = String(receipt?.error || '');
-            if (/Cloudflare GET \/user\/tokens\/verify failed:/i.test(message)) {
-              return 'token-verify-failed';
-            }
-            if (/Cloudflare GET \/accounts\/[^/]+\/workers\/scripts/i.test(message)) {
-              return 'workers-scripts-read-failed';
-            }
-            if (/Cloudflare GET \/accounts\/[^/]+\/builds\/workers\/[^/]+\/triggers/i.test(message)) {
-              return 'workers-ci-read-failed';
+            // Sanitized provider failures do not retain endpoint paths or messages.
+            if (/^CLOUDFLARE_PROVIDER_REQUEST_FAILED(?:\\s|$)/.test(message)) {
+              return 'provider-request-failed';
             }
             if (/PRODUCTION_TRIGGER_SELECTION_FAILED/i.test(message)) return 'production-trigger-selection-failed';
             if (/NON_PRODUCTION_TRIGGER_SELECTION_FAILED/i.test(message)) return 'non-production-trigger-selection-failed';
@@ -277,7 +277,7 @@ jobs:
           }
 
           function providerCode(receipt) {
-            const match = String(receipt?.error || '').match(/\bcode=(\d+)\b/);
+            const match = String(receipt?.error || '').match(/\bcodes=(\d+)(?:,|\b)/);
             return match?.[1] || 'none';
           }
 
