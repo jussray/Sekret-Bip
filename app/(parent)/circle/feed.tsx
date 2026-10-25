@@ -30,8 +30,7 @@ export default function ParentCircleRoute() {
       const cloud = await loadParentCommunityFeed();
       setParentCirclePosts(cloud);
       setCommunityNotice(null);
-    } catch (error) {
-      if (__DEV__) console.warn('[parent-circle] feed unavailable', error);
+    } catch {
       setParentCirclePosts([]);
       setCommunityNotice(friendlyCommunityNotice());
     }

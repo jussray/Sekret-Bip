@@ -126,6 +126,7 @@ test('active Parent Circle route replaces legacy self-history with V2 community 
   assert.match(route, /reportParentCommunityPost/);
   assert.doesNotMatch(route, /loadParentCircleFeed/);
   assert.doesNotMatch(route, /syncParentCirclePost/);
+  assert.doesNotMatch(route, /console\.(?:log|info|warn|error|debug)/);
   assert.match(route, /setParentCirclePosts\(cloud\)/);
 });
 
