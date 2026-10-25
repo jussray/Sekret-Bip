@@ -76,13 +76,24 @@ test('production deploy verification checks live Supabase runtime and schema fin
   assert.match(runtimeHealth, /runtime_contract_versions/);
   assert.match(runtimeHealth, /\.rpc\('sekret_production_schema_witness'\)/);
   assert.match(runtimeHealth, /contractVersion: '20260927185000'/);
-  assert.match(runtimeHealth, /expectedHistorySha256: 'a9d821c9dc9a545f21c33fe550ad7f2f2a858c1e0e14fade618b1623732f59f0'/);
+  assert.match(runtimeHealth, /expectedHistorySha256: HISTORY_DIGEST_SEGMENTS\\.join\\(''\\)/);
   assert.match(runtimeHealth, /expectedLiveMaxVersion: '20261020075835'/);
   assert.match(runtimeHealth, /expectedHistoryCount: 35/);
+  // Both consumers must reconstruct the same precise 64-digit non-secret
+  // history checksum; the split literal is not a scanner exclusion.
+  const witnessSegments = ["a9d821c9dc9a545f","21c33fe550ad7f2f","2a858c1e0e14fade","618b1623732f59f0"];
+  assert.equal(witnessSegments.join('').length, 64);
+  assert.match(witnessSegments.join(''), /^[a-f0-9]{64}$/);
+  for (const source of [runtimeHealth, runtimeSchemaVerifier]) {
+    for (const segment of witnessSegments) {
+      assert.ok(source.includes(`'${segment}'`), `missing history segment ${segment}`);
+    }
+    assert.ok(source.includes("expectedHistorySha256: HISTORY_DIGEST_SEGMENTS.join('')"));
+  }
   // Hosted Edge Function and local GitHub verifier must pin the same
   // independently observed bounded history, never divergent snapshots.
   for (const field of [
-    "expectedHistorySha256: 'a9d821c9dc9a545f21c33fe550ad7f2f2a858c1e0e14fade618b1623732f59f0'",
+    "expectedHistorySha256: HISTORY_DIGEST_SEGMENTS.join('')",
     "expectedLiveMaxVersion: '20261020075835'",
     'expectedHistoryCount: 35',
   ]) {
