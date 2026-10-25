@@ -26,6 +26,11 @@ test('Cloudflare errors expose only bounded HTTP status and numeric provider cod
   assert.equal(cloudflareHasErrorCode(failure, 6003), true);
   assert.equal(cloudflareHasErrorCode(failure, 9999), false);
   assert.doesNotMatch(JSON.stringify(failure.message), /fake-only-provider-secret|private\.fixture@/);
+  const tagged = cloudflareRequestFailure({ errors: [{ code: 6003, message: providerSecret }] }, 403, 'token-verify');
+  assert.equal(tagged.message, 'CLOUDFLARE_PROVIDER_REQUEST_FAILED status=403 codes=6003 operation=token-verify');
+  assert.equal(safeCloudflareErrorReason(tagged), tagged.message);
+  const dynamicTag = cloudflareRequestFailure({ errors: [] }, 403, providerSecret);
+  assert.doesNotMatch(dynamicTag.message, /operation=|fake-only-provider-secret/);
 });
 
 test('arbitrary provider exceptions cannot inject log text or evidence', () => {
