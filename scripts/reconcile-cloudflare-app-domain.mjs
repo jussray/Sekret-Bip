@@ -227,7 +227,8 @@ export function safeProbeUrl(value) {
 export async function runtimeProbe(url, fetchImpl = fetch) {
   const response = await fetchImpl(url, { redirect: 'follow' });
   const body = await response.text();
-  const finalUrl = response.url || url;
+  // A redirected response with no final URL cannot prove the requested origin.
+  const finalUrl = response.url || (response.redirected === true ? '' : url);
   return {
     url: safeProbeUrl(url),
     requestedUrl: safeProbeUrl(url),
