@@ -21,7 +21,7 @@ test('muse is not advertised with a non-allow-listed BIP_MUSE_MODEL', async () =
   const fetchImpl = okFetch();
   await assert.rejects(
     () => invokeBipProvider(env, { provider: 'muse', prompt: 'hi', source: 'founder' }, fetchImpl),
-    /not configured/,
+    /muse_not_configured/,
   );
   assert.equal(fetchImpl.calls, 0);
 });
