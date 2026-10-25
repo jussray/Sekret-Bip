@@ -135,6 +135,9 @@ test('provider reconciliation entrypoints do not echo raw provider errors or run
   const app = readFileSync(new URL('../scripts/reconcile-cloudflare-app-domain.mjs', import.meta.url), 'utf8');
   assert.match(app, /bodyFingerprint: safeRuntimeBodyFingerprint\(body\)/);
   assert.doesNotMatch(app, /bodyFingerprint:\s*body\.replace/);
+  assert.match(app, /console\.log\('CLOUDFLARE_APP_DOMAIN_PLAN_READY'\)/);
+  assert.doesNotMatch(app, /console\.log\(\s*JSON\.stringify/);
+
   for (const path of ['scripts/reconcile-cloudflare-resend-dns.mjs', 'scripts/reconcile-cloudflare-email-routing.mjs']) {
     const source = readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
     assert.doesNotMatch(source, /console\.error\(error instanceof Error \? error\.message : error\)/, path);
