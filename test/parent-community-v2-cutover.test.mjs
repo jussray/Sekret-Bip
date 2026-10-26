@@ -89,8 +89,16 @@ test('SECURITY DEFINER Parent Community RPCs are not executable by PUBLIC or ano
     'reply_to_parent_community_post(uuid, text)',
     'report_parent_community_post(uuid, text)',
   ]) {
-    assert.match(cutover, new RegExp('revoke all on function public\\.' + signature.replace(/[()]/g, '\\$&') + ' from public, anon'));
-    assert.match(cutover, new RegExp('grant execute on function public\\.' + signature.replace(/[()]/g, '\\$&') + ' to authenticated'));
+    assert.equal(
+      cutover.includes('revoke all on function public.' + signature + ' from public, anon;'),
+      true,
+      'missing anon/public revoke for ' + signature,
+    );
+    assert.equal(
+      cutover.includes('grant execute on function public.' + signature + ' to authenticated;'),
+      true,
+      'missing authenticated execute grant for ' + signature,
+    );
   }
 });
 
