@@ -18,6 +18,7 @@ export const TEEN_ROUTES = {
   periodCalendar:  '/(teen)/period-calendar',
   discover:        '/(teen)/discover',
   profile:         '/(teen)/profile',
+  scrapbookCheckIn:'/(teen)/scrapbook-check-in',
   // Canonical companion chat screen. Always pass { companion: PersonalityId } param.
   // The old /(teen)/chat hub and /(teen)/chat/[personalityId] are retired.
   companionChat:   '/(teen)/companion-chat',

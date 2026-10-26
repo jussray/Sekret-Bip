@@ -6,10 +6,12 @@ import {
   buildTestLedger,
   classifyObservation,
   classifyProviderAuthority,
+  githubActionsJobId,
   githubJson,
   isRetryableGithubResponse,
   isRetryableGithubStatus,
   mapCheckState,
+  reconcileGithubActionsCheckRuns,
   selectLatestChecks,
 } from '../scripts/control-room-test-ledger.mjs';
 
@@ -55,6 +57,65 @@ test('maps provider states without false green', () => {
   assert.equal(mapCheckState(check({status: 'completed', conclusion: null})), 'unknown');
 });
 
+test('extracts GitHub Actions job IDs only from canonical job details URLs', () => {
+  assert.equal(
+    githubActionsJobId('https://github.com/jussray/Sekret-Bip/actions/runs/39798827561/job/119893375614'),
+    '119893375614',
+  );
+  assert.equal(githubActionsJobId('https://github.com/jussray/Sekret-Bip/actions/runs/39798827561'), null);
+  assert.equal(githubActionsJobId('https://example.com/jussray/Sekret-Bip/actions/runs/1/job/2'), null);
+  assert.equal(githubActionsJobId('not-a-url'), null);
+});
+
+test('reconciles a stale running GitHub Actions check from the completed Actions job', async () => {
+  const stale = check({
+    id: 119893375614,
+    name: 'Discover repo-native tests and enforce critical workflow authority',
+    status: 'in_progress',
+    conclusion: null,
+    completed_at: null,
+    details_url: 'https://github.com/jussray/Sekret-Bip/actions/runs/39798827561/job/119893375614',
+  });
+  const reconciled = await reconcileGithubActionsCheckRuns([stale], {
+    repository: 'jussray/Sekret-Bip',
+    token: 'redacted-token',
+    fetchJob: async (jobId) => {
+      assert.equal(jobId, '119893375614');
+      return {
+        status: 'completed',
+        conclusion: 'success',
+        completed_at: '2026-10-22T14:58:05Z',
+      };
+    },
+  });
+  assert.equal(reconciled[0].status, 'completed');
+  assert.equal(reconciled[0].conclusion, 'success');
+  assert.equal(reconciled[0].completed_at, '2026-10-22T14:58:05Z');
+  assert.equal(reconciled[0]._reconciledFromActionsJob, true);
+  assert.equal(mapCheckState(reconciled[0]), 'passed');
+});
+
+test('reconciliation fails closed when Actions job state is unavailable or still running', async () => {
+  const stale = check({
+    status: 'in_progress',
+    conclusion: null,
+    details_url: 'https://github.com/jussray/Sekret-Bip/actions/runs/123/job/456',
+  });
+  const stillRunning = await reconcileGithubActionsCheckRuns([stale], {
+    repository: 'jussray/Sekret-Bip',
+    token: 'redacted-token',
+    fetchJob: async () => ({status: 'in_progress', conclusion: null}),
+  });
+  assert.equal(stillRunning[0].status, 'in_progress');
+
+  const unavailable = await reconcileGithubActionsCheckRuns([stale], {
+    repository: 'jussray/Sekret-Bip',
+    token: 'redacted-token',
+    fetchJob: async () => { throw new Error('provider unavailable'); },
+  });
+  assert.equal(unavailable[0].status, 'in_progress');
+  assert.equal(unavailable[0].conclusion, null);
+});
 test('classifies Supabase check authority against the repository-owned project', () => {
   const canonical = classifyProviderAuthority(check({
     name: 'Supabase Preview',
