@@ -110,7 +110,7 @@ jobs:
           NODE
 
       - name: Run exact-release unit tests
-        run: node --test test/cloudflare-native-deploy.test.mjs test/release-metadata.test.mjs test/playwright-evidence-provenance-workflow.test.mjs
+        run: node --test test/cloudflare-native-deploy.test.mjs test/release-metadata.test.mjs test/playwright-evidence-provenance-workflow.test.mjs test/playwright-suite-lane-contract.test.mjs
 
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
