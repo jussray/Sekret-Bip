@@ -14,6 +14,18 @@ Before material planning, implementation, review, automation, publishing, deploy
 
 > **Before making any claim about current PR, deployment, migration, backend state, GitHub Actions status, Cloudflare status, Supabase state, or release truth, inspect the real repository and read `docs/CURRENT_STATUS.md`, `docs/TRUTH_AUTHORITY.md`, `docs/CLOUDFLARE_OWNERSHIP.md`, and `.agents/skills/bip-repo-truth/SKILL.md`. Also check Founder Control Room when release, CI, outage, or cross-repo truth is involved.**
 
+## Mandatory read-only preflight before every coding-agent advance
+
+For each new implementation, draft PR, review, readiness assertion, cross-repo handoff, or release task, first audit the **authorized Se'kret Bip surfaces**. Repeat after any candidate head, branch, provider release, or migration change. Never treat an agent's old narrative as current provider evidence.
+
+1. **GitHub:** check current `main`, candidate/base/head SHAs, open and draft PRs, recent red commits, reviews, unresolved comments, annotations, code-scanning alerts, Dependabot alerts if access is granted, Bearer/CodeQL SARIF and actual scanner job results, and every applicable test/check/workflow/branch-protection bypass. A red, skipped, pending, stale, inaccessible, or no-log result is not green. A successful SARIF upload is not proof the `bearer` scan succeeded.
+2. **Cloudflare (read only):** inspect the authorized `sekret-bip` Pages project, `sekret-backend` Worker, companion Worker provider identity, relevant builds/log summaries, exact deployed version, routes/custom domains, and Service Bindings. Keep routing intent in GitHub distinct from independently observed live provider configuration. If the Cloudflare account, token, or read-only connector is unavailable, record `UNKNOWN/BLOCKED`, not success. Do not expand token scopes or copy private logs.
+3. **Supabase (read only):** confirm the live `tbsevonvegdnlyjgplmm` project identity matches the approved repository configuration; inspect relevant schema, migration history, RLS/auth advisories, Edge Functions and sanitized operational error counts. Never read user rows, private journals, companion conversations, teen/parent data, secret values, or bulk exports to prove parity.
+4. **Application parity:** separately record repository head SHA, checked CI subject, Pages/Worker release identity, target Supabase project, migration/version identity, and any production browser evidence. Compare only the matching app's surfaces. No source commit or provider build proves the other layers automatically.
+5. **Stop/receipt:** before declaring progress, create a minimized `READ_ONLY_AUDIT_RECEIPT` containing source, scope, observation time, exact candidate/production identities, findings and required checks, `PASS/FAIL/UNKNOWN/NOT_APPLICABLE` with rationale, and next owner. Required `FAIL` or `UNKNOWN` blocks unrelated work and all merge/deploy/production authority; authorized scoped diagnostic and isolated draft fixes may continue. No receipt, no advancement claim.
+
+This instruction is not itself a machine gate. Enforce consequential transitions with GitHub trusted exact-head required checks and rulesets, independent provider readback, safety/privacy review, and fresh founder approval for each mutation. The repository must not release merely because an agent says it audited the stack. Keep receipts metadata-only and do not share protected details or credentials.
+
 ## Current repository checkpoint
 
 - Default branch: `main`.
