@@ -203,7 +203,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
 
 const invokedDirectly = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 if (invokedDirectly) {
-  main().catch((error) => {
+  main().catch(() => {
     console.error('CLOUDFLARE_RESEND_DNS_RECONCILIATION_FAILED');
     process.exitCode = 1;
   });
