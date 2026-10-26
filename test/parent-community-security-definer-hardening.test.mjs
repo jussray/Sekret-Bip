@@ -26,8 +26,15 @@ test('restrictive Parent Community policies call only private classifiers', () =
   }
   assert.match(migration, /private\.is_parent_community_circle_id\(circle_id\)/);
   assert.match(migration, /private\.is_parent_community_post_id\(post_id\)/);
+  const policyStart = migration.indexOf('drop policy if exists parent_community_membership_rpc_only');
+  const cleanupStart = migration.indexOf(
+    'revoke all on function public.is_parent_community_circle_id(uuid)',
+    policyStart,
+  );
+  assert.notEqual(policyStart, -1);
+  assert.notEqual(cleanupStart, -1);
   assert.doesNotMatch(
-    migration.slice(migration.indexOf('drop policy if exists parent_community_membership_rpc_only')),
+    migration.slice(policyStart, cleanupStart),
     /public\.is_parent_community_(?:circle|post)_id/,
   );
 });
