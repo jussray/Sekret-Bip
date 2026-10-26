@@ -109,5 +109,5 @@ test('Supabase production migration command is founder-bound and delegates only 
   assert.match(dispatch, /confirm_project: "tbsevonvegdnlyjgplmm"/);
   assert.match(dispatch, /apply_confirmation: "APPLY PRODUCTION MIGRATIONS"/);
   assert.doesNotMatch(dispatch, /SUPABASE_ACCESS_TOKEN|SUPABASE_DB_PASSWORD/);
-  assert.doesNotMatch(dispatch, /execute_sql|apply_migration|supabase migration repair/i);
+  assert.doesNotMatch(dispatch, /execute_sql|apply_migration|supabase migration repair|supabase db push/i);
 });
