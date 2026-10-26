@@ -313,7 +313,7 @@ jobs:
             echo "- Approval reference: \`${{ steps.supabase-production-command.outputs.approval_reference }}\`"
             echo '- Mutation authority: existing `.github/workflows/deploy-supabase-migrations.yml` only'
             echo '- Target project: `tbsevonvegdnlyjgplmm`'
-            echo '- Mode: version-preserving `supabase db push --linked`'
+            echo '- Mode: existing version-preserving production migration workflow'
             echo '- Main is rechecked both in this bridge and again inside the downstream workflow'
             echo '- Supabase credentials in bridge: none'
           } >> "$GITHUB_STEP_SUMMARY"
