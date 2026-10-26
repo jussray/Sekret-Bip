@@ -47,6 +47,20 @@ test('production exposes the exact expected Pages and Worker release commit', as
     worker: 'sekret-backend',
     releaseSha: expectedReleaseSha,
   });
+
+  
+  // Public disclosure is verified only after matching frontend and backend SHAs.
+  const disclosureResponse = await request.get('https://sekretbip.net/.well-known/security.txt', {
+    maxRedirects: 0,
+    headers: { 'cache-control': 'no-cache' },
+  });
+  expect(disclosureResponse.status()).toBe(200);
+  expect(disclosureResponse.headers()['content-type'] ?? '').toContain('text/plain');
+  const contents = await disclosureResponse.text();
+  expect(contents).toMatch(/^Contact: mailto:founder@jussco\.company$/m);
+  const expiration = contents.match(/^Expires: ([^\r\n]+)$/m);
+  expect(expiration).not.toBeNull();
+  expect(Date.parse(expiration![1])).toBeGreaterThan(Date.now());
 });
 
 test('production Teen front door renders and Enter reaches Teen onboarding', async ({ page }, testInfo) => {
