@@ -37,6 +37,7 @@ test('router recognizes commands only on launch gate 925 from founder jussray', 
   assert.match(route, /body\.startswith\('\/reconcile-app-domain '\)/);
   assert.match(route, /body\.startswith\('\/reconcile-supabase-history '\)/);
   assert.match(route, /body\.startswith\('\/verify-production '\)/);
+  assert.match(route, /body\.startswith\('\/apply-supabase-migrations '\)/);
   assert.match(route, /command = 'none'/);
 });
 
@@ -89,4 +90,24 @@ test('production verification command can force the real exact-current-main proo
   assert.match(dispatch, /target_sha:\$sha/);
   assert.doesNotMatch(dispatch, /CLOUDFLARE_API_TOKEN|SUPABASE_ACCESS_TOKEN|SUPABASE_DB_PASSWORD/);
   assert.doesNotMatch(dispatch, /wrangler deploy|migration repair|db push/);
+});
+
+
+test('Supabase production migration command is founder-bound and delegates only to the existing version-preserving workflow', () => {
+  const parse = stepBlock('Parse Supabase production migration founder command');
+  const verify = stepBlock('Verify Supabase production apply SHA is current main');
+  const dispatch = stepBlock('Dispatch version-preserving Supabase production migration apply');
+
+  assert.match(parse, /steps\.route\.outputs\.command == 'supabase-production-apply'/);
+  assert.match(parse, /Expected exactly: \/apply-supabase-migrations <40-char-main-sha> <approval-reference>/);
+  assert.match(parse, /re\.fullmatch\(r'\[0-9a-f\]\{40\}', sha\)/);
+  assert.match(verify, /\/git\/ref\/heads\/main/);
+  assert.match(verify, /test "\$CURRENT_MAIN_SHA" = "\$EXPECTED_HEAD_SHA"/);
+  assert.match(dispatch, /deploy-supabase-migrations\.yml\/dispatches/);
+  assert.match(dispatch, /target_sha: \$sha/);
+  assert.match(dispatch, /mode: "apply"/);
+  assert.match(dispatch, /confirm_project: "tbsevonvegdnlyjgplmm"/);
+  assert.match(dispatch, /apply_confirmation: "APPLY PRODUCTION MIGRATIONS"/);
+  assert.doesNotMatch(dispatch, /SUPABASE_ACCESS_TOKEN|SUPABASE_DB_PASSWORD/);
+  assert.doesNotMatch(dispatch, /execute_sql|apply_migration|supabase migration repair/i);
 });
