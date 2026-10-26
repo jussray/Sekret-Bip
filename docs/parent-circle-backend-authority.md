@@ -21,3 +21,14 @@ The canonical backend surface is:
 - `report_parent_community_post(uuid,text)`
 
 Authenticated clients do not receive raw cross-parent Parent Community rows. Restrictive RLS membranes keep `parent_community` circles, memberships, posts, comments, reactions, and V2 UUID reports behind the RPC contract while leaving other Circle kinds on their existing access model.
+
+
+## SECURITY DEFINER hardening before production
+
+Current Supabase guidance treats RLS-only `SECURITY DEFINER` helpers differently from user-facing privileged RPCs:
+
+- internal classifiers belong outside exposed API schemas;
+- user-facing privileged RPCs must pin their search path and validate caller authority;
+- execute grants must be explicit.
+
+The follow-up migration `20261026103000_harden_parent_community_security_definer_surface.sql` therefore moves the two Parent Community RLS classifiers into `private`, rewires the restrictive policies, drops the public helper endpoints, and pins the five intentionally exposed guardian RPCs to an empty search path.
