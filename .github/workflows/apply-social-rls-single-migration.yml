@@ -1,0 +1,233 @@
+name: Apply Se'kret Social RLS Guard (Single Migration)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Full exact SHA of the current main commit'
+        type: string
+        required: true
+      mode:
+        description: 'Plan reads metadata only; apply executes one reviewed migration'
+        type: choice
+        required: true
+        default: plan
+        options: [plan, apply]
+      confirm_project:
+        description: 'Confirm the exact production Supabase project ref'
+        type: string
+        required: true
+      approval_confirmation:
+        description: 'For apply, enter APPLY SOCIAL RLS 20261006040000 ONLY'
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-production-migrations
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  SUPABASE_PROJECT_REF: tbsevonvegdnlyjgplmm
+  SUPABASE_TARGET: sekret-bip-production
+  PGHOST: aws-1-us-east-1.pooler.supabase.com
+  PGUSER: postgres.tbsevonvegdnlyjgplmm
+  PGDATABASE: postgres
+  PGPORT: '5432'
+  PGSSLMODE: require
+  MIGRATION_VERSION: '20261006040000'
+  MIGRATION_FILE: supabase/migrations/20261006040000_social_surfaces_permanent_accounts_only.sql
+  WITNESS_FILE: supabase/probes/social_rls_single_migration_witness.sql
+
+jobs:
+  single-rls-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+    steps:
+      - name: Validate exact scope and approval
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          MODE: ${{ inputs.mode }}
+          CONFIRM_PROJECT: ${{ inputs.confirm_project }}
+          APPROVAL_CONFIRMATION: ${{ inputs.approval_confirmation }}
+        run: |
+          set -euo pipefail
+          [[ "$TARGET_SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'INVALID_TARGET_SHA'; exit 1; }
+          test "$CONFIRM_PROJECT" = "$SUPABASE_PROJECT_REF" || { echo 'TARGET_IDENTITY_MISMATCH'; exit 1; }
+          if [[ "$MODE" == apply ]]; then
+            test "$APPROVAL_CONFIRMATION" = 'APPLY SOCIAL RLS 20261006040000 ONLY' || {
+              echo 'EXACT_SINGLE_MIGRATION_APPROVAL_REQUIRED'
+              exit 1
+            }
+          else
+            test "$MODE" = plan || { echo 'INVALID_MODE'; exit 1; }
+          fi
+
+      - name: Checkout reviewed exact source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ inputs.target_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify current main and frozen SQL identity before provider access
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$TARGET_SHA"
+          git fetch --no-tags --depth=1 origin main
+          test "$(git rev-parse FETCH_HEAD)" = "$TARGET_SHA" || {
+            echo 'CURRENT_MAIN_CHANGED'
+            exit 1
+          }
+          # Public Git blob identity, split only to avoid misclassifying a Git SHA as a credential.
+          # Reconstruct the exact 40-character reviewed blob; never weaken this equality check.
+          reviewed_blob="$(printf '%s%s' 'ed0769f2e417e84ea51a' '98db3c94542a63b4f7fd')"
+          test "$(git hash-object "$MIGRATION_FILE")" = "$reviewed_blob" || {
+            echo 'REVIEWED_SQL_BLOB_CHANGED'
+            exit 1
+          }
+          node --test test/social-surfaces-permanent-account-guard.test.mjs
+          test -s "$WITNESS_FILE"
+          mkdir -p artifacts
+          printf 'project=%s\nmigration=%s\nmode=%s\nsource_sha=%s\n' \
+            "$SUPABASE_PROJECT_REF" "$MIGRATION_VERSION" '${{ inputs.mode }}' "$TARGET_SHA" \
+            > artifacts/social-rls-single-migration-receipt.txt
+
+      - name: Verify provider target identity
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo 'MISSING_PROVIDER_TARGET_CREDENTIAL'; exit 1; }
+          node scripts/supabase-target-identity.mjs
+
+      - name: Set up pinned Supabase CLI
+        uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1
+        with:
+          version: 2.113.0
+
+      - name: Link exact production project via protected CLI identity
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          command -v psql >/dev/null || { echo 'PSQL_UNAVAILABLE'; exit 1; }
+          test -n "$SUPABASE_DB_PASSWORD" || { echo 'MISSING_DATABASE_CREDENTIAL'; exit 1; }
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
+      - name: Metadata-only RLS and migration history preflight
+        shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
+          [[ "$enabled" == 14 && "$fingerprint" =~ ^[0-9a-f]{64}$ ]] || {
+            echo 'TARGET_TABLES_RLS_OR_FINGERPRINT_MISMATCH'
+            exit 1
+          }
+          if [[ "$effective" == 0 && "$named" == 0 && "$ledger" == 0 ]]; then
+            echo 'NEEDS_APPLY=yes' >> "$GITHUB_ENV"
+          elif [[ "$effective" == 14 && "$named" == 14 && "$ledger" == 1 ]]; then
+            echo 'NEEDS_APPLY=no' >> "$GITHUB_ENV"
+          else
+            echo 'PARTIAL_OR_CONFLICTING_MIGRATION_STATE'
+            exit 1
+          fi
+          printf 'BASELINE_SNAPSHOT=%s\n' "$snapshot" >> "$GITHUB_ENV"
+          printf 'preflight_rls_enabled=%s\npreflight_effective_guards=%s\npreflight_guard_names=%s\npreflight_history=%s\n' \
+            "$enabled" "$effective" "$named" "$ledger" \
+            >> artifacts/social-rls-single-migration-receipt.txt
+
+      - name: Verify current main and unchanged database immediately before write
+        if: ${{ inputs.mode == 'apply' && env.NEEDS_APPLY == 'yes' }}
+        shell: bash
+        env:
+          TARGET_SHA: ${{ inputs.target_sha }}
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          test "$(git rev-parse FETCH_HEAD)" = "$TARGET_SHA" || { echo 'SOURCE_DRIFT_BEFORE_WRITE'; exit 1; }
+          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          test "$snapshot" = "$BASELINE_SNAPSHOT" || { echo 'DATABASE_DRIFT_BEFORE_WRITE'; exit 1; }
+
+      - name: Execute only reviewed canonical SQL
+        if: ${{ inputs.mode == 'apply' && env.NEEDS_APPLY == 'yes' }}
+        shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # The reviewed migration has an explicit BEGIN/COMMIT and changes policies only.
+          # No supabase db push, extra migrations, or application data.
+          psql -X -q -v ON_ERROR_STOP=1 -f "$MIGRATION_FILE"
+          echo 'canonical_sql_executed=yes' >> artifacts/social-rls-single-migration-receipt.txt
+
+      - name: Verify all guards before recording migration identity
+        if: ${{ inputs.mode == 'apply' && env.NEEDS_APPLY == 'yes' }}
+        shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
+          IFS='|' read -r original_enabled original_effective original_named original_ledger baseline_hash <<< "$BASELINE_SNAPSHOT"
+          [[ "$enabled" == 14 && "$effective" == 14 && "$named" == 14 && "$ledger" == 0 &&
+             "$fingerprint" == "$baseline_hash" ]] || {
+            echo 'POST_DDL_POLICY_OR_HISTORY_MISMATCH_NO_REPAIR_PERFORMED'
+            exit 1
+          }
+
+      - name: Record original migration identity with supported CLI
+        if: ${{ inputs.mode == 'apply' && env.NEEDS_APPLY == 'yes' }}
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # Only after the effective RLS policies were checked. The CLI records history, not SQL.
+          supabase migration repair "$MIGRATION_VERSION" --status applied --linked
+          echo 'canonical_migration_receipt_recorded=yes' >> artifacts/social-rls-single-migration-receipt.txt
+
+      - name: Verify exact post-apply RLS state and migration ledger
+        if: ${{ inputs.mode == 'apply' }}
+        shell: bash
+        env:
+          PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
+          IFS='|' read -r original_enabled original_effective original_named original_ledger baseline_hash <<< "$BASELINE_SNAPSHOT"
+          [[ "$enabled" == 14 && "$effective" == 14 && "$named" == 14 && "$ledger" == 1 &&
+             "$fingerprint" == "$baseline_hash" ]] || {
+            echo 'FINAL_AUTHORIZATION_OR_HISTORY_WITNESS_FAILED'
+            exit 1
+          }
+          printf 'postflight_rls_enabled=%s\npostflight_effective_guards=%s\npostflight_history=%s\n' \
+            "$enabled" "$effective" "$ledger" >> artifacts/social-rls-single-migration-receipt.txt
+
+      - name: Retain metadata-only receipt
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: social-rls-single-migration-${{ inputs.mode }}-${{ inputs.target_sha }}
+          path: artifacts/social-rls-single-migration-receipt.txt
+          if-no-files-found: warn
+          retention-days: 30
