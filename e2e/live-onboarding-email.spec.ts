@@ -13,6 +13,7 @@ const signInRetryMs = Number.parseInt(process.env.LIVE_SIGNIN_RETRY_MS?.trim() |
 
 const shouldRunReadiness = phase === 'readiness' || phase === 'all';
 const shouldRunSignup = phase === 'signup' || phase === 'all';
+const shouldRunUnverified = phase === 'unverified';
 const shouldRunSignIn = phase === 'signin' || phase === 'all';
 const shouldRunInvite = phase === 'invite' || phase === 'all';
 
@@ -22,6 +23,12 @@ type InviteResponseBody = {
     status?: string;
     error_code?: string | null;
   };
+};
+
+type WelcomeResponseBody = {
+  ok?: boolean;
+  status?: string;
+  receipt_persisted?: boolean;
 };
 
 type AuthObservation = {
@@ -210,6 +217,54 @@ test.describe('live onboarding email smoke', () => {
     expect(pageErrors).toEqual([]);
   });
 
+  test('unconfirmed teen account is rejected by Supabase Auth before email confirmation', async ({ page }) => {
+    test.setTimeout(90_000);
+    test.skip(!shouldRunUnverified, 'Run only before the disposable signup email is confirmed.');
+    test.skip(!liveEmail, 'A disposable LIVE_ONBOARDING_EMAIL is required for this live-write proof.');
+
+    await page.goto('/login?side=teen');
+    await page.getByPlaceholder('Phone number, username or email').fill(liveEmail!);
+    await page.getByPlaceholder('Password').fill(livePassword);
+
+    // An inaccessible server or a client-side redirect cannot prove the
+    // provider rejected unverified credentials. Inspect the actual Auth result.
+    const authResponse = page.waitForResponse((response) => {
+      try {
+        const url = new URL(response.url());
+        return url.hostname.endsWith('.supabase.co')
+          && url.pathname === '/auth/v1/token'
+          && url.searchParams.get('grant_type') === 'password';
+      } catch {
+        return false;
+      }
+    }, { timeout: 45_000 });
+
+    await page.getByRole('button', { name: /log in/i }).click();
+    const response = await authResponse;
+    let providerError: { error_code?: string; code?: string; error_description?: string; msg?: string; message?: string } = {};
+    try {
+      providerError = await response.json();
+    } catch {
+      throw new Error('Unconfirmed-account test requires a parseable Supabase Auth denial.');
+    }
+
+    const classification = String(providerError.error_code || providerError.code || '');
+    const explanation = String(providerError.msg || providerError.error_description || providerError.message || '');
+    expect(response.status(), 'Unconfirmed email must be rejected by Supabase Auth').toBeGreaterThanOrEqual(400);
+    expect(
+      classification === 'email_not_confirmed' || /email.*(not confirmed|unverified)|confirm.*email/i.test(explanation),
+      'The server must specifically deny unconfirmed email, not report a generic error',
+    ).toBe(true);
+    await expect(page).toHaveURL(/\/login(?:\?|$)/);
+
+    await attachPageState(page, 'unverified-email-login-denied', {
+      phase,
+      authStatus: response.status(),
+      authErrorCode: classification || null,
+      checkpoint: 'server_rejected_unconfirmed_email',
+    });
+  });
+
   test('confirmed teen account can return through sign in', async ({ page }) => {
     test.setTimeout(90_000);
     test.skip(!shouldRunSignIn, 'Set LIVE_ONBOARDING_PHASE=signin or all to run returning sign-in proof.');
@@ -217,6 +272,18 @@ test.describe('live onboarding email smoke', () => {
 
     let lastFailure = 'sign-in was not attempted';
     let signedIn = false;
+    const welcomeResponses: Array<{ status: number; body: unknown }> = [];
+
+    page.on('response', async (response) => {
+      if (!response.url().includes('/functions/v1/send-welcome-email')) return;
+      let body: unknown = null;
+      try {
+        body = await response.json();
+      } catch {
+        body = await response.text().catch(() => null);
+      }
+      welcomeResponses.push({ status: response.status(), body });
+    });
 
     for (let attempt = 1; attempt <= Math.max(signInAttempts, 1); attempt += 1) {
       try {
@@ -238,6 +305,26 @@ test.describe('live onboarding email smoke', () => {
     }
 
     expect(signedIn, `Returning teen sign-in never completed: ${lastFailure}`).toBe(true);
+
+    // Welcome delivery is intentionally non-blocking. The response listener
+    // may settle after the login route has already changed.
+    await expect.poll(() => welcomeResponses.length, {
+      message: 'send-welcome-email should complete after successful sign-in',
+      timeout: 15_000,
+      intervals: [200, 500, 1_000],
+    }).toBeGreaterThan(0);
+
+    const latestWelcome = welcomeResponses.at(-1);
+    await attachPageState(page, 'welcome-email-response', {
+      response: latestWelcome ?? { error: 'no send-welcome-email response captured' },
+    });
+
+    expect(latestWelcome, 'send-welcome-email response should be captured').toBeTruthy();
+    expect(latestWelcome?.status).toBe(200);
+    expect(latestWelcome?.body && typeof latestWelcome.body === 'object').toBe(true);
+    const welcomeBody = latestWelcome?.body as WelcomeResponseBody;
+    expect(welcomeBody.ok).toBe(true);
+    expect(['sent', 'already_sent']).toContain(welcomeBody.status);
   });
 
   test('confirmed teen account can send parent invite email', async ({ page }) => {
