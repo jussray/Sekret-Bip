@@ -8,7 +8,7 @@ import {classifyProductionImpact} from '../scripts/classify-production-impact.mj
 const workflow = readFileSync('.github/workflows/deploy-cloudflare.yml', 'utf8');
 
 function workflowStepBlock(name) {
-  const marker = `- name: ${name}`;
+  const marker = `- name: ${name}\n`;
   const start = workflow.indexOf(marker);
   assert.notEqual(start, -1, `missing production workflow step: ${name}`);
   const next = workflow.indexOf('\n      - name:', start + marker.length);
@@ -62,29 +62,71 @@ test('main-push classification executes the previous trusted main classifier, ne
   );
 });
 
-test('production witnesses continue independently after one witness fails but stop when the run is cancelled', () => {
-  const witnessSteps = [
-    'Verify exact Supabase production schema contract',
-    'Record safe frontend and backend transport evidence',
-    'Wait for exact frontend and backend Worker checks plus release marker',
-    'Verify backend health',
-    'Verify Supabase runtime contracts',
-    'Install Chromium',
-    'Verify exact deployed frontend with Playwright',
-  ];
+test('production verification job remains fail-closed on dependency drift but stops when superseded', () => {
+  assert.match(
+    workflow,
+    /if: \$\{\{ !cancelled\(\) && \(github\.event_name == 'workflow_dispatch' \|\| needs\.classify-production-impact\.result != 'success' \|\| needs\.classify-production-impact\.outputs\.production_impact != 'false'\) \}\}/u,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /verify-native-deployment:[\s\S]*?if: \$\{\{ always\(\)/u,
+    'the Production job must not use always() because cancelled superseded runs must terminate active witnesses',
+  );
+});
 
-  for (const name of witnessSteps) {
-    const block = workflowStepBlock(name);
+test('production verification preserves independent evidence after current-main trust while keeping release identity load-bearing', () => {
+  const schema = workflowStepBlock('Verify exact Supabase runtime and schema contracts');
+  const transport = workflowStepBlock('Record safe frontend and backend transport evidence');
+  const backend = workflowStepBlock('Verify backend health');
+  const chromium = workflowStepBlock('Install Chromium');
+  const browserObservation = workflowStepBlock('Observe public production browser journeys independently');
+  const cloudflare = workflowStepBlock('Wait for exact frontend and backend Worker checks plus release marker');
+  const releaseIdentity = workflowStepBlock('Verify exact deployed release identity with Playwright');
+
+  for (const block of [schema, transport, backend, chromium]) {
     assert.match(
       block,
       /if: \$\{\{ !cancelled\(\) && steps\.trusted_current_main\.outcome == 'success' \}\}/u,
-      `${name} must continue after an earlier witness failure but stop on superseded-run cancellation`,
+      'independent proof planes must continue observing after exact-current-main trust is established',
     );
-    assert.doesNotMatch(
-      block,
-      /continue-on-error:\s*true/u,
-      `${name} must remain a load-bearing failure signal`,
-    );
+  }
+  assert.match(schema, /id: supabase_schema/u);
+  assert.match(
+    schema,
+    /run: node scripts\/verify-supabase-runtime-contract-health\.mjs/u,
+    'the Supabase proof plane must still verify live runtime contract health',
+  );
+
+  assert.match(
+    browserObservation,
+    /if: \$\{\{ !cancelled\(\) && steps\.chromium\.outcome == 'success' \}\}/u,
+    'public browser observation must remain independent of Cloudflare release convergence',
+  );
+  assert.doesNotMatch(browserObservation, /steps\.cloudflare_release\.outcome/u);
+
+  assert.match(
+    cloudflare,
+    /if: \$\{\{ !cancelled\(\) && steps\.trusted_current_main\.outcome == 'success' && steps\.release_transport\.outcome == 'success' \}\}/u,
+    'Cloudflare convergence requires trusted current main and safe release transport without suppressing sibling proof planes',
+  );
+  assert.doesNotMatch(cloudflare, /steps\.supabase_schema\.outcome|steps\.backend_health\.outcome|steps\.supabase_health\.outcome/u);
+
+  assert.match(
+    releaseIdentity,
+    /if: \$\{\{ !cancelled\(\) && steps\.chromium\.outcome == 'success' && steps\.cloudflare_release\.outcome == 'success' \}\}/u,
+    'exact release identity Playwright remains load-bearing on both browser availability and Cloudflare release convergence',
+  );
+
+  for (const [name, block] of [
+    ['supabase runtime and schema', schema],
+    ['transport', transport],
+    ['backend', backend],
+    ['chromium', chromium],
+    ['browser observation', browserObservation],
+    ['cloudflare', cloudflare],
+    ['release identity', releaseIdentity],
+  ]) {
+    assert.doesNotMatch(block, /continue-on-error:\s*true/u, `${name} must remain load-bearing`);
   }
 
   assert.match(
@@ -95,7 +137,47 @@ test('production witnesses continue independently after one witness fails but st
   assert.match(
     workflow,
     /- name: Publish blocked exact production observation\n\s+if: failure\(\)/u,
-    'a failed witness must still produce a blocked release observation',
+    'a failed proof plane must still produce a blocked release observation',
+  );
+});
+
+test('all production steps are bounded with reserved time for evidence publication', () => {
+  const jobTimeoutMinutes = 180;
+  assert.match(
+    workflow,
+    /verify-native-deployment:[\s\S]*?timeout-minutes: 180/u,
+    'the job budget must leave explicit headroom after every bounded step',
+  );
+
+  const stepBudgets = new Map([
+    ['Validate trusted release target before checkout', 5],
+    ['Check out release commit under verification', 5],
+    ['Record and verify exact target head', 2],
+    ['Set up Node', 5],
+    ['Install repository dependencies', 10],
+    ['Revalidate current main before Production secret use', 5],
+    ['Verify exact Supabase runtime and schema contracts', 5],
+    ['Record safe frontend and backend transport evidence', 5],
+    ['Verify backend health', 5],
+    ['Install Chromium', 15],
+    ['Observe public production browser journeys independently', 30],
+    ['Wait for exact frontend and backend Worker checks plus release marker', 35],
+    ['Verify exact deployed release identity with Playwright', 10],
+    ['Upload deployment evidence', 5],
+    ['Publish exact production release observation', 5],
+    ['Publish blocked exact production observation', 5],
+  ]);
+
+  let boundedMinutes = 0;
+  for (const [name, minutes] of stepBudgets) {
+    const block = workflowStepBlock(name);
+    assert.match(block, new RegExp(`timeout-minutes: ${minutes}\\b`, 'u'), `${name} must have a bounded timeout`);
+    boundedMinutes += minutes;
+  }
+
+  assert.ok(
+    jobTimeoutMinutes - boundedMinutes >= 20,
+    'job timeout must reserve at least 20 minutes beyond the sum of every bounded setup, witness, evidence, and publication step',
   );
 });
 
