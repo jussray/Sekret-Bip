@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const PUBLIC_WELCOME_URL = 'https://sekretbip.net/';
+const PUBLIC_APEX_URL = 'https://sekretbip.net/';
 
 function isCloudflareAccessUrl(rawUrl: string) {
   try {
@@ -16,7 +16,7 @@ function isCloudflareAccessUrl(rawUrl: string) {
   }
 }
 
-test('anonymous apex front door reaches the Se’kret Bip welcome screen without Cloudflare Access', async ({ page }, testInfo) => {
+test('anonymous public front door reaches Se’kret Bip without Cloudflare Access', async ({ page }, testInfo) => {
   const documentNavigations: string[] = [];
 
   page.on('request', (request) => {
@@ -25,9 +25,9 @@ test('anonymous apex front door reaches the Se’kret Bip welcome screen without
     }
   });
 
-  const response = await page.goto(PUBLIC_WELCOME_URL, { waitUntil: 'domcontentloaded' });
-  expect(response, 'public apex front door must return a browser response').not.toBeNull();
-  expect(response!.status(), 'public apex front door must not fail at transport').toBeLessThan(400);
+  const response = await page.goto(PUBLIC_APEX_URL, { waitUntil: 'domcontentloaded' });
+  expect(response, 'public front door must return a browser response').not.toBeNull();
+  expect(response!.status(), 'public front door must not fail at transport').toBeLessThan(400);
 
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible({ timeout: 30_000 });
 
@@ -41,7 +41,7 @@ test('anonymous apex front door reaches the Se’kret Bip welcome screen without
     `anonymous customer navigation must never enter Cloudflare Access; observed: ${documentNavigations.join(' -> ')}`,
   ).toEqual([]);
 
-  await testInfo.attach('production-anonymous-apex-welcome.png', {
+  await testInfo.attach('production-anonymous-public-front-door.png', {
     body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
     contentType: 'image/png',
   });
