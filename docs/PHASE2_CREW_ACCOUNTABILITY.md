@@ -1,60 +1,105 @@
 # Phase 2 — Crew Accountability
 
 Parent goal: #238 (Relationship Layer)  
-Feature flag: `crewAccountability` in `src/constants/relationshipFeatureFlags.ts`
+Feature flag: `crewAccountability` in `src/constants/relationshipFeatureFlags.ts`  
+Unlimited Crew/privacy owner: [#432](https://github.com/jussray/Sekret-Bip/issues/432)
 
 ## What it is
 
-A teen can post a daily emoji check-in and optionally share it with specific accepted crew members. Crew members can respond with a preset encouragement. No raw content is visible to parents. No access is granted to non-accepted connections.
+A teen can post a daily emoji check-in and optionally share it with any number of accepted Crew members. Crew members can respond with a preset encouragement.
 
-## Schema
+There is no numeric Crew cap. Access is limited by relationship quality, not an arbitrary member count.
 
-Migration: `supabase/migrations/20260705010000_crew_accountability.sql`
+No raw Crew content is visible to parents. No access or private account identity is granted to strangers, pending invites, removed connections, or blocked connections.
+
+## Identity rule
+
+All accounts remain anonymous to other users by default.
+
+- Pending invite: anonymous account + Bip invite/status only.
+- Accepted Crew: private display identity may appear inside private Crew surfaces.
+- Blocked or removed: trusted identity and active content access end immediately.
+- Public Circle remains anonymous even when two accounts are accepted Crew.
+
+The client cannot type another account’s identity during acceptance. `redeem_crew_invite` resolves the accepted identity from the completed account profile.
+
+## Schema and RPCs
+
+| Contract | Purpose |
+|---|---|
+| `crew_members` | Owner-scoped invite and relationship state |
+| `crew_check_ins` | Teen-owned check-in content |
+| `crew_check_in_shares` | Deliberate per-recipient sharing |
+| `crew_encouragements` | Preset support from accepted recipients |
+| `get_crew_connection_profiles(uuid[])` | Accepted-Crew-only private identity resolver |
+| `create_crew_check_in(...)` | Unlimited atomic check-in and share creation |
+| `set_crew_connection_status(...)` | Either participant may leave or block |
+
+Migrations:
+
+- `20260707020922_crew_accountability.sql`
+- `20260714183100_remove_crew_caps_and_guard_relationships.sql`
+- `20260714183200_guard_crew_invite_acceptance.sql`
+- `20260714183300_accepted_crew_identity_rpc.sql`
+- `20260714183400_unlimited_crew_check_in_rpc.sql`
+- `20260714183500_harden_crew_membership_paths.sql`
+
+## Access model
 
 | Table | Owner | Permitted readers |
 |---|---|---|
-| `crew_check_ins` | teen (`owner_user_id`) | Owner + accepted crew via share |
-| `crew_check_in_shares` | teen (`owner_user_id`) | Owner + recipient crew member (accepted only) |
-| `crew_encouragements` | crew member (`sender_user_id`) | Sender + recipient teen |
+| `crew_check_ins` | teen (`owner_user_id`) | Owner + accepted recipient through an active share |
+| `crew_check_in_shares` | teen (`owner_user_id`) | Owner + the accepted recipient |
+| `crew_encouragements` | Crew member (`sender_user_id`) | Sender + recipient teen |
 
-RLS enforces `connection_status = 'accepted'` on every crew member read. Block or remove = immediate loss of access.
+RLS and guarded database functions enforce accepted status on every Crew content read and write. Block or remove causes immediate loss of access.
 
 ## Service
 
-`src/services/crewAccountabilityService.ts`
+Canonical entry: `src/services/crewAccountabilityService.ts`  
+Implementation: `src/services/crewAccountabilityServiceV2.ts`
 
 | Function | Actor | Description |
 |---|---|---|
-| `createCheckIn` | Teen | Creates check-in + shares to accepted crew members |
+| `createCheckIn` | Teen | Atomically creates one check-in and shares it with all selected accepted Crew members, without a numeric cap |
 | `revokeCheckInShare` | Teen | Revokes one specific share immediately |
 | `fetchMyCheckIns` | Teen | Own history with share status |
-| `fetchCrewFeed` | Crew member | Check-ins shared with them |
-| `sendEncouragement` | Crew member | Sends preset reaction to teen |
+| `fetchCrewFeed` | Crew member | Check-ins deliberately shared with that account |
+| `sendEncouragement` | Crew member | Sends a preset reaction to the teen |
 
-## Build sequence
+## Implemented UI
 
-- [x] Migration
-- [x] Service
-- [x] Worker route stub
-- [ ] Teen UI — check-in composer screen
-- [ ] Teen UI — my check-ins history with share status
-- [ ] Crew member UI — incoming feed
-- [ ] Crew member UI — encouragement preset picker
-- [ ] Push notification on new share (Worker route)
-- [ ] Flag flip: `crewAccountability: 'internal'` → test → `'beta'` → test → `'enabled'`
+- [x] Unlimited Crew connection manager
+- [x] Pending anonymous invite state
+- [x] Accepted-Crew trusted identity resolver
+- [x] Unlimited recipient selection and select-all
+- [x] Teen check-in composer
+- [x] Teen check-in history
+- [x] Crew incoming feed
+- [x] Preset encouragement picker
+- [x] Leave and block controls for either participant
+- [x] Founder Preview local samples with explicit labeling
+- [ ] Push notification on new share
 
-## Gate before flag flip to 'enabled'
+## Gate before flag flip to `enabled`
 
-- [ ] All RLS tests pass (owner, crew-accepted, crew-blocked, crew-removed, stranger, parent, service)
-- [ ] `connection_status` audit: no pending/removed/blocked user can reach check-in content
-- [ ] Note sanitization verified (280 char cap, trim)
-- [ ] No raw content in any error message or meta field
-- [ ] Teen can revoke individual share and crew member loses access within one query
-- [ ] Block/remove crew member immediately invalidates all active shares
+- [ ] All RLS tests pass: owner, accepted member, pending, blocked, removed, stranger, parent, anonymous, service role
+- [ ] Two-account identity test proves anonymous before acceptance
+- [ ] Public Circle remains anonymous after Crew acceptance
+- [ ] More than fifteen accepted fixture members load without a cap
+- [ ] More than ten accepted recipients receive one atomic check-in
+- [ ] One invalid recipient causes a complete rollback
+- [ ] Note sanitization verified: 280-character maximum and trimming
+- [ ] No raw content appears in error messages or metadata
+- [ ] Individual share revocation removes access within one query
+- [ ] Block/remove immediately revokes shares and trusted identity
+- [ ] iOS and Android long-list/accessibility checks pass
 
 ## Privacy invariants
 
-- Parents have no access path to check-ins, shares, or encouragements
-- Safety escalation does not grant Bridge, Crew, or Scrapbook access
-- Crew feed only shows check-ins shared with that specific user — no broadcast
-- Preset encouragements only — no free-text from crew members
+- Parents have no access path to check-ins, shares, encouragements, or Crew identity.
+- Safety escalation does not grant Bridge, Crew, or Scrapbook access.
+- Crew feeds show only check-ins shared with that specific accepted account.
+- Preset encouragements only; no free-text Crew replies.
+- Owner-authored pending labels are private notes, not another account’s identity.
+- Unlimited membership never weakens acceptance, blocking, revocation, or RLS requirements.

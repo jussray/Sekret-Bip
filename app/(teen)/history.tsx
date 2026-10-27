@@ -1,24 +1,13 @@
 import React from 'react';
-import { useAppContext } from '@/context/AppContext';
-import { THEME_PACKS } from '@constants/theme';
-import { HistoryScreen } from '@screens/HistoryScreen';
+import { router } from 'expo-router';
+import { MeaningfulHistoryScreen } from '@screens/MeaningfulHistoryScreen';
 import { navigateTo } from '@/utils/navigation';
 
 export default function HistoryRoute() {
-  const { theme, mood, selectedSekret, moodHistory, entries, circlePosts } = useAppContext();
-  const t = THEME_PACKS[theme] ?? THEME_PACKS.neon;
   return (
-    <HistoryScreen
-      t={t}
-      mood={mood}
-      selectedSekret={selectedSekret}
-      moodHistory={moodHistory}
-      journalEntries={entries}
-      voiceNotes={[]}
-      circlePosts={circlePosts}
-      streakDays={0}
-      setScreen={(screen: string) => navigateTo(screen, 'teen')}
-      BottomNav={null}
+    <MeaningfulHistoryScreen
+      onBack={() => router.back()}
+      onNavigate={(screen: string) => navigateTo(screen, 'teen')}
     />
   );
 }

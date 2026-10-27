@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { getRoomBg } from '../constants/theme';
 import { glowForMood as glowFor } from '../constants/moodGlow';
 import { TEEN_MORE_GROUPS } from '@/constants/screenPurpose';
+import { isFounderPreviewEnabled } from '@/constants/founderPreview';
 import { isDevTestFamilyEnabled } from '@/features/testing/devTestFamily';
 import { ControlRoomEntry } from '@/components/ControlRoomEntry';
 
@@ -39,6 +40,7 @@ export function MoreScreen({
   onSideChanged,
 }: MoreScreenProps) {
   const glow = glowFor(mood);
+  const founderPreview = isFounderPreviewEnabled();
   const allowSideSwitch = process.env.EXPO_PUBLIC_ENABLE_SIDE_SWITCH === 'true' || isDevTestFamilyEnabled();
   const character = (
     selectedSekret === 'rylane' ? 'rylane' :
@@ -66,6 +68,23 @@ export function MoreScreen({
         <Text style={styles.kicker}>FEATURE DRAWER</Text>
         <Text style={styles.logo}>More</Text>
         <Text style={styles.subtitle}>The extra tools live here. Room, Pages, Calm, Voice Bip, and Circle keep their own jobs.</Text>
+
+        {founderPreview ? (
+          <TouchableOpacity
+            style={styles.previewHero}
+            onPress={() => setScreen('dev-feature-preview')}
+            activeOpacity={0.86}
+            accessibilityRole="button"
+            accessibilityLabel="Open every feature in Founder Preview"
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.previewKicker}>EXPO GO · FOUNDER PREVIEW</Text>
+              <Text style={styles.previewTitle}>Open every Bip feature</Text>
+              <Text style={styles.previewBody}>Teen, parent, hidden routes, point-gated companions, setup-dependent flows, and honest prototypes.</Text>
+            </View>
+            <Text style={styles.previewArrow}>›</Text>
+          </TouchableOpacity>
+        ) : null}
 
         <ControlRoomEntry />
 
@@ -125,6 +144,11 @@ const styles = StyleSheet.create({
   kicker: { color: '#d8b9ef', fontSize: 10, fontWeight: '900', letterSpacing: 2.3, marginBottom: 8 },
   logo: { fontSize: 34, fontWeight: '900', color: '#fff', marginBottom: 8 },
   subtitle: { fontSize: 14, color: '#c9bfd1', marginBottom: 24, lineHeight: 21 },
+  previewHero: { minHeight: 118, flexDirection: 'row', alignItems: 'center', borderRadius: 22, borderWidth: 1, borderColor: '#f59e0b66', backgroundColor: 'rgba(74,35,10,0.92)', padding: 17, marginBottom: 16 },
+  previewKicker: { color: '#fde68a', fontSize: 9, fontWeight: '900', letterSpacing: 1.4, marginBottom: 5 },
+  previewTitle: { color: '#fff', fontSize: 18, fontWeight: '900' },
+  previewBody: { color: '#dbc9a8', fontSize: 11, lineHeight: 17, marginTop: 5 },
+  previewArrow: { color: '#fde68a', fontSize: 34, marginLeft: 10 },
   group: { marginBottom: 22 },
   groupTitle: { color: '#9d8cac', fontSize: 10, fontWeight: '900', letterSpacing: 1.8, marginBottom: 10 },
   row: { minHeight: 76, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: 18, backgroundColor: 'rgba(24,16,40,0.90)', paddingHorizontal: 14, paddingVertical: 12, marginBottom: 10 },

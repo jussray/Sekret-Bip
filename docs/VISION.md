@@ -1,210 +1,223 @@
-# Se'kret Bip — Full App Vision & Screen Breakdown
+# Se’kret Bip — Canonical Product Vision
 
-> This is the canon. Every screen polish, every feature, every line of copy
-> measures against this doc. If something in the codebase contradicts it,
-> the codebase is wrong — not this doc.
+> **My space. My voice. My pace.**
 
-## What Se'kret Bip Actually Is
+This document is the product north star. Code, design, AI behavior, parent access, data contracts, release claims, and marketing must agree with it. When reality differs, record the difference and fix the stale source rather than quietly pretending both are true.
 
-Se'kret Bip is **not** a social media app.
-It is **not** therapy.
-It is **not** a habit tracker.
-It is **not** a journal.
+## What Se’kret Bip is
 
-It is all of those things combined into a **private emotional growth ecosystem for teens**.
+Se’kret Bip is a private emotional-growth, self-expression, habit-building, and trusted-connection ecosystem for teens.
 
-The goal is to create the digital version of a **trusted older cousin** who helps teens navigate life, emotions, growth, identity, confidence, habits, communication, and self-expression.
+It combines journaling, voice reflection, emotional regulation, creative memory, supportive AI companions, healthy habits, anonymous community, trusted accountability, puberty education, optional parent connection, and rewards without becoming therapy, social-media clout, school, or surveillance.
 
-### Tone
+The emotional goal is simple:
 
-- Warm
-- Funny
-- Honest
-- Never clinical
-- Never preachy
-- Never judgmental
-- Slightly nosy because it cares
-- "Cool cousin energy"
+> A teen should feel understood instead of managed.
 
-### Feeling
+## North star
 
-Everything should feel like:
+Help teens understand themselves, build emotional skills, create a meaningful record of their growth, and ask for support without surrendering privacy or identity control.
 
-> "My space. My voice. My pace."
+## Cultural mission
 
-The app should feel **alive and emotionally responsive**.
+Se’kret Bip exists to help expand the emotional culture available to young people and families, not merely to react after hurt has already happened.
 
----
+The product should create compelling, age-appropriate examples of:
 
-## The Characters
+- love that does not require control;
+- repair after conflict;
+- communication instead of humiliation;
+- belonging without performance;
+- family responsibility without surveillance;
+- courage that includes vulnerability and asking for help;
+- community, care, and mutual responsibility;
+- self-respect and healthy boundaries;
+- handling hurt without making retaliation the only imaginable response.
 
-### Raylene — big sister energy
-Warm. Protective. Encouraging. Gentle.
+This is a creation mission, not a censorship mission. Se’kret Bip should not shame artists, media, parents, communities, or young people for the culture they already live in. It should make healthier emotional scripts vivid, current, useful, and worth choosing.
 
-**Used heavily in:** Journaling, Womanhood, Emotional support, Comfort Mode, Reflection
+The current teen and parent product is the proving ground. Younger-age experiences, broader cultural programs, creator partnerships, school/community partnerships, or claimed social outcomes remain future work until their real product, safety, privacy, age-appropriateness, evidence, and release gates exist.
 
-**Examples:**
-- "Aight, come here."
-- "You good for real?"
-- "We can figure it out together."
+Cultural influence must be earned through evidence. Public claims about impact should come from measured product behavior, user outcomes, validated research, and real-world use rather than founder belief alone.
 
-### Rylane — big brother / older cousin energy
-Playful. Direct. Funny. Motivational.
+## Product promises
 
-**Used heavily in:** Confidence, Manhood, Goals, Growth, Accountability
+### 1. Private by default
 
-**Examples:**
-- "Bet."
-- "Let's lock in."
-- "You stronger than you think."
+Private journals, Voice Bip transcripts, companion chats, character memory, notes, unshared messages, safety-sensitive content, and general activity history remain private unless the teen intentionally shares eligible content through a designed pathway.
 
-### Cloud — the emotional mascot
-Represents mood, comfort, feelings, reflection. Different cloud versions appear based on mood:
+### 2. Parent connection is relationship-based, not surveillance-based
 
-- Happy Cloud
-- Calm Cloud
-- Rain Cloud
-- Sleep Cloud
-- Headphone Cloud
+Parent or guardian visibility depends on verified account state, a valid relationship, scoped consent, and explicit product rules. A parent account does not grant unrestricted access.
 
----
+Bridge contains only content intentionally shared into the linked relationship. Circle, private reflection, and Bridge remain separate systems.
 
-## App Flow
+### 3. Identity remains contextual
 
-### Opening Screen
-**Purpose:** Immediately create emotional safety.
-**User sees:** Raylene, Rylane, Cloud
-**Main CTA:** ENTER SE'KRET BIP
-**Feeling:** Entering your safe space. Not opening an app.
+The app distinguishes:
 
-### Home Screen
-**Purpose:** Daily emotional headquarters. The dashboard. Everything starts here.
+- `private_self` identity for the account holder;
+- explicitly allowed trusted-friend identity;
+- verified guardian identity;
+- anonymous public Circle identity;
+- safe fallback identity.
 
-**Shows:**
-- Daily greeting
-- Current mood
-- Streak
-- Encouragement
-- Quick actions
+A real first name, email, Bip ID, anonymous handle, avatar, and relationship state are not interchangeable. Public and parent surfaces must not accidentally inherit private identity.
 
-**Quick actions:** Write It Out · Voice Bip · Calm Me · Circle · Comfort Mode
+### 4. Companions support without impersonating clinicians
 
-**Background changes based on time of day, mood, activity:**
-- Morning → bright room
-- Afternoon → sunny room
-- Night → purple cozy room
-- Late Night → rainy city room
+Raylene, Rylane, Cloud, Night, and Oracle/Se’kret are supportive, emotionally aware, non-clinical companions.
 
-### Write It Out (Journal)
-**Purpose:** Private emotional dumping ground. No pressure. No judgment.
+They may listen, reflect, encourage, help a teen slow down, suggest safe coping tools, celebrate progress, and support intentional sharing. They do not diagnose, treat, replace therapy, promise outcomes, or replace emergency services.
 
-**Users can:** Write journals · Save thoughts · Add mood tags · Reflect
+### 5. Safety is enforced across layers
 
-**Raylene appears here most.**
-**Background:** Cozy desk, notebook, candle, room aesthetic.
-**Feeling:** Late-night diary.
+Privacy and consent must agree across:
+
+- Expo Router and route authorization;
+- account and guardian verification states;
+- client services and shared types;
+- Supabase migrations, RLS, RPCs, and Storage policies;
+- Cloudflare Worker authentication and input validation;
+- local cache clearing and second-user isolation;
+- AI context selection, memory, moderation, and logging;
+- deletion, revocation, blocking, and recovery;
+- automated tests and production smoke checks.
+
+A hidden button is not a security boundary. The species has tried that enough times.
+
+### 6. The full vision ships in safe phases
+
+Future features are preserved, but planned work must not be marketed or demoed as implemented. Durable companion memory, advanced parent experiences, rewards liability, broad notification flows, richer social systems, and cross-companion intelligence require their actual migrations, services, privacy controls, deletion behavior, tests, and release gates.
+
+## Product tone
+
+Se’kret Bip should feel:
+
+- warm;
+- funny;
+- emotionally sharp;
+- stylish;
+- protective;
+- honest;
+- slightly nosy because it cares;
+- never clinical;
+- never preachy;
+- never fake-cheerful;
+- never childish about serious feelings.
+
+The closest human energy is a trusted, cool person who notices when somebody is dodging, knows when to sit quietly, and does not turn every emotion into a worksheet.
+
+## Character vision
+
+### Raylene
+
+Cool, emotionally sharp, stylish, loyal, funny, protective, real, hard to fool, and quick to notice avoidance. She is not a generic maternal caretaker. She can comfort, challenge, listen, and tell the truth without sounding clinical.
+
+### Rylane
+
+Grounded, direct, playful, observant, encouraging, and accountability-minded without macho posturing. He supports confidence, communication, habits, self-respect, and honest reflection.
+
+### Cloud
+
+The emotional mascot and soft regulation presence. Cloud represents mood, comfort, quiet, weather, headphones, sleep, reflection, and nonverbal support.
+
+### Night
+
+A calm, reflective companion for late-night thought, loneliness, uncertainty, music, rain, and quieter emotional states. Night is not merely a dark visual skin; he owns a distinct emotional presence.
+
+### Oracle / Se’kret
+
+A rules-aware reflective guide. Oracle should not be described as AI-powered where the live Worker path or reply capability does not exist.
+
+## Core teen experiences
+
+### Room
+
+The emotional headquarters. It responds to time, mood, weather, activity, and companion state while preserving a stable sense of personal place.
+
+### Pages
+
+Private text and creative reflection. It should feel like a real diary or scrapbook rather than a clinical form.
 
 ### Voice Bip
-**Purpose:** Speak instead of type.
 
-**Users record:** Thoughts · Rants · Wins · Frustrations · Feelings
+Speak instead of type. Capture, transcription, AI response, voice generation, playback, privacy, deletion, and latency must remain distinct observable stages.
 
-**Current:** Voice journal. **Future:** Voice AI companion.
-**Uses:** Headphone Cloud, Raylene, Rylane.
-**Background:** Animated purple room.
+### Calm, Comfort, and Mind–Body Reset
 
-### Calm Me
-**Purpose:** Nervous system reset.
-**Tools:** Breathing · Grounding · Reflection · Focus
-**Background:** Sleep cloud, soft animations, breathing effects.
-**Feeling:** A weighted blanket for your brain.
+Fast, understandable regulation tools for overwhelm, anxiety, anger, loneliness, shutdown, or restless energy. Tools should be useful without inflated medical claims.
 
-### Comfort Mode
-**Purpose:** Emergency comfort. When users feel overwhelmed, lonely, sad, angry, anxious.
+### Circle
 
-**Shows:** Comfort messages · Breathing · Grounding · Raylene support
-**Background:** Rainy room, Sad Cloud, purple city lights.
-**Feeling:** Someone sitting beside you.
-
-### Bip Circle
-**Purpose:** Healthy connection. **Not** social media. **Not** popularity. **Not** followers.
-
-**Users can:** Share victories · Share struggles · Support others · React positively
-**No public clout systems. No popularity contests.**
-**Goal:** Connection.
-
-### Growth
-**Purpose:** Life skills. Confidence. Personal growth.
-**Topics:** Goals · Confidence · Self-worth · Communication · Friendships · Responsibility
-**Mostly guided by Rylane.**
-
-### History
-**Purpose:** See progress.
-**Shows:** Past moods · Journal history · Voice history · Growth trends
-**Allows users to realize:** *"I'm actually doing better."*
-
-### Comfort Streaks
-**Purpose:** Celebrate showing up. Not perfection. Not punishment. Rewards consistency.
-**Examples:** 7 Day Bip · 30 Day Bip · 100 Day Bip
-**Language:** "We see you." NOT "You're failing."
-
-### Bippin 2 Womanhood
-**Purpose:** Safe puberty and womanhood education.
-**Topics:** First period · Cycle tracking · Hormones · Mood changes · Body changes · Hygiene · Confidence
-**Led by:** Raylene
-**Feeling:** Big sister guidance. Not medical textbook. Not awkward. Not embarrassing.
-
-### Bippin 2 Manhood
-**Purpose:** Safe puberty and manhood education.
-**Topics:** Growth · Body changes · Confidence · Hygiene · Emotions · Respect · Self-control
-**Led by:** Rylane
-**Feeling:** Big brother guidance. Not macho nonsense. Not cringe. Not lectures.
-
-### Parent Window
-**Purpose:** Trust building. **NOT surveillance.**
-
-- Parents only see what teens **choose to share**.
-- Parents **cannot** spy.
-- Parents **cannot** browse private journals.
-- Parents receive: shared prompts, shared reflections, shared memories.
-
-**Goal:** Better conversations. Not monitoring.
+Anonymous or circle-safe peer connection. No open stranger direct messages, follower economy, public popularity contests, or exposure of account-holder-only counts.
 
 ### Bip Crew
-**Purpose:** Accountability groups. Invite-only.
-Friends help each other reach goals, build habits, stay consistent.
-**No public popularity systems.**
 
-### Points System
-**Purpose:** Reward growth.
+Invite-based trusted accountability using privacy-safe Bip IDs. Pending, accepted, blocked, and removed states control identity visibility and access.
 
-**Earn points for:** Journaling · Reflection · Goals · Positive habits · Returning to app
-**Lose points slowly for inactivity. Never harsh. Never punishing.**
+### Bridge and S2Tell
 
----
+The consent-based teen-parent relationship system. Doorbell signals, intentional shares, presentation, revocation, and parent responses must preserve teen choice and clear relationship scope.
 
-## The Visual System
+### Bippin 2
 
-The entire app should feel like a **living scrapbook**.
+Puberty, body, hygiene, confidence, emotions, respect, and growing-up education without “womanhood/manhood” being forced into every product label. Content must remain age-appropriate, respectful, non-shaming, and careful about medical boundaries.
 
-**Visual inspirations:**
-MySpace · Journals · Stickers · Doodles · Purple city nights · Cozy bedrooms · Clouds · Polaroids · Music · Rain · Soft lighting
+### Growth, History, Memories, and Scrapbook
 
-Every screen should feel: Personal. Safe. Warm. Creative. Comforting.
+Help teens notice patterns and progress without turning normal inconsistency into failure. History must respect deletion and privacy. Memories must distinguish user-created records from AI-generated summaries.
 
----
+### Points and Rewards
 
-## Ultimate Mission
+Reward positive participation and return gently. Do not create harsh punishment loops, hidden financial liability, unsafe incentives, or commerce promises before redemption, stock, fraud, refunds, and restoration are defined.
 
-> The mission of Se'kret Bip is to help teens build emotional intelligence, confidence, healthy habits, self-expression, and stronger relationships while feeling understood instead of judged.
+## Parent vision
 
-The app should feel like:
+The parent side should help adults respond better, not monitor more.
 
-> **"A trusted older cousin in your pocket."**
+Parent experiences may include:
 
-Not therapy.
-Not social media.
-Not school.
-Not parenting.
+- onboarding and guardian verification;
+- teen-link invitation, acceptance, rejection, revocation, and recovery;
+- Bridge inbox and intentional shared content;
+- parent reflection or video journaling;
+- Parent Circle with its own privacy rules;
+- guidance and coaching that does not reveal private teen content;
+- explicitly permitted period or wellbeing sharing;
+- notification controls and clear relationship state.
 
-A safe place to **keep bippin**. 💜
+The parent experience is not production-complete merely because routes or tables exist.
+
+## Visual vision
+
+A living scrapbook and emotional room system inspired by:
+
+- sketchbook paper;
+- diaries and binder tabs;
+- doodles, stickers, tape, stars, clouds, and Polaroids;
+- purple city nights, rain, cozy rooms, music, and soft lighting;
+- MySpace-era self-expression without MySpace-era privacy chaos;
+- time-of-day and mood-responsive backgrounds;
+- phone-first layouts with readable text and reachable controls.
+
+Visual continuity must come from approved tokens, assets, character identity, and state rules rather than random “vibes.”
+
+## Release truth
+
+A feature is production-ready only when:
+
+- the user-facing path works end to end;
+- identity, authorization, RLS, storage, and consent are enforced;
+- failure and recovery states exist;
+- private content is minimized in logs and AI context;
+- deletion and revocation behavior is understood;
+- web and device behavior are verified where supported;
+- documentation matches the implementation;
+- claims accurately distinguish current, partial, and planned capability.
+
+## Ultimate mission
+
+> Help young people and families build a richer emotional culture: understand themselves, communicate, repair, belong, take responsibility, ask for help, and handle hurt without surrendering dignity, privacy, or identity.
+
+Se’kret Bip begins with a private teen-and-parent product. The larger ambition is to prove that a healthier emotional environment can be deliberately designed, genuinely used, and responsibly measured, so the work can eventually influence creators, families, and communities beyond the app.

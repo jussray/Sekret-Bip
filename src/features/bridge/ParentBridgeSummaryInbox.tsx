@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { isFounderPreviewEnabled } from '@/constants/founderPreview';
 import type { BridgeSummaryListItem } from '@/types/bridgeSummary';
 import {
   fetchParentBridgeSummaryInbox,
@@ -11,10 +12,34 @@ interface ParentBridgeSummaryInboxProps {
   audience?: 'founder' | 'internal' | 'beta' | 'public';
 }
 
+const PREVIEW_SUMMARY: BridgeSummaryListItem = {
+  requestId: 'preview-bridge-request',
+  summaryId: 'preview-bridge-summary',
+  teenUserId: 'preview-teen',
+  parentUserId: 'preview-parent',
+  status: 'ready',
+  generatedAt: new Date().toISOString(),
+  viewedAt: null,
+  usedFallback: false,
+  summary: {
+    themes: [
+      'They may be carrying more pressure than they want to explain all at once.',
+      'They want support without feeling watched or rushed.',
+    ],
+    conversationStarters: [
+      'I’m here. Would listening, comfort, space, or help making a plan feel best right now?',
+      'You do not have to tell me everything for me to take you seriously.',
+    ],
+    limitations: 'Founder Preview sample: this is generalized context, not the teen’s full private content, a diagnosis, or proof of what happened.',
+  },
+};
+
 export function ParentBridgeSummaryInbox({ audience = 'public' }: ParentBridgeSummaryInboxProps) {
+  const founderPreview = isFounderPreviewEnabled();
   const [items, setItems] = useState<BridgeSummaryListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [previewViewed, setPreviewViewed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -22,18 +47,31 @@ export function ParentBridgeSummaryInbox({ audience = 'public' }: ParentBridgeSu
     if (result.ok) {
       setItems(result.value);
       setMessage(null);
+    } else if (founderPreview) {
+      setItems([]);
+      setMessage(null);
     } else {
       setItems([]);
       setMessage(result.message);
     }
     setLoading(false);
-  }, [audience]);
+  }, [audience, founderPreview]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
+  const visibleItems = useMemo(() => {
+    if (items.length > 0) return items;
+    if (!founderPreview) return [];
+    return [{ ...PREVIEW_SUMMARY, viewedAt: previewViewed ? new Date().toISOString() : null }];
+  }, [founderPreview, items, previewViewed]);
+
   const markViewed = useCallback(async (item: BridgeSummaryListItem) => {
+    if (item.requestId === PREVIEW_SUMMARY.requestId) {
+      setPreviewViewed(true);
+      return;
+    }
     if (item.viewedAt || !item.summaryId) return;
     const result = await markBridgeSummaryViewed(item.summaryId, audience);
     if (!result.ok) {
@@ -64,7 +102,7 @@ export function ParentBridgeSummaryInbox({ audience = 'public' }: ParentBridgeSu
     );
   }
 
-  if (items.length === 0) {
+  if (visibleItems.length === 0) {
     return (
       <View style={styles.stateCard}>
         <Text style={styles.emptyTitle}>No Bridge Summaries yet</Text>
@@ -73,46 +111,57 @@ export function ParentBridgeSummaryInbox({ audience = 'public' }: ParentBridgeSu
     );
   }
 
+  const showingPreview = visibleItems[0]?.requestId === PREVIEW_SUMMARY.requestId;
+
   return (
     <View style={styles.list}>
-      {items.map((item) => {
+      {showingPreview ? (
+        <View style={styles.previewBanner}>
+          <Text style={styles.previewKicker}>FOUNDER PREVIEW SAMPLE</Text>
+          <Text style={styles.previewText}>
+            This card demonstrates the privacy-safe parent experience. No teen content was read, summarized, or written to Supabase.
+          </Text>
+        </View>
+      ) : null}
+
+      {visibleItems.map((item) => {
         const summary = item.summary;
         if (!summary) return null;
         return (
-        <TouchableOpacity
-          key={item.summaryId ?? item.requestId}
-          style={styles.card}
-          activeOpacity={0.86}
-          onPress={() => void markViewed(item)}
-          accessibilityRole="button"
-          accessibilityLabel={`Bridge Summary from ${new Date(item.generatedAt ?? Date.now()).toLocaleDateString()}`}
-        >
-          <View style={styles.headerRow}>
-            <Text style={styles.cardTitle}>Bridge Summary</Text>
-            {!item.viewedAt && <Text style={styles.newBadge}>New</Text>}
-          </View>
+          <TouchableOpacity
+            key={item.summaryId ?? item.requestId}
+            style={styles.card}
+            activeOpacity={0.86}
+            onPress={() => void markViewed(item)}
+            accessibilityRole="button"
+            accessibilityLabel={`Bridge Summary from ${new Date(item.generatedAt ?? Date.now()).toLocaleDateString()}`}
+          >
+            <View style={styles.headerRow}>
+              <Text style={styles.cardTitle}>Bridge Summary</Text>
+              {!item.viewedAt && <Text style={styles.newBadge}>New</Text>}
+            </View>
 
-          <Text style={styles.dateText}>
-            {new Date(item.generatedAt ?? Date.now()).toLocaleDateString(undefined, {
-              month: 'short', day: 'numeric', year: 'numeric',
-            })}
-          </Text>
+            <Text style={styles.dateText}>
+              {new Date(item.generatedAt ?? Date.now()).toLocaleDateString(undefined, {
+                month: 'short', day: 'numeric', year: 'numeric',
+              })}
+            </Text>
 
-          <Text style={styles.sectionLabel}>Themes noticed</Text>
-          {summary.themes.map((theme) => (
-            <Text key={theme} style={styles.bodyText}>• {theme}</Text>
-          ))}
+            <Text style={styles.sectionLabel}>Themes noticed</Text>
+            {summary.themes.map((theme) => (
+              <Text key={theme} style={styles.bodyText}>• {theme}</Text>
+            ))}
 
-          <Text style={styles.sectionLabel}>Conversation starters</Text>
-          {summary.conversationStarters.map((starter) => (
-            <Text key={starter} style={styles.bodyText}>• {starter}</Text>
-          ))}
+            <Text style={styles.sectionLabel}>Conversation starters</Text>
+            {summary.conversationStarters.map((starter) => (
+              <Text key={starter} style={styles.bodyText}>• {starter}</Text>
+            ))}
 
-          <View style={styles.noticeBox}>
-            <Text style={styles.noticeText}>{summary.limitations}</Text>
-          </View>
-        </TouchableOpacity>
-      );
+            <View style={styles.noticeBox}>
+              <Text style={styles.noticeText}>{summary.limitations}</Text>
+            </View>
+          </TouchableOpacity>
+        );
       })}
     </View>
   );
@@ -120,6 +169,9 @@ export function ParentBridgeSummaryInbox({ audience = 'public' }: ParentBridgeSu
 
 const styles = StyleSheet.create({
   list: { gap: 12 },
+  previewBanner: { borderRadius: 14, borderWidth: 1, borderColor: '#f59e0b66', backgroundColor: '#4a230a55', padding: 12 },
+  previewKicker: { color: '#fde68a', fontSize: 9, fontWeight: '900', letterSpacing: 1.1 },
+  previewText: { color: '#d7c39b', fontSize: 10, lineHeight: 16, marginTop: 4 },
   card: {
     backgroundColor: 'rgba(46,26,16,0.92)',
     borderWidth: 1,

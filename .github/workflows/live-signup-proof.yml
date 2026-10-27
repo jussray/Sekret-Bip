@@ -1,0 +1,447 @@
+name: Live Signup Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/live-signup-proof.yml'
+      - 'playwright.live-onboarding.config.ts'
+      - 'scripts/playwright-executable.mjs'
+      - 'e2e/live-onboarding-email.spec.ts'
+      - 'e2e/live-family-authority.spec.ts'
+      - 'app/(auth)/signup.tsx'
+      - 'app/(auth)/parent-link-verify.tsx'
+      - 'app/(onboarding)/parent-link.tsx'
+      - 'app/(parent)/teen-verification.tsx'
+      - 'app/(parent)/bip-jr.tsx'
+      - 'screens/BridgeScreen.tsx'
+      - 'components/bridge/ParentBridgeResponseRequestCard.tsx'
+      - 'src/utils/parentBridgeCompat.ts'
+      - 'src/context/VerificationContext.tsx'
+      - 'src/services/verificationState.ts'
+      - 'supabase/migrations/20260919190000_auth_signup_onboarding_baseline.sql'
+      - 'supabase/migrations/20260919190500_parent_link_relationship_only.sql'
+      - 'supabase/migrations/20260919190800_teen_age_assurance_authority.sql'
+      - 'supabase/migrations/20260919191000_bip_jr_managed_child_profiles.sql'
+      - 'scripts/live-signup-mailbox.mjs'
+      - 'test/live-onboarding-email-gate.test.mjs'
+      - 'test/family-account-authority.test.mjs'
+      - 'test/humane-retention-loops.test.mjs'
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Exact PR head SHA to prove'
+        required: true
+        type: string
+      preview_url:
+        description: 'Exact isolated Cloudflare Pages preview URL'
+        required: true
+        type: string
+      confirm_live_write:
+        description: 'Allow one disposable signup/email confirmation transaction'
+        required: true
+        default: false
+        type: boolean
+      confirm_family_authority_write:
+        description: 'After signup, allow the exact-preview family authority journey with the controlled verified guardian'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: live-signup-${{ github.event_name == 'workflow_dispatch' && 'write' || github.event.pull_request.number }}-${{ github.repository }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CI: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.target_sha || github.event.pull_request.head.sha }}
+
+jobs:
+  live-signup-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out exact proof head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Resolve live-write authority
+        id: opt_in
+        shell: bash
+        env:
+          CONFIRM_LIVE_WRITE: ${{ inputs.confirm_live_write || false }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ] && [ "$CONFIRM_LIVE_WRITE" = 'true' ]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+            echo 'Live signup transaction explicitly enabled for this exact head.'
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Readiness-only mode: no account or email write will occur.'
+          fi
+
+      - name: Resolve family-authority write authority
+        id: family_opt_in
+        shell: bash
+        env:
+          CONFIRM_LIVE_WRITE: ${{ inputs.confirm_live_write || false }}
+          CONFIRM_FAMILY_AUTHORITY_WRITE: ${{ inputs.confirm_family_authority_write || false }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_EVENT_NAME" = 'workflow_dispatch' ] \
+            && [ "$CONFIRM_LIVE_WRITE" = 'true' ] \
+            && [ "$CONFIRM_FAMILY_AUTHORITY_WRITE" = 'true' ]; then
+            echo 'enabled=true' >> "$GITHUB_OUTPUT"
+            echo 'Family authority live-write proof explicitly enabled for this exact head.'
+          else
+            echo 'enabled=false' >> "$GITHUB_OUTPUT"
+            echo 'Family authority proof disabled; no relationship, Bridge, verification, or Bip Jr write will occur.'
+          fi
+
+      - name: Resolve isolated preview URL
+        shell: bash
+        env:
+          DISPATCH_PREVIEW_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.preview_url || '' }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+          GH_TOKEN: ${{ github.token }}
+          CONFIRM_LIVE_WRITE: ${{ inputs.confirm_live_write || false }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node <<'NODE'
+          const { appendFileSync, writeFileSync } = await import('node:fs');
+
+          const dispatchPreview = process.env.DISPATCH_PREVIEW_URL?.trim() || '';
+          const expected = process.env.EXPECTED_HEAD_SHA;
+          const repository = process.env.GITHUB_REPOSITORY;
+          const prNumber = process.env.PR_NUMBER?.trim() || '';
+          const token = process.env.GH_TOKEN?.trim() || '';
+          const environmentFile = process.env.GITHUB_ENV;
+          const receiptPath = 'artifacts/live-signup-readiness.json';
+          const shortSha = expected.slice(0, 7);
+
+          function writeReadinessReceipt({
+            state,
+            classification = null,
+            previewOrigin = null,
+            cloudflareCommentCount = null,
+            providerState = null,
+          }) {
+            writeFileSync(receiptPath, `${JSON.stringify({
+              schemaVersion: 1,
+              scope: 'live-signup-preview-readiness',
+              observedAt: new Date().toISOString(),
+              expectedHeadSha: expected,
+              prNumber: prNumber || null,
+              state,
+              classification,
+              previewOrigin,
+              cloudflareCommentCount,
+              providerState,
+              previewIdentityVerified: false,
+              releaseMarkerStatus: null,
+              releaseMarkerEnvironment: null,
+              liveWriteAuthorized: process.env.GITHUB_EVENT_NAME === 'workflow_dispatch'
+                && process.env.CONFIRM_LIVE_WRITE === 'true',
+            }, null, 2)}\n`, 'utf8');
+          }
+
+          function persistPreview(url, evidence = {}) {
+            const parsed = new URL(url);
+            if (!parsed.hostname.endsWith('.pages.dev') || parsed.hostname === 'sekretbip.net') {
+              writeReadinessReceipt({
+                state: 'blocked',
+                classification: 'non-isolated-preview-rejected',
+                cloudflareCommentCount: evidence.cloudflareCommentCount ?? null,
+                providerState: evidence.providerState ?? null,
+              });
+              throw new Error(`Live signup proof must target an isolated Pages preview, got ${parsed.hostname}`);
+            }
+            appendFileSync(environmentFile, `LIVE_ONBOARDING_BASE_URL=${parsed.origin}\n`);
+            writeReadinessReceipt({
+              state: 'preview-resolved',
+              previewOrigin: parsed.origin,
+              cloudflareCommentCount: evidence.cloudflareCommentCount ?? null,
+              providerState: evidence.providerState ?? 'preview-available',
+            });
+            console.log(`Resolved isolated Pages preview: ${parsed.origin}`);
+          }
+
+          if (process.env.GITHUB_EVENT_NAME === 'workflow_dispatch') {
+            if (!dispatchPreview) {
+              writeReadinessReceipt({
+                state: 'blocked',
+                classification: 'manual-preview-url-required',
+              });
+              throw new Error('workflow_dispatch requires preview_url.');
+            }
+            persistPreview(dispatchPreview, { providerState: 'manual-preview' });
+            process.exit(0);
+          }
+
+          if (!prNumber) {
+            writeReadinessReceipt({
+              state: 'blocked',
+              classification: 'pull-request-number-required',
+            });
+            throw new Error('Pull-request preview resolution requires PR_NUMBER.');
+          }
+
+          const deadline = Date.now() + 240_000;
+          let last = null;
+          let lastCloudflareCommentCount = 0;
+          let lastProviderState = 'unknown';
+
+          while (Date.now() < deadline) {
+            try {
+              const headers = {
+                Accept: 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+              };
+              if (token) headers.Authorization = `Bearer ${token}`;
+
+              const response = await fetch(
+                `https://api.github.com/repos/${repository}/issues/${prNumber}/comments?per_page=100`,
+                { headers, cache: 'no-store' },
+              );
+              if (!response.ok) {
+                last = { status: response.status };
+                lastProviderState = 'github-evidence-unavailable';
+              } else {
+                const comments = await response.json();
+                const cloudflareComments = comments
+                  .filter((comment) => comment?.user?.login === 'cloudflare-workers-and-pages[bot]')
+                  .reverse();
+                lastCloudflareCommentCount = cloudflareComments.length;
+
+                for (const comment of cloudflareComments) {
+                  const body = String(comment?.body || '');
+                  if (!body.includes(`<code>${shortSha}</code>`)) continue;
+
+                  if (/Build in progress|Status:<\/strong><\/td><td>[^<]*Build in progress/i.test(body)) {
+                    lastProviderState = 'build-in-progress';
+                  } else if (/Build:\s*<\/b>\s*Success|Status:<\/strong><\/td><td>[^<]*(?:Success|Deployed)/i.test(body)) {
+                    lastProviderState = 'build-success';
+                  } else if (/Build:\s*<\/b>\s*(?:Failed|Failure)|Status:<\/strong><\/td><td>[^<]*(?:Failed|Failure)/i.test(body)) {
+                    lastProviderState = 'build-failed';
+                  } else {
+                    lastProviderState = 'exact-head-comment-present';
+                  }
+
+                  const branchPreview = body.match(
+                    /Branch Preview URL:[\s\S]{0,600}?href=['"]([^'"]+\.pages\.dev)['"]/i,
+                  );
+                  const immutablePreview = body.match(
+                    /<strong>Preview URL:<\/strong>[\s\S]{0,600}?href=['"]([^'"]+\.pages\.dev)['"]/i,
+                  );
+                  const resolved = branchPreview?.[1] || immutablePreview?.[1] || null;
+                  if (!resolved) continue;
+
+                  persistPreview(resolved, {
+                    cloudflareCommentCount: cloudflareComments.length,
+                    providerState: 'preview-available',
+                  });
+                  process.exit(0);
+                }
+
+                last = {
+                  cloudflareComments: cloudflareComments.length,
+                  expectedShortSha: shortSha,
+                  providerState: lastProviderState,
+                };
+              }
+            } catch (error) {
+              last = { error: error instanceof Error ? error.message : String(error) };
+              if (lastProviderState === 'unknown') lastProviderState = 'evidence-read-error';
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+
+          writeReadinessReceipt({
+            state: 'blocked',
+            classification: 'cloudflare-pages-preview-unavailable',
+            cloudflareCommentCount: lastCloudflareCommentCount,
+            providerState: lastProviderState,
+          });
+          throw new Error(
+            `Cloudflare PR preview for ${shortSha} was not discoverable from PR evidence: ${JSON.stringify(last)}`,
+          );
+          NODE
+
+      - name: Verify isolated preview is exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const { readFileSync, writeFileSync } = await import('node:fs');
+          const receiptPath = 'artifacts/live-signup-readiness.json';
+          const base = process.env.LIVE_ONBOARDING_BASE_URL;
+          const expected = process.env.EXPECTED_HEAD_SHA;
+
+          function updateReceipt(patch) {
+            let existing = {};
+            try {
+              existing = JSON.parse(readFileSync(receiptPath, 'utf8'));
+            } catch {
+              existing = {
+                schemaVersion: 1,
+                scope: 'live-signup-preview-readiness',
+                expectedHeadSha: expected,
+              };
+            }
+            writeFileSync(receiptPath, `${JSON.stringify({
+              ...existing,
+              ...patch,
+              observedAt: new Date().toISOString(),
+            }, null, 2)}\n`, 'utf8');
+          }
+
+          const parsedBase = new URL(base);
+          if (!parsedBase.hostname.endsWith('.pages.dev') || parsedBase.hostname === 'sekretbip.net') {
+            updateReceipt({
+              state: 'blocked',
+              classification: 'non-isolated-preview-rejected',
+              previewIdentityVerified: false,
+            });
+            throw new Error(`Live signup PR proof must target an isolated Pages preview, got ${parsedBase.hostname}`);
+          }
+
+          const markerUrl = new URL('/.well-known/sekret-release.json', base);
+          const deadline = Date.now() + 240_000;
+          let last = null;
+          let lastStatus = null;
+          let lastEnvironment = null;
+          let sawReachableMarker = false;
+          while (Date.now() < deadline) {
+            try {
+              const response = await fetch(`${markerUrl}?proof=${Date.now()}`, { cache: 'no-store' });
+              const body = response.ok ? await response.json() : null;
+              lastStatus = response.status;
+              lastEnvironment = typeof body?.environment === 'string' ? body.environment : null;
+              sawReachableMarker = true;
+              last = {
+                status: response.status,
+                commitMatchesExpected: body?.commitSha === expected,
+                environment: lastEnvironment,
+              };
+              if (response.ok && body?.commitSha === expected && body?.environment === 'preview') {
+                updateReceipt({
+                  state: 'exact-preview-verified',
+                  classification: null,
+                  providerState: 'preview-available',
+                  previewIdentityVerified: true,
+                  releaseMarkerStatus: response.status,
+                  releaseMarkerEnvironment: 'preview',
+                });
+                console.log(`Exact isolated preview verified: ${parsedBase.hostname} @ ${expected}`);
+                process.exit(0);
+              }
+            } catch {
+              last = { markerReachable: false };
+            }
+            await new Promise((resolve) => setTimeout(resolve, 5000));
+          }
+
+          updateReceipt({
+            state: 'blocked',
+            classification: 'exact-preview-identity-unproven',
+            providerState: sawReachableMarker ? 'release-marker-mismatch' : 'release-marker-unreachable',
+            previewIdentityVerified: false,
+            releaseMarkerStatus: lastStatus,
+            releaseMarkerEnvironment: lastEnvironment,
+          });
+          throw new Error(`Exact preview did not reach the requested head: ${JSON.stringify(last)}`);
+          NODE
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove exact-preview browser readiness without account write
+        env:
+          LIVE_ONBOARDING_PHASE: readiness
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Prepare disposable guest identity and mailbox
+        if: steps.opt_in.outputs.enabled == 'true'
+        run: node scripts/live-signup-mailbox.mjs create
+
+      - name: Create disposable account through exact preview UI
+        if: steps.opt_in.outputs.enabled == 'true'
+        env:
+          LIVE_ONBOARDING_PHASE: signup
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Confirm disposable signup email
+        if: steps.opt_in.outputs.enabled == 'true'
+        env:
+          LIVE_MAILBOX_TIMEOUT_MS: '120000'
+          LIVE_MAILBOX_POLL_MS: '3000'
+        run: node scripts/live-signup-mailbox.mjs confirm
+
+      - name: Prove returning-user sign in
+        if: steps.opt_in.outputs.enabled == 'true'
+        env:
+          LIVE_ONBOARDING_PHASE: signin
+          LIVE_SIGNIN_ATTEMPTS: '3'
+          LIVE_SIGNIN_RETRY_MS: '5000'
+        run: npx playwright test --config=playwright.live-onboarding.config.ts
+
+      - name: Prove exact-preview family authority boundaries
+        if: steps.family_opt_in.outputs.enabled == 'true'
+        shell: bash
+        env:
+          LIVE_ONBOARDING_PHASE: family
+          SEKRET_CONTROLLED_GUARDIAN_EMAIL: ${{ secrets.SEKRET_CONTROLLED_GUARDIAN_EMAIL }}
+          SEKRET_CONTROLLED_GUARDIAN_PASSWORD: ${{ secrets.SEKRET_CONTROLLED_GUARDIAN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SEKRET_CONTROLLED_GUARDIAN_EMAIL:-}" ] || [ -z "${SEKRET_CONTROLLED_GUARDIAN_PASSWORD:-}" ]; then
+            echo 'CONTROLLED_GUARDIAN_FIXTURE_MISSING' >&2
+            exit 78
+          fi
+          npx playwright test e2e/live-family-authority.spec.ts --config=playwright.live-onboarding.config.ts
+
+      - name: Remove disposable mailbox
+        if: always() && steps.opt_in.outputs.enabled == 'true'
+        run: node scripts/live-signup-mailbox.mjs cleanup
+
+      - name: Upload live signup proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-signup-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            artifacts/live-signup-readiness.json
+            artifacts/live-signup-proof-account.json
+            artifacts/live-signup-confirmation.json
+            artifacts/live-family-authority.json
+            artifacts/live-signup-mailbox-cleanup.json
+            playwright-report-live-onboarding/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14

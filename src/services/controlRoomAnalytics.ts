@@ -14,6 +14,18 @@ export type ReleaseHealth = {
   summary: Record<string, unknown> | null;
 };
 
+export type CompanionFallbackAnalytics = {
+  total: number;
+  safety: number;
+  identity: number;
+  natural: number;
+  founderApprovalState: 'draft_founder_review';
+  latestPackVersion: string | null;
+  byCompanion: MetricPoint[];
+  bySurface: MetricPoint[];
+  byPackVersion: MetricPoint[];
+};
+
 export type ControlRoomAnalytics = {
   cost: {
     estimatedUsd: number;
@@ -26,6 +38,7 @@ export type ControlRoomAnalytics = {
   signals: MetricPoint[];
   adoption: MetricPoint[];
   crashes: MetricPoint[];
+  fallback?: CompanionFallbackAnalytics;
   releases: ReleaseHealth[];
 };
 
@@ -35,6 +48,18 @@ type AuditRow = {
   screen: string | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
+};
+
+const emptyFallbackAnalytics: CompanionFallbackAnalytics = {
+  total: 0,
+  safety: 0,
+  identity: 0,
+  natural: 0,
+  founderApprovalState: 'draft_founder_review',
+  latestPackVersion: null,
+  byCompanion: [],
+  bySurface: [],
+  byPackVersion: [],
 };
 
 const numberValue = (value: unknown): number =>
@@ -55,6 +80,40 @@ function countBy(rows: AuditRow[], picker: (row: AuditRow) => string | null): Me
     .slice(0, 8);
 }
 
+function isCompanionFallbackRow(row: AuditRow): boolean {
+  return row.event_type === 'companion_fallback_used'
+    || row.event_type === 'companion_fallback'
+    || row.event_type.includes('companion_fallback');
+}
+
+function loadFallbackAnalytics(rows: AuditRow[]): CompanionFallbackAnalytics {
+  const fallbackRows = rows.filter(isCompanionFallbackRow);
+  const safety = fallbackRows.filter((row) => row.metadata?.safety_flag === true || row.metadata?.fallback_kind === 'safety').length;
+  const identity = fallbackRows.filter((row) => row.metadata?.identity_disclosure === true || row.metadata?.fallback_kind === 'identity').length;
+  const byPackVersion = countBy(
+    fallbackRows,
+    (row) => textValue(row.metadata?.fallback_pack_version) || textValue(row.metadata?.pack_version),
+  );
+
+  return {
+    total: fallbackRows.length,
+    safety,
+    identity,
+    natural: Math.max(0, fallbackRows.length - safety - identity),
+    founderApprovalState: 'draft_founder_review',
+    latestPackVersion: byPackVersion[0]?.label ?? null,
+    byCompanion: countBy(
+      fallbackRows,
+      (row) => textValue(row.metadata?.companion) || textValue(row.metadata?.character_id) || textValue(row.metadata?.characterId),
+    ),
+    bySurface: countBy(
+      fallbackRows,
+      (row) => textValue(row.metadata?.surface) || row.screen,
+    ),
+    byPackVersion,
+  };
+}
+
 export async function loadControlRoomAnalytics(days = 30): Promise<ControlRoomAnalytics> {
   const empty: ControlRoomAnalytics = {
     cost: { estimatedUsd: 0, requests: 0, tokens: 0, byProvider: [] },
@@ -63,6 +122,7 @@ export async function loadControlRoomAnalytics(days = 30): Promise<ControlRoomAn
     signals: [],
     adoption: [],
     crashes: [],
+    fallback: emptyFallbackAnalytics,
     releases: [],
   };
   if (!isSupabaseConfigured) return empty;
@@ -142,6 +202,7 @@ export async function loadControlRoomAnalytics(days = 30): Promise<ControlRoomAn
     signals,
     adoption,
     crashes,
+    fallback: loadFallbackAnalytics(rows),
     releases: (releasesResult.data ?? []) as ReleaseHealth[],
   };
 }

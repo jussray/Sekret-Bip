@@ -8,6 +8,8 @@ test('profile separates account identity from Circle identity', () => {
   const profile = read('app/(teen)/profile.tsx');
   assert.match(profile, /My Profile/);
   assert.match(profile, /Circle Identity/);
+  assert.match(profile, /hydrateAccountProfile\('teen'\)/);
+  assert.match(profile, /saveAccountProfile/);
   assert.match(profile, /teen_profile_data/);
   assert.match(profile, /teen_circle_identity/);
 });
@@ -55,13 +57,14 @@ test('profile memories point back to owning spaces instead of exposing private c
   assert.match(profile, /Profile only remembers/);
 });
 
-test('parent profile mirrors identity, Circle identity, and support memories', () => {
+test('parent profile mirrors durable identity, Circle identity, and support memories', () => {
   const profile = read('app/(parent)/profile.tsx');
   assert.match(profile, /My Profile/);
   assert.match(profile, /Circle Identity/);
   assert.match(profile, /Memories/);
   assert.match(profile, /Support Memories/);
-  assert.match(profile, /parent_profile_data/);
+  assert.match(profile, /hydrateAccountProfile\('parent'\)/);
+  assert.match(profile, /saveAccountProfile/);
   assert.match(profile, /parent_circle_identity/);
 });
 

@@ -1,15 +1,16 @@
 import * as FileSystem from 'expo-file-system';
 import { getSupabase } from '../../src/utils/supabase';
 
+const VOICE_BUCKET = 'voice-notes';
+
 export interface AudioUploadResult {
-  publicUrl: string;
   storagePath: string;
 }
 
 /**
- * Uploads a local audio file to Supabase Storage.
- * Bucket: 'voice-entries' with RLS enforcing user ownership.
- * Returns the public URL and storage path on success.
+ * Uploads a local audio file to the canonical private Supabase Storage bucket.
+ * Bucket: 'voice-notes' with owner-scoped RLS defined in db/storage.sql.
+ * Returns only the storage path; callers must use an authenticated/private read path.
  */
 export async function uploadAudioToSupabase(
   localUri: string,
@@ -29,7 +30,7 @@ export async function uploadAudioToSupabase(
   const blob = new Blob([byteArray], { type: 'audio/m4a' });
 
   const { data, error } = await supabase.storage
-    .from('voice-entries')
+    .from(VOICE_BUCKET)
     .upload(filename, blob, {
       contentType: 'audio/m4a',
       upsert: false,
@@ -37,25 +38,20 @@ export async function uploadAudioToSupabase(
 
   if (error) throw new Error(`Audio upload failed: ${error.message}`);
 
-  const { data: urlData } = supabase.storage
-    .from('voice-entries')
-    .getPublicUrl(data.path);
-
   return {
-    publicUrl: urlData.publicUrl,
     storagePath: data.path,
   };
 }
 
 /**
- * Deletes an uploaded audio file from Supabase Storage.
+ * Deletes an uploaded audio file from the canonical private bucket.
  */
 export async function deleteAudioFromSupabase(storagePath: string): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) throw new Error('Supabase is not configured. Audio delete unavailable.');
 
   const { error } = await supabase.storage
-    .from('voice-entries')
+    .from(VOICE_BUCKET)
     .remove([storagePath]);
   if (error) throw new Error(`Audio delete failed: ${error.message}`);
 }
