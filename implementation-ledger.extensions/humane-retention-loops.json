@@ -1,0 +1,64 @@
+{
+  "features": [
+    {
+      "id": "humane-retention-loops",
+      "name": "Value-led teen retention across Room, History, Circle, Bridge, and Bip Energy",
+      "status": "integrated",
+      "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/404",
+      "acceptanceCriteria": [
+        "Meaningful teen actions create privacy-safe return receipts and the canonical Room offers expression, regulation, or chosen-connection next steps.",
+        "History emphasizes active days and meaningful actions while streak bonuses remain positive and absence does not erase the teen's growth record.",
+        "Public Circle support reactions remain usable while aggregate totals are returned only to the post owner and cannot be downloaded through direct client table SELECT access.",
+        "Bridge persists the teen's requested response and the linked parent can see that request without gaining access to journals, chats, mood history, voice notes, or other private content.",
+        "Bip Energy keeps the intentional one-day grace, once-per-day, maximum-five, never-below-zero fade against the canonical bip_events ledger while Bip Tickets, redeemed rewards, and unlocked room items remain permanent."
+      ],
+      "contractPaths": [
+        "docs/HUMANE_RETENTION_LOOPS.md",
+        "src/features/bridge/responsePreference.ts",
+        "supabase/migrations/20260714043000_humane_retention_loops.sql",
+        "supabase/migrations/20260714045500_restore_intentional_bip_energy_fade.sql",
+        "supabase/migrations/20260714051500_align_bip_energy_with_bip_events.sql",
+        "supabase/migrations/20260714054500_make_circle_support_counts_owner_only.sql"
+      ],
+      "runtimePaths": [
+        "app/(teen)/room.tsx",
+        "components/retention/BipReturnOverlay.tsx",
+        "src/features/retention/meaningfulReturn.ts",
+        "src/features/activity/bipEnergy.ts",
+        "src/features/activity/ledger.ts",
+        "app/(teen)/history.tsx",
+        "screens/MeaningfulHistoryScreen.tsx",
+        "app/(teen)/circle/feed-v2.tsx",
+        "src/features/circle/circleRepository.ts",
+        "app/(teen)/bridge.tsx",
+        "components/bridge/BridgeResponsePreferenceDock.tsx",
+        "components/bridge/ParentBridgeResponseRequestCard.tsx",
+        "src/features/bridge/ParentBridgeSummaryScreen.tsx",
+        "src/utils/parentBridgeCompat.ts",
+        "src/utils/storage.ts"
+      ],
+      "testPaths": [
+        "test/humane-retention-loops.test.mjs",
+        "test/implementation-ledger.test.mjs"
+      ],
+      "telemetryPaths": [
+        "src/features/activity/events.ts",
+        "src/features/retention/meaningfulReturn.ts",
+        "supabase/migrations/20260714043000_humane_retention_loops.sql",
+        "supabase/migrations/20260714051500_align_bip_energy_with_bip_events.sql",
+        "supabase/migrations/20260714054500_make_circle_support_counts_owner_only.sql"
+      ],
+      "rollout": {
+        "state": "internal",
+        "controlPath": "app/(teen)/room.tsx",
+        "controlKey": "BipReturnOverlay on the canonical teen Room with route-level History, Circle, and Bridge integration"
+      },
+      "verification": {
+        "state": "partial",
+        "evidence": "https://github.com/jussray/Sekret-Bip/issues/404",
+        "blocker": "Exact-head CI, Type Check, Quality Gate, Regression, Pre-Push, Playwright, physical-device layout/accessibility QA, controlled two-account Bridge response-request proof, and controlled two-account Circle owner-only total proof remain before verified or released status."
+      },
+      "rollback": "Revert the feature merge and apply reviewed follow-up migrations to restore prior RPC, trigger, and Circle table-grant definitions if needed. Keep additive event rows and the nullable response_preference column unless a separate data-safe removal is reviewed."
+    }
+  ]
+}

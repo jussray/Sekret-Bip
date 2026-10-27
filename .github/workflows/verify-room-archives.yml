@@ -1,25 +1,17 @@
 name: Verify Room Archives
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'assets/images/**'
-      - 'scripts/verify-room-archives.js'
-      - 'scripts/repair-archive-stubs.js'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'assets/images/**'
-      - 'scripts/verify-room-archives.js'
   workflow_dispatch:
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   verify-archives:
     name: Archive Integrity Check
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
 
     steps:
       - name: Checkout (with LFS)
@@ -27,7 +19,6 @@ jobs:
         with:
           lfs: true
           fetch-depth: 1
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Hydrate LFS assets
         run: git lfs pull
@@ -43,33 +34,18 @@ jobs:
           fi
           echo "✅ All live files are real PNGs."
 
-      - name: Auto-repair archive stubs
-        run: |
-          echo "── Copying live files to archive/ ──"
-          cp -f assets/images/bg-*.png assets/images/archive/
-          echo "── Archive sizes after repair ──"
-          ls -lh assets/images/archive/bg-*.png
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      - name: Run verify:room-archives --strict-match
+      - name: Verify archive files match live files
         run: node scripts/verify-room-archives.js --strict-match
 
-      - name: Commit repaired archives (if changed)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Report repair boundary
         run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add assets/images/archive/
-          if git diff --cached --quiet; then
-            echo "✅ Archive already up-to-date — nothing to commit."
-          else
-            git commit -m "fix: replace LFS stub archive copies with real PNG bytes [skip ci]"
-            git push
-          fi
+          echo "Archive repair is verification-only in Actions budget mode."
+          echo "If this job fails, repair the files in a normal PR and preserve the evidence there."

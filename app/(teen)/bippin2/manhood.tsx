@@ -49,7 +49,7 @@ const SECTIONS = [
       "Anxiety and stress during puberty are common. Movement, sleep, and breathing help.",
       "If you feel low for weeks or start withdrawing from things you loved -- tell someone.",
     ],
-    tip: 'Rylane keeps it real: "feel it, name it, move it through. that\'s the way."',
+    tip: 'Sy keeps it real: "feel it, name it, move it through. that\'s the way."',
     route: 'calm',
     routeLabel: 'calm space ->',
   },
@@ -75,11 +75,11 @@ const SECTIONS = [
       '"Is it normal if one side is bigger?" -- Yes, bodies are asymmetrical. Very common.',
       '"What if I get an erection at a bad time?" -- Happens to everyone. It passes.',
       '"My voice cracked, is that it?" -- Voice changes can take 1-2 years to settle.',
-      '"How do I talk to someone about this stuff?" -- Start with Rylane. No judgement.',
+      '"How do I talk to someone about this stuff?" -- Start with Sy. No judgement.',
     ],
     tip: "No question is too embarrassing. You deserve real answers.",
     route: 'sekret',
-    routeLabel: 'ask Rylane ->',
+    routeLabel: 'ask Sy ->',
   },
 ] as const;
 
@@ -180,14 +180,14 @@ export default function ManhoodGuide() {
           <Text style={[s.quoteText, { color: soft }]}>
             "you don't gotta have it all figured out. just keep going. that's enough."
           </Text>
-          <Text style={[s.quoteSig, { color: accent }]}>{'-- Rylane 🪱'}</Text>
+          <Text style={[s.quoteSig, { color: accent }]}>{'-- Sy 🪱'}</Text>
         </View>
 
         <TouchableOpacity
           style={[s.primaryBtn, { backgroundColor: accent }]}
           onPress={() => router.push(routeForSide('teen', 'sekret') as any)}
         >
-          <Text style={s.primaryBtnText}>{'talk to Rylane 🪱'}</Text>
+          <Text style={s.primaryBtnText}>{'talk to Sy 🪱'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={s.ghostBtn} onPress={() => router.back()}>

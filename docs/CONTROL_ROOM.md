@@ -38,6 +38,30 @@ The verifier currently covers:
 
 If the report says `Push safe: yes`, the branch passed the required local checks. If it says `Push safe: no`, open `reports/control-room/latest.md` and fix the listed failure.
 
+## Browser verification with Playwright
+
+Run:
+
+```bash
+npm run control-room:mission:verify-frontend
+```
+
+The `verify-frontend` mission is allowlisted in the local Control Room agent. It runs the repository's Playwright smoke suite against the local Expo web build when both `@playwright/test` and a Chromium executable are available.
+
+It writes:
+
+```text
+reports/control-room/frontend.json
+reports/control-room/frontend.md
+```
+
+The report includes an explicit `browserProof` field and an evidence level:
+
+- `browser` means Playwright actually ran and passed.
+- `non-browser-fallback` means Playwright could not run and the mission used `npm run verify:local` instead.
+
+A passing fallback is useful local evidence, but it must never be described as Playwright or browser proof. The mission records that distinction so Control Room cannot silently downgrade the verification claim.
+
 ## Publish failures into the existing founder Control Room
 
 The app's Control Room reads Supabase-backed audit events and issues. A local JSON file alone is not visible to the app.
@@ -86,15 +110,19 @@ Recommended split while hosted minutes are unavailable:
 ## OODA model
 
 ### Observe
+
 Run real repository checks locally.
 
 ### Orient
+
 Group failures by app, companions, Supabase, voice, Oracle, assets, tests, and code quality.
 
 ### Decide
+
 Mark the branch push-safe or blocked.
 
 ### Act
+
 Fix the highest-impact failure, rerun locally, and optionally ingest unresolved failures into the existing founder Control Room.
 
 ## MCP direction
@@ -135,6 +163,7 @@ The mission engine is scaffolded in `src/config/controlRoomOs.ts` and `src/servi
 - Launch Bip
 - Continue Yesterday
 - Verify Local
+- Verify Frontend
 - Ship Release
 - Recover System
 
@@ -142,7 +171,7 @@ The existing founder dashboard renders these missions inside `src/screens/DevCon
 
 ### Worker and connector registries
 
-Workers and connectors are registries, not hardcoded single points of failure. V1 includes local-first workers and provider connectors with explicit fallback notes for GitHub, Supabase, Expo, Gmail, and the filesystem.
+Workers and connectors are registries, not hardcoded single points of failure. V1 includes local-first workers and provider connectors with explicit fallback notes for GitHub, Supabase, Expo, Gmail, Playwright, and the filesystem.
 
 GitHub remains project memory and source of truth, but local git and local reports keep execution unblocked when hosted services fail.
 
@@ -156,6 +185,7 @@ Allowed local missions include:
 npm run control-room:agent -- --help
 npm run control-room:mission:launch-bip
 npm run control-room:mission:verify-local
+npm run control-room:mission:verify-frontend
 ```
 
 Remote access must stay authenticated before this becomes anything other than a localhost/default local process.

@@ -2,6 +2,7 @@ import React from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+import { ParentBridgeResponseRequestCard } from '../../../components/bridge/ParentBridgeResponseRequestCard';
 import { ParentBridgeSummaryInbox } from '@/features/bridge/ParentBridgeSummaryInbox';
 
 export function ParentBridgeSummaryScreen() {
@@ -12,17 +13,18 @@ export function ParentBridgeSummaryScreen() {
         <View style={styles.header}>
           <Text style={styles.emoji}>🌉</Text>
           <Text style={styles.title}>Parent Bridge</Text>
-          <Text style={styles.subtitle}>Only summaries your teen deliberately chooses to share.</Text>
+          <Text style={styles.subtitle}>Only summaries and signals your teen deliberately chooses to share.</Text>
         </View>
 
         <View style={styles.privacyCard}>
           <Text style={styles.privacyTitle}>Privacy boundary</Text>
           <Text style={styles.privacyText}>
             Linking accounts does not unlock journals, chats, mood history, media, or other private content.
-            Bridge shows generated context only after your teen confirms a share.
+            Bridge shows generated context and support requests only after your teen confirms a share.
           </Text>
         </View>
 
+        <ParentBridgeResponseRequestCard />
         <ParentBridgeSummaryInbox />
       </ScrollView>
     </View>

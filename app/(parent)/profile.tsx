@@ -2,35 +2,82 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import {
+  hydrateAccountProfile,
+  saveAccountProfile,
+  type ParentFocus,
+  type ParentRoomStyle,
+} from '@/features/identity/accountProfile';
 
 type ParentTab = 'identity' | 'circle' | 'memories';
+
+const FOCUS_OPTIONS: ParentFocus[] = ['support', 'listen', 'repair', 'learn'];
 
 export default function ParentProfile() {
   const [tab, setTab] = useState<ParentTab>('identity');
   const [name, setName] = useState('');
-  const [focus, setFocus] = useState('support');
-  const [circleName, setCircleName] = useState('');
+  const [focus, setFocus] = useState<ParentFocus>('support');
+  const [roomStyle, setRoomStyle] = useState<ParentRoomStyle | null>(null);
+  const [circleName, setCircleName] = useState('Guardian Bip');
   const [supportStyle, setSupportStyle] = useState('listen first');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    AsyncStorage.multiGet(['parent_profile_data', 'parent_circle_identity']).then(pairs => {
-      const [profile, circle] = pairs.map(([, v]) => (v ? JSON.parse(v) : null));
-      if (profile?.name) setName(profile.name);
-      if (profile?.focus) setFocus(profile.focus);
-      if (circle?.circleName) setCircleName(circle.circleName);
-      if (circle?.supportStyle) setSupportStyle(circle.supportStyle);
-    }).catch(() => {});
+    let active = true;
+    void Promise.all([
+      hydrateAccountProfile('parent'),
+      AsyncStorage.getItem('parent_circle_identity'),
+    ]).then(([profile, circleRaw]) => {
+      if (!active) return;
+      if (profile?.accountSide === 'parent') {
+        setName(profile.privateDisplayName);
+        if (profile.parentFocus) setFocus(profile.parentFocus);
+        setRoomStyle(profile.parentRoomStyle);
+        setCircleName(profile.circleNickname);
+      }
+      try {
+        const circle = circleRaw ? JSON.parse(circleRaw) as Record<string, unknown> : null;
+        if (typeof circle?.supportStyle === 'string') setSupportStyle(circle.supportStyle);
+      } catch {
+        // Local presentation preferences are optional; durable identity still loads.
+      }
+    }).catch(caught => {
+      if (active) setError(caught instanceof Error ? caught.message : 'Unable to load your Parent profile.');
+    });
+    return () => { active = false; };
   }, []);
 
   async function finish() {
-    if (!name.trim()) return;
-    await AsyncStorage.setItem('parent_profile_done', 'true');
-    await AsyncStorage.setItem('parent_profile_data', JSON.stringify({ name: name.trim(), focus }));
-    await AsyncStorage.setItem('parent_circle_identity', JSON.stringify({ circleName: circleName.trim() || name.trim(), supportStyle }));
-    router.replace('/(parent)/room');
+    if (!ready || !roomStyle || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await saveAccountProfile({
+        accountSide: 'parent',
+        privateDisplayName: name.trim(),
+        onboardingComplete: true,
+        parentRoomStyle: roomStyle,
+        parentFocus: focus,
+        circleNickname: circleName.trim() || 'Guardian Bip',
+      });
+      const circleRaw = await AsyncStorage.getItem('parent_circle_identity');
+      let circle: Record<string, unknown> = {};
+      try { circle = circleRaw ? JSON.parse(circleRaw) : {}; } catch { circle = {}; }
+      await AsyncStorage.setItem('parent_circle_identity', JSON.stringify({
+        ...circle,
+        circleName: circleName.trim() || 'Guardian Bip',
+        supportStyle,
+      }));
+      router.replace('/(parent)/room');
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to save your Parent profile.');
+    } finally {
+      setSaving(false);
+    }
   }
 
-  const ready = name.trim().length > 0;
+  const ready = name.trim().length > 0 && roomStyle !== null;
 
   return (
     <ScrollView contentContainerStyle={styles.root} showsVerticalScrollIndicator={false}>
@@ -53,12 +100,12 @@ export default function ParentProfile() {
       {tab === 'identity' ? (
         <>
           <Text style={styles.label}>Your name</Text>
-          <TextInput value={name} onChangeText={setName} placeholder="name" placeholderTextColor="#789082" style={styles.input} />
+          <TextInput value={name} onChangeText={text => { setName(text); setError(null); }} placeholder="name" placeholderTextColor="#789082" style={styles.input} />
 
           <Text style={styles.label}>Main focus</Text>
           <View style={styles.grid}>
-            {['support', 'listen', 'repair', 'learn'].map(item => (
-              <TouchableOpacity key={item} onPress={() => setFocus(item)} style={[styles.card, focus === item && styles.active]}>
+            {FOCUS_OPTIONS.map(item => (
+              <TouchableOpacity key={item} onPress={() => { setFocus(item); setError(null); }} style={[styles.card, focus === item && styles.active]}>
                 <Text style={styles.cardText}>{item}</Text>
               </TouchableOpacity>
             ))}
@@ -73,10 +120,10 @@ export default function ParentProfile() {
         <>
           <View style={styles.identityCard}>
             <Text style={styles.identityLabel}>Parent Circle Identity</Text>
-            <Text style={styles.identityHelp}>This is your community-facing support identity.</Text>
+            <Text style={styles.identityHelp}>This is your community-facing support identity, separate from your private Parent name.</Text>
           </View>
           <Text style={styles.label}>Parent Circle name</Text>
-          <TextInput value={circleName} onChangeText={setCircleName} placeholder="display name" placeholderTextColor="#789082" style={styles.input} />
+          <TextInput value={circleName} onChangeText={text => { setCircleName(text); setError(null); }} placeholder="display name" placeholderTextColor="#789082" style={styles.input} />
           <Text style={styles.label}>Support style</Text>
           <TextInput value={supportStyle} onChangeText={setSupportStyle} placeholder="listen first, repair gently..." placeholderTextColor="#789082" style={styles.input} />
           <TouchableOpacity style={styles.ownerCard} onPress={() => router.push('/(parent)/circle' as any)}>
@@ -109,8 +156,9 @@ export default function ParentProfile() {
         </>
       )}
 
-      <TouchableOpacity disabled={!ready} onPress={finish} style={[styles.button, !ready && styles.disabled]}>
-        <Text style={styles.buttonText}>Save parent identity</Text>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <TouchableOpacity disabled={!ready || saving} onPress={finish} style={[styles.button, (!ready || saving) && styles.disabled]}>
+        <Text style={styles.buttonText}>{saving ? 'Saving…' : 'Save parent identity'}</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -140,6 +188,7 @@ const styles = StyleSheet.create({
   ownerText: { color: '#b7c9bf', fontSize: 12, lineHeight: 18, marginTop: 5 },
   memoryCard: { flexDirection: 'row', gap: 12, padding: 16, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.05)', borderWidth: 1, borderColor: '#ffffff18', marginBottom: 10 },
   memoryEmoji: { fontSize: 24, width: 34, textAlign: 'center' },
+  error: { color: '#fca5a5', fontSize: 12, lineHeight: 18, marginTop: 14 },
   button: { minHeight: 54, borderRadius: 18, backgroundColor: '#a7f3d0', alignItems: 'center', justifyContent: 'center', marginTop: 30 },
   disabled: { opacity: 0.4 },
   buttonText: { color: '#062015', fontSize: 15, fontWeight: '900' },

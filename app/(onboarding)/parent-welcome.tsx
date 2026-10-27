@@ -40,7 +40,7 @@ export default function ParentWelcome() {
       <Animated.View style={[styles.content, { opacity: fade, transform: [{ translateY: rise }] }]}>
         <Text style={styles.kicker}>FOR PARENTS</Text>
 
-        <Text style={styles.title}>You're here{'\n'}for them.</Text>
+        <Text style={styles.title}>You're here{`\n`}for them.</Text>
 
         <View style={styles.divider} />
 
@@ -64,9 +64,19 @@ export default function ParentWelcome() {
         <TouchableOpacity
           style={styles.btn}
           activeOpacity={0.85}
-          onPress={() => router.push('/(onboarding)/parent-setup')}
+          onPress={() => router.push('/(auth)/signup?side=parent' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Create my Parent account"
         >
-          <Text style={styles.btnText}>Set up my side →</Text>
+          <Text style={styles.btnText}>Create my Parent account →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.signIn}
+          onPress={() => router.push('/(auth)/login?side=parent' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="I already have an account"
+        >
+          <Text style={styles.signInText}>I already have an account</Text>
         </TouchableOpacity>
         <Text style={styles.legal}>Your teen's data stays private</Text>
       </Animated.View>
@@ -87,7 +97,9 @@ const styles = StyleSheet.create({
   pill:       { borderRadius: 999, borderWidth: 1, borderColor: '#ffffff15', paddingHorizontal: 12, paddingVertical: 7 },
   pillText:   { color: '#8aaf9c', fontSize: 12, fontWeight: '700' },
   footer:     { paddingHorizontal: 28, paddingBottom: Platform.OS === 'ios' ? 52 : 36 },
-  btn:        { height: 58, borderRadius: 20, backgroundColor: '#a7f3d0', alignItems: 'center', justifyContent: 'center', marginBottom: 14 },
-  btnText:    { color: '#062015', fontSize: 17, fontWeight: '900' },
+  btn:        { height: 58, borderRadius: 20, backgroundColor: '#a7f3d0', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  btnText:    { color: '#062015', fontSize: 16, fontWeight: '900' },
+  signIn:     { alignItems: 'center', paddingVertical: 10, marginBottom: 4 },
+  signInText: { color: '#8aaf9c', fontSize: 13, fontWeight: '800' },
   legal:      { color: '#3d5e4a', fontSize: 11, textAlign: 'center' },
 });

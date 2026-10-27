@@ -43,8 +43,9 @@ test('history reads summary tables rather than raw legacy Bridge payloads', () =
 });
 
 
-test('freeform Bridge signals do not fabricate Bridge Summary source IDs', () => {
+test('freeform Bridge signals route summary setup to Pages without fabricating source IDs', () => {
   assert.doesNotMatch(bridgeScreen, /sourceId:\s*`bridge-/);
   assert.doesNotMatch(bridgeScreen, /createBridgeShareRequest/);
-  assert.match(bridgeScreen, /Bridge Summaries become available when you share a journal, check-in, or reflection with your Parent Window/);
+  assert.match(bridgeScreen, /setScreen\('pages'\)/);
+  assert.match(bridgeScreen, /choose something in Pages/);
 });

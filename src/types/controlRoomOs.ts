@@ -4,6 +4,7 @@ export type ControlRoomMissionId =
   | 'launch-bip'
   | 'continue-yesterday'
   | 'verify-local'
+  | 'verify-frontend'
   | 'ship-release'
   | 'recover-system';
 
