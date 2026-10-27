@@ -1,148 +1,138 @@
-# Se'kret Bip — Documentation Map
+<!-- truth-mode: durable -->
+# Se’kret Bip — Documentation Map
 
-**Last reviewed:** 2026-07-16  
-**Owner issue:** [#456](https://github.com/jussray/Sekret-Bip/issues/456)
+This map defines which repository documents are durable authorities, which are historical snapshots, and where volatile live truth must be resolved.
 
-This file explains which documents are authoritative, what each one owns, and how stale planning material must be handled.
+## Live truth boundary
 
-## Read these first
+Repository prose is not the authority for live `main`, PR/issue state, Cloudflare state, Supabase runtime state, production-browser behavior, or device/account behavior.
 
-| Question | Canonical source |
-|---|---|
-| What is implemented, verified, or released? | `implementation-ledger.json` plus validated extensions |
-| What are we doing right now? | `SPRINT.md` |
-| How do we get from here to launch? | `docs/LAUNCH_ROADMAP.md` |
-| What exists today in human language? | `docs/CURRENT_STATUS.md` |
-| How are frontend, Supabase, Worker, and deployment wired? | `docs/WIRING_STATUS.md` |
-| How does production release work? | `DEPLOYMENT.md` |
-| What blocks legal and operational launch? | `docs/legal/LAUNCH_COMPLIANCE_CHECKLIST.md` |
-| What authorization proof exists? | `docs/security/SUPABASE_AUTHORIZATION_PHASE0.md` and security evidence files |
+For live state, inspect the owning system at decision time. Use the newest marked exact-production receipt on issue #696 for release-status handoff, then verify its target against fresh `main` and the independent provider/database/browser witnesses it names.
+
+See `docs/TRUTH_AUTHORITY.md` for claim expiry and supersession.
 
 ## Authority levels
 
-### Level 1 — live operating truth
+### Level 0 — inspected external truth
 
-These files may direct current implementation and release decisions:
+Highest authority for volatile state:
+
+- GitHub branch, PR, issue, check, review, job, and log state;
+- Cloudflare Pages / Workers / Access / routes / custom domains / Service Bindings / build-trigger evidence;
+- live Supabase migration, catalog, grants, policies, Auth, Storage, and runtime evidence;
+- exact deployed release markers and Worker health/version evidence;
+- production Playwright;
+- controlled-account and physical-device evidence.
+
+Every Level 0 claim must identify its target, observation time, authority, and evidence reference. One system does not silently prove another.
+
+### Level 1 — machine-checked repository truth
 
 - `implementation-ledger.json`
 - `implementation-ledger.extensions/*.json`
-- `SPRINT.md`
-- `docs/LAUNCH_ROADMAP.md`
+- exact-head CI artifacts and receipts
+- repository truth, migration-lineage, documentation-truth, and release-contract gates
+
+These prove only the scope they actually executed against.
+
+### Level 2 — durable operating contracts
+
+- `docs/TRUTH_AUTHORITY.md`
 - `docs/CURRENT_STATUS.md`
-- `docs/WIRING_STATUS.md`
+- `docs/ISSUE_AUTHORITY.md`
+- `docs/LAUNCH_ROADMAP.md`
 - `DEPLOYMENT.md`
-- `.control-room/repository.manifest.json`
+- `README.md`
+- `docs/CLOUDFLARE_OWNERSHIP.md`
+- `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md`
+- `.control-room/README_SYNC_POLICY.md`
+- architecture, privacy, security, legal, and agent instruction documents that describe invariants rather than current provider state
 
-When these disagree, stop and reconcile them against code, live Supabase, Cloudflare, tests, and the exact deployed SHA. Do not choose the most convenient statement.
+Durable documents may point to live evidence, but must not copy volatile current-state claims into evergreen prose.
 
-### Level 2 — architecture and product contracts
+## Worker-document authority
 
-These define durable boundaries but do not prove current runtime state by themselves:
+When Worker names or responsibilities disagree across older docs, use this order:
 
-- `docs/ARCHITECTURE.md`
-- `docs/AGENT_L4_ARCHITECTURE.md`
-- `docs/RELATIONSHIP_LAYER_ARCHITECTURE.md`
-- `docs/RELATIONSHIP_LAYER_RELEASE_GATES.md`
-- `docs/CONTROL_ROOM_ARCHITECTURE.md`
-- `docs/DAILY_INTENTIONS_PRIVACY_CONTRACT.md`
-- `docs/legal/*`
-- `docs/security/*`
-- `GLOBAL_AI.md`, `AGENTS.md`, `CLAUDE.md`, and provider instructions
+1. fresh Cloudflare provider readback for actual live routes/bindings/versions;
+2. current source and machine contracts;
+3. `docs/CLOUDFLARE_OWNERSHIP.md` for durable identity/purpose rules;
+4. `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md` for migration/rollback sequence;
+5. `DEPLOYMENT.md` for deployment and exact-release proof;
+6. historical snapshots only for chronology.
 
-Architecture documents describe what must be true. The ledger and evidence determine whether it is true now.
+The current durable distinction is:
 
-### Level 3 — runbooks, audits, and evidence
+- public client origin remains `api.sekretbip.net` on the repository-configured `sekret-backend` path until a cutover is proven;
+- `sekret` is the founder-confirmed companion API lineage and target companion execution plane;
+- the preferred split uses a Cloudflare Service Binding instead of a second client-facing Worker URL;
+- Bridge/privileged Supabase/email/platform responsibilities remain with `sekret-backend`;
+- `SUPABASE_SERVICE_ROLE_KEY` must not move into the companion Worker merely for convenience.
 
-These explain how a claim was tested or how an operation should be performed:
+This purpose contract does not override Level 0 provider truth about what is currently attached to a hostname or binding.
 
-- deployment and rollback runbooks;
-- RLS audits and denial probes;
-- Bridge connection and journey audits;
-- Playwright, Maestro, device, and accessibility evidence;
-- security JSON evidence;
-- production receipts and retained CI artifacts.
+### Level 3 — historical snapshots
 
-Evidence is valid only for the commit, environment, accounts, and time window it actually observed.
+Dated status files, old sprint handoffs, old wiring/status inventories, prior PR bodies, old issue comments, and archived audits remain evidence for the observation window they describe. They must be visibly labeled historical and must not override Level 0 or newer machine evidence.
 
-### Level 4 — strategy, research, and future options
+## Read these first
 
-These inform decisions but do not authorize work or change implementation status:
+| Question | Authority |
+|---|---|
+| What is live right now? | Level 0 owning system + newest marked receipt for that exact target |
+| How do claims expire or get superseded? | `docs/TRUTH_AUTHORITY.md` |
+| What does “current status” mean here? | `docs/CURRENT_STATUS.md` |
+| Which Worker owns what by durable purpose? | `docs/CLOUDFLARE_OWNERSHIP.md` |
+| How does the Worker split/cutover roll forward and back? | `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md` |
+| Which issue owns a durable outcome? | `docs/ISSUE_AUTHORITY.md`, then GitHub live state |
+| What is the durable launch sequence? | `docs/LAUNCH_ROADMAP.md` |
+| What is the deployment contract? | `DEPLOYMENT.md` |
+| What feature state is machine tracked? | `implementation-ledger.json` + validated extensions |
 
-- `docs/strategy/`
-- `docs/industry-signals/`
-- design explorations and handoff concepts;
-- future feature proposals;
-- archived sprint notes and historical audits.
+## Historical documents
 
-A Level 4 idea becomes active work only after founder approval, dependency review, privacy and safety review, issue ownership, and reconciliation with the launch roadmap and ledger.
+`SPRINT.md` and `docs/WIRING_STATUS.md` are retained as historical entrypoints so old links do not break. Their top banners explicitly direct operators to fresh authority. Their detailed prior contents remain preserved in Git history.
 
-## Document roles
+Dated launch/status snapshots are historical by filename and observation window. They are not “current overlays” merely because another document still links to them.
 
-### `SPRINT.md`
+Do not rewrite a historical snapshot merely because Worker ownership changed later. Add or update its historical banner/current-authority pointer instead.
 
-Volatile execution handoff. It should contain only:
+## Claim freshness rules
 
-- the verified baseline;
-- current sprint outcome;
-- workstreams in progress;
-- immediate execution order;
-- explicit non-goals;
-- definition of done;
-- blockers and owners.
-
-It should not become a permanent encyclopedia of every feature ever discussed.
-
-### `docs/LAUNCH_ROADMAP.md`
-
-Stable phase and dependency map. It owns:
-
-- launch sequence;
-- launch-critical versus non-critical work;
-- phase exit evidence;
-- controlled-alpha and launch-clearance gates;
-- future lanes that must not quietly enter launch scope.
-
-It does not promise dates without known capacity and evidence owners.
-
-### `docs/CURRENT_STATUS.md`
-
-Human-readable snapshot of the current product. It summarizes the ledger and production truth without duplicating every test result.
-
-### `implementation-ledger.json`
-
-Machine-checked feature state. It owns status words such as `planned`, `contract`, `integrated`, `verified`, and `released`, plus contract, runtime, test, telemetry, rollout, verification, and rollback evidence.
+- A PR body is proposed scope and self-reported evidence, not independent proof.
+- A merged PR is repository history, not automatic production proof.
+- Exact-head evidence must be re-pinned after the relevant head moves.
+- Live issue state comes from GitHub issue state, not copied prose in an issue body or Markdown file.
+- A newer authoritative contradiction supersedes an older current-state claim while preserving the old observation as history.
+- Cloudflare uploads/previews prove only the named provider event.
+- A Worker name in Wrangler proves intended deployment target, not all current provider bindings for other Worker identities.
+- A founder-confirmed purpose may establish intended/known role while exact route/custom-domain/build state still requires provider readback.
+- Live Supabase claims require the intended project and current evidence.
+- A screenshot proves appearance, not auth, privacy, database state, deployment, or device behavior.
+- Zero-step/no-log jobs remain infrastructure evidence, never a pass.
 
 ## Stale-document policy
 
-A planning or audit file that is no longer current must do one of three things:
+A document that no longer represents its intended authority must be handled explicitly:
 
-1. **Update** — reconcile it with current truth and retain its role.
-2. **Archive** — add a top-of-file banner:
+1. **Update** — retain the role and reconcile it with durable truth.
+2. **Archive** — add a visible historical banner and point to current authority.
+3. **Replace** — preserve detail in Git history while replacing a misleading current-looking surface with a small durable or historical entrypoint.
 
-   > Historical snapshot. Do not use this file as current implementation, roadmap, security, or deployment truth. See `docs/DOCUMENTATION_MAP.md`.
-
-3. **Remove** — only when the file is truly obsolete, unsafe, secret-bearing, misleading beyond repair, or has no preservation value.
-
-Do not leave an old sprint or roadmap looking current. A stale date in small text is not an adequate warning.
-
-## Naming rules
-
-- Use `CURRENT`, `LAUNCH`, or `ROADMAP` only for canonical active documents.
-- Historical files should include `HISTORICAL`, `ARCHIVED`, or a clear dated snapshot in the title.
-- Avoid parallel files named `ROADMAP_NEW`, `FINAL_ROADMAP`, `SPRINT_LATEST`, or `STATUS_REAL`. Those names are how documentation develops trust issues.
-- One topic should have one canonical active owner document, with supporting detail linked beneath it.
+Do not leave an old sprint, status, or provider incident looking current. A date alone is not enough.
 
 ## Update protocol
 
-When a PR changes product scope, architecture, release state, or launch sequence:
+When a change affects product scope, architecture, release state, wiring, validation, or authority:
 
-1. verify the actual repository and runtime state;
-2. update the ledger or add a validated extension;
-3. update only the canonical documents whose ownership changed;
-4. label preserved historical material clearly;
-5. run implementation-evidence and documentation contract tests;
-6. merge only after the documentation describes the tested content rather than the hoped-for future.
+1. inspect fresh repository and relevant external witnesses;
+2. update machine-tracked state when feature state changed;
+3. update durable docs only for changed invariants/procedures/ownership;
+4. put volatile outcomes into retained receipts or live systems, not durable prose;
+5. run `node scripts/audit-documentation-truth.mjs`;
+6. keep repository, provider, database, browser, account, and device evidence separate;
+7. merge only after the documentation describes the tested contract rather than a hoped-for future.
 
 ## Privacy boundary
 
-Documentation, screenshots, issue bodies, CI artifacts, roadmaps, and Control Room records must not contain raw teen journal text, private messages, voice transcripts, safety evidence, names, emails, tokens, secrets, or broad database exports.
+Documentation, receipts, CI artifacts, and operational analytics must not contain raw teen journal text, private messages, voice transcripts, safety content, names/emails, credentials, or broad database exports.

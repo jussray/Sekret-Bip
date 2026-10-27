@@ -35,7 +35,7 @@ export function AccountDeletionControls() {
   const scheduleDeletion = useCallback(() => {
     Alert.alert(
       'Schedule account deletion?',
-      'Your account will be scheduled for deletion after a seven-day grace period. You can cancel before then. This includes server data and private uploads.',
+      'Your account will be scheduled for deletion after a seven-day grace period. You can cancel before processing begins. This includes account-owned server data and private uploads.',
       [
         { text: 'Keep account', style: 'cancel' },
         {
@@ -52,7 +52,7 @@ export function AccountDeletionControls() {
             setRequest(result.value);
             Alert.alert(
               'Deletion scheduled',
-              `Your account is scheduled for deletion on ${formatDeletionDate(result.value.scheduledFor)}.`,
+              `Your account is scheduled for deletion on ${formatDeletionDate(result.value.scheduledFor)}. You can cancel from Settings before processing begins.`,
             );
           },
         },
@@ -96,16 +96,16 @@ export function AccountDeletionControls() {
       {isPending ? (
         <>
           <Text style={styles.status}>
-            Account deletion scheduled for {formatDeletionDate(request.scheduledFor)}.
+            Account deletion scheduled for {formatDeletionDate(request.scheduledFor)}. You can cancel before processing begins.
           </Text>
           <TouchableOpacity
             style={styles.secondaryButton}
             onPress={cancelDeletion}
             disabled={isSubmitting}
             accessibilityRole="button"
-            accessibilityLabel="Cancel account deletion"
+            accessibilityLabel="Cancel scheduled account deletion"
           >
-            <Text style={styles.secondaryText}>{isSubmitting ? 'Cancelling…' : 'Cancel account deletion'}</Text>
+            <Text style={styles.secondaryText}>{isSubmitting ? 'Cancelling…' : 'Cancel scheduled deletion'}</Text>
           </TouchableOpacity>
         </>
       ) : isProcessing ? (
@@ -116,9 +116,9 @@ export function AccountDeletionControls() {
           onPress={scheduleDeletion}
           disabled={isSubmitting}
           accessibilityRole="button"
-          accessibilityLabel="Delete account"
+          accessibilityLabel="Schedule account deletion"
         >
-          <Text style={styles.dangerText}>{isSubmitting ? 'Scheduling…' : 'Delete account'}</Text>
+          <Text style={styles.dangerText}>{isSubmitting ? 'Scheduling…' : 'Schedule account deletion'}</Text>
         </TouchableOpacity>
       )}
     </View>

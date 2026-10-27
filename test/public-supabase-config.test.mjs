@@ -21,6 +21,10 @@ const supabaseSource = fs.readFileSync(
   new URL('../src/utils/supabase.ts', import.meta.url),
   'utf8',
 );
+const frontDoorSource = fs.readFileSync(
+  new URL('../app/index.tsx', import.meta.url),
+  'utf8',
+);
 const releaseMetadataSource = fs.readFileSync(
   new URL('../scripts/write-release-metadata.mjs', import.meta.url),
   'utf8',
@@ -42,6 +46,10 @@ test('production Expo export receives the canonical public Supabase config', () 
     /^EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_[A-Za-z0-9_-]+$/m,
   );
   assert.match(
+    productionEnv,
+    /^EXPO_PUBLIC_BACKEND_URL=https:\/\/api\.sekretbip\.net$/m,
+  );
+  assert.doesNotMatch(
     productionEnv,
     /^EXPO_PUBLIC_BACKEND_URL=https:\/\/sekret-backend\.mcgill-raylene\.workers\.dev$/m,
   );
@@ -87,6 +95,22 @@ test('Supabase readiness uses the resolved Expo public values', () => {
   assert.match(envSource, /isSupabaseReady = Boolean\(SUPABASE_URL && SUPABASE_ANON\)/);
   assert.match(supabaseSource, /export const isSupabaseConfigured = isSupabaseReady/);
   assert.match(supabaseSource, /createClient\(SUPABASE_URL, SUPABASE_ANON/);
+});
+
+test('front door shares canonical Supabase readiness for production sign-in', () => {
+  assert.match(
+    frontDoorSource,
+    /import \{ isSupabaseConfigured \} from '@\/utils\/supabase';/,
+  );
+  assert.match(
+    frontDoorSource,
+    /const isAccountServiceConfigured = isSupabaseConfigured;/,
+  );
+  assert.doesNotMatch(frontDoorSource, /isSupabaseConfigured\(\)/);
+  assert.doesNotMatch(
+    frontDoorSource,
+    /EXPO_PUBLIC_SUPABASE_URL\s*&&\s*process\.env\.EXPO_PUBLIC_SUPABASE_ANON_KEY/,
+  );
 });
 
 test('release generation refuses a web bundle missing required public config', () => {

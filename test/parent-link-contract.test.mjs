@@ -27,7 +27,10 @@ test('parent onboarding matches the live contract', async () => {
   assert.match(source, /redeemInviteCodeResult/);
 });
 
-test('teen invite screen describes eight characters', async () => {
+test('teen invite display length stays bound to the canonical code constant', async () => {
   const source = await read('app/(auth)/parent-link-verify.tsx');
-  assert.match(source, /eight-character code/);
+  assert.match(source, /PARENT_INVITE_CODE_LENGTH/);
+  assert.match(source, /repeat\(PARENT_INVITE_CODE_LENGTH\)/);
+  assert.match(source, /Codes expire after 48 hours/);
+  assert.match(source, /linking alone does not verify your account/);
 });

@@ -1,20 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, ActivityIndicator, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, ActivityIndicator, Platform, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { useVerificationContext } from '@/context/VerificationContext';
 import { SplashScreen } from '@screens/SplashScreen';
-import { getSupabase, isSupabaseConfigured } from '@/utils/supabase';
-import {
-  hydrateAccountProfile,
-  type AccountProfile,
-  type AccountSide,
-} from '@/features/identity/accountProfile';
-import { fetchPostAuthBootstrap } from '@/services/auth/postAuthBootstrap';
+import { WebWelcomeScreen } from '@screens/WebWelcomeScreen';
+import { FrontDoorSceneArrival } from '@/components/FrontDoorSceneArrival';
+import { getDevSplitViewSideOverride } from '@/utils/devSplitViewSide';
+import { isSupabaseConfigured } from '@/utils/supabase';
+import type { AccountProfile, AccountSide } from '@/features/identity/accountProfile';
 import {
   resolveParentEntryState,
   routeForParentEntryState,
 } from '@/services/parentEntryState';
+import { getCurrentFounderProfile, isFounderProfile } from '@/services/founderAudit';
+
+const isAccountServiceConfigured = isSupabaseConfigured;
 
 function getBuildSide(): AccountSide | null {
   const variant = process.env.EXPO_PUBLIC_APP_VARIANT;
@@ -24,7 +25,12 @@ function getBuildSide(): AccountSide | null {
 
 export default function Index() {
   const { userSide, setUserSide, isLoading } = useAppContext();
-  const { verificationState, isVerificationLoading } = useVerificationContext();
+  const {
+    verificationState,
+    isVerificationLoading,
+    isAuthResolved,
+    session,
+  } = useVerificationContext();
   const [authChecked, setAuthChecked] = useState(false);
   const [profileResolved, setProfileResolved] = useState(false);
   const [accountProfile, setAccountProfile] = useState<AccountProfile | null>(null);
@@ -34,31 +40,53 @@ export default function Index() {
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [splashEntered, setSplashEntered] = useState(false);
+  const [selectedEntrySide, setSelectedEntrySide] = useState<AccountSide | null>(null);
   const [routed, setRouted] = useState(false);
   const buildSide = useMemo(getBuildSide, []);
+  const previewSide = useMemo(getDevSplitViewSideOverride, []);
   const effectiveSide: AccountSide = accountProfile?.accountSide ?? buildSide ?? userSide ?? 'teen';
+  const publicWelcomeSide: AccountSide = previewSide ?? buildSide ?? userSide ?? 'teen';
+  const publicEntrySide: AccountSide = selectedEntrySide ?? previewSide ?? buildSide ?? userSide ?? 'teen';
+  const canOfferSignIn = authChecked
+    && profileResolved
+    && !hasPermanentSession
+    && !requiresAccountUpgrade
+    && !bootstrapError;
 
   useEffect(() => {
+    if (!isAuthResolved) {
+      setAuthChecked(false);
+      setProfileResolved(false);
+      return;
+    }
+
     let cancelled = false;
+    let profileDeferred = false;
 
     async function bootstrap() {
       setBootstrapError(null);
       setProfileResolved(false);
       setRequiresAccountUpgrade(false);
       try {
-        // Surface missing Supabase config as a real error so users (and devs)
-        // are never silently walked into a dead-end signup screen.
-        if (!isSupabaseConfigured) {
+        if (!isAccountServiceConfigured) {
+          if (process.env.NODE_ENV !== 'production') {
+            if (!cancelled) {
+              setHasPermanentSession(false);
+              setRequiredConsentsComplete(false);
+              setAccountProfile(null);
+            }
+            return;
+          }
+
           throw new Error(
-            'Account service is not configured.\n\nCheck that EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY are set correctly in your environment.'
+            'Account service is not configured.\n\nCheck that EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (or legacy EXPO_PUBLIC_SUPABASE_ANON_KEY) are set correctly in your environment.'
           );
         }
 
-        const sb = getSupabase();
-        if (!sb) throw new Error('Supabase account service is unavailable.');
-        const { data, error } = await sb.auth.getSession();
-        if (error) throw error;
-        const user = data.session?.user;
+        // VerificationProvider owns the single startup session restoration.
+        // Entry consumes that resolved session instead of mounting another
+        // Supabase getSession() call on the mobile critical path.
+        const user = session?.user;
 
         if (!user) {
           if (!cancelled) {
@@ -80,12 +108,23 @@ export default function Index() {
           return;
         }
 
-        // Explicit second-device restore: hydrate the durable Supabase profile,
-        // then reuse it in the post-auth bootstrap so it is fetched only once.
-        const profile = await hydrateAccountProfile(buildSide);
-        const result = await fetchPostAuthBootstrap(profile?.accountSide ?? buildSide, profile);
-        if (cancelled) return;
         setHasPermanentSession(true);
+
+        // A signed-in web visitor should see the front door before profile,
+        // consent, and founder routing modules compete for mobile startup time.
+        // The exact same bootstrap resumes as soon as the person enters.
+        if (Platform.OS === 'web' && !splashEntered) {
+          profileDeferred = true;
+          return;
+        }
+
+        const [profileModule, bootstrapModule] = await Promise.all([
+          import('@/features/identity/accountProfile'),
+          import('@/services/auth/postAuthBootstrap'),
+        ]);
+        const profile = await profileModule.hydrateAccountProfile(buildSide);
+        const result = await bootstrapModule.fetchPostAuthBootstrap(profile?.accountSide ?? buildSide, profile);
+        if (cancelled) return;
         setRequiredConsentsComplete(result.requiredConsentsComplete);
         setAccountProfile(result.profile);
         if (profile?.accountSide && profile.accountSide !== userSide) {
@@ -100,14 +139,22 @@ export default function Index() {
       } finally {
         if (!cancelled) {
           setAuthChecked(true);
-          setProfileResolved(true);
+          if (!profileDeferred) setProfileResolved(true);
         }
       }
     }
 
     void bootstrap();
     return () => { cancelled = true; };
-  }, [bootstrapAttempt, buildSide, setUserSide, userSide]);
+  }, [
+    bootstrapAttempt,
+    buildSide,
+    isAuthResolved,
+    session,
+    setUserSide,
+    splashEntered,
+    userSide,
+  ]);
 
   useEffect(() => {
     if (
@@ -126,9 +173,9 @@ export default function Index() {
     async function route() {
       if (!hasPermanentSession) {
         if (requiresAccountUpgrade) {
-          router.replace(`/(auth)/signup?side=${effectiveSide}` as never);
+          router.replace(`/(auth)/signup?side=${publicEntrySide}` as never);
         } else {
-          router.replace(buildSide === 'parent' ? '/(onboarding)/parent-splash' : '/(onboarding)/welcome');
+          router.replace(publicEntrySide === 'parent' ? '/(onboarding)/parent-splash' : '/(onboarding)/welcome');
         }
         return;
       }
@@ -146,6 +193,20 @@ export default function Index() {
         );
         return;
       }
+
+      try {
+        const founderProfile = await getCurrentFounderProfile();
+        if (active && isFounderProfile(founderProfile)) {
+          router.replace('/(dev)/control-room' as never);
+          return;
+        }
+      } catch (error) {
+        // Founder-status lookup is a routing convenience only; any failure
+        // (including a signed-in account with no app_profiles row yet)
+        // falls through to the ordinary teen/parent front door below.
+        console.warn('Founder-status lookup failed during front-door routing', error);
+      }
+      if (!active) return;
 
       if (accountProfile.accountSide === 'parent') {
         try {
@@ -174,18 +235,36 @@ export default function Index() {
     accountProfile,
     authChecked,
     bootstrapError,
-    buildSide,
     effectiveSide,
     hasPermanentSession,
     isLoading,
     isVerificationLoading,
     profileResolved,
+    publicEntrySide,
     requiredConsentsComplete,
     requiresAccountUpgrade,
     routed,
     splashEntered,
     verificationState,
   ]);
+
+  // This watched entrypoint intentionally participates in the exact-head release gate.
+  if (Platform.OS === 'web' && !splashEntered) {
+    return (
+      <FrontDoorSceneArrival>
+        <WebWelcomeScreen
+          variant={publicWelcomeSide}
+          showSignIn={canOfferSignIn}
+          onEnter={(side) => {
+            setRouted(false);
+            setSelectedEntrySide(side);
+            setUserSide(side);
+            setSplashEntered(true);
+          }}
+        />
+      </FrontDoorSceneArrival>
+    );
+  }
 
   if (bootstrapError) {
     return (
@@ -205,7 +284,14 @@ export default function Index() {
     );
   }
 
-  if (!isLoading && !isVerificationLoading && authChecked && profileResolved && !splashEntered) {
+  if (
+    Platform.OS !== 'web'
+    && !isLoading
+    && !isVerificationLoading
+    && authChecked
+    && profileResolved
+    && !splashEntered
+  ) {
     return (
       <SplashScreen
         userSide={hasPermanentSession ? effectiveSide : buildSide ?? 'teen'}
@@ -215,14 +301,22 @@ export default function Index() {
   }
 
   return (
-    <View style={styles.root}>
+    <View
+      style={styles.root}
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Opening Se'kret Bip"
+      accessibilityLiveRegion="polite"
+    >
       <ActivityIndicator color="#c4b5fd" />
+      <Text style={styles.loadingText}>Opening your Se’kret Bip space…</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#090711', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28 },
+  loadingText: { color: '#b9afc5', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 12 },
   errorTitle: { color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center', marginBottom: 12 },
   errorBody: { color: '#b9afc5', fontSize: 14, lineHeight: 21, textAlign: 'center', marginBottom: 24 },
   retry: { minWidth: 160, height: 52, borderRadius: 16, backgroundColor: '#6d28d9', alignItems: 'center', justifyContent: 'center' },

@@ -27,7 +27,7 @@ export interface AgeAssuranceDecision {
   method: AgeVerificationMethod;
   guardianRequired: boolean;
   nextSide: 'teen' | 'parent';
-  nextRoute: '/(auth)/signup?side=teen' | '/(onboarding)/parent-splash';
+  nextRoute: '/(auth)/signup?side=teen' | '/(onboarding)/parental-consent' | '/(onboarding)/parent-splash';
   actionLabel: string;
   message: string;
 }
@@ -72,9 +72,9 @@ export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
       method: 'none',
       guardianRequired: true,
       nextSide: 'parent',
-      nextRoute: '/(onboarding)/parent-splash',
+      nextRoute: '/(onboarding)/parental-consent',
       actionLabel: 'Ask a parent or guardian →',
-      message: 'Bip is for ages 13 and up. A parent or guardian can continue from the parent path.',
+      message: 'Bip needs a parent or guardian before any child account can be created. We will not collect account details on this path.',
     };
   }
 

@@ -1,6 +1,18 @@
 {
-  "version": 1,
-  "reviewedAt": "2026-07-18",
+  "version": 5,
+  "reviewedAt": "2026-09-25",
+  "providerInventory": {
+    "workers": [
+      "bip",
+      "sekret-backend"
+    ],
+    "founderGatedPlannedWorkers": [
+      "sekret-backend-alpha"
+    ],
+    "pages": [
+      "sekret-bip"
+    ]
+  },
   "production": {
     "pages": {
       "name": "sekret-bip",
@@ -10,7 +22,7 @@
     },
     "worker": {
       "name": "sekret-backend",
-      "entrypoint": "worker/observed-index.ts",
+      "entrypoint": "worker/voice-entry.ts",
       "roles": [
         "authenticated-api",
         "sekret-reply",
@@ -22,23 +34,31 @@
       ]
     }
   },
+  "separateWorkerAuthorities": {
+    "bip": {
+      "kind": "worker",
+      "status": "founder-confirmed-renamed-from-sekret",
+      "previousName": "sekret",
+      "providerIdentityReadback": "required",
+      "routeBinding": "provider-readback-required",
+      "buildAuthority": "main-only-or-disabled",
+      "mutationPolicy": "preserve-until-exact-provider-binding-proven"
+    }
+  },
   "nonProduction": {
     "worker": {
       "name": "sekret-backend-alpha",
       "config": "wrangler.alpha.toml",
-      "status": "founder-gated"
+      "status": "founder-gated-not-deployed",
+      "provisioningAuthority": "explicit-founder-approval-required"
     }
   },
   "legacyDashboardServices": [
     {
       "name": "bip-mail",
       "kind": "worker",
-      "action": "retire-after-email-routing-cutover"
-    },
-    {
-      "name": "sekret",
-      "kind": "worker",
-      "action": "retire-after-route-binding-and-traffic-audit"
+      "status": "retired-provider-absent",
+      "action": "do-not-recreate"
     }
   ]
 }

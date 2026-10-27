@@ -1,5 +1,13 @@
 # ChatGPT Operating Contract — Sekret-Bip
 
+## Mandatory Sauce Guard — founder-owned canonical skill
+
+Every contributor, AI agent (ChatGPT, Claude, Codex, Perplexity, and later assistants), reviewer, automation, or delegated writer touching this repository must follow the founder-owned `sauce-guard` skill **before any outward-facing communication** drawn from internal product work. Canonical source: `jussray/founder-control-room/.agents/skills/sauce-guard/SKILL.md`. Use the current canonical skill; this is a reference, not a replacement implementation or an approval to publish.
+
+Enforce: evidence before claims; classify each material claim CURRENT / HISTORICAL / STALE / SUPERSEDED / UNKNOWN; remove raw diffs, provider payloads, proprietary prompts/architecture, credentials, private teen/parent/customer content, and unapproved metrics; obtain **Current You**'s exact-copy approval; have FCR revalidate at publication; require provider readback for publication claims. Missing or inaccessible skill / absent approval means HOLD, never publish or share externally.
+
+**Separate machine-enforced log safety:** public posts and CI/job logs are different egress channels. Use the repository `scripts/audit-sauce-guard-logging.mjs` changed-line gate and fixed-event-code logs for any auth, account deletion, payment, teen, parent, safety, or provider interaction. Never log untrusted error messages, tokens, raw response bodies, identifiers, prompts, messages, or request payloads. A green log gate is not proof that Sauce Guard reviewed a public communication. Do not edit or bypass these rules to silence a scanner; resolve and review the finding.
+
 This file governs ChatGPT (chat.openai.com, desktop, API, Codex tasks) when working in `jussray/Sekret-Bip`.
 
 ## 5W1H — Required Before Every Nontrivial Action
@@ -29,6 +37,31 @@ This file governs ChatGPT (chat.openai.com, desktop, API, Codex tasks) when work
 - Run any available lint/build checks before PR.
 - PR descriptions must not expose unreleased IP, story beats, or character details.
 - Include rollback steps before requesting merge.
+
+## Governed Gap-to-Merge Workflow
+
+When the founder invokes `/gaps`, `/blueprint`, `/rent`, `/implement`, `/review`, `/merge`, `/cont`, or equivalent stacked language, load `.ai-skills/skills/gap-blueprint-implement-review.md` and execute:
+
+`GAPS → BLUEPRINT → RENT → IMPLEMENT → VERIFY → REVIEW → MERGE GATE → CONTINUE`
+
+The loop must read current repository, `main`, PR, Founder Control Room, provider, database, checks, jobs, steps, logs, and review evidence before judging. Label claims `VERIFIED`, `INFERRED`, `UNKNOWN`, or `BLOCKED`. A failed lookup is `UNKNOWN`, never absence. Missing runs are not `workflow_no_jobs`. Never claim a code regression without an executed failing step and logs. Require Playwright or device proof for rendered changes. Do not mutate production or merge without explicit authority, and stop if the verified head moves before merge.
+
+## Seek, Learn, Find — No-Assumption Rule
+
+For every nontrivial diagnosis, status claim, repair, merge, deployment, provider, secret, CI, database, or release decision, use this sequence:
+
+`SEEK → INSPECT → VERIFY → LEARN → COMPARE → CONCLUDE → ACT`
+
+- Seek and find available authoritative evidence before asking the founder to repeat information or filling a gap with a guess.
+- Inspect the exact current repository, branch, head SHA, workflow run, provider state, database state, or other authority relevant to the claim.
+- Verify before concluding. A plausible explanation is not a verified fact.
+- If evidence is missing, inaccessible, stale, or contradictory, label the claim `UNKNOWN`, `INFERRED`, or `BLOCKED` instead of upgrading it to `VERIFIED`.
+- Keep provider truth, repository truth, CI truth, runtime truth, browser truth, device truth, and account truth separate unless direct evidence proves they match.
+- If `main` moves, re-read the new head and inspect intervening commits before acting or reusing prior conclusions.
+- A workflow rerun is not automatically equivalent to a newly queued run. For claims involving changed secrets, environment, permissions, provider state, or other queue-time inputs, require a fresh run unless platform documentation and exact evidence prove the rerun is equivalent.
+- Never use an old receipt, stale run, cached assumption, prior conversation statement, or historical issue status as proof of current state when a fresher authority can be checked.
+- When two evidence sources disagree, investigate the disagreement before naming a cause.
+- Confess and correct an evidence mistake immediately; do not defend a conclusion after its proof boundary has failed.
 
 ## Approval Gates
 

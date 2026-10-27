@@ -40,6 +40,7 @@ test('production browser validates the Supabase publishable key and reaches Auth
 }) => {
   expect(supabaseUrl).toMatch(/^https:\/\/[a-z0-9]+\.supabase\.co$/);
   expect(supabasePublishableKey).toMatch(/^(sb_publishable_|eyJ)/);
+  expect(supabasePublishableKey).not.toMatch(/^sb_secret_/);
 
   await page.goto('/signup?side=teen');
 
@@ -75,9 +76,8 @@ test('production browser validates the Supabase publishable key and reaches Auth
       };
 
       return {
-        key: await read('/rest/v1/', {
-          apikey: key,
-          Accept: 'application/openapi+json, application/json',
+        withoutKey: await read('/auth/v1/settings', {
+          Accept: 'application/json',
         }),
         auth: await read('/auth/v1/settings', {
           apikey: key,
@@ -88,14 +88,12 @@ test('production browser validates the Supabase publishable key and reaches Auth
     { url: supabaseUrl, key: supabasePublishableKey },
   );
 
-  expect(probes.key.status, JSON.stringify(probes.key)).toBe(200);
-  expect(probes.key.ok, JSON.stringify(probes.key)).toBe(true);
-  expect(probes.key.contentType).toMatch(/json/i);
-  expect(probes.key.body).not.toContain(supabasePublishableKey);
-  expect(probes.key.body).not.toMatch(/sb_secret_|service[_-]?role/i);
+  expect([401, 403], JSON.stringify(probes.withoutKey)).toContain(probes.withoutKey.status);
+  expect(probes.withoutKey.ok, JSON.stringify(probes.withoutKey)).toBe(false);
 
   expect(probes.auth.status, JSON.stringify(probes.auth)).toBe(200);
   expect(probes.auth.ok, JSON.stringify(probes.auth)).toBe(true);
   expect(probes.auth.contentType).toContain('application/json');
+  expect(probes.auth.body).not.toContain(supabasePublishableKey);
   expect(probes.auth.body).not.toMatch(/sb_secret_|service[_-]?role/i);
 });

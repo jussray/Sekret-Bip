@@ -2,6 +2,8 @@ const DESTINATION_EMAIL = 'sekretbip@gmail.com';
 
 const BIP_INBOXES: Record<string, string> = {
   hello: 'general',
+  founder: 'founder',
+  partnerships: 'partnerships',
   support: 'support',
   parents: 'parent-support',
   safety: 'safety',

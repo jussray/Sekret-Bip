@@ -3,22 +3,72 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+const exists = async (path) => {
+  try {
+    await read(path);
+    return true;
+  } catch (error) {
+    if (error?.code === 'ENOENT') return false;
+    throw error;
+  }
+};
 
 const livePath = 'docs/migration-history/onboarding/20260718040638_onboarding_state.live.sql';
 const repoStatePath = 'docs/migration-history/onboarding/20260718000000_onboarding_state.repository.sql';
 const repoMoodPath = 'docs/migration-history/onboarding/20260718000001_onboarding_mood_log_trigger.repository.sql';
 const observationPath = 'docs/migration-history/onboarding/production-observation-2026-07-18.json';
+const canonicalPath = 'supabase/migrations/20260718040638_onboarding_state.sql';
+const enumExtensionPath = 'supabase/migrations/20260811132500_extend_onboarding_stage_enum.sql';
+const reconcilePath = 'supabase/migrations/20260811132600_reconcile_onboarding_and_moods_contract.sql';
 
-test('repository migration archives are exact content copies', async () => {
-  const [activeState, archivedState, activeMood, archivedMood] = await Promise.all([
-    read('supabase/migrations/20260718000000_onboarding_state.sql'),
+const oldExecutablePaths = [
+  'supabase/migrations/20260718000000_onboarding_state.sql',
+  'supabase/migrations/20260718000001_onboarding_mood_log_trigger.sql',
+  'supabase/migrations/20260718000002_harden_onboarding_state.sql',
+];
+
+test('historical repository split-brain evidence remains inert and preserved', async () => {
+  const [repositoryState, repositoryMood] = await Promise.all([
     read(repoStatePath),
-    read('supabase/migrations/20260718000001_onboarding_mood_log_trigger.sql'),
     read(repoMoodPath),
   ]);
 
-  assert.equal(archivedState, activeState);
-  assert.equal(archivedMood, activeMood);
+  assert.match(repositoryState, /'signed_up'/);
+  assert.match(repositoryState, /age_bucket/);
+  assert.match(repositoryMood, /handle_first_mood_log/);
+
+  for (const path of oldExecutablePaths) {
+    assert.equal(await exists(path), false, `${path} must stay out of ordered migrations`);
+  }
+});
+
+test('ordered migration authority now uses recorded baseline plus current reconciliation', async () => {
+  const [canonical, enumExtension, reconcile] = await Promise.all([
+    read(canonicalPath),
+    read(enumExtensionPath),
+    read(reconcilePath),
+  ]);
+
+  assert.match(canonical, /CREATE TYPE public\.onboarding_stage AS ENUM/);
+  assert.match(canonical, /'signup'/);
+  assert.match(canonical, /'offboarded'/);
+  assert.doesNotMatch(canonical, /'signed_up'/);
+
+  for (const stage of [
+    'pre_signup', 'signed_up', 'age_verified', 'role_selected',
+    'parent_link_sent', 'parent_linked', 'steady_state',
+  ]) {
+    assert.match(enumExtension, new RegExp(`'${stage}'`));
+  }
+
+  assert.match(reconcile, /requires manual review for offboarded rows/);
+  assert.match(reconcile, /when 'signup' then 'signed_up'/);
+  assert.match(reconcile, /when 'age_confirmed' then 'age_verified'/);
+  assert.match(reconcile, /when 'parent_link_complete' then 'parent_linked'/);
+  assert.match(reconcile, /add column if not exists age_bucket text/);
+  assert.match(reconcile, /add column if not exists parent_link_code text/);
+  assert.match(reconcile, /create table if not exists public\.moods/);
+  assert.match(reconcile, /create trigger trg_first_mood_activation/);
 });
 
 test('live baseline evidence preserves the observed remote contract', async () => {
@@ -42,14 +92,12 @@ test('live baseline evidence preserves the observed remote contract', async () =
   assert.doesNotMatch(live, /age_bucket|parent_link_sent|steady_state|handle_first_mood_log/);
 });
 
-test('evidence document fails closed on execution and unsafe enum mapping', async () => {
+test('historical evidence document remains fail-closed about unsafe legacy mapping', async () => {
   const doc = await read('docs/ONBOARDING_MIGRATION_RECONCILIATION.md');
 
   assert.match(doc, /evidence and planning only/);
   assert.match(doc, /All SQL under `docs\/migration-history\/onboarding\/` is inert historical evidence/);
   assert.match(doc, /`offboarded` \| none \| must fail\/manual review/);
-  assert.match(doc, /Do not merge or apply them as live reconciliation/);
-  assert.match(doc, /Production remains untouched/);
 });
 
 test('read-only parity probe contains no mutation statements', async () => {
@@ -62,7 +110,7 @@ test('read-only parity probe contains no mutation statements', async () => {
   assert.doesNotMatch(probe, /select\s+\*/i);
 });
 
-test('retained production observation is aggregate-only and fail-closed', async () => {
+test('retained production observation stays aggregate-only historical evidence', async () => {
   const observation = JSON.parse(await read(observationPath));
 
   assert.equal(observation.observationMode, 'read_only_catalog_and_aggregate');
@@ -80,7 +128,7 @@ test('retained production observation is aggregate-only and fail-closed', async 
   assert.equal(observation.decision, 'hold_for_development_branch_reconciliation');
 });
 
-test('live and repository stage contracts are intentionally distinct evidence', async () => {
+test('archived live and repository contracts remain intentionally distinct evidence', async () => {
   const [live, repository] = await Promise.all([
     read(livePath),
     read(repoStatePath),
@@ -95,7 +143,7 @@ test('live and repository stage contracts are intentionally distinct evidence', 
   assert.doesNotMatch(live, /age_bucket/);
 });
 
-test('evidence artifacts stay outside the ordered migration directory', async () => {
+test('all retained historical evidence stays outside the ordered migration directory', async () => {
   for (const path of [livePath, repoStatePath, repoMoodPath, observationPath]) {
     assert.ok(path.startsWith('docs/migration-history/onboarding/'));
     assert.ok(!path.startsWith('supabase/migrations/'));

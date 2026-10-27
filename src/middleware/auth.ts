@@ -7,17 +7,15 @@
  *  - Automatic token refresh on expiry
  *
  * Usage (in _layout.tsx or route guards):
- *   import { requireAuth, requireRole } from '@/src/middleware/auth';
+ *   import { requireAuth, requireRole } from '@/middleware/auth';
  */
-import { createClient } from '@supabase/supabase-js';
 import type { User } from '@supabase/supabase-js';
+import { getSupabase, supabase } from '../utils/supabase';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: { autoRefreshToken: true, persistSession: true },
-});
+// Compatibility export for existing callers. The canonical singleton is
+// nullable when account credentials are intentionally absent, which keeps
+// public/local routes from crashing at module import time.
+export { supabase };
 
 export type AuthResult =
   | { ok: true; user: User; role: string }
@@ -25,10 +23,13 @@ export type AuthResult =
 
 /**
  * Returns the current session user, refreshing the token if needed.
- * Returns null if no valid session exists.
+ * Returns null if no configured client or valid session exists.
  */
 export async function getCurrentUser(): Promise<User | null> {
-  const { data, error } = await supabase.auth.getUser();
+  const client = getSupabase();
+  if (!client) return null;
+
+  const { data, error } = await client.auth.getUser();
   if (error || !data.user) return null;
   return data.user;
 }
@@ -64,8 +65,10 @@ export async function requireRole(required: 'admin' | 'user'): Promise<AuthResul
 }
 
 /**
- * Sign out and clear session.
+ * Sign out and clear session. No-op when account service is unconfigured.
  */
 export async function signOut(): Promise<void> {
-  await supabase.auth.signOut();
+  const client = getSupabase();
+  if (!client) return;
+  await client.auth.signOut();
 }

@@ -1,12 +1,9 @@
-import fs from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
+import { resolvePlaywrightExecutablePath } from './scripts/playwright-executable.mjs';
 
 const PORT = 4174;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
-const sandboxChromium = '/opt/pw-browsers/chromium';
-const executablePath =
-  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ||
-  (fs.existsSync(sandboxChromium) ? sandboxChromium : undefined);
+const executablePath = resolvePlaywrightExecutablePath();
 
 export default defineConfig({
   testDir: './e2e-founder-preview',

@@ -124,3 +124,48 @@ The feature remains `internal` until all of the following pass:
 4. Oracle teaching endpoint, grounding, verification, and Se'kret rendering.
 5. Notifications, shared recaps, accessibility, and offline/error states.
 6. Full CI, Playwright, cost controls, red-team review, and staged rollout.
+
+Only slice 1 exists in the repository today (`src/features/bridgeLearning/types.ts`,
+`src/features/bridgeLearning/teachingPolicy.ts`). Slices 2-6 have not started.
+
+## Oracle grounding design (planned, slice 4 — not implemented)
+
+Design only. No Worker route, secret, schema, or grounding call exists yet.
+`OracleTeachingPacket.sources: GroundedSource[]` (`src/features/bridgeLearning/types.ts`)
+is currently an unpopulated contract shape. This section records the intended
+approach for when slice 4 starts, so a future session does not have to
+rediscover it, and so it is never mistaken for shipped capability in the
+meantime — see `implementation-ledger.json`'s `bridge-learning-oracle-grounding`
+entry, status `planned`.
+
+Candidate approach, once slices 2-3 exist to build against:
+
+- **Server-side only.** A Worker route parallel to `worker/sekret-reply.ts`'s
+  existing OpenAI call issues the grounding query; the client never calls a
+  search provider directly. Any API key is a Worker secret, handled under the
+  same rules as `OPENAI_API_KEY` in `docs/OPENAI_COMPANION_RUNTIME.md`: never
+  in Expo/React Native bundles, committed env files, logs, or telemetry.
+- **Query minimization.** The grounding query may carry only the shared
+  session's `subject`, `topic`, and the specific step being taught — never
+  private Study Buddy history, journal content, or anything outside the
+  Bridge Learning session, per this document's privacy boundary above.
+- **Source-type mapping.** `GroundedSource.sourceType` is `'user_source' |
+  'approved_curriculum' | 'reference'`. A search-grounded citation can only
+  ever populate `'reference'`; it is never eligible to be written as
+  `'approved_curriculum'` (a separate, founder-curated set) or `'user_source'`.
+- **Abstain over fabricate.** When grounding returns no citable, on-topic
+  source, the packet must set `needsOutsideHelp: true` with a correspondingly
+  low `confidence` rather than a citation-shaped guess. This is the literal
+  test of the "abstain and recommend outside help when confidence is
+  insufficient" requirement above.
+- **A scoped usage boundary, separate from `PERPLEXITY.md`.** The repository's
+  existing `PERPLEXITY.md` governs Se'kret Bip creative-IP and world-building
+  research; it does not cover engineering-time grounding calls for a
+  teen-facing educational feature. Slice 4 needs its own boundary at minimum
+  covering source/domain suitability for K-12 education and exclusion of
+  unmoderated web/forum content, before any real query is issued.
+
+Before this can leave `planned` status: a fabricated-citation negative test, an
+abstain-on-low-confidence test, and a source-type-mapping test, in addition to
+the Worker-authentication, active-link, and privacy-boundary tests slices 2-3
+already require.

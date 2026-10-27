@@ -37,6 +37,7 @@
       "url": "https://observability.mcp.cloudflare.com/mcp"
     },
     "playwright": {
+      "type": "local",
       "command": "npx",
       "args": [
         "-y",
@@ -44,7 +45,8 @@
         "--isolated",
         "--browser",
         "chromium"
-      ]
+      ],
+      "tools": ["*"]
     }
   }
 }

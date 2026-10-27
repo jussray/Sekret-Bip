@@ -31,9 +31,13 @@ test('preview builds use the isolated alpha Worker while production stays canoni
   assert.equal(eas.build['parent-preview'].env.EXPO_PUBLIC_RELEASE_AUDIENCE, 'beta');
   assert.equal(
     eas.build.production.env.EXPO_PUBLIC_BACKEND_URL,
-    'https://sekret-backend.mcgill-raylene.workers.dev',
+    'https://api.sekretbip.net',
   );
   assert.equal(eas.build.production.env.EXPO_PUBLIC_RELEASE_AUDIENCE, 'public');
+  assert.equal(
+    eas.build['parent-production'].env.EXPO_PUBLIC_BACKEND_URL,
+    'https://api.sekretbip.net',
+  );
   assert.equal(eas.build['parent-production'].env.EXPO_PUBLIC_RELEASE_AUDIENCE, 'public');
 });
 
@@ -54,7 +58,7 @@ test('controlled-alpha commands are explicit and cannot silently deploy producti
 
   assert.equal(
     pkg.scripts['test:controlled-alpha'],
-    'node --test test/controlled-alpha-activation.test.mjs test/controlled-alpha-founder-room-plan.test.mjs test/controlled-alpha-service-boundaries.test.mjs',
+    'node --test test/controlled-alpha-activation.test.mjs test/controlled-alpha-founder-room-plan.test.mjs test/controlled-alpha-service-boundaries.test.mjs test/controlled-alpha-crew-access-hardening.test.mjs',
   );
   assert.equal(
     pkg.scripts['verify:worker:alpha'],
@@ -68,5 +72,9 @@ test('controlled-alpha commands are explicit and cannot silently deploy producti
     pkg.scripts['preview:worker:alpha'],
     'wrangler dev --config wrangler.alpha.toml',
   );
-  assert.equal(pkg.scripts['deploy:worker'], 'wrangler deploy');
+  assert.equal(
+    pkg.scripts['deploy:api:production'],
+    'node scripts/assert-production-deploy-branch.mjs && node scripts/deploy-cloudflare-worker.mjs',
+  );
+  assert.equal(pkg.scripts['deploy:worker'], 'npm run deploy:api:production');
 });

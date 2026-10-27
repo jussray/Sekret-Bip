@@ -108,7 +108,11 @@ test('voice event payloads use a strict primitive metadata allowlist', async () 
     'error_code',
     'region',
   ]) {
-    assert.match(migration, new RegExp(`when '${allowedKey}'`));
+    // Some allowed keys share a single `when 'a', 'b' then` case rather than
+    // each getting a standalone `when` clause (e.g. 'is_reconnect' and
+    // 'was_cancelled' are grouped). Match the key anywhere within a when
+    // clause's value list, not only as the first value after `when`.
+    assert.match(migration, new RegExp(`when[^\\n]*'${allowedKey}'`));
   }
 
   assert.match(errorCodeMigration, /voice_events_error_code_vocabulary/);

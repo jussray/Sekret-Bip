@@ -68,11 +68,15 @@ test('implemented and founder-only prototype features receive development overri
   assert.doesNotMatch(previewSet, /companionMemory/);
 });
 
-test('route visibility opens in development while screen safety boundaries remain', () => {
+test('route visibility opens in development while side and Quiet Bip safety boundaries remain', () => {
   const teenLayout = read('app/(teen)/_layout.tsx');
   const parentLayout = read('app/(parent)/_layout.tsx');
 
-  assert.match(teenLayout, /if \(founderPreview\) return <TeenTabs/);
+  assert.match(teenLayout, /if \(founderPreview && devSideOverride === 'parent'\)/);
+  assert.match(teenLayout, /if \(founderPreview\) \{/);
+  assert.match(teenLayout, /if \(!sleepLoaded\) return <TeenLoadingSurface \/>/);
+  assert.match(teenLayout, /if \(sleepActive && !quietRouteAllowed\) return <Redirect href="\/\(teen\)\/quiet" \/>/);
+  assert.match(teenLayout, /return <TeenTabs selectedSekret=\{selectedSekret \?\? 'raylene'\} quietActive=\{sleepActive\} \/>/);
   assert.match(teenLayout, /SafetyExperienceSheet/);
   assert.match(teenLayout, /useSafetyCheck/);
   assert.match(parentLayout, /if \(founderPreview\) return <ParentTabs/);

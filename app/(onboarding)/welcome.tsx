@@ -56,7 +56,7 @@ export default function Welcome() {
     setUserSide(decision.nextSide);
 
     if (decision.allowed) {
-      advance('age_verified', {
+      await advance('age_verified', {
         age_bucket: decision.ageBucket,
         age_verification_status: decision.status,
         age_verification_method: decision.method,
@@ -71,7 +71,7 @@ export default function Welcome() {
   async function handleParent() {
     await AsyncStorage.setItem(ONBOARDING_SIDE_KEY, 'parent');
     setUserSide('parent');
-    advance('role_selected', { role: 'parent' });
+    await advance('role_selected', { role: 'parent' });
     router.push('/(onboarding)/parent-splash');
   }
 
@@ -126,7 +126,7 @@ export default function Welcome() {
         ) : null}
 
         <View style={styles.companionRow}>
-          {['💜 Raylene', '💙 Rylane', '☁️ Cloud', '🌙 Night'].map(label => (
+          {['💜 Suhana', '💙 Sy', '☁️ Cloud', '🌙 Night'].map(label => (
             <View key={label} style={styles.companionChip}>
               <Text style={styles.companionText}>{label}</Text>
             </View>
@@ -154,7 +154,7 @@ export default function Welcome() {
 }
 
 const styles = StyleSheet.create({
-  root:          { flex: 1, backgroundColor: BG },
+  root:          { flex: 1, backgroundColor: BG, overflow: 'hidden' },
   bgDot1:        { position: 'absolute', width: 340, height: 340, borderRadius: 170, backgroundColor: '#4c1d9520', top: -80, right: -100 },
   bgDot2:        { position: 'absolute', width: 260, height: 260, borderRadius: 130, backgroundColor: '#7c3aed12', bottom: 60, left: -80 },
   content:       { flexGrow: 1, paddingTop: Platform.OS === 'ios' ? 72 : 52, paddingHorizontal: 28, paddingBottom: 170, alignItems: 'flex-start' },

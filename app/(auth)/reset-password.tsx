@@ -12,16 +12,32 @@ import {
   View,
 } from 'react-native';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   PASSWORD_RECOVERY_PATH,
   isRecoveryCredential,
   parseRecoveryUrl,
   validateNewPassword,
+  type RecoveryAccountSide,
 } from '@/features/auth/passwordRecovery';
 import { getSupabase } from '@/utils/supabase';
 
 type RecoveryState = 'checking' | 'ready' | 'invalid';
+
+function normalizeSide(value: string | undefined): RecoveryAccountSide | undefined {
+  return value === 'parent' || value === 'teen' ? value : undefined;
+}
+
+function authRoute(
+  path: '/(auth)/login' | '/(auth)/forgot-password',
+  side?: RecoveryAccountSide,
+  extra?: string,
+): string {
+  const params = new URLSearchParams(extra ?? '');
+  if (side) params.set('side', side);
+  const query = params.toString();
+  return query ? `${path}?${query}` : path;
+}
 
 function readableAuthError(error: unknown): string {
   if (error instanceof TypeError && error.message.toLowerCase().includes('failed to fetch')) {
@@ -30,12 +46,16 @@ function readableAuthError(error: unknown): string {
   return 'Could not update your password. Please request a new reset link.';
 }
 
-function scrubRecoveryUrl() {
+function scrubRecoveryUrl(side?: RecoveryAccountSide) {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-  window.history.replaceState({}, document.title, PASSWORD_RECOVERY_PATH);
+  const target = new URL(PASSWORD_RECOVERY_PATH, window.location.origin);
+  if (side) target.searchParams.set('side', side);
+  window.history.replaceState({}, document.title, `${target.pathname}${target.search}`);
 }
 
 export default function ResetPasswordScreen() {
+  const params = useLocalSearchParams<{ side?: string }>();
+  const preferredSide = normalizeSide(params.side);
   const [password, setPassword]   = useState('');
   const [confirm, setConfirm]     = useState('');
   const [error, setError]         = useState('');
@@ -55,7 +75,6 @@ export default function ResetPasswordScreen() {
     ]).start();
   }
 
-  // ─ Recovery link acceptance (unchanged logic) ──────────────────────────────
   useEffect(() => {
     const sb = getSupabase();
     if (!sb) {
@@ -73,7 +92,7 @@ export default function ResetPasswordScreen() {
       recoveryAccepted = true;
       setError('');
       setRecoveryState('ready');
-      scrubRecoveryUrl();
+      scrubRecoveryUrl(preferredSide);
     }
 
     function markInvalid(message: string) {
@@ -126,9 +145,8 @@ export default function ResetPasswordScreen() {
       authSubscription.unsubscribe();
       linkSubscription.remove();
     };
-  }, []);
+  }, [preferredSide]);
 
-  // ─ Submit ──────────────────────────────────────────────────────────────────
   async function handleUpdatePassword() {
     setError('');
     if (recoveryState !== 'ready') {
@@ -163,7 +181,7 @@ export default function ResetPasswordScreen() {
 
       setPassword('');
       setConfirm('');
-      router.replace('/(auth)/login?passwordReset=1');
+      router.replace(authRoute('/(auth)/login', preferredSide, 'passwordReset=1') as never);
     } catch (caught) {
       setError(readableAuthError(caught));
       shakeCard();
@@ -175,7 +193,6 @@ export default function ResetPasswordScreen() {
   const ready    = recoveryState === 'ready';
   const checking = recoveryState === 'checking';
 
-  // ─ Render ─────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.root}
@@ -185,7 +202,6 @@ export default function ResetPasswordScreen() {
       <View style={styles.bgDot2} pointerEvents="none" />
 
       <Animated.View style={[styles.inner, { transform: [{ translateX: shakeAnim }] }]}>
-        {/* Logo */}
         <View style={styles.logoWrap}>
           <Text style={styles.logoMark}>Bip</Text>
           <Text style={styles.logoHeart}>💜</Text>
@@ -205,7 +221,6 @@ export default function ResetPasswordScreen() {
           <ActivityIndicator color="#a78bfa" style={{ marginBottom: 20 }} />
         ) : null}
 
-        {/* New password */}
         <View style={[styles.inputWrap, !ready && styles.inputDisabled]}>
           <TextInput
             style={[styles.input, { paddingRight: 52 }]}
@@ -229,7 +244,6 @@ export default function ResetPasswordScreen() {
           </Pressable>
         </View>
 
-        {/* Confirm password */}
         <View style={[styles.inputWrap, { marginBottom: 6 }, !ready && styles.inputDisabled]}>
           <TextInput
             style={[styles.input, { paddingRight: 52 }]}
@@ -275,7 +289,7 @@ export default function ResetPasswordScreen() {
 
         {!ready && !checking ? (
           <TouchableOpacity
-            onPress={() => router.replace('/(auth)/forgot-password')}
+            onPress={() => router.replace(authRoute('/(auth)/forgot-password', preferredSide) as never)}
             style={styles.linkBtn}
             accessibilityRole="link"
             accessibilityLabel="Request a new reset link"
@@ -285,7 +299,7 @@ export default function ResetPasswordScreen() {
         ) : null}
 
         <TouchableOpacity
-          onPress={() => router.replace('/(auth)/login')}
+          onPress={() => router.replace(authRoute('/(auth)/login', preferredSide) as never)}
           style={styles.linkBtn}
           accessibilityRole="link"
           accessibilityLabel="Back to Sign In"

@@ -8,9 +8,12 @@ import { useVerificationContext } from '@/context/VerificationContext';
 import {
   saveAccountProfile,
   type AgeRange,
-  type Companion,
   type ProfileGender,
 } from '@/features/identity/accountProfile';
+import {
+  migratePersistedCompanionId,
+  toLegacyPersistedCompanionId,
+} from '@/features/identity/legacyCompanionIdMigration';
 import { fetchPostAuthBootstrap } from '@/services/auth/postAuthBootstrap';
 import { advanceStage, markActivated } from '@/services/onboarding';
 import { getSupabase } from '@/utils/supabase';
@@ -27,9 +30,6 @@ function isAgeRange(value: string): value is AgeRange {
 }
 function isGender(value: string | null): value is ProfileGender {
   return value === 'girl' || value === 'boy' || value === 'other';
-}
-function isCompanion(value: string): value is Companion {
-  return value === 'raylene' || value === 'rylane' || value === 'cloud' || value === 'night';
 }
 
 const PURPLE     = '#7c3aed';
@@ -85,13 +85,18 @@ export default function ReflectionScreen() {
         'bip_onboarding_gender',
         'bip_onboarding_companion',
       ]);
-      const age    = values[0][1] ?? '';
-      const gender = values[1][1];
-      const choice = values[2][1] ?? 'raylene';
+      const age             = values[0][1] ?? '';
+      const gender          = values[1][1];
+      const canonicalChoice = migratePersistedCompanionId(values[2][1] ?? 'suhana');
 
-      if (!name.trim() || !isAgeRange(age) || !isGender(gender) || !isCompanion(choice)) {
+      if (!name.trim() || !isAgeRange(age) || !isGender(gender) || !canonicalChoice) {
         throw new Error('Your onboarding profile is incomplete. Go back and finish each step.');
       }
+
+      // Durable profile/runtime storage still uses the legacy IDs. Keep that
+      // translation explicit at this boundary until the persistence contract
+      // is migrated in the follow-up canonical Room/profile cutover.
+      const persistedChoice = toLegacyPersistedCompanionId(canonicalChoice);
 
       await saveAccountProfile({
         accountSide: 'teen',
@@ -99,7 +104,7 @@ export default function ReflectionScreen() {
         onboardingComplete: true,
         ageRange: age,
         gender,
-        selectedCompanion: choice,
+        selectedCompanion: persistedChoice,
         circleNickname: 'anonymous bip',
       });
 
@@ -115,7 +120,7 @@ export default function ReflectionScreen() {
       });
 
       setUserSide('teen');
-      setSelectedSekret(choice);
+      setSelectedSekret(persistedChoice);
       await refreshVerification();
       router.replace(
         verificationState === 'VERIFIED_TEEN'

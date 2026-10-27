@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router, useLocalSearchParams } from 'expo-router';
 
 import type { AccountSide } from '@/features/identity/accountProfile';
@@ -16,6 +17,7 @@ import { fetchPostAuthBootstrap } from '@/services/auth/postAuthBootstrap';
 import { getSupabase } from '@/utils/supabase';
 import { consentService } from '../../services/consentService';
 import { useOnboarding } from '@/context/OnboardingContext';
+import { AGE_ASSURANCE_STORAGE_KEYS, type AgeBucket } from '@/features/onboarding/ageAssurance';
 
 const PRIVACY_POLICY_URL = 'https://github.com/jussray/Sekret-Bip/blob/main/docs/PRIVACY_POLICY.md';
 const TERMS_URL = 'https://github.com/jussray/Sekret-Bip/blob/main/docs/TERMS_OF_SERVICE.md';
@@ -29,6 +31,10 @@ const PARENT_BG       = '#08140f';
 
 function normalizeSide(value: string | undefined): AccountSide {
   return value === 'parent' ? 'parent' : 'teen';
+}
+
+function isStoredAgeBucket(value: string | null): value is AgeBucket {
+  return value === 'under-13' || value === '13-15' || value === '16-17' || value === '18-19';
 }
 
 function CheckRow({
@@ -104,6 +110,24 @@ export default function ConsentScreen() {
     await Linking.openURL(url);
   }
 
+  async function replayDurableOnboardingChoices() {
+    await advance('consent_complete');
+
+    if (side === 'teen') {
+      const storedAge = await AsyncStorage.getItem(AGE_ASSURANCE_STORAGE_KEYS.bucket);
+      if (!isStoredAgeBucket(storedAge) || storedAge === 'under-13') {
+        router.replace('/(onboarding)/age' as never);
+        return false;
+      }
+      await advance('age_verified', { age_bucket: storedAge });
+      await advance('role_selected', { role: 'teen' });
+      return true;
+    }
+
+    await advance('role_selected', { role: 'parent' });
+    return true;
+  }
+
   async function handleContinue() {
     if (!userId || !privacyAccepted || !termsAccepted || saving) return;
     setSaving(true);
@@ -113,7 +137,10 @@ export default function ConsentScreen() {
       if (!consentService.has('termsOfService')) await consentService.grant(userId, 'termsOfService');
       await consentService.load(userId);
       if (!consentService.hasCompletedOnboarding()) throw new Error('Your choices were not fully saved. Please try again.');
-      await advance('consent_complete');
+
+      const replayed = await replayDurableOnboardingChoices();
+      if (!replayed) return;
+
       const bootstrap = await fetchPostAuthBootstrap(side);
       router.replace(bootstrap.nextRoute as never);
     } catch (caught) {

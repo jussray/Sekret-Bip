@@ -42,6 +42,18 @@ test('legacy API and main chat route through the shared client instead of direct
   }
 });
 
+test('unused duplicate frontend transports stay retired', () => {
+  assert.equal(fs.existsSync(path.join(root, 'src/services/worker/index.ts')), false);
+  assert.equal(fs.existsSync(path.join(root, 'services/ttsService.ts')), false);
+
+  const voiceBip = read('screens/VoiceBipScreen.tsx');
+  assert.match(voiceBip, /fetchSekretReply/);
+  assert.match(voiceBip, /fetchSekretVoice/);
+  assert.match(voiceBip, /fetchSekretTranscribe/);
+  assert.doesNotMatch(voiceBip, /EXPO_PUBLIC_PIPER_TTS_URL/);
+  assert.doesNotMatch(voiceBip, /EXPO_PUBLIC_PIPER_API_TOKEN/);
+});
+
 test('Worker style enforcement always supplies an avatar state', () => {
   const runtimeStyle = read('worker/runtime-style.ts');
 

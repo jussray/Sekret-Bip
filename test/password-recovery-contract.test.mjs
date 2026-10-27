@@ -14,6 +14,7 @@ import {
 const loginSource = fs.readFileSync('app/(auth)/login.tsx', 'utf8');
 const forgotSource = fs.readFileSync('app/(auth)/forgot-password.tsx', 'utf8');
 const resetSource = fs.readFileSync('app/(auth)/reset-password.tsx', 'utf8');
+const supabaseSource = fs.readFileSync('src/utils/supabase.ts', 'utf8');
 const playwrightSource = fs.readFileSync('playwright.config.ts', 'utf8');
 const productionPlaywrightSource = fs.readFileSync('playwright.production.config.ts', 'utf8');
 const appConfig = JSON.parse(fs.readFileSync('app.json', 'utf8'));
@@ -121,11 +122,19 @@ test('wires the public request and recovery screens without account enumeration'
   assert.doesNotMatch(`${forgotSource}\n${resetSource}`, /console\.(log|warn|error)/);
 });
 
+test('keeps the one-time PKCE recovery exchange owned by the reset screen', () => {
+  assert.match(supabaseSource, /PASSWORD_RECOVERY_PATH/);
+  assert.match(supabaseSource, /shouldDetectSessionInUrl/);
+  assert.match(supabaseSource, /!pathname\.endsWith\(PASSWORD_RECOVERY_PATH\)/);
+  assert.match(supabaseSource, /detectSessionInUrl: shouldDetectSessionInUrl\(\)/);
+  assert.match(resetSource, /exchangeCodeForSession/);
+});
+
 test('production recovery browser checks are excluded only from the blank-config suite', () => {
   assert.match(playwrightSource, /production-password-recovery\.spec\.ts/);
   assert.match(playwrightSource, /EXPO_PUBLIC_SUPABASE_URL: ''/);
   assert.match(productionPlaywrightSource, /testDir: '\.\/e2e'/);
-  assert.doesNotMatch(productionPlaywrightSource, /production-password-recovery\.spec\.ts/);
+  assert.match(productionPlaywrightSource, /production-password-recovery\.spec\.ts/);
 });
 
 test('native scheme and hosted redirect requirements remain explicit', () => {

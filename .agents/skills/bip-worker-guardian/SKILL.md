@@ -2,136 +2,171 @@
 
 ## 5W1H operating contract
 
-Before planning, editing, or claiming completion, establish and state:
+Before planning, editing, or claiming completion, establish:
 
-- **Who** — the requester, decision owner, affected users, data subjects, and execution authority.
-- **What** — the requested outcome, concrete deliverable, non-goals, and existing work that must be preserved.
-- **Where** — the exact repository, branch, environment, runtime, route, service, table, or provider boundary involved.
-- **When** — the current lifecycle or release state, required ordering, timing constraint, and rollback window.
-- **Why** — the user problem and verified evidence that justify the work.
-- **How** — the smallest safe implementation, required permissions, verification evidence, rollout, and rollback.
+- **Who** owns the decision/execution and who is affected.
+- **What** behavior changes and what must be preserved.
+- **Where** exact repository/branch/environment/Worker/route/binding/data boundary.
+- **When** lifecycle state, ordering, and rollback window.
+- **Why** verified evidence justifies the change.
+- **How** smallest safe implementation, permissions, proof, rollout, rollback.
 
-Inspect repository and runtime truth for unknowns. Ask the user only when a missing answer would materially change the safe solution or authority. Re-run 5W1H after red-team/OODA findings change the plan. Finish by mapping the result, evidence, remaining blocker, and next owner back to these six questions.
-
-
-Last reviewed: 2026-07-13
+Last reviewed: 2026-08-20
 
 ## Trigger
 
-Any PR touching files in `worker/`, `wrangler.toml`, Cloudflare bindings, authenticated API behavior, AI/TTS runtime behavior, or production deployment verification.
+Any PR touching `worker/`, `wrangler.toml`, Cloudflare Worker identities/routes/Service Bindings, authenticated API behavior, AI/TTS/STT runtime behavior, privileged Supabase Worker access, or production deployment verification.
 
 ## Canonical ownership
 
-Read `DEPLOYMENT.md`, `docs/CLOUDFLARE_OWNERSHIP.md`, and the current `wrangler.toml` before changing deployment behavior.
+Read `DEPLOYMENT.md`, `docs/CLOUDFLARE_OWNERSHIP.md`, `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md`, and current Wrangler/provider evidence before changing deployment behavior.
 
-- `sekret-backend` is the canonical backend Cloudflare Worker.
-- `sekret-bip` is the canonical Cloudflare Pages frontend project.
-- Cloudflare native Git integration deploys both from `main`.
-- GitHub Actions verifies the exact deployed release and does not act as a second upload authority.
+### Current public route
 
-This skill guards the backend Worker and its boundary with the frontend. It must not infer deployment names from old branches, domains, or historical documentation.
+- `api.sekretbip.net` is the stable public API origin.
+- Repository `wrangler.toml` currently maps it to `sekret-backend` using `worker/voice-entry.ts`.
+- `sekret-bip` is the canonical Pages frontend project.
+
+### Companion authority
+
+- `sekret` is founder-confirmed active companion API lineage.
+- Exact current hostname/routes/custom domains/workers.dev/build trigger/bindings/version/traffic remain Cloudflare provider-readback truth.
+- Best-fit companion responsibility is reply + voice + transcription plus companion identity/style/safety-response execution.
+
+### Platform authority
+
+Best-fit `sekret-backend` responsibilities are stable public ingress, Bridge/privileged-data operations, service-role Supabase access, inbound email, and non-companion backend/platform business logic.
+
+### Preferred split
+
+Keep clients on `api.sekretbip.net`; after provider census and compatibility proof, delegate `/api/sekret/*` from `sekret-backend` to `sekret` with a Cloudflare Service Binding.
+
+Do not introduce a second client-facing production Worker URL solely to split services.
+
+This skill guards both Workers and the boundary between them. It must not infer current provider state from historical names.
 
 FAIL if:
 
-- backend API or business logic is moved into the Pages frontend;
-- frontend routes or static assets are treated as Worker responsibilities without a documented reason;
-- client code receives Worker secrets, service-role keys, provider credentials, or server-only shared secrets;
-- a deployment change introduces a second competing production authority;
-- exact-release verification is replaced with a stale check-state or retired release function.
+- backend/companion secrets are moved into Pages/client code;
+- `SUPABASE_SERVICE_ROLE_KEY` is duplicated into `sekret` merely to preserve telemetry;
+- Bridge/private source access or inbound email is moved into the companion Worker without a separately reviewed reason;
+- `sekret` is deleted/renamed/detached without exact provider readback and rollback;
+- service-binding activation removes the old backend-local companion path before rollback/proof exists;
+- a second competing public production API authority is introduced;
+- exact-release verification is replaced by stale check state or a retired release function.
 
-## Verified Worker files
+## Worker file map
 
-Verify paths before use, then expect the current Worker tree to include responsibilities such as:
+Verify paths before use:
 
 ```text
 worker/
-  observed-index.ts       configured observability entry point
-  index.ts                runtime wrapper and request dispatch
-  auth.ts                 JWT validation and auth helpers
-  sekret-reply.ts         AI reply brain
-  runtime-style.ts        canonical identity/style enforcement
-  bridge-summary.ts       teen-to-parent summary generation
-  bridge-summary-store.ts Bridge persistence boundary
-  piper-tts.ts            TTS integration
-  push-notifications.ts   push notification dispatch
-  telemetry.ts            metadata-only telemetry helpers
-  audit/                  audit persistence helpers
-  config/                 Worker configuration
+  voice-entry.ts          current public backend entry point
+  observed-index.ts       telemetry wrapper
+  index.ts                auth/rate/style router
+  auth.ts                 JWT/auth helpers
+  sekret-reply.ts         companion reply/TTS/STT brain
+  runtime-style.ts        companion identity/style enforcement
+  bridge-summary.ts       privileged teen-to-parent summary generation
+  bridge-summary-store.ts privileged Bridge persistence
+  email-router.ts         inbound email processing
+  piper-tts.ts            legacy voice integration
+  push-notifications.ts   privileged push helper (not proof of a live public route)
+  telemetry.ts            metadata-only telemetry
+  audit/                  assurance persistence
+  config/                 runtime model/policy configuration
 ```
 
 Repository truth overrides this snapshot.
 
 ## Core security rules
 
-### JWT validation
+### Authentication
 
-Every authenticated endpoint must:
-
-1. validate the JWT before protected data access;
-2. derive user identity from the verified token, not the request body;
-3. return 401 for missing, expired, or invalid authentication;
-4. minimize response fields to the authorized use case.
-
-Flag any handler that trusts a body-only user identifier for protected access.
+Every protected endpoint must validate credentials before protected data access, derive user identity from verified auth rather than body-only identifiers, fail closed for invalid auth, and minimize responses.
 
 ### Service-role boundary
 
-- Service-role access is for narrowly scoped elevated operations only.
-- User-scoped reads must preserve a verified user boundary or perform an equivalent explicit authorization check.
-- Flag any elevated query filtered only by a user-supplied identifier.
-- The correct pattern is verified identity -> least-privilege query -> minimized response.
+- `SUPABASE_SERVICE_ROLE_KEY` is a privileged platform credential.
+- Keep it on the backend/platform boundary unless a separately reviewed least-privilege design proves another placement necessary.
+- The current companion assurance persistence uses this key. Treat that as technical debt to remove before the companion Worker becomes least-privilege, not justification to copy the key.
+- Elevated queries must derive authority from verified identity/control-plane context, not user-supplied IDs.
 
-### AI reply and style runtime
+### Companion runtime
 
-Changes to AI reply, prompt, identity, or style code require heightened scrutiny:
+Changes to reply, prompt, identity, style, voice, transcription, or delegation require:
 
-- [ ] actor identity comes from trusted repository configuration;
-- [ ] Se'kret remains a continuity presence rather than a selectable named companion;
-- [ ] forbidden internal identities do not appear in user-visible text, speech, archives, notifications, or accessibility labels;
-- [ ] user content is never treated as trusted system instruction;
-- [ ] memory context excludes unauthorized identity or private content;
-- [ ] safety guardrails remain applied after prompt changes;
-- [ ] question-budget and deterministic repair behavior remain tested;
-- [ ] telemetry remains metadata-only;
-- [ ] model or voice changes update configuration and evidence.
+- trusted actor identity configuration;
+- compatibility for Suhana, Sy, Cloud, Night, Se'kret and required legacy IDs;
+- no internal identity leakage;
+- user content never treated as trusted system instruction;
+- unauthorized memory/private context excluded;
+- safety-response guardrails preserved;
+- question/style repair tested;
+- metadata-only telemetry;
+- model/voice changes reflected in configuration and evidence.
 
 ### Bridge boundary
 
-- [ ] only explicitly consented teen content is included;
-- [ ] raw journal text is never returned to the parent client;
-- [ ] summaries exclude unrelated private content and identity-bearing fields;
-- [ ] revoked, expired, blocked, deleted, or unlinked relationships cannot generate or retrieve summaries;
-- [ ] controlled rollout remains disabled until production two-account proof passes.
+Bridge is privileged platform work, not general companion inference:
 
-### Endpoint checklist
+- only explicitly shared teen content may be used;
+- raw source text is never returned to parent clients;
+- revoked/expired/blocked/deleted/unlinked relationships fail closed;
+- rollout remains controlled until applicable production proof passes.
 
-For every new or modified endpoint:
+### Email boundary
 
-- [ ] authentication occurs before protected data access;
-- [ ] unauthenticated requests fail closed;
-- [ ] CORS is restricted appropriately;
-- [ ] rate limiting is considered for AI, voice, and abuse-sensitive routes;
-- [ ] logs exclude private content, credentials, and tokens;
-- [ ] rollout and rollback are documented;
-- [ ] tests cover positive and negative authorization paths.
+Inbound Email Routing stays on the platform Worker. Companion Worker changes must not mutate email handlers/rules as a side effect.
+
+## Service Binding checklist
+
+For any `sekret-backend -> sekret` change:
+
+- [ ] provider census for both Workers retained;
+- [ ] exact target `sekret` release/version known;
+- [ ] companion contract compatible before binding activation;
+- [ ] original Authorization/request semantics preserved or explicitly replaced with tested equivalent;
+- [ ] CORS/auth/rate limiting enforced exactly once or intentionally layered;
+- [ ] trace/correlation continuity preserved;
+- [ ] no service-role secret copied into companion runtime;
+- [ ] public client URL remains unchanged unless separately approved;
+- [ ] Bridge/email/platform routes do not delegate accidentally;
+- [ ] old local companion implementation remains available for rollback during first cutover;
+- [ ] binding is read back from Cloudflare after mutation;
+- [ ] production reply/voice/transcription journeys prove the intended companion Worker executed;
+- [ ] exact-release packet records both Worker identities and rollback.
+
+## Endpoint checklist
+
+For every new/modified endpoint:
+
+- auth before protected access;
+- unauthenticated requests fail closed;
+- CORS appropriate to invocation path;
+- abuse/rate limiting considered;
+- logs exclude private content/credentials/tokens;
+- rollout and rollback documented;
+- positive and negative authorization tests included.
 
 ## Deployment safety
 
-- [ ] `wrangler.toml` still names Worker `sekret-backend` and points to the intended entry point.
-- [ ] bindings match provisioned configuration and secrets.
-- [ ] no binding is removed without caller verification.
-- [ ] Cloudflare native Git integration remains the production authority.
-- [ ] Pages project `sekret-bip` is verified separately from Worker deployment.
-- [ ] exact-release verification checks the Worker build, deployed `release.json`, health endpoint, and production Playwright.
+- [ ] current public `wrangler.toml` still targets `sekret-backend` unless the approved change explicitly says otherwise;
+- [ ] `api.sekretbip.net` ownership is read back before route mutation;
+- [ ] `sekret` provider identity/bindings are read back before mutation;
+- [ ] bindings match provisioned configuration;
+- [ ] no binding/route/secret is removed without caller and rollback verification;
+- [ ] Cloudflare native integration remains normal production authority;
+- [ ] Pages is verified separately;
+- [ ] exact release uses the canonical well-known marker, Worker health/version, binding evidence when applicable, and production Playwright;
 - [ ] retired Supabase `release-health` is never used as deployment evidence.
-- [ ] if staging exists, validate there first; if it does not, document the real preview/test path instead of inventing one.
 
 ## Output
 
-Return: `APPROVED` or `CHANGES REQUIRED`.
+Return `APPROVED` or `CHANGES REQUIRED`.
 
-For required changes, include exact file, line, violated rule, and severity:
+For required changes, include exact file/line/rule/severity:
 
-- CRITICAL: auth bypass, secret exposure, or private-data leak
-- HIGH: missing validation, wrong deployment authority, or parent/teen boundary failure
-- MEDIUM: stale configuration, missing evidence, or weak rollback/telemetry
+- CRITICAL: auth bypass, secret exposure, private-data leak
+- HIGH: wrong Worker authority, service-role expansion, binding/route blast radius, missing authorization
+- MEDIUM: stale configuration/docs, missing evidence, weak rollback/telemetry

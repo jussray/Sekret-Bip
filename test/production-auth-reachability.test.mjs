@@ -17,7 +17,6 @@ const productionPlaywright = fs.readFileSync(
 
 test('production probe validates the public key and reaches Auth read-only', () => {
   assert.match(source, /page\.evaluate/);
-  assert.match(source, /\/rest\/v1\//);
   assert.match(source, /\/auth\/v1\/settings/);
   assert.match(source, /apikey:\s*key/);
   assert.match(source, /method:\s*['"]GET['"]/);
@@ -46,5 +45,5 @@ test('production probe is excluded from the blank local suite only', () => {
   assert.match(localPlaywright, /production-auth-reachability\.spec\.ts/);
   assert.match(localPlaywright, /EXPO_PUBLIC_SUPABASE_URL:\s*''/);
   assert.match(productionPlaywright, /testDir:\s*['"]\.\/e2e['"]/);
-  assert.doesNotMatch(productionPlaywright, /production-auth-reachability\.spec\.ts/);
+  assert.match(productionPlaywright, /production-auth-reachability\.spec\.ts/);
 });

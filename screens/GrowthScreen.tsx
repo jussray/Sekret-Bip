@@ -1,5 +1,5 @@
 // screens/GrowthScreen.tsx
-// Se'kret Bip — Growth (Rylane-led life skills hub)
+// Se'kret Bip — Growth (Sy-led life skills hub)
 //
 // Phase 2 build: separates pure "life skills" Growth from Bippin2 (which stays
 // as the Womanhood/Manhood content layer). Same voice and polish patterns as
@@ -172,7 +172,7 @@ export function GrowthScreen({
 
   const isRylane = selectedSekret === 'rylane';
   const charKey: 'raylene' | 'rylane' = isRylane ? 'rylane' : 'raylene';
-  const charName = isRylane ? 'Rylane' : 'Raylene';
+  const charName = isRylane ? 'Sy' : 'Suhana';
 
   const time     = useMemo(() => timeOfDay(), []);
   const bgSource = useMemo(() => getRoomBg(charKey, time), [charKey, time]);

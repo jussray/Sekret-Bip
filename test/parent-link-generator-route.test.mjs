@@ -77,3 +77,14 @@ test('parent-link-create edge function wraps RPC and never directly mutates pare
   assert.doesNotMatch(source, /\.update\(/);
   assert.doesNotMatch(source, /SUPABASE_SERVICE_ROLE_KEY/);
 });
+
+test('parent-link-create supports browser preflight for email invite invokes', async () => {
+  const source = await read('supabase/functions/parent-link-create/index.ts');
+
+  assert.match(source, /CORS_HEADERS/);
+  assert.match(source, /access-control-allow-origin/);
+  assert.match(source, /access-control-allow-headers/);
+  assert.match(source, /authorization, x-client-info, apikey, content-type/);
+  assert.match(source, /req\.method === "OPTIONS"/);
+  assert.match(source, /POST, OPTIONS/);
+});

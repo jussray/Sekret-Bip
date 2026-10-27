@@ -23,6 +23,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { useVerificationContext } from '@/context/VerificationContext';
 import type { AccountSide } from '@/features/identity/accountProfile';
+import { buildEmailConfirmationRedirectUrl } from '@/features/auth/emailConfirmation';
 import {
   fetchPostAuthBootstrap,
   ONBOARDING_SIDE_KEY,
@@ -30,14 +31,21 @@ import {
 import { getSupabase } from '@/utils/supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// ─── Error helpers (unchanged) ────────────────────────────────────────────
+// ─── Error helpers ────────────────────────────────────────────────────────
 function authErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
   return '';
 }
 
+function authErrorStatus(error: unknown): number | null {
+  if (!error || typeof error !== 'object' || !('status' in error)) return null;
+  const status = Number((error as { status?: unknown }).status);
+  return Number.isFinite(status) ? status : null;
+}
+
 function isAmbiguousSignupError(error: unknown): boolean {
+  if (authErrorStatus(error) === 504) return true;
   const msg = authErrorMessage(error).toLowerCase();
   return (
     msg.includes('failed to fetch') ||
@@ -60,9 +68,8 @@ function isConfirmationPendingError(error: unknown): boolean {
 }
 
 function hasAuthServerResponse(error: unknown): boolean {
-  if (!error || typeof error !== 'object' || !('status' in error)) return false;
-  const status = Number((error as { status?: unknown }).status);
-  return Number.isFinite(status) && status >= 400;
+  const status = authErrorStatus(error);
+  return status !== null && status >= 400;
 }
 
 function readableAuthError(error: unknown): string {
@@ -78,6 +85,20 @@ function readableAuthError(error: unknown): string {
 
 function normalizeSide(value: string | undefined): AccountSide {
   return value === 'parent' ? 'parent' : 'teen';
+}
+
+type SignupMetadata = Readonly<{
+  account_side: AccountSide;
+  username: string;
+  signup_source: 'sekret-bip';
+}>;
+
+function buildSignupMetadata(side: AccountSide, username: string): SignupMetadata {
+  return {
+    account_side: side,
+    username: username.trim(),
+    signup_source: 'sekret-bip',
+  };
 }
 
 function loginRoute(side: AccountSide): string {
@@ -136,7 +157,7 @@ export default function SignupScreen() {
     ]).start();
   }
 
-  // ─── Auth helpers (logic unchanged) ──────────────────────────────────────
+  // ─── Auth helpers ───────────────────────────────────────────────────────
   const finishAuthenticatedSignup = useCallback(async (_userId: string) => {
     await AsyncStorage.setItem(ONBOARDING_SIDE_KEY, preferredSide);
     const bootstrap = await fetchPostAuthBootstrap(preferredSide);
@@ -155,6 +176,8 @@ export default function SignupScreen() {
     sb: NonNullable<ReturnType<typeof getSupabase>>,
     signupEmail: string,
     signupPassword: string,
+    metadata: SignupMetadata,
+    redirectTo: string,
     initialError: unknown,
   ): Promise<boolean> {
     await delay(SIGNUP_RECOVERY_DELAY_MS);
@@ -175,9 +198,25 @@ export default function SignupScreen() {
     } catch (probeError) {
       if (!isAmbiguousSignupError(probeError)) return false;
     }
+
+    // A real HTTP response means Auth received the first signup. Never submit
+    // signUp again here: duplicate submissions can emit duplicate confirmation
+    // emails and consume the project-wide email-send quota.
+    if (initialSignupReachedAuth) {
+      showConfirmationSuccess(
+        `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
+      );
+      return true;
+    }
+
+    // Only a transport failure with no Auth response may retry signup once.
+    let retryThrown: unknown = null;
     try {
-      const { data: retryData, error: retryError } =
-        await sb.auth.signUp({ email: signupEmail, password: signupPassword });
+      const { data: retryData, error: retryError } = await sb.auth.signUp({
+        email: signupEmail,
+        password: signupPassword,
+        options: { emailRedirectTo: redirectTo, data: metadata },
+      });
       if (!retryError) {
         if (retryData.session?.user) {
           await finishAuthenticatedSignup(retryData.session.user.id);
@@ -192,20 +231,22 @@ export default function SignupScreen() {
         );
         return true;
       }
-      const retryReachedAuth = hasAuthServerResponse(retryError);
-      if (isAmbiguousSignupError(retryError) && (initialSignupReachedAuth || retryReachedAuth)) {
+      if (isAmbiguousSignupError(retryError) && hasAuthServerResponse(retryError)) {
         showConfirmationSuccess(
           `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
         );
         return true;
       }
     } catch (retryError) {
-      if (isAmbiguousSignupError(retryError) && initialSignupReachedAuth) {
-        showConfirmationSuccess(
-          `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
-        );
-        return true;
-      }
+      retryThrown = retryError;
+      console.warn('[signup] retry failed after ambiguous transport response');
+    }
+
+    if (isAmbiguousSignupError(retryThrown) && hasAuthServerResponse(retryThrown)) {
+      showConfirmationSuccess(
+        `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
+      );
+      return true;
     }
     return false;
   }
@@ -237,6 +278,7 @@ export default function SignupScreen() {
     setError('');
     const e = email.trim();
     const p = password;
+    const metadata = buildSignupMetadata(preferredSide, username);
 
     setLoading(true);
     const sb = getSupabase();
@@ -251,6 +293,8 @@ export default function SignupScreen() {
       return;
     }
 
+    const redirectTo = buildEmailConfirmationRedirectUrl(preferredSide);
+
     try {
       await AsyncStorage.setItem(ONBOARDING_SIDE_KEY, preferredSide);
       const { data: sessionData, error: sessionError } = await sb.auth.getSession();
@@ -264,10 +308,17 @@ export default function SignupScreen() {
         if (refreshErr0 || !refreshed0.user?.is_anonymous) {
           await sb.auth.signOut();
         } else {
-          const { error: upgradeError } = await sb.auth.updateUser({ email: e, password: p });
+          const { error: upgradeError } = await sb.auth.updateUser(
+            {
+              email: e,
+              password: p,
+              data: metadata,
+            },
+            { emailRedirectTo: redirectTo },
+          );
           if (upgradeError) {
             if (isAmbiguousSignupError(upgradeError)) {
-              const recovered = await recoverAmbiguousSignup(sb, e, p, upgradeError);
+              const recovered = await recoverAmbiguousSignup(sb, e, p, metadata, redirectTo, upgradeError);
               if (recovered) return;
             }
             const msg = upgradeError.message.toLowerCase();
@@ -282,7 +333,12 @@ export default function SignupScreen() {
             return;
           }
           const { data: refreshed, error: refreshError } = await sb.auth.getSession();
-          if (!refreshError && refreshed.session?.user && !refreshed.session.user.is_anonymous) {
+          if (
+            !refreshError
+            && refreshed.session?.user
+            && !refreshed.session.user.is_anonymous
+            && Boolean(refreshed.session.user.email_confirmed_at)
+          ) {
             await finishAuthenticatedSignup(refreshed.session.user.id);
           } else {
             showConfirmationSuccess();
@@ -291,10 +347,14 @@ export default function SignupScreen() {
         }
       }
 
-      const { data: signUpData, error: authErr } = await sb.auth.signUp({ email: e, password: p });
+      const { data: signUpData, error: authErr } = await sb.auth.signUp({
+        email: e,
+        password: p,
+        options: { emailRedirectTo: redirectTo, data: metadata },
+      });
       if (authErr) {
         if (isAmbiguousSignupError(authErr)) {
-          const recovered = await recoverAmbiguousSignup(sb, e, p, authErr);
+          const recovered = await recoverAmbiguousSignup(sb, e, p, metadata, redirectTo, authErr);
           if (recovered) return;
         }
         setError(readableAuthError(authErr));
@@ -311,7 +371,7 @@ export default function SignupScreen() {
       if (isAmbiguousSignupError(caught)) {
         const sb2 = getSupabase();
         if (sb2) {
-          const recovered = await recoverAmbiguousSignup(sb2, e, p, caught);
+          const recovered = await recoverAmbiguousSignup(sb2, e, p, metadata, redirectTo, caught);
           if (recovered) return;
         }
       }
@@ -411,7 +471,12 @@ export default function SignupScreen() {
                   onChangeText={t => { setPassword(t); setError(''); }}
                   accessibilityLabel="Password"
                 />
-                <Pressable style={s.eyeBtn} onPress={() => setPwVisible(v => !v)}>
+                <Pressable
+                  style={s.eyeBtn}
+                  onPress={() => setPwVisible(v => !v)}
+                  accessibilityRole="button"
+                  accessibilityLabel={pwVisible ? 'Hide password' : 'Show password'}
+                >
                   <Text style={s.eyeText}>{pwVisible ? '🙈' : '👁'}</Text>
                 </Pressable>
               </View>
@@ -430,7 +495,12 @@ export default function SignupScreen() {
                   returnKeyType="next"
                   accessibilityLabel="Confirm password"
                 />
-                <Pressable style={s.eyeBtn} onPress={() => setCfVisible(v => !v)}>
+                <Pressable
+                  style={s.eyeBtn}
+                  onPress={() => setCfVisible(v => !v)}
+                  accessibilityRole="button"
+                  accessibilityLabel={cfVisible ? 'Hide password confirmation' : 'Show password confirmation'}
+                >
                   <Text style={s.eyeText}>{cfVisible ? '🙈' : '👁'}</Text>
                 </Pressable>
               </View>

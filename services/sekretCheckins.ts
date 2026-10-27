@@ -20,14 +20,14 @@ function daysSince(value?: string): number {
 }
 
 const MESSAGES: Record<SekretPersonality, Record<CheckInTrigger, Omit<CompanionCheckIn, 'id'>>> = {
-  raylene: {
+  suhana: {
     'low-mood': { message: 'dang. c’mere for a second.', tone: 'warm' },
     'repeated-emotion': { message: 'friend... yesterday was rough too. how we doing today?', tone: 'protective' },
     'long-absence': { message: 'there you are. no speech. what’s been going on?', tone: 'warm' },
     'late-night': { message: 'okay, it’s late. what’s keeping you up?', tone: 'gentle' },
     'winning-mood': { message: 'AS YOU SHOULD. tell me everything 😭', tone: 'warm' },
   },
-  rylane: {
+  sy: {
     'low-mood': { message: 'damn. what actually happened?', tone: 'protective' },
     'repeated-emotion': { message: 'rough again? aight. talk to me.', tone: 'protective' },
     'long-absence': { message: 'you been quiet. no lecture. what’s up?', tone: 'warm' },

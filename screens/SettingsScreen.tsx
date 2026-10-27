@@ -23,12 +23,12 @@ const VIBE_CONFIG: Record<string, {
   previewBg: any; glow: string; gtop: string; gbot: string;
 }> = {
   raylene: {
-    name: "Raylene's Room",  tagline: 'lavender · fairy lights · cozy bedroom',
+    name: "Suhana's Room",  tagline: 'lavender · fairy lights · cozy bedroom',
     emoji: '💜', previewBg: IMAGES.bgRayleneRoomEvening,
     glow: '#e879f9', gtop: 'rgba(80,0,80,0.55)',  gbot: 'rgba(20,0,45,0.90)',
   },
   rylane: {
-    name: "Rylane's Space",  tagline: 'midnight blue · city lights · chill night',
+    name: "Sy's Space",  tagline: 'midnight blue · city lights · chill night',
     emoji: '⚡', previewBg: IMAGES.bgRylaneRoomNight,
     glow: '#4DA3FF', gtop: 'rgba(0,20,70,0.55)',  gbot: 'rgba(0,8,30,0.90)',
   },
@@ -60,12 +60,12 @@ const SEKRET_PROFILES: Record<string, {
   name: string; emoji: string; title: string; tagline: string; avatar: any; accent: string;
 }> = {
   soft:   {
-    name: 'Raylene', emoji: '💜', title: 'Big Sis',
+    name: 'Suhana', emoji: '💜', title: 'Big Sis',
     tagline: 'warm, protective, emotionally real',
     avatar: IMAGES.rayleneNeutral, accent: '#e879f9',
   },
   rylane: {
-    name: 'Rylane',  emoji: '⚡', title: 'Loyal Bro',
+    name: 'Sy',  emoji: '⚡', title: 'Loyal Bro',
     tagline: 'street smart, down to earth, no cap',
     avatar: IMAGES.rylaneNeutral, accent: '#4DA3FF',
   },

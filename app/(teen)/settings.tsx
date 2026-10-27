@@ -1,24 +1,24 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
+  Alert,
+  Clipboard,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  SafeAreaView,
-  Switch,
-  Alert,
-  Clipboard,
+  View,
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppContext } from '@/context/AppContext';
 import { THEME_PACKS } from '@constants/theme';
 import {
+  cancelDailyReminder,
   requestNotificationPermissions,
   scheduleDailyReminder,
-  cancelDailyReminder,
 } from '@/utils/notifications';
 import { createParentLink, redeemParentLink } from '@/utils/parentBridgeCompat';
 import { useSleepGuard, type SleepWindow } from '../../hooks/useSleepGuard';
@@ -29,23 +29,25 @@ import { getSupabase } from '@/utils/supabase';
 
 const THEME_ORDER = Object.keys(THEME_PACKS) as (keyof typeof THEME_PACKS)[];
 
+// Compatibility keys remain unchanged so persisted selections keep working.
+// Only user-facing names use the current Se'kret Bip canon.
 const COMPANIONS = [
-  { key: 'soft',   name: 'Raylene', emoji: '💜', title: 'Big Sis', tagline: 'warm · protective · emotionally real' },
-  { key: 'rylane', name: 'Rylane',  emoji: '⚡', title: 'Loyal Bro', tagline: 'street smart · down to earth · no cap' },
+  { key: 'soft', name: 'Suhana', emoji: '💜', title: 'Big Sis', tagline: 'warm · protective · emotionally real' },
+  { key: 'rylane', name: 'Sy', emoji: '⚡', title: 'Loyal Bro', tagline: 'street smart · down to earth · no cap' },
 ];
 
 const SEKRET_MODES = [
-  { key: 'soft',     emoji: '🌙', label: 'Soft' },
+  { key: 'soft', emoji: '🌙', label: 'Soft' },
   { key: 'realTalk', emoji: '🧠', label: 'Real Talk' },
   { key: 'distract', emoji: '😂', label: 'Distract' },
-  { key: 'listen',   emoji: '☁️', label: 'Just Listen' },
-  { key: 'push',     emoji: '🔥', label: 'Push Me' },
+  { key: 'listen', emoji: '☁️', label: 'Just Listen' },
+  { key: 'push', emoji: '🔥', label: 'Push Me' },
 ];
 
 const SLEEP_OPTIONS: Array<{ label: string; value: SleepWindow | null }> = [
-  { label: 'Off',         value: null },
-  { label: '10pm – 7am',  value: { start: '22:00', end: '07:00' } },
-  { label: '11pm – 8am',  value: { start: '23:00', end: '08:00' } },
+  { label: 'Off', value: null },
+  { label: '10pm – 7am', value: { start: '22:00', end: '07:00' } },
+  { label: '11pm – 8am', value: { start: '23:00', end: '08:00' } },
 ];
 
 type RedeemStatus = 'idle' | 'ok' | 'not_found' | 'error';
@@ -57,20 +59,25 @@ function themeLabel(key: keyof typeof THEME_PACKS): string {
 
 export default function SettingsScreen() {
   const {
-    theme, setTheme,
-    userSide, setUserSide,
-    selectedSekret, setSelectedSekret,
-    sekretMode, setSekretMode,
-    notificationsEnabled, setNotificationsEnabled,
+    theme,
+    setTheme,
+    userSide,
+    setUserSide,
+    selectedSekret,
+    setSelectedSekret,
+    sekretMode,
+    setSekretMode,
+    notificationsEnabled,
+    setNotificationsEnabled,
     resetApp,
   } = useAppContext();
 
   const { sleepWindow, setSleepWindow } = useSleepGuard();
 
-  const [inviteCode,   setInviteCode]   = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [codeInput,    setCodeInput]    = useState('');
-  const [isRedeeming,  setIsRedeeming]  = useState(false);
+  const [codeInput, setCodeInput] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
   const [redeemStatus, setRedeemStatus] = useState<RedeemStatus>('idle');
   const [linkStatusVersion, setLinkStatusVersion] = useState(0);
 
@@ -118,11 +125,6 @@ export default function SettingsScreen() {
     if (code) {
       setInviteCode(code);
       setLinkStatusVersion((value) => value + 1);
-
-      // ── Onboarding state machine ──────────────────────────────
-      // Fire-and-forget: record that the teen generated an invite
-      // code. This is the parent_link_sent signal — it fires even
-      // post-onboarding when a teen re-invites from settings.
       getSupabase()
         ?.auth.getUser()
         .then(({ data }) => {
@@ -130,7 +132,6 @@ export default function SettingsScreen() {
             advanceStage(data.user.id, 'parent_link_sent').catch(() => null);
           }
         });
-      // ──────────────────────────────────────────────────────────
     } else {
       Alert.alert('Not signed in', 'Sign in to your account first, then generate a link code.');
     }
@@ -147,8 +148,8 @@ export default function SettingsScreen() {
     setIsRedeeming(true);
     const raw = await redeemParentLink(codeInput);
     setIsRedeeming(false);
-    const VALID: RedeemStatus[] = ['idle', 'ok', 'not_found', 'error'];
-    const result = VALID.includes(raw as RedeemStatus) ? (raw as RedeemStatus) : 'error';
+    const valid: RedeemStatus[] = ['idle', 'ok', 'not_found', 'error'];
+    const result = valid.includes(raw as RedeemStatus) ? (raw as RedeemStatus) : 'error';
     setRedeemStatus(result);
     if (result === 'ok') setLinkStatusVersion((value) => value + 1);
   }, [codeInput]);
@@ -157,10 +158,11 @@ export default function SettingsScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Settings</Text>
+
         <Text style={styles.sectionTitle}>Side</Text>
         <View style={styles.row}>
           <Text style={styles.label}>Teen side</Text>
-          <Switch value={userSide === 'teen'} onValueChange={(v) => setUserSide(v ? 'teen' : 'parent')} />
+          <Switch value={userSide === 'teen'} onValueChange={(value) => setUserSide(value ? 'teen' : 'parent')} />
         </View>
 
         <Text style={styles.sectionTitle}>Theme</Text>
@@ -172,18 +174,25 @@ export default function SettingsScreen() {
         ))}
 
         <Text style={styles.sectionTitle}>Companion</Text>
-        {COMPANIONS.map((c) => (
-          <TouchableOpacity key={c.key} style={styles.option} onPress={() => setSelectedSekret(c.key)}>
-            <Text style={styles.optionText}>{c.emoji} {c.name} — {c.title}</Text>
-            {selectedSekret === c.key && <Text style={styles.check}>✓</Text>}
+        {COMPANIONS.map((companion) => (
+          <TouchableOpacity
+            key={companion.key}
+            style={styles.option}
+            onPress={() => setSelectedSekret(companion.key)}
+            accessibilityRole="button"
+            accessibilityLabel={`Choose ${companion.name}, ${companion.title}`}
+            accessibilityState={{ selected: selectedSekret === companion.key }}
+          >
+            <Text style={styles.optionText}>{companion.emoji} {companion.name} — {companion.title}</Text>
+            {selectedSekret === companion.key && <Text style={styles.check}>✓</Text>}
           </TouchableOpacity>
         ))}
 
-        <Text style={styles.sectionTitle}>Se'kret mode</Text>
-        {SEKRET_MODES.map((m) => (
-          <TouchableOpacity key={m.key} style={styles.option} onPress={() => setSekretMode(m.key)}>
-            <Text style={styles.optionText}>{m.emoji} {m.label}</Text>
-            {sekretMode === m.key && <Text style={styles.check}>✓</Text>}
+        <Text style={styles.sectionTitle}>Se&apos;kret mode</Text>
+        {SEKRET_MODES.map((mode) => (
+          <TouchableOpacity key={mode.key} style={styles.option} onPress={() => setSekretMode(mode.key)}>
+            <Text style={styles.optionText}>{mode.emoji} {mode.label}</Text>
+            {sekretMode === mode.key && <Text style={styles.check}>✓</Text>}
           </TouchableOpacity>
         ))}
 
@@ -194,10 +203,10 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>Sleep guard</Text>
-        {SLEEP_OPTIONS.map((opt) => (
-          <TouchableOpacity key={opt.label} style={styles.option} onPress={() => setSleepWindow(opt.value)}>
-            <Text style={styles.optionText}>{opt.label}</Text>
-            {JSON.stringify(sleepWindow) === JSON.stringify(opt.value) && <Text style={styles.check}>✓</Text>}
+        {SLEEP_OPTIONS.map((option) => (
+          <TouchableOpacity key={option.label} style={styles.option} onPress={() => setSleepWindow(option.value)}>
+            <Text style={styles.optionText}>{option.label}</Text>
+            {JSON.stringify(sleepWindow) === JSON.stringify(option.value) && <Text style={styles.check}>✓</Text>}
           </TouchableOpacity>
         ))}
 
@@ -230,9 +239,7 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.button} onPress={handleRedeemCode} disabled={isRedeeming}>
           <Text style={styles.buttonText}>{isRedeeming ? 'Connecting…' : 'Redeem code'}</Text>
         </TouchableOpacity>
-        {redeemStatus !== 'idle' && (
-          <Text style={styles.hint}>Status: {redeemStatus}</Text>
-        )}
+        {redeemStatus !== 'idle' && <Text style={styles.hint}>Status: {redeemStatus}</Text>}
 
         <Text style={styles.sectionTitle}>Danger zone</Text>
         <AccountDeletionControls />
@@ -245,20 +252,20 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#130b24' },
-  content:      { padding: 20, paddingBottom: 80 },
-  title:        { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 20 },
+  container: { flex: 1, backgroundColor: '#130b24' },
+  content: { padding: 20, paddingBottom: 80 },
+  title: { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 20 },
   sectionTitle: { color: '#c4b5fd', fontWeight: '800', fontSize: 16, marginTop: 18, marginBottom: 8 },
-  row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 8 },
-  label:        { color: '#fff', fontWeight: '700' },
-  option:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 8 },
-  optionText:   { color: '#fff', flex: 1 },
-  check:        { color: '#a78bfa', fontWeight: '900', fontSize: 18 },
-  button:       { padding: 14, borderRadius: 16, backgroundColor: '#a78bfa', alignItems: 'center', marginBottom: 10 },
-  danger:       { backgroundColor: '#ef4444' },
-  buttonText:   { color: '#1e1236', fontWeight: '800' },
-  codeBox:      { padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#a78bfa', alignItems: 'center', marginBottom: 10 },
-  codeText:     { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: 3 },
-  hint:         { color: '#c4b5fd', textAlign: 'center', marginBottom: 10 },
-  input:        { color: '#fff', borderWidth: 1, borderColor: '#6d5aa5', borderRadius: 14, padding: 12, marginBottom: 10 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 8 },
+  label: { color: '#fff', fontWeight: '700' },
+  option: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 8 },
+  optionText: { color: '#fff', flex: 1 },
+  check: { color: '#a78bfa', fontWeight: '900', fontSize: 18 },
+  button: { padding: 14, borderRadius: 16, backgroundColor: '#a78bfa', alignItems: 'center', marginBottom: 10 },
+  danger: { backgroundColor: '#ef4444' },
+  buttonText: { color: '#1e1236', fontWeight: '800' },
+  codeBox: { padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#a78bfa', alignItems: 'center', marginBottom: 10 },
+  codeText: { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: 3 },
+  hint: { color: '#c4b5fd', textAlign: 'center', marginBottom: 10 },
+  input: { color: '#fff', borderWidth: 1, borderColor: '#6d5aa5', borderRadius: 14, padding: 12, marginBottom: 10 },
 });

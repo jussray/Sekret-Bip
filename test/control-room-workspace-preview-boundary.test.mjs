@@ -17,9 +17,14 @@ const workspaceFiles = [
 ];
 
 const workspaceSource = workspaceFiles.map(read).join('\n');
+// The only currently-registered active Control Room panels (see
+// src/screens/DevControlRoomScreen.tsx's imports); there is no active
+// ThreadBoardPanel.tsx — that file has never existed in this repository.
 const workerPanel = read('src/features/control-room/WorkerPanel.tsx');
-const threadBoardPanel = read('src/features/control-room/ThreadBoardPanel.tsx');
+const guardianReviewsPanel = read('src/features/control-room/GuardianReviewsPanel.tsx');
+const promptOsPanel = read('src/features/control-room/PromptOsPanel.tsx');
 const devControlRoom = read('src/screens/DevControlRoomScreen.tsx');
+const devControlRoomWorkspace = read('src/screens/DevControlRoomWorkspace.tsx');
 
 test('workspace preview files exist as an additive isolated directory', () => {
   assert.equal(fs.existsSync(workspaceRoot), true);
@@ -44,7 +49,13 @@ test('workspace preview cannot manufacture approved or applied state', () => {
 });
 
 test('workspace preview is not registered into active Control Room panels', () => {
-  for (const activeSource of [workerPanel, threadBoardPanel, devControlRoom]) {
+  for (const activeSource of [
+    workerPanel,
+    guardianReviewsPanel,
+    promptOsPanel,
+    devControlRoom,
+    devControlRoomWorkspace,
+  ]) {
     assert.doesNotMatch(activeSource, /control-room\/workspace|workspace\/ThreadBoard/);
   }
 });

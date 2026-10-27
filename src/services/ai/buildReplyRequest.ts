@@ -37,6 +37,8 @@ export interface ReplyRequestContext {
   oracleContext?: string[];
   /** Surface-specific memory keys folded into the memory bundle (e.g. teenGender). */
   extraMemory?: Record<string, unknown>;
+  /** True only for the user's first introduction to this companion. */
+  isFirstCompanionChat?: boolean;
 }
 
 export interface SekretReplyRequest {
@@ -52,6 +54,7 @@ export interface SekretReplyRequest {
   conversationPhase: ConversationPhase;
   phaseInstruction: string;
   isArrival: boolean;
+  isFirstCompanionChat: boolean;
   memory: Record<string, unknown>;
 }
 
@@ -90,10 +93,12 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
   await saveTeenRelationshipProfile(relationship);
 
   const conversationPhase = getConversationPhase(historyLength);
+  const isFirstCompanionChat = ctx.isFirstCompanionChat ?? historyLength === 0;
   const phaseInstruction = buildConversationPhaseInstruction(
     conversationPhase,
     historyLength,
     ctx.characterId,
+    isFirstCompanionChat,
   );
   const isArrival = isArrivalMessage(ctx.text, historyLength);
 
@@ -117,6 +122,7 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
       conversationPhase,
       phaseInstruction,
       isArrival,
+      isFirstCompanionChat,
       memory,
     },
     relationship,

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getSupabasePublishableKey } from "../_shared/supabase-api-keys.ts";
 
 type ParentInviteRequest = {
   parentEmail?: string;
@@ -13,7 +14,14 @@ type PendingInvite = {
   is_active: boolean;
 };
 
+const CORS_HEADERS = {
+  "access-control-allow-origin": "*",
+  "access-control-allow-headers": "authorization, x-client-info, apikey, content-type",
+  "access-control-allow-methods": "POST, OPTIONS",
+};
+
 const JSON_HEADERS = {
+  ...CORS_HEADERS,
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
 };
@@ -116,13 +124,14 @@ async function sendInviteEmail(parentEmail: string, code: string, expiresAt: str
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
 
   const authorization = req.headers.get("authorization");
   if (!authorization?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
 
   const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_ANON_KEY");
+  const key = getSupabasePublishableKey();
   if (!url || !key) return json({ error: "server_config" }, 500);
 
   const db = createClient(url, key, {

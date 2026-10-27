@@ -2,6 +2,35 @@
 
 This log records issue-hygiene decisions that affect repository authority. It is not a feature-status ledger and does not replace `implementation-ledger.json`, `SPRINT.md`, or `docs/CURRENT_STATUS.md`.
 
+## 2026-07-24
+
+A user request to "close old issues" prompted a fresh read-only re-verification pass against current `main`, rather than a blanket age-based sweep. This pass predates and does not repeat the 2026-07-17 authority normalization below; it adds new evidence gathered since, cross-checked against that document's existing scope table.
+
+### Closed as completed
+
+- **#451 — trust: wire explicit onboarding consent into atomic consent service**
+  - Verified against current `main`: `app/(onboarding)/consent.tsx` calls `consentService.load()`, `consentService.has('privacyPolicy')`, `consentService.has('termsOfService')`, `consentService.grant(userId, 'privacyPolicy')`, `consentService.grant(userId, 'termsOfService')`, and `consentService.hasCompletedOnboarding()` — the exact `consentService.grant` marker `.control-room/repository.manifest.json`'s `onboarding-requires-explicit-consent-action` usage assertion requires.
+  - `node --test test/auth-onboarding-runtime.test.mjs` passes 5/5, including "Control Room proof points to the real consent action."
+  - Per this document's canonical table, #451 was tracked as "a focused implementation gate under #413." Closing it does not complete #413; consent and onboarding disclosures remain owned by #413.
+
+### Re-verified and confirmed correctly still open
+
+- **#507 — Founder Control Room: verify direct Comfort and Cloud screen commit**
+  - PR #508 (the canonical route restoration) is merged, but the independent copy blocker named in #507's own thread is still present verbatim: `screens/CloudThoughtsScreen.tsx` line 317 still reads "Everything you send here stays between you and Se'kret. 🔒" — an unsupported absolute privacy claim.
+  - #507's most recent comment (2026-07-24) also reports a new, unrelated, still-open problem: PR branches auto-deploying to production Cloudflare Workers without an approval gate.
+- **#414 (Trust-03) — persistent crisis-support surface**: `components/CrisisSupport.tsx` (`CrisisSupportButton`, `CrisisSupportModal`) exists but has zero imports anywhere else in the app. Built, never mounted. Separately, `worker/sekret-reply.ts`'s `crisisReply()` already provides a real, warm, resource-linked (988, 741741) in-chat crisis response — that chat-side coverage is real and substantial, but it does not satisfy #414's "persistent, always-accessible... across all teen-facing surfaces" surface requirement.
+- **#419 / #467 (Trust-08) — AI companion boundary / identity transparency**: `components/companions/AIDisclosureModal.tsx` exists but has zero imports anywhere else in the app. Same unmounted-component pattern as #414.
+- **#492 — route every GitHub Actions failure through Founder Control Room**: no `workflow_run`-triggered scanner exists that watches other workflows' completions and auto-classifies failures. Every failure classification observed across this repository's issue history (including several read during this pass) was done manually.
+- **#417 / #426 (Trust-06) — account deletion**: `DeleteAccountScreen` / `AccountDeletionControls` are now wired into both `app/(teen)/settings.tsx` and `app/(parent)/settings.tsx` (real progress since #417/#426 were last touched), but full Storage/Auth/second-user-isolation verification proof remains outstanding per `SPRINT.md`'s own account-deletion proof requirements.
+
+### Correction to prior evidence, no status change
+
+- **#563 — Founder Access Recovery Gate**: the `wrangler.toml` naming bug its "Current note" describes (`bip-mail` instead of `sekret-backend`) was already fixed by commit `940cb83` ("fix: restore official backend Worker name"), landing 2026-07-20 10:25:34 UTC — 20 seconds after #563 was opened flagging it. Current `wrangler.toml` correctly reads `name = "sekret-backend"`. This does not close #563: its actual gate (the founder personally completing signup/login/onboarding on a physical device) has no evidence either way and is not something a repository-only pass can verify.
+
+### General infrastructure note
+
+The `runner_startup_failure` GitHub Actions pattern cited as a live blocker across #492, #494, #507, #514, #528, and #563 (and pervasive throughout the 2026-07-17 pass above) appears to have cleared: four PRs merged during this same 2026-07-24 session (#595, #596, #600, #601) all ran real, exact-head CI with real logs and real pass/fail results. Issues that cited only that infra problem as their blocker have since accumulated newer, distinct, still-open problems rather than becoming closable — see #507 above. This note does not itself close or complete any issue.
+
 ## 2026-07-17
 
 ### Closed as completed

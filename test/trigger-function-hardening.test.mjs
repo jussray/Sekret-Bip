@@ -21,12 +21,17 @@ async function readMigrationCorpus() {
 // need special cleanup evidence.
 
 test('enforce_circle_anonymity blocks identity reveal on public/parent_community posts', async () => {
-  const source = await read('supabase/migrations/20260701020000_circle_v2_parent_community.sql');
+  const source = await read('supabase/migrations/20260701174943_circle_v2_parent_community_guardian_access.sql');
   const fn = source.match(/create or replace function public\.enforce_circle_anonymity\(\)[\s\S]*?\$\$;/)?.[0];
   assert.ok(fn, 'expected enforce_circle_anonymity() definition');
 
   assert.match(fn, /security definer/);
   assert.match(fn, /set search_path = public/);
+  // Ties _kind to NEW.circle_id specifically — without this, a future edit
+  // that leaves _kind null or sourced from the wrong circle would still pass
+  // the predicate/exception assertions below while silently letting an
+  // identity-revealing post through.
+  assert.match(fn, /select kind into _kind from public\.circles where id = new\.circle_id/);
   assert.match(fn, /_kind in \('public', 'parent_community'\) and new\.is_identity_revealed is true/);
   assert.match(fn, /raise exception/);
 
@@ -126,16 +131,15 @@ test('trigger_safety_scan does not regress the historical dynamic-field-access b
   assert.doesNotMatch(fn, /NEW\.user_id\b/);
 });
 
-// KNOWN GAP, tracked not hidden. auto_resolve_issue_on_event_resolve is
-// SECURITY DEFINER but currently has no effective search_path pin. Existing
-// deployed migrations should not be edited after deployment; when the gap is
-// repaired, a follow-up migration may use ALTER FUNCTION ... SET search_path or
-// a replacement function definition. This test reads the full migration corpus
-// so the future effective configuration is what matters, not only the original
+// auto_resolve_issue_on_event_resolve was SECURITY DEFINER with no effective
+// search_path pin. Existing deployed migrations should not be edited after
+// deployment, so the fix landed as a follow-up migration
+// (20260720010000_pin_auto_resolve_issue_search_path.sql) rather than editing
+// the original CREATE. This test reads the full migration corpus so the
+// future effective configuration is what matters, not only the original
 // historical definition.
 test(
   'auto_resolve_issue_on_event_resolve pins search_path (SECURITY DEFINER)',
-  { todo: 'known gap — SECURITY DEFINER without effective search_path pin, see SPRINT.md "SECURITY DEFINER trigger assurance"' },
   async () => {
     const source = await read('supabase/migrations/20260701_control_room_normalization.sql');
     const corpus = await readMigrationCorpus();

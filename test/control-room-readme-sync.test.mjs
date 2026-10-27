@@ -8,18 +8,24 @@ const read = (relativePath) =>
 const readme = read('README.md');
 const policy = read('.control-room/README_SYNC_POLICY.md');
 
-test('README exposes Founder Control Room documentation synchronization', () => {
-  assert.match(readme, /Founder Control Room.*README sync/is);
-  assert.match(readme, /required.*not_required.*deferred_with_reason/is);
-  assert.match(readme, /runner_startup_failure/);
-  assert.match(readme, /README_SYNC_POLICY\.md/);
+test('README exposes Founder Control Room documentation truth synchronization', () => {
+  assert.match(readme, /Founder Control Room/);
+  assert.match(readme, /Live truth boundary/);
+  assert.match(readme, /State → Evidence → Claim/);
+  assert.match(readme, /docs\/TRUTH_AUTHORITY\.md/);
+  assert.match(readme, /historical/i);
+  assert.match(readme, /supersed/i);
 });
 
-test('Founder Control Room policy requires a README impact decision', () => {
-  assert.match(policy, /README impact value/i);
-  assert.match(policy, /required.*not_required.*deferred_with_reason/is);
-  assert.match(policy, /same pull request/i);
+test('Founder Control Room policy requires an explicit document impact decision', () => {
+  assert.match(policy, /README impact decision/i);
+  assert.match(policy, /required[\s\S]*not_required[\s\S]*deferred_with_reason/i);
+  assert.match(policy, /durable/);
+  assert.match(policy, /historical/);
+  assert.match(policy, /live receipt/);
   assert.match(policy, /runner_startup_failure/);
-  assert.match(policy, /must not be rewritten as a code regression/i);
+  assert.match(policy, /Exact-head evidence expires/);
+  assert.match(policy, /Live GitHub issue state outranks copied issue-state prose/);
+  assert.match(policy, /audit-documentation-truth\.mjs/);
   assert.match(policy, /avoid claiming deployment or live proof from a merge alone/i);
 });

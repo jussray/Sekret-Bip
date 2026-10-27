@@ -24,6 +24,14 @@ Private Se’kret Bip creative universe — characters, lore, stories, productio
 - Run any available lint/build checks before PR.
 - Creative and publishing decisions require explicit founder approval.
 
+## Governed Gap-to-Merge Workflow
+
+When the founder invokes `/gaps`, `/blueprint`, `/rent`, `/implement`, `/review`, `/merge`, `/cont`, or equivalent stacked language, read `.ai-skills/skills/gap-blueprint-implement-review.md` and follow:
+
+`GAPS → BLUEPRINT → RENT → IMPLEMENT → VERIFY → REVIEW → MERGE GATE → CONTINUE`
+
+Cursor must inspect the current repository, `main`, exact branch/PR head, Founder Control Room, provider/database boundaries, checks, jobs, steps, logs, and review state before editing. Claims use `VERIFIED`, `INFERRED`, `UNKNOWN`, or `BLOCKED`. Failed lookups do not prove absence. Missing or zero-step CI evidence does not prove a regression. Rendered changes require Playwright/device proof. Production and merge actions require explicit authority, and verification is invalidated when the final head moves.
+
 ## Approval Gates
 
 Require explicit founder approval before: merging, publishing, deploying, releasing IP, platform config changes, or rotating secrets.

@@ -11,6 +11,7 @@ const cancelFunction = fs.readFileSync(new URL('../supabase/functions/account-re
 const deleteFunction = fs.readFileSync(new URL('../supabase/functions/account-delete/index.ts', import.meta.url), 'utf8');
 const sweepScript = fs.readFileSync(new URL('../scripts/sweep-account-deletions.mjs', import.meta.url), 'utf8');
 const sweepWorkflow = fs.readFileSync(new URL('../.github/workflows/account-deletion-sweep.yml', import.meta.url), 'utf8');
+const sitePublicationGate = fs.readFileSync(new URL('../docs/site/privacy-publication-gate.md', import.meta.url), 'utf8');
 
 test('client uses deployed account deletion function names', () => {
   assert.match(service, /functions\.invoke\('account-deletion-request'/);
@@ -25,7 +26,10 @@ test('request function derives user identity from authenticated session', () => 
 
 test('account deletion retains the seven-day grace and cancel path', () => {
   assert.match(controls, /seven-day grace period/);
-  assert.match(controls, /Cancel account deletion/);
+  assert.match(controls, /Schedule account deletion/);
+  assert.match(controls, /Cancel scheduled deletion/);
+  assert.match(controls, /accessibilityLabel="Schedule account deletion"/);
+  assert.doesNotMatch(controls, /accessibilityLabel="Delete account"/);
   assert.match(cancelFunction, /status: 'cancelled'/);
   assert.match(cancelFunction, /\.eq\('status', 'pending'\)/);
 });
@@ -63,4 +67,13 @@ test('sweep workflow keeps bounded scheduled processing plus explicit production
   assert.match(sweepWorkflow, /node scripts\/sweep-account-deletions\.mjs/);
   assert.match(sweepWorkflow, /SUPABASE_SERVICE_ROLE_KEY/);
   assert.match(sweepWorkflow, /ACCOUNT_DELETION_PROCESS_SECRET/);
+});
+
+test('public-site gate keeps legal and runtime claims evidence-bound', () => {
+  assert.match(sitePublicationGate, /seven-day grace period/);
+  assert.match(sitePublicationGate, /Website footer: Privacy, Terms, and Support links/);
+  assert.match(sitePublicationGate, /Do not publish claims that are not backed by current evidence/);
+  assert.match(sitePublicationGate, /SOC 2 certification before an audit report exists/);
+  assert.match(sitePublicationGate, /zero-retention AI processing unless/);
+  assert.match(sitePublicationGate, /Desktop and mobile screenshots/);
 });

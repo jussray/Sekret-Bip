@@ -1,14 +1,19 @@
+<!-- truth-mode: durable -->
 # Founder Control Room README Sync Policy
 
 ## Purpose
 
-Founder Control Room owns the operational decision about whether a repository change must update `README.md`.
+Founder Control Room decides whether a repository change must update README or another canonical document. Documentation is a guardrail, not a second live control plane.
 
-The README is not a changelog, but it must stay aligned with current product truth, setup, validation, release posture, major incident state, and authoritative operating documents.
+## Live truth boundary
 
-## Required decision
+Durable docs carry invariants, procedures, ownership, acceptance criteria, and pointers to live evidence. They must not copy volatile main SHAs, issue state, provider outcomes, run IDs, or production verdicts as evergreen truth.
 
-Every nontrivial incident, fix, merge, deployment change, migration change, validation change, or authority change must record one README impact value:
+See `docs/TRUTH_AUTHORITY.md` for claim expiry and supersession.
+
+## Required README impact decision
+
+Every nontrivial incident, fix, merge, deployment change, migration change, validation change, or authority change records one value:
 
 ```text
 required
@@ -16,44 +21,37 @@ not_required
 deferred_with_reason
 ```
 
-### `required`
+Use `required` when a durable contract changed. Use `not_required` only when durable documentation remains accurate. Use `deferred_with_reason` only when another active PR owns the edit and the owner, PR, and deadline are recorded.
 
-Use when the change alters any of the following:
+## Truth classes
 
-- user-visible product behavior or recovery;
-- setup, environment, or deployment instructions;
-- validation commands or evidence boundaries;
-- launch posture, blockers, or current implementation claims;
-- canonical documents, ownership, or operational authority;
-- a major production incident whose status materially changes repository truth.
+Canonical status-oriented material is one of:
 
-Update `README.md` in the same pull request whenever practical.
+- **durable** — invariants, procedures, and pointers;
+- **historical** — a clearly labeled observation window;
+- **live receipt** — a machine/provider/account observation with target, authority, time, and evidence reference.
 
-### `not_required`
+Do not create another ambiguous current-status Markdown surface when a live receipt or owning-system read is the correct authority.
 
-Use only when the README remains fully accurate and the pull request explains why.
+## Revocation and supersession
 
-### `deferred_with_reason`
+Verification is scoped and can expire.
 
-Use only when another active pull request owns the README edit. Record the owner, linked pull request, and deadline. An unowned deferral is invalid.
-
-## Incident handling
-
-Founder Control Room is the first evidence surface for production incidents and GitHub Actions failures.
-
-- Zero-step, no-log workflow failures remain classified as `runner_startup_failure` infrastructure evidence unless later evidence changes the classification.
-- Infrastructure failure must not be rewritten as a code regression.
-- README language must separate merged code evidence, local verification, hosted verification, deployment, and live production proof.
-- Incident records remain open until their explicit verification gate is satisfied, even when a code fix is merged.
+- Exact-head evidence expires for current-main claims when the head moves.
+- Newer authoritative evidence that contradicts a prior verified state supersedes current use of the older claim while preserving the old observation as history.
+- Live GitHub issue state outranks copied issue-state prose.
+- A merged fix does not complete an external evidence gate unless that gate's acceptance evidence passes.
+- A zero-step or no-log job remains `runner_startup_failure` infrastructure evidence unless later evidence changes that classification.
 
 ## Completion gate
 
-Before a pull request is merged, the active agent must:
+Before merge, the active agent must:
 
-1. classify README impact;
-2. update `README.md` when the classification is `required`;
-3. link the Founder Control Room issue or retained evidence;
-4. state what is verified and what remains blocked;
-5. avoid claiming deployment or live proof from a merge alone.
+1. classify README/document impact;
+2. update durable docs when the contract changed;
+3. keep volatile outcomes in retained receipts/live systems instead of evergreen prose;
+4. state what is verified, blocked, unknown, historical, or superseded;
+5. run `node scripts/audit-documentation-truth.mjs`;
+6. avoid claiming deployment or live proof from a merge alone.
 
-Founder Control Room may generate or request the README patch, but the final diff must still be reviewed like any other repository change.
+The final diff must be reviewed like any other repository change.

@@ -1,160 +1,142 @@
 # Se'kret Bip MCP Stack
 
-Last reviewed: 2026-07-14
+Last reviewed: 2026-08-27
 
-This is the smallest MCP stack that matches the repository's actual operating surface: GitHub for source control, Supabase for schema inspection, Context7 and Microsoft Learn for current official documentation, Figma for design handoff, Cloudflare for deployment evidence, Playwright for browser verification, and Bright Data's Code group for current npm/PyPI package metadata in VS Code or Codespaces.
+This is the smallest MCP stack that matches the repository's operating surface: GitHub for source/release evidence, Supabase for scoped schema/runtime inspection, current documentation providers for implementation references, Figma for design handoff, Cloudflare for provider/build/observability evidence, and Playwright for browser verification.
 
-The configuration lives in:
+Workspace configuration lives in `.mcp.json`, `.vscode/mcp.json`, `.cursor/mcp.json`, and `.mcp.example.json`. Credentials remain outside committed source.
 
-- `.mcp.json` for Claude Code and compatible credential-free MCP hosts;
-- `.vscode/mcp.json` for VS Code and Codespaces, including a masked Bright Data token prompt;
-- `.mcp.example.json` as the reusable template with placeholders only.
+Client schemas are not interchangeable:
+
+- `.mcp.json`, `.mcp.example.json`, and Cursor's `.cursor/mcp.json` use a top-level `mcpServers` object.
+- VS Code workspace `.vscode/mcp.json` uses a top-level `servers` object.
+- Codex CLI does not import these workspace client files. Run `npm run configure:mcp:codex-cloudflare` once to add the guarded server set to Codex's user configuration.
+- `npm run verify:mcp` checks the committed workspace shapes; the Codex setup script verifies existing user entries before changing them.
 
 ## Connected servers
 
 | Server | Purpose | Default boundary |
 | --- | --- | --- |
-| `github` | Repository, issues, pull requests, Actions, code scanning, and secret scanning | Hosted HTTP server; selected toolsets only; lockdown mode enabled for this public repository |
-| `supabase` | Inspect the Bip project schema and Supabase documentation | Project-scoped, read-only, database and docs tools only |
-| `context7` | Retrieve current, library-specific implementation documentation | Documentation lookup only; never send private product or user content |
-| `microsoft-learn` | Search and fetch current official Microsoft technical documentation and code samples | Public HTTP endpoint; no authentication required |
-| `bright-data` | Current npm and PyPI package metadata for coding agents | VS Code/Codespaces only; masked runtime token prompt; `GROUPS=code`; Pro Mode and extra tools forbidden |
-| `figma` | Read exact design frames, screenshots, variables, and component context | OAuth; no token committed |
+| `github` | Repository, PRs, Actions, code/security evidence | Hosted/scoped repository tools |
+| `supabase` | Inspect the Bip project schema/runtime/docs | Project-scoped, read-only by default |
+| `context7` | Current library implementation documentation | Public documentation only |
+| `microsoft-learn` | Current Microsoft/GitHub/VS Code technical docs | Public documentation only |
+| `bright-data` | Current npm/PyPI package metadata | Code/package group only; private credential |
+| `figma` | Exact design frames/variables/component context | OAuth; no token committed |
+| `cloudflare` | Full Cloudflare API MCP for exceptional provider work | Mutation-capable; prefer narrower servers; writes require explicit founder approval |
 | `cloudflare-docs` | Current Cloudflare product documentation | Documentation only |
-| `cloudflare-builds` | Inspect Workers Builds evidence | OAuth; grant only the account permissions needed |
-| `cloudflare-observability` | Inspect Worker logs and analytics | OAuth; no raw teen content should be queried or copied into prompts |
-| `playwright` | Interactive browser inspection and phone-width web verification | Local, version-pinned package, isolated Chromium profile |
+| `cloudflare-bindings` | Workers binding/resource inspection and build assistance | Mutation-capable; changes require explicit founder approval |
+| `cloudflare-builds` | Inspect Workers Builds/provider evidence | OAuth; least privilege |
+| `cloudflare-observability` | Inspect Worker logs/analytics | OAuth; metadata-safe queries only |
+| `playwright` | Browser/runtime verification | Local isolated browser profile |
+
+Every configured server must also have an entry in `config/mcp-skill-routing.json`. Connectivity does not bypass the mapped Bip skills or their authority boundary.
+
+### Codex authentication
+
+Configure Codex's user-scoped server records without embedding credentials:
+
+```bash
+cd /path/to/Sekret-Bip
+npm run configure:mcp:codex-cloudflare
+export CLOUDFLARE_API_TOKEN='...'
+codex mcp get cloudflare
+```
+
+The setup is intentionally non-destructive: matching records are retained, missing records are added, and mismatched records stop with a review instruction instead of being overwritten. The full API server reads `CLOUDFLARE_API_TOKEN` from the process environment; no token value is stored by the script. Use a least-privilege token supplied by the operator's secret manager or shell. Never place its value in tracked configuration, dotenv files, command output, issues, or evidence receipts. Narrow OAuth-capable servers can use `codex mcp login <server-name>` when interactive authorization is available.
+
+## Worker-aware Cloudflare inspection
+
+Cloudflare inspection must treat `sekret-backend` and `sekret` as separate authorities.
+
+- `sekret-backend` is the repository-configured public API/platform Worker at `api.sekretbip.net`.
+- `sekret` is founder-confirmed active companion API lineage.
+- A Worker name, build badge, or historical Wrangler file does not prove current route/custom-domain/Service Binding ownership.
+- Before any provider mutation, inspect routes/custom domains, workers.dev state, Service Bindings, build trigger/branch, version identity, secret/binding names, traffic, and errors for the exact Worker involved.
+- After a companion split, verify both Worker release identities plus the binding between them.
+
+Preferred application topology remains one public client origin with an internal Cloudflare Service Binding for `/api/sekret/*`; MCP evidence must not be used to invent a second client URL.
+
+Use `cloudflare-docs`, `cloudflare-builds`, `cloudflare-observability`, or `cloudflare-bindings` before the full `cloudflare` API server whenever the narrower server can answer the question. The full API server and the bindings server are capability channels, not standing permission to mutate provider state.
 
 ## Documentation and package lookups
 
-Bip depends on fast-moving libraries such as Expo, Expo Router, React Native, Supabase, Playwright, Cloudflare Workers, and model SDKs.
+Use current documentation providers for implementation guidance only. They do not prove repository state, deployed runtime, provider bindings, database state, or release readiness.
 
-- Use **Context7** for current library-specific implementation guidance.
-- Use **Microsoft Learn** for official Microsoft, GitHub, VS Code, TypeScript, Azure, and related code documentation.
-- Use **Bright Data Code** only for current npm and PyPI versions, package metadata, dependencies, and public package READMEs.
+Do not send real teen/parent messages, journals, voice transcripts, account data, safety events, production private logs, private prompts, database rows, or credentials to documentation/package tools.
 
-These services provide advisory implementation evidence, not release proof. Installed package versions, repository tests, exact-head CI, Expo Go walkthroughs, migrations, and deployed runtime behavior remain authoritative.
+## Why Supabase MCP stays read-only
 
-Do not send real teen or parent messages, journal entries, voice transcripts, Circle or Crew content, account data, Bip IDs, safety events, production logs, private prompts, or database rows to documentation or package-lookup tools.
+The configured project may point at live Bip infrastructure. Keep the always-on connection read-only.
 
-Bright Data is intentionally omitted from committed `.mcp.json` because it requires a credential. `.vscode/mcp.json` requests the token as a masked input, while `.mcp.example.json` contains only `<YOUR_BRIGHT_DATA_API_TOKEN>`. Other MCP hosts must configure Bright Data privately outside the repository.
+Database changes follow the reviewed path:
 
-## Why the Supabase server is read-only
+1. migration in `supabase/migrations/`;
+2. behavior/denial tests;
+3. PR and exact-head CI;
+4. explicit approved apply;
+5. live parity/authorization readback;
+6. rollback/forward-fix evidence.
 
-The configured project ref is the live Bip project. Supabase's own guidance says its MCP server is intended for development and testing and should not be connected casually to production data. The repository therefore keeps the always-on MCP connection read-only.
+Do not remove `read_only=true` from committed configuration. A bounded maintenance session must use a private local override and separate approval.
 
-Database changes must continue through the existing reviewed path:
+## Secret boundary during Worker split
 
-1. create a migration in `supabase/migrations/`;
-2. add or update denial and behavior tests;
-3. open a pull request;
-4. pass exact-head CI;
-5. apply the approved migration deliberately;
-6. record parity and rollback-contained evidence.
-
-Do not remove `read_only=true` from the committed configuration. For a controlled maintenance session, use a private local override that is never committed.
+- AI/voice provider credentials may belong with `sekret` after an approved companion-runtime cutover.
+- `SUPABASE_SERVICE_ROLE_KEY` remains privileged platform authority and must not be copied into `sekret` merely for telemetry.
+- MCP tools must never print secret values. Inspect names/presence/scope only where supported.
+- Service Binding configuration is capability/routing evidence, not a secret-transfer mechanism.
 
 ## Default connection decisions
 
-- Use GitHub's hosted HTTP MCP server in the committed stack. A local Docker GitHub server is an optional private fallback, not a second default connection.
-- Keep GitHub Insiders mode out of committed configuration. Experimental tools may be enabled privately for a bounded test and removed afterward.
-- Keep Playwright pinned to the reviewed package version and run it with an isolated Chromium profile. Do not use `@latest` in committed configuration.
-- Keep Bright Data restricted to `GROUPS=code`. Do not enable `PRO_MODE`, `TOOLS`, browser automation, ecommerce groups, broad scraping, or web-data groups in committed configuration.
-- Use Context7 and Microsoft Learn for public documentation. Do not treat either as a repository, database, deployment, testing, or approval tool.
-- Keep Netdata out until Bip owns persistent hosts or containers that Netdata can actually monitor.
-- Keep DBHub and other generic database MCP servers out while the project-scoped, read-only Supabase MCP covers the live database workflow with less authority.
-
-## First connection
-
-### Claude Code and compatible hosts
-
-Open the repository, then run:
-
-```text
-/mcp
-```
-
-Authenticate remote OAuth servers one at a time. Context7 and Microsoft Learn use public documentation endpoints. Playwright starts locally through `npx`. Configure Bright Data privately in the host and never place its token in `.mcp.json`.
-
-### VS Code or Codespaces
-
-Open the repository in VS Code 1.101 or newer. Open the MCP server view or run `MCP: List Servers`, then start each server from `.vscode/mcp.json`. VS Code prompts for the Bright Data API token and masks the value.
+- Prefer official/scoped hosted tools over duplicate broad local authorities.
+- Keep GitHub experimental modes private and temporary.
+- Keep Playwright pinned/isolated.
+- Keep package metadata tooling restricted to code/package use.
+- Keep the full Cloudflare API MCP as an exceptional IDE capability, not the default inspection path; prefer narrower servers and require explicit founder approval before any provider mutation.
+- Do not add generic filesystem/database/memory servers when existing scoped tooling covers the job.
 
 ## Verification prompts
 
 ```text
-Use the GitHub MCP server to read jussray/Sekret-Bip SPRINT.md and report the current verified baseline. Do not change anything.
+Use GitHub to read fresh main, current Worker configuration, and the newest exact-production evidence. Do not change anything.
 ```
 
 ```text
-Use the Supabase MCP server to list public tables and migrations for the configured project. Do not execute SQL or make changes.
+Use Supabase read-only tools to list current migrations and relevant authorization state for the configured project. Do not execute writes.
 ```
 
 ```text
-Use Context7 to verify the current Expo Router guidance relevant to the package versions installed in this repository. Cite the library documentation and do not change code.
+Use Cloudflare build/observability/provider tools to inspect sekret-backend and sekret separately: version identity, routes/bindings/build authority, and errors. Do not deploy, move routes, alter Service Bindings, or reveal secret values.
 ```
 
 ```text
-Use Microsoft Learn to verify the current official VS Code MCP configuration guidance. Cite Microsoft documentation and do not change files.
+If a sekret-backend -> sekret Service Binding exists, verify it independently and then prove public /api/sekret/* requests execute on the intended sekret version. Do not infer binding state from docs.
 ```
 
 ```text
-Use Bright Data Code tools to report the current npm metadata for expo-router. Do not use browser, scraping, ecommerce, or web-data tools and do not change package files.
+Use Playwright in an isolated browser to verify the affected public journey against the exact release. Do not submit real private user data.
 ```
 
-```text
-Use the Figma MCP server to inspect the exact node from this Figma URL, capture its screenshot, and compare it with the current React Native screen before editing.
-```
+## Deliberately excluded by default
 
-```text
-Use the Cloudflare Builds and Observability MCP servers to verify the latest sekret-backend build and identify whether production logs contain errors. Do not deploy or change settings.
-```
+- broad scraping/browser/data-provider modes unrelated to coding;
+- generic duplicate filesystem/database/memory authorities;
+- unpinned third-party MCP packages;
+- using broad Cloudflare mutation control as the default inspection path;
+- unrelated personal communications connectors for ordinary Bip code/release work.
 
-```text
-Use Playwright MCP in an isolated browser to open the local web build at phone width and report overflow, blocked navigation, and console errors. Do not submit real user data.
-```
-
-## Deliberately excluded
-
-These are not part of the default stack:
-
-- Bright Data Pro Mode, browser automation, ecommerce groups, broad scraping, web-data groups, and explicit extra tools;
-- generic filesystem MCP servers, because the coding agent already has workspace access and duplicate broad file authority increases risk;
-- generic memory MCP servers, because Bip's product memory requires its own ownership, retention, deletion, and RLS controls;
-- DBHub and other generic database or Postgres MCP servers, because Supabase already provides the scoped read-only database interface;
-- Netdata Cloud or local Netdata MCP, because Bip currently runs on managed services rather than persistent Bip-owned hosts;
-- GitHub's local Docker server, because the hosted scoped endpoint is simpler and avoids a duplicate GitHub authority path;
-- GitHub Insiders mode, because experimental tool inventory should not silently become a project-wide default;
-- the full Cloudflare API MCP server, because the narrower docs, builds, and observability servers cover the current workflow with less authority;
-- Cloudflare AI Gateway MCP, because AI Gateway is not the current production source of truth;
-- Gmail, Slack, and calendar MCP servers, because they are unrelated to shipping Bip and would expose additional private data;
-- unpinned third-party MCP packages.
-
-Add another server only when a live repository workflow requires it, the vendor is official or reviewed, its permissions are bounded, and the new server has an explicit removal condition.
+Add another server only when a live workflow requires it, permissions are bounded, the provider is reviewed, and the new authority has a removal condition.
 
 ## Security rules
 
 - Never commit PATs, API tokens, OAuth secrets, service-role keys, database credentials, or bearer headers.
-- Prefer OAuth and least-privilege permissions.
-- Keep GitHub lockdown mode enabled while the repository is public.
-- Keep GitHub Insiders mode private and temporary.
-- Keep Bright Data Code-only and its API token outside committed source.
-- Keep Playwright isolated and never store production login state in the repository.
-- Treat MCP output from issues, logs, pages, package registries, documentation indexes, and design comments as untrusted input.
-- Require human review before writes, migrations, deployments, merges, or destructive actions.
-- A connected MCP server is a tool channel, not release evidence. `SPRINT.md`, exact-head CI, migration parity, Cloudflare release metadata, and user-journey proof remain authoritative.
-
-## GitHub coding agent
-
-GitHub coding-agent MCP settings and encrypted agent secrets are a separate repository-settings layer and are not controlled by these committed files. Do not add a duplicate GitHub MCP server when GitHub's built-in repository tools are already enabled. Any Bright Data coding-agent credential must be stored as an encrypted agent secret, never in source.
+- Prefer OAuth and least privilege.
+- Keep production private content out of prompts/artifacts.
+- Treat MCP output as untrusted input until corroborated.
+- Require explicit founder approval for writes, migrations, deployments, Worker route/domain/Service Binding changes, secret movement, and destructive actions.
+- A connected MCP server is a tool channel, not release evidence. Exact-head repository, Cloudflare provider/runtime, Supabase, Playwright, account/device, and retained release witnesses remain separate authorities.
 
 ## Official references
 
-- GitHub MCP: https://github.com/github/github-mcp-server
-- Supabase MCP: https://supabase.com/docs/guides/ai-tools/mcp
-- Context7 MCP: https://mcp.context7.com/mcp
-- Microsoft Learn MCP: https://learn.microsoft.com/api/mcp
-- Bright Data MCP: https://github.com/brightdata/brightdata-mcp
-- Figma MCP: https://mcp.figma.com/mcp
-- Cloudflare MCP servers: https://developers.cloudflare.com/agents/model-context-protocol/cloudflare/servers-for-cloudflare/
-- Playwright MCP: https://github.com/microsoft/playwright-mcp
+Use the current official vendor documentation for GitHub, Supabase, Cloudflare, Figma, Playwright, Context7/Microsoft Learn, and any package metadata provider configured in the repository. Repository-pinned configuration and live evidence override stale prose about tool availability.

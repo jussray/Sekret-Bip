@@ -1,4 +1,4 @@
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, useGlobalSearchParams, usePathname } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { GlobalMoodButton } from '@/components/GlobalMoodButton';
@@ -6,6 +6,8 @@ import { SideSafeBackButton } from '@/components/SideSafeBackButton';
 import { SafetyExperienceSheet } from '../../components/safety/SafetyExperienceSheet';
 import { useAppContext } from '@/context/AppContext';
 import { useSafetyCheck } from '@/hooks/useSafetyCheck';
+import { useSleepGuard } from '../../hooks/useSleepGuard';
+import { isQuietRouteAllowed } from '@/features/quiet/quietMode';
 import { toCompanionId } from '@/features/sekret/companionEngine';
 import { hydrateAccountProfile } from '@/features/identity/accountProfile';
 import { getDevSplitViewSideOverride } from '@/utils/devSplitViewSide';
@@ -16,7 +18,7 @@ function TabIcon({ emoji }: { emoji: string }) {
   return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
 }
 
-function TeenTabs({ selectedSekret }: { selectedSekret: string }) {
+function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; quietActive: boolean }) {
   const companionId = toCompanionId(selectedSekret ?? 'raylene');
   const { experience, clear } = useSafetyCheck(companionId, true);
 
@@ -26,7 +28,9 @@ function TeenTabs({ selectedSekret }: { selectedSekret: string }) {
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: { backgroundColor: '#111827', borderTopWidth: 0, height: 68, paddingBottom: 10 },
+          tabBarStyle: quietActive
+            ? { display: 'none' }
+            : { backgroundColor: '#111827', borderTopWidth: 0, height: 68, paddingBottom: 10 },
           tabBarActiveTintColor: '#fff',
           tabBarInactiveTintColor: '#94A3B8',
           tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
@@ -38,6 +42,7 @@ function TeenTabs({ selectedSekret }: { selectedSekret: string }) {
         <Tabs.Screen name="calm/breathe" options={{ href: null }} />
         <Tabs.Screen name="circle" options={{ title: 'Circle', tabBarIcon: () => <TabIcon emoji="🌐" /> }} />
         <Tabs.Screen name="circle/feed" options={{ href: null }} />
+        <Tabs.Screen name="circle/feed-v2" options={{ href: null }} />
         <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: () => <TabIcon emoji="•••" /> }} />
         <Tabs.Screen name="user-room" options={{ href: null }} />
         <Tabs.Screen name="sekret" options={{ href: null }} />
@@ -71,11 +76,16 @@ function TeenTabs({ selectedSekret }: { selectedSekret: string }) {
         <Tabs.Screen name="circle/[id]" options={{ href: null }} />
         <Tabs.Screen name="circle/weather" options={{ href: null }} />
         <Tabs.Screen name="resources" options={{ href: null }} />
+        <Tabs.Screen name="quiet" options={{ href: null }} />
       </Tabs>
-      <SideSafeBackButton side="teen" />
-      <GlobalMoodButton />
+      {!quietActive && <SideSafeBackButton side="teen" />}
+      {!quietActive && <GlobalMoodButton />}
     </View>
   );
+}
+
+function TeenLoadingSurface() {
+  return <View style={{ flex: 1, backgroundColor: '#0d0820' }} />;
 }
 
 export default function TeenLayout() {
@@ -84,6 +94,11 @@ export default function TeenLayout() {
   const [profileComplete, setProfileComplete] = useState(false);
   const sessionLogged = useRef(false);
   const founderPreview = isFounderPreviewEnabled();
+  const devSideOverride = getDevSplitViewSideOverride();
+  const pathname = usePathname();
+  const { companion } = useGlobalSearchParams<{ companion?: string | string[] }>();
+  const { sleepActive, sleepLoaded } = useSleepGuard();
+  const quietRouteAllowed = isQuietRouteAllowed({ pathname, companion });
 
   useEffect(() => {
     let active = true;
@@ -106,12 +121,12 @@ export default function TeenLayout() {
     };
   }, []);
 
-  const effectiveUserSide = getDevSplitViewSideOverride() ?? userSide;
+  const effectiveUserSide = devSideOverride ?? userSide;
   const isTeenActive = founderPreview || (
     !isLoading &&
     profileChecked &&
     profileComplete &&
-    (effectiveUserSide === 'teen' || getDevSplitViewSideOverride() != null)
+    (effectiveUserSide === 'teen' || devSideOverride != null)
   );
 
   useEffect(() => {
@@ -121,14 +136,25 @@ export default function TeenLayout() {
     }
   }, [isTeenActive]);
 
-  // Founder Preview bypasses only route/onboarding visibility in development.
-  // Individual screens still enforce authentication, consent, accepted links,
-  // RLS, microphone permissions, and safety checks.
-  if (founderPreview) return <TeenTabs selectedSekret={selectedSekret ?? 'raylene'} />;
+  // Split View and exact-head browser proof can land on the teen copy of a
+  // duplicate web URL first. Honor the explicit side before Founder Preview
+  // renders so /(teen) and /(parent) remain deterministic in development.
+  if (founderPreview && devSideOverride === 'parent') {
+    return <Redirect href={`/(parent)${pathname}` as never} />;
+  }
 
-  if (isLoading || !profileChecked) return <View style={{ flex: 1, backgroundColor: '#0d0820' }} />;
+  // Founder Preview bypasses only route/onboarding visibility in development.
+  // Quiet Bip remains a product boundary, so preview still honors Sleep Guard.
+  if (founderPreview) {
+    if (!sleepLoaded) return <TeenLoadingSurface />;
+    if (sleepActive && !quietRouteAllowed) return <Redirect href="/(teen)/quiet" />;
+    return <TeenTabs selectedSekret={selectedSekret ?? 'raylene'} quietActive={sleepActive} />;
+  }
+
+  if (isLoading || !profileChecked || !sleepLoaded) return <TeenLoadingSurface />;
   if (effectiveUserSide === 'parent') return <Redirect href="/(parent)/room" />;
   if (effectiveUserSide !== 'teen') return <Redirect href="/" />;
   if (!profileComplete) return <Redirect href="/(onboarding)/welcome" />;
-  return <TeenTabs selectedSekret={selectedSekret ?? 'raylene'} />;
+  if (sleepActive && !quietRouteAllowed) return <Redirect href="/(teen)/quiet" />;
+  return <TeenTabs selectedSekret={selectedSekret ?? 'raylene'} quietActive={sleepActive} />;
 }

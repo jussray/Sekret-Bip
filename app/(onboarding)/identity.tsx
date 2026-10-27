@@ -3,9 +3,9 @@ import { Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from '
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useOnboarding } from '@/context/OnboardingContext';
+import type { NamedCompanionId } from '@/features/identity/companionIds';
 
 type Identity = 'girl' | 'boy' | 'other';
-type Companion = 'raylene' | 'rylane' | 'cloud' | 'night';
 
 const IDENTITIES: { id: Identity; label: string }[] = [
   { id: 'girl', label: 'Girl' },
@@ -13,9 +13,9 @@ const IDENTITIES: { id: Identity; label: string }[] = [
   { id: 'other', label: 'My own way' },
 ];
 
-const COMPANIONS: { id: Companion; label: string }[] = [
-  { id: 'raylene', label: 'Raylene' },
-  { id: 'rylane', label: 'Rylane' },
+const COMPANIONS: { id: NamedCompanionId; label: string }[] = [
+  { id: 'suhana', label: 'Suhana' },
+  { id: 'sy', label: 'Sy' },
   { id: 'cloud', label: 'Cloud' },
   { id: 'night', label: 'Night' },
 ];
@@ -33,11 +33,11 @@ const STEP_IDX = 2; // step 3 of 4
 export default function IdentityScreen() {
   const { advance } = useOnboarding();
   const [identity, setIdentity] = useState<Identity | null>(null);
-  const [choice, setChoice] = useState<Companion>('raylene');
+  const [choice, setChoice] = useState<NamedCompanionId>('suhana');
 
   function chooseIdentity(next: Identity) {
     setIdentity(next);
-    setChoice(next === 'boy' ? 'rylane' : 'raylene');
+    setChoice(next === 'boy' ? 'sy' : 'suhana');
   }
 
   async function handleNext() {
@@ -60,7 +60,6 @@ export default function IdentityScreen() {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
 
-        {/* Step dots */}
         <View style={styles.stepDots}>
           {Array.from({ length: STEPS }).map((_, i) => (
             <View key={i} style={[styles.dot, i === STEP_IDX && styles.dotActive]} />
@@ -71,14 +70,15 @@ export default function IdentityScreen() {
         <Text style={styles.sub}>Pick a starting point. You can change it later in Profile.</Text>
 
         <Text style={styles.label}>You are</Text>
-        <View style={styles.grid}>
+        <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel="You are">
           {IDENTITIES.map(item => (
             <TouchableOpacity
               key={item.id}
               onPress={() => chooseIdentity(item.id)}
               style={[styles.card, identity === item.id && styles.cardActive]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: identity === item.id }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: identity === item.id }}
+              aria-checked={identity === item.id}
             >
               <Text style={[styles.cardText, identity === item.id && styles.cardTextActive]}>{item.label}</Text>
             </TouchableOpacity>
@@ -86,14 +86,15 @@ export default function IdentityScreen() {
         </View>
 
         <Text style={styles.label}>Your first Se'kret</Text>
-        <View style={styles.grid}>
+        <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel="Your first Se'kret">
           {COMPANIONS.map(item => (
             <TouchableOpacity
               key={item.id}
               onPress={() => setChoice(item.id)}
               style={[styles.card, choice === item.id && styles.cardActive]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: choice === item.id }}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: choice === item.id }}
+              aria-checked={choice === item.id}
             >
               <Text style={[styles.cardText, choice === item.id && styles.cardTextActive]}>{item.label}</Text>
             </TouchableOpacity>
