@@ -11,6 +11,7 @@ import type {
   CompanionReplyRequest,
   CompanionSurface,
   TranscriptionRequest,
+  VoiceSynthesisData,
   VoiceSynthesisRequest,
   WorkerErrorCode,
   WorkerResult,
@@ -20,7 +21,6 @@ import {
   WORKER_BASE_URL,
   type WorkerHealthResult,
 } from '@/services/backend/sekretClient';
-import { getCurrentFounderProfile, isFounderProfile } from '@/services/founderAudit';
 
 export type CharacterId = CompanionId;
 export type Surface = CompanionSurface;
@@ -55,40 +55,16 @@ function unwrap<T>(result: WorkerResult<T>): T {
   );
 }
 
-const WORKER_MANAGER_ROLES = new Set(['admin', 'founder']);
-
-async function assertWorkerManagementAccess(): Promise<void> {
-  const profile = await getCurrentFounderProfile();
-  const authorized = Boolean(
-    profile &&
-      isFounderProfile(profile) &&
-      profile.can_manage_app &&
-      WORKER_MANAGER_ROLES.has(profile.role),
-  );
-
-  if (!authorized) {
-    throw new WorkerError(
-      403,
-      'ACCESS_DENIED',
-      'Founder or admin management access is required for live Worker operations.',
-    );
-  }
-}
-
 const workerClient = {
   async sendReply(params: SendReplyParams): Promise<CompanionReply> {
-    await assertWorkerManagementAccess();
     return unwrap(await sekretClient.sendReply(params));
   },
 
-  async synthesizeVoice(params: SendVoiceParams): Promise<{ audioBase64: string }> {
-    await assertWorkerManagementAccess();
-    const data = unwrap(await sekretClient.synthesizeVoice(params));
-    return { audioBase64: data.audioBase64 };
+  async synthesizeVoice(params: SendVoiceParams): Promise<VoiceSynthesisData> {
+    return unwrap(await sekretClient.synthesizeVoice(params));
   },
 
   async transcribeAudio(params: TranscribeParams): Promise<{ text: string }> {
-    await assertWorkerManagementAccess();
     const data = unwrap(await sekretClient.transcribeAudio(params));
     return { text: data.transcript ?? data.text ?? '' };
   },

@@ -1,22 +1,21 @@
 /**
- * AppleSignInButton.tsx
- * Sign in with Apple — mandatory for App Store if ANY other social login exists.
- * Wires expo-apple-authentication → Supabase signInWithIdToken.
+ * Deferred Sign in with Apple surface.
  *
- * Usage:
- *   import AppleSignInButton from '@/components/auth/AppleSignInButton';
- *   <AppleSignInButton onSuccess={(session) => router.replace('/home')} />
+ * The full native implementation is preserved at:
+ * `docs/archive/code-snapshots/AppleSignInButton.pre-capability.md`.
  *
- * Prerequisites (not yet done — this file is excluded from tsconfig until they are):
- *   - expo install expo-apple-authentication
- *   - Add "Sign In with Apple" capability in Xcode
- *   - Enable Apple provider in Supabase Auth dashboard
- *   - Wire this component into an actual sign-in screen (currently has zero importers)
+ * Do not import `expo-apple-authentication` until the native dependency,
+ * Apple capability, Supabase provider, EAS/App Store impact, and device proof
+ * are explicitly approved. This inactive component stays compile-safe and
+ * fails closed instead of pretending the provider is configured.
  */
 import React from 'react';
-import { Platform, StyleSheet } from 'react-native';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import { supabase } from '@/utils/supabase';
+import {
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+} from 'react-native';
 import type { Session } from '@supabase/supabase-js';
 
 interface Props {
@@ -24,52 +23,37 @@ interface Props {
   onError?: (error: Error) => void;
 }
 
-export default function AppleSignInButton({ onSuccess, onError }: Props) {
-  // Only available on iOS 13+
+export default function AppleSignInButton(_props: Props) {
   if (Platform.OS !== 'ios') return null;
 
-  const handlePress = async () => {
-    try {
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-
-      if (!credential.identityToken) {
-        throw new Error('No identity token returned from Apple.');
-      }
-
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken,
-      });
-
-      if (error) throw error;
-      if (data.session) onSuccess?.(data.session);
-    } catch (error: any) {
-      // ERR_REQUEST_CANCELED = user tapped Cancel — not a real error
-      if (error.code === 'ERR_REQUEST_CANCELED') return;
-      console.error('[AppleSignIn]', error);
-      onError?.(error instanceof Error ? error : new Error(error.message));
-    }
-  };
-
   return (
-    <AppleAuthentication.AppleAuthenticationButton
-      buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-      buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-      cornerRadius={12}
+    <TouchableOpacity
+      accessibilityRole="button"
+      accessibilityState={{ disabled: true }}
+      accessibilityLabel="Sign in with Apple is not enabled in this build"
+      disabled
       style={styles.button}
-      onPress={handlePress}
-    />
+    >
+      <Text style={styles.text}>Sign in with Apple unavailable</Text>
+    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
     width: '100%',
-    height: 54,
+    minHeight: 54,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#1f1f1f',
+    opacity: 0.55,
+    paddingHorizontal: 16,
+  },
+  text: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

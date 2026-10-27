@@ -44,5 +44,7 @@ export async function handleStatus(req: Request, env: Env): Promise<Response> {
 }
 
 interface Env {
+  // Minimal local shape for the one method this file calls, rather than
+  // pulling in @cloudflare/workers-types for a single optional health probe.
   BIP_KV?: { get(key: string): Promise<string | null> };
 }

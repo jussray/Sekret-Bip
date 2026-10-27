@@ -143,5 +143,7 @@ export function lockScreenNotificationCopy(senderRole: 'teen' | 'parent'): strin
  * screen.
  */
 export function isPrivateNotificationCopy(copy: string): boolean {
+  // copy is arbitrary/unvalidated input being checked against the known-safe
+  // allowlist, so the comparison array is intentionally widened to string[].
   return (Object.values(LOCK_SCREEN_NOTIFICATION_COPY) as string[]).includes(copy);
 }

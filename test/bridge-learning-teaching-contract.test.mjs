@@ -75,7 +75,7 @@ test('lock-screen pings reveal only an exact approved request to join Bridge', (
   assert.match(policy, /LOCK_SCREEN_NOTIFICATION_COPY/);
   assert.match(policy, /Your teen asked you to join them in Learning Bridge/);
   assert.match(policy, /Your parent asked you to join them in Learning Bridge/);
-  assert.match(policy, /Object\.values\(LOCK_SCREEN_NOTIFICATION_COPY\)[^)]*\)\.includes\(copy\)/);
+  assert.match(policy, /Object\.values\(LOCK_SCREEN_NOTIFICATION_COPY\) as string\[\]\)\.includes\(copy\)/);
   assert.match(policy, /exact-template allowlist/);
   assert.match(policy, /subject, question, answer, source document/);
   assert.doesNotMatch(policy, /forbidden = \[/);

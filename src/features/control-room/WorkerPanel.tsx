@@ -10,7 +10,7 @@
  *   History — last 20 session shots (in-memory, no persistence)
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -28,7 +28,8 @@ import {
   type Surface,
   type WorkerHealthResult,
 } from '@/services/ai/workerClient';
-import { getCurrentFounderProfile, isFounderProfile } from '@/services/founderAudit';
+import { getCurrentFounderProfile } from '@/services/founderAudit';
+import { isWorkerManagementProfile } from './workerManagementAccess';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,8 +50,8 @@ interface ShotRecord {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CHARACTERS: CharacterId[] = [
-  'raylene',
-  'rylane',
+  'suhana',
+  'sy',
   'cloud',
   'night',
   'sekret',
@@ -92,9 +93,16 @@ export default function WorkerPanel() {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
-    void getCurrentFounderProfile().then((profile) => {
-      setAuthorized(isFounderProfile(profile));
-    });
+    let active = true;
+    void getCurrentFounderProfile()
+      .then((profile) => {
+        if (active) setAuthorized(isWorkerManagementProfile(profile));
+      })
+      .catch(() => {
+        // A failed permission lookup never unlocks the live Worker controls.
+        if (active) setAuthorized(false);
+      });
+    return () => { active = false; };
   }, []);
 
   if (authorized === null) {
@@ -171,7 +179,7 @@ function HealthPanel() {
             <Pill ok={result.ok} label={result.ok ? 'UP' : 'DOWN'} />
           </Row>
           <Row label='Latency'>
-            <Text style={[s.value, { color: latencyColor(result.latencyMs) }]}>
+            <Text style={[s.value, { color: latencyColor(result.latencyMs) }]}> 
               {result.latencyMs} ms
             </Text>
           </Row>
@@ -198,7 +206,7 @@ const shotHistory: ShotRecord[] = [];
 let shotCounter = 0;
 
 function FirePanel() {
-  const [characterId, setCharacterId] = useState<CharacterId>('raylene');
+  const [characterId, setCharacterId] = useState<CharacterId>('suhana');
   const [surface, setSurface] = useState<Surface>('journal');
   const [userText, setUserText] = useState('');
   const [mood, setMood] = useState('');

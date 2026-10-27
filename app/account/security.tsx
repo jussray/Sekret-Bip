@@ -122,7 +122,7 @@ export default function AccountSecurityScreen() {
             </View>
 
             {error ? <Text style={s.errorText} accessibilityRole="alert">{error}</Text> : null}
-            {status ? <Text style={s.statusText} accessibilityRole="text" accessibilityLiveRegion="polite">{status}</Text> : null}
+            {status ? <Text style={s.statusText} accessibilityLiveRegion="polite">{status}</Text> : null}
 
             <TouchableOpacity
               style={[s.btn, loading && s.btnDim]}
