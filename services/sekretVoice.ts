@@ -304,61 +304,6 @@ const BLOCKED_REPLY_LANGUAGE = [
   /\bin order to\b/i,
   /\bdue to the fact that\b/i,
   /\bit is important to note that\b/i,
-
-  // Chatbot service phrases (ported from PR #469)
-  /\bgreat question\b/i,
-  /\byou're absolutely right\b/i,
-
-  // Sycophancy (ported from PR #469)
-  /\bthat'?s a (?:great|fantastic|wonderful|brilliant) (?:point|question|observation)\b/i,
-  /\bwhat an insightful\b/i,
-  /\bthank you for sharing\b/i,
-
-  // Signposting (ported from PR #469)
-  /\blet'?s explore\b/i,
-  /\bwithout further ado\b/i,
-  /\bnow let'?s (?:look at|turn to)\b/i,
-
-  // Significance inflation / essay-speak (ported from PR #469)
-  /\bmarks (?:a|the) shift\b/i,
-
-  // Vague positive conclusions (ported from PR #469)
-  /\bthe future looks bright\b/i,
-  /\bexciting times (?:lie ahead|ahead)\b/i,
-  /\ba (?:major |big )?step in the right direction\b/i,
-  /\bcontinues to thrive\b/i,
-  /\bjourney toward excellence\b/i,
-
-  // AI vocabulary (ported from PR #469)
-  /\bshowcase(?:s|d|ing)?\b/i,
-  /\bvibrant\b/i,
-  /\bintricate(?:ly|ies)?\b/i,
-  /\bgarner(?:s|ed|ing)?\b/i,
-  /\bfostering\b/i,
-  /\binterplay\b/i,
-
-  // Promotional / brochure language (ported from PR #469)
-  /\brenowned\b/i,
-  /\bnestled\b/i,
-  /\bin the heart of\b/i,
-
-  // Superficial -ing analyses (ported from PR #469)
-  /\bhighlighting that\b/i,
-  /\bunderscoring (?:the|that|its|their)\b/i,
-  /\bsymbolizing\b/i,
-  /\bcultivating (?:a|the|deeper)\b/i,
-  /\bencompassing\b/i,
-
-  // Filler / bureaucratic phrases (ported from PR #469)
-  /\bat this point in time\b/i,
-  /\bin the event that\b/i,
-  /\bhas the ability to\b/i,
-
-  // Excessive hedging (ported from PR #469)
-  /\bcould potentially possibly\b/i,
-  /\bmight possibly\b/i,
-  /\bit could be argued that\b/i,
-  /\bone could argue\b/i,
 ];
 
 // Em/en dashes and spaced double hyphens read as an AI tell in a text, but
