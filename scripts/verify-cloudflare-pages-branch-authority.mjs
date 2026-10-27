@@ -62,7 +62,8 @@ export function evaluatePagesBranchAuthority(
   if (observed.sourceType !== 'github') failures.push(`source-type:${observed.sourceType || 'missing'}`);
   if (observed.repoOwner !== expectedRepoOwner) failures.push(`repo-owner:${observed.repoOwner || 'missing'}`);
   if (observed.repoName !== expectedRepoName) failures.push(`repo-name:${observed.repoName || 'missing'}`);
-  if (!observed.domains.includes(expectedCanonicalDomain)) failures.push(`canonical-domain:${expectedCanonicalDomain}:missing`);
+  // Accept the canonical configured hostname only as a complete domain value.
+  if (!observed.domains.some((domain) => domain === expectedCanonicalDomain)) failures.push(`canonical-domain:${expectedCanonicalDomain}:missing`);
   if (observed.productionBranch !== expectedBranch) failures.push(`production-branch:${observed.productionBranch || 'missing'}`);
   if (observed.productionDeploymentsEnabled !== true) failures.push(`production-deployments-enabled:${String(observed.productionDeploymentsEnabled)}`);
   if (!VALID_PREVIEW_SETTINGS.has(observed.previewDeploymentSetting)) failures.push(`preview-deployment-setting:${observed.previewDeploymentSetting || 'missing'}`);
@@ -92,6 +93,39 @@ async function cloudflareGet(token, pathName) {
   return payload?.result;
 }
 
+async function selectPagesCredential(env, accountId, projectName) {
+  const candidates = [
+    { source: 'CLOUDFLARE_PAGES_READ_API_TOKEN', token: clean(env.CLOUDFLARE_PAGES_READ_API_TOKEN) },
+    { source: 'CLOUDFLARE_API_TOKEN', token: clean(env.CLOUDFLARE_API_TOKEN) },
+    { source: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', token: clean(env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN) },
+  ].filter((candidate) => candidate.token);
+
+  if (candidates.length === 0) {
+    throw new Error('A Cloudflare token with read access to the Pages project is required.');
+  }
+
+  const projectPath = `/accounts/${accountId}/pages/projects/${encodeURIComponent(projectName)}`;
+  let lastError = null;
+  for (const candidate of candidates) {
+    try {
+      const project = await cloudflareGet(candidate.token, projectPath);
+      return { ...candidate, project };
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  const providerStatus = Number(lastError?.providerStatus);
+  const providerCodes = Array.isArray(lastError?.providerCodes)
+    ? lastError.providerCodes.filter((code) => Number.isInteger(code))
+    : [];
+  const suffix = Number.isInteger(providerStatus) ? ` Last provider status: ${providerStatus}.` : '';
+  const error = new Error(`No configured Cloudflare token can read Pages project ${projectName}.${suffix}`);
+  error.providerStatus = Number.isInteger(providerStatus) ? providerStatus : null;
+  error.providerCodes = providerCodes;
+  throw error;
+}
+
 function parseArgs(argv) {
   const parsed = { output: DEFAULT_OUTPUT, expectSnapshot: null };
   for (let index = 0; index < argv.length; index += 1) {
@@ -108,9 +142,63 @@ function parseArgs(argv) {
   return parsed;
 }
 
+function configuredCredentialSources(env) {
+  return [
+    env.CLOUDFLARE_PAGES_READ_API_TOKEN ? 'CLOUDFLARE_PAGES_READ_API_TOKEN' : null,
+    env.CLOUDFLARE_API_TOKEN ? 'CLOUDFLARE_API_TOKEN' : null,
+    env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN ? 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN' : null,
+  ].filter(Boolean);
+}
+
+async function retainPreReadFailure({
+  output,
+  env,
+  projectName,
+  expectedBranch,
+  expectedRepoOwner,
+  expectedRepoName,
+  expectedCanonicalDomain,
+  code,
+  error,
+}) {
+  const providerStatus = Number(error?.providerStatus);
+  const providerCodes = Array.isArray(error?.providerCodes)
+    ? error.providerCodes.filter((providerCode) => Number.isInteger(providerCode))
+    : [];
+  const receipt = {
+    schemaVersion: 3,
+    generatedAt: new Date().toISOString(),
+    mode: 'read-only',
+    mutationPerformed: false,
+    status: 'blocked',
+    credentialSource: null,
+    credentialConfiguredSources: configuredCredentialSources(env),
+    project: projectName,
+    expectedProductionBranch: expectedBranch,
+    expectedRepoOwner,
+    expectedRepoName,
+    expectedCanonicalDomain,
+    observed: null,
+    fingerprint: null,
+    verified: false,
+    failures: [code],
+    expectedSnapshotFingerprint: null,
+    snapshotMatched: null,
+    failure: {
+      code,
+      message: error instanceof Error ? error.message : String(error),
+      providerStatus: Number.isInteger(providerStatus) ? providerStatus : null,
+      providerCodes,
+    },
+  };
+
+  await mkdir(path.dirname(output), { recursive: true });
+  await writeFile(output, `${JSON.stringify(receipt, null, 2)}\n`, 'utf8');
+  return receipt;
+}
+
 export async function verifyPagesBranchAuthority({ argv = [], env = process.env } = {}) {
   const { output, expectSnapshot } = parseArgs(argv);
-  const token = clean(env.CLOUDFLARE_PAGES_READ_API_TOKEN);
   const accountId = clean(env.CLOUDFLARE_ACCOUNT_ID);
   const projectName = clean(env.CLOUDFLARE_PAGES_PROJECT) || DEFAULT_PROJECT;
   const expectedBranch = clean(env.CLOUDFLARE_PAGES_PRODUCTION_BRANCH) || DEFAULT_BRANCH;
@@ -118,17 +206,41 @@ export async function verifyPagesBranchAuthority({ argv = [], env = process.env 
   const expectedRepoName = clean(env.CLOUDFLARE_PAGES_REPO_NAME) || DEFAULT_REPO_NAME;
   const expectedCanonicalDomain = clean(env.CLOUDFLARE_PAGES_CANONICAL_DOMAIN) || DEFAULT_CANONICAL_DOMAIN;
 
-  if (!token) throw new Error('CLOUDFLARE_PAGES_READ_API_TOKEN is required for read-only Pages authority.');
-  if (!accountId) throw new Error('CLOUDFLARE_ACCOUNT_ID is required for Pages readback.');
+  if (!accountId) {
+    const error = new Error('CLOUDFLARE_ACCOUNT_ID is required for Pages readback.');
+    await retainPreReadFailure({
+      output,
+      env,
+      projectName,
+      expectedBranch,
+      expectedRepoOwner,
+      expectedRepoName,
+      expectedCanonicalDomain,
+      code: 'configuration-missing',
+      error,
+    });
+    throw error;
+  }
 
-  const tokenState = await cloudflareGet(token, '/user/tokens/verify');
-  if (tokenState?.status !== 'active') throw new Error('Dedicated Cloudflare Pages read token is not active.');
+  let credential;
+  try {
+    credential = await selectPagesCredential(env, accountId, projectName);
+  } catch (error) {
+    await retainPreReadFailure({
+      output,
+      env,
+      projectName,
+      expectedBranch,
+      expectedRepoOwner,
+      expectedRepoName,
+      expectedCanonicalDomain,
+      code: configuredCredentialSources(env).length === 0 ? 'credential-not-configured' : 'credential-read-failed',
+      error,
+    });
+    throw error;
+  }
 
-  const project = await cloudflareGet(
-    token,
-    `/accounts/${accountId}/pages/projects/${encodeURIComponent(projectName)}`,
-  );
-  const verdict = evaluatePagesBranchAuthority(project, {
+  const verdict = evaluatePagesBranchAuthority(credential.project, {
     expectedProject: projectName,
     expectedBranch,
     expectedRepoOwner,
@@ -145,11 +257,11 @@ export async function verifyPagesBranchAuthority({ argv = [], env = process.env 
   }
 
   const receipt = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     generatedAt: new Date().toISOString(),
     mode: 'read-only',
     mutationPerformed: false,
-    credentialSource: 'CLOUDFLARE_PAGES_READ_API_TOKEN',
+    credentialSource: credential.source,
     project: projectName,
     expectedProductionBranch: expectedBranch,
     expectedRepoOwner,
@@ -166,7 +278,7 @@ export async function verifyPagesBranchAuthority({ argv = [], env = process.env 
   if (!verdict.verified) throw new Error(`CLOUDFLARE_PAGES_BRANCH_AUTHORITY_NOT_VERIFIED: ${verdict.failures.join(',')}`);
   if (expectSnapshot && snapshotMatched !== true) throw new Error('CLOUDFLARE_PAGES_BRANCH_AUTHORITY_DRIFTED');
 
-  console.log(`CLOUDFLARE_PAGES_BRANCH_AUTHORITY_VERIFIED project=${projectName} repo=${expectedRepoOwner}/${expectedRepoName} domain=${expectedCanonicalDomain} production_branch=${verdict.observed.productionBranch} preview=${verdict.observed.previewDeploymentSetting}`);
+  console.log(`CLOUDFLARE_PAGES_BRANCH_AUTHORITY_VERIFIED project=${projectName} repo=${expectedRepoOwner}/${expectedRepoName} domain=${expectedCanonicalDomain} production_branch=${verdict.observed.productionBranch} preview=${verdict.observed.previewDeploymentSetting} credential=${credential.source}`);
   return receipt;
 }
 

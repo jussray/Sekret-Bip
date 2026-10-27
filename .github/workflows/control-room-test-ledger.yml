@@ -5,17 +5,36 @@ on:
     branches: [main]
   push:
     branches: [main]
+  repository_dispatch:
+    types: [runtime_state_changed]
   workflow_dispatch:
+    inputs:
+      external_state_epoch:
+        description: Non-secret sha256 state epoch from the provider or authority that observed runtime state movement
+        required: false
+        type: string
+      external_state_source:
+        description: Provider or authority identifier for the observed runtime state movement
+        required: false
+        type: string
 
 permissions:
   contents: read
   checks: read
+  id-token: write
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
   CONTROL_ROOM_LEDGER_SELF_CHECK: Publish exact-head test ledger
   CONTROL_ROOM_TEST_LEDGER_PATH: artifacts/control-room-test-ledger.json
+  CONTROL_ROOM_RUNTIME_STATE_PATH: artifacts/control-room-runtime-state.json
+  CONTROL_ROOM_EXTERNAL_STATE_ACTION: ${{ github.event.action || '' }}
+  CONTROL_ROOM_EXTERNAL_STATE_EPOCH: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.external_state_epoch || inputs.external_state_epoch || '' }}
+  CONTROL_ROOM_EXTERNAL_STATE_SOURCE: ${{ github.event_name == 'repository_dispatch' && github.event.client_payload.source || inputs.external_state_source || '' }}
+  CONTROL_ROOM_JUSS_PROOF_PATH: artifacts/control-room-juss-proof.json
+  FCR_BIP_PROOF_URL: https://api.foundercontrolroom.org/ingest/bip-control-room-proof
+  FCR_BIP_OIDC_AUDIENCE: https://api.foundercontrolroom.org/bip-control-room-proof
 
 concurrency:
   group: control-room-test-ledger-${{ github.event.pull_request.number || github.ref }}
@@ -46,7 +65,10 @@ jobs:
           node-version: '24'
 
       - name: Run Control Room test-ledger contracts
-        run: node --test test/control-room-test-ledger.test.mjs test/control-room-test-ledger-workflow-contract.test.mjs
+        run: node --test test/control-room-test-ledger.test.mjs test/control-room-test-ledger-workflow-contract.test.mjs test/control-room-juss-proof.test.mjs
+
+      - name: Verify runtime-state invalidation contract
+        run: node --test test/control-room-runtime-state.test.mjs
 
   publish-ledger:
     name: Publish exact-head test ledger
@@ -72,16 +94,96 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Record tracked config and runtime-state proof boundary
+        run: node scripts/control-room-runtime-state.mjs
+
       - name: Observe every exact-head check lane
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/control-room-test-ledger.mjs
+
+      - name: Normalize ledger to federated proof
+        run: node scripts/control-room-juss-proof.mjs
 
       - name: Upload repository-local Control Room ledger
         if: ${{ always() && hashFiles('artifacts/control-room-test-ledger.json') != '' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: control-room-test-ledger-${{ env.EXPECTED_HEAD_SHA }}
-          path: artifacts/control-room-test-ledger.json
+          path: |
+            artifacts/control-room-test-ledger.json
+            artifacts/control-room-runtime-state.json
           if-no-files-found: error
           retention-days: 14
+
+      - name: Upload sanitized juss-proof receipt
+        if: ${{ hashFiles('artifacts/control-room-juss-proof.json') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: juss-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/control-room-juss-proof.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Relay sanitized proof through FCR to Chief
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        timeout-minutes: 2
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+
+          const required = [
+            'ACTIONS_ID_TOKEN_REQUEST_URL',
+            'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+            'FCR_BIP_OIDC_AUDIENCE',
+            'FCR_BIP_PROOF_URL',
+            'CONTROL_ROOM_JUSS_PROOF_PATH',
+            'EXPECTED_HEAD_SHA',
+          ];
+          for (const name of required) {
+            if (!process.env[name]) throw new Error(`${name} is required for the FCR proof relay`);
+          }
+
+          const oidcUrl = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+          oidcUrl.searchParams.set('audience', process.env.FCR_BIP_OIDC_AUDIENCE);
+          const oidcResponse = await fetch(oidcUrl, {
+            headers: {
+              Authorization: `Bearer ${process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN}`,
+              Accept: 'application/json',
+            },
+          });
+          const oidcText = await oidcResponse.text();
+          if (!oidcResponse.ok) {
+            throw new Error(`GitHub OIDC request failed (${oidcResponse.status}): ${oidcText.slice(0, 300)}`);
+          }
+          const oidcPayload = JSON.parse(oidcText);
+          if (typeof oidcPayload.value !== 'string' || !oidcPayload.value) {
+            throw new Error('GitHub OIDC response omitted token value');
+          }
+
+          const proof = fs.readFileSync(process.env.CONTROL_ROOM_JUSS_PROOF_PATH, 'utf8');
+          const relayResponse = await fetch(process.env.FCR_BIP_PROOF_URL, {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${oidcPayload.value}`,
+              'Content-Type': 'application/json; charset=utf-8',
+            },
+            body: proof,
+          });
+          const relayText = await relayResponse.text();
+          if (!relayResponse.ok) {
+            throw new Error(`FCR proof relay failed (${relayResponse.status}): ${relayText.slice(0, 500)}`);
+          }
+          const relay = JSON.parse(relayText);
+          if (relay.accepted !== true || relay.sourceRevision !== process.env.EXPECTED_HEAD_SHA) {
+            throw new Error('FCR proof relay response did not bind to the exact expected head');
+          }
+          console.log(JSON.stringify({
+            accepted: true,
+            sourceReceiptId: relay.sourceReceiptId,
+            sourceRevision: relay.sourceRevision,
+            chiefReleaseSha: relay.chiefReleaseSha,
+            contract: relay.contract,
+          }));
+          NODE

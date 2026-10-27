@@ -224,11 +224,13 @@ test('Teen entry preserves the teen onboarding path', async ({ page }) => {
   await expectNoDocumentHorizontalOverflow(page);
 });
 
-test('Bip Jr entry preserves the parent onboarding path', async ({ page }) => {
+test('Bip Jr entry preserves the parent onboarding path without a splash step', async ({ page }) => {
   await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'networkidle' });
   await page.getByTestId('web-welcome-enter').click();
-  await expect(page).toHaveURL(/\/parent-splash(?:\?|$)/);
-  await expect(page.getByRole('button', { name: "Se'kret Bip — enter your parent space" })).toBeVisible({ timeout: 15_000 });
+  await expect(page).toHaveURL(/\/parent-welcome(?:\?|$)/);
+  await expect(page.getByRole('button', { name: 'Create my Parent account' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByRole('button', { name: 'I already have an account' })).toBeVisible({ timeout: 15_000 });
+  await expectNoDocumentHorizontalOverflow(page);
 });
 
 test('Circle renders Open Bip as the public audience layer with the face rule', async ({ page }, testInfo) => {

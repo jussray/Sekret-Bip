@@ -1,16 +1,28 @@
-# Se'kret Bip AI Pattern Linter v1.1
+# Se'kret Bip Voice Pattern Audit v2.0
 
-AI-writing pattern detector and voice-seed system for Se'kret Bip avatars. Based on humanizer v2.8.2 (blader/humanizer), MIT License.
+Density-based persona voice-quality audit for Se'kret Bip avatars. The historical filename remains `AI_PATTERN_LINTER.md` for compatibility, but this system is **not an AI-authorship detector**.
 
-## Personas in this release
+## Upstream provenance
 
-| Persona | Tag | Status | Primary risk patterns |
-|---|---|---|---|
-| Redteam | `redteam` | Primary build | P33 fake candor, P31 staccato drama, P32 aphorisms, P7 AI vocab |
-| Cool cousin | `cool-cousin` | Highest traction, formerly soft-therapist | P22 sycophancy, P201 therapy-script, P25 pep-talk closers, P14 em dashes |
-| Caveman | `caveman` | Next build | P7 AI vocab, P24 hedging, P3 -ing analyses, P10 rule of three |
-| Hype queen | `hype-queen` | Background | P4 promotional language, P10 rule of three |
-| Ghostwriter | `ghostwriter` | Background | P7 AI vocab, P14 em dashes |
+The pattern catalog is derived in part from **humanizer v2.8.2 (`blader/humanizer`)**, licensed under the MIT License. Upstream copyright: **Copyright (c) 2025 Siqi Chen**. The authoritative upstream license is retained by reference at `https://github.com/blader/humanizer/blob/main/LICENSE`, and the repository-level release attribution boundary is recorded in `THIRD_PARTY_NOTICES.md`.
+
+## Core rule
+
+A word, phrase, punctuation mark, list structure, or rhetorical pattern is never treated as proof of AI authorship and never blocks a response by itself.
+
+The audit looks for **clusters** that can weaken a persona's voice, such as repeated canned signposting, chatbot closers, scripted empathy, authority tropes, staccato drama, filler, or loaded vocabulary. Isolated markers remain clean. Clustered style drift produces a warning for review, not an automatic detector-evasion rewrite.
+
+The audit also preserves valid punctuation and precise vocabulary. It must not invent personal experience, certainty, opinions, or emotional texture merely to make text appear human.
+
+## Personas
+
+| Persona | Tag | Primary voice-drift watch |
+|---|---|---|
+| Redteam | `redteam` | canned service language, authority tropes, staccato drama, aphorism formulas |
+| Cool cousin | `cool-cousin` | scripted empathy, sycophancy, vague pep-talk closers |
+| Caveman | `caveman` | abstraction, hedging, promotional copy, formulaic rhetoric |
+| Hype queen | `hype-queen` | vague superlatives, generic positive endings, promotional clusters |
+| Ghostwriter | `ghostwriter` | canned signposting, vague conclusions, repetitive cadence |
 
 ## Library location
 
@@ -18,7 +30,7 @@ AI-writing pattern detector and voice-seed system for Se'kret Bip avatars. Based
 src/services/ai/aiPatternLinter.ts
 ```
 
-The library intentionally has no CLI demo. Use the Control Room Redteam tab for local founder checks.
+The library intentionally has no CLI demo. Use the founder Control Room for local voice checks.
 
 ## Usage
 
@@ -32,30 +44,41 @@ import {
 
 const result = lintAvatarResponse(draftText, 'redteam');
 
-if (result.severity === 'block') {
-  // Hard-ban pattern hit. Do not send, log internally, optionally retry.
-} else {
-  // Clean or soft-warn. Send to user.
+if (result.severity === 'warn') {
+  // A density cluster exists. Review the surrounding prose and rewrite only
+  // what weakens the persona or truth. Do not blindly replace every match.
 }
+
+// `block` remains in the result type only for backward compatibility.
+// Style-only findings do not emit it.
 
 const systemPrompt = composeAvatarPrompt(myBasePrompt, 'redteam');
 const customSeedPrompt = composeAvatarPrompt(myBasePrompt, 'redteam', VOICE_SEEDS.redteam);
 const promptRulesOnly = buildAvatarSystemPrompt('cool-cousin');
 ```
 
+Every result declares:
+
+```text
+auditKind = voice-density
+authorshipInference = not-supported
+```
+
 ## Control Room workflow
 
 1. Open the existing founder Control Room.
-2. Choose the Redteam tab.
+2. Choose the quality tab.
 3. Select a persona.
 4. Paste an avatar draft.
-5. Review the score, severity, and pattern hits before shipping or copying prompt rules.
+5. Review whether style markers form a real cluster.
+6. Preserve unaffected language and rewrite only spans that weaken voice, truth, or usefulness.
 
 ## Adding a new avatar
 
 1. Add the tag to the `AvatarPersona` union type.
 2. Add a voice seed to `VOICE_SEEDS`.
 3. Add prompt parts to `AVATAR_PROMPT_PARTS`.
-4. Add the persona to `AVATAR_PERSONAS` only if it shares every global hard ban.
-5. Update this document with the persona status and primary risk patterns.
-6. Verify TypeScript and the Control Room lint flow.
+4. Add the persona to `AVATAR_PERSONAS` when it should participate in the shared voice-density audit.
+5. Add only evidence-backed persona drift patterns. Do not create vocabulary or punctuation blacklists.
+6. Update this document with the persona status and primary voice-drift patterns.
+7. Verify TypeScript, focused contract tests, and the Control Room browser flow.

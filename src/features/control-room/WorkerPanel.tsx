@@ -28,7 +28,8 @@ import {
   type Surface,
   type WorkerHealthResult,
 } from '@/services/ai/workerClient';
-import { getCurrentFounderProfile, isFounderProfile } from '@/services/founderAudit';
+import { getCurrentFounderProfile } from '@/services/founderAudit';
+import { isWorkerManagementProfile } from './workerManagementAccess';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -92,9 +93,16 @@ export default function WorkerPanel() {
   const [authorized, setAuthorized] = useState<boolean | null>(null);
 
   useEffect(() => {
-    void getCurrentFounderProfile().then((profile) => {
-      setAuthorized(isFounderProfile(profile));
-    });
+    let active = true;
+    void getCurrentFounderProfile()
+      .then((profile) => {
+        if (active) setAuthorized(isWorkerManagementProfile(profile));
+      })
+      .catch(() => {
+        // A failed permission lookup never unlocks the live Worker controls.
+        if (active) setAuthorized(false);
+      });
+    return () => { active = false; };
   }, []);
 
   if (authorized === null) {

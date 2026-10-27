@@ -7,6 +7,8 @@ on:
       - ".github/workflows/cloudflare-email-routing.yml"
       - ".github/workflows/cloudflare-email-routing-contract.yml"
       - "scripts/reconcile-cloudflare-email-routing.mjs"
+      - "scripts/reconcile-cloudflare-resend-dns.mjs"
+      - "scripts/run-with-normalized-cloudflare-token.mjs"
       - "test/cloudflare-email-routing-control-plane.test.mjs"
       - "docs/CLOUDFLARE_EMAIL_ROUTING.md"
   push:
@@ -15,6 +17,8 @@ on:
       - ".github/workflows/cloudflare-email-routing.yml"
       - ".github/workflows/cloudflare-email-routing-contract.yml"
       - "scripts/reconcile-cloudflare-email-routing.mjs"
+      - "scripts/reconcile-cloudflare-resend-dns.mjs"
+      - "scripts/run-with-normalized-cloudflare-token.mjs"
       - "test/cloudflare-email-routing-control-plane.test.mjs"
       - "docs/CLOUDFLARE_EMAIL_ROUTING.md"
   workflow_dispatch:
@@ -53,8 +57,11 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Parse-check Email Routing reconciler
-        run: node --check scripts/reconcile-cloudflare-email-routing.mjs
+      - name: Parse-check Email Routing reconcilers
+        run: |
+          node --check scripts/reconcile-cloudflare-email-routing.mjs
+          node --check scripts/reconcile-cloudflare-resend-dns.mjs
+          node --check scripts/run-with-normalized-cloudflare-token.mjs
 
       - name: Run Email Routing control-plane contract
         run: node --test test/cloudflare-email-routing-control-plane.test.mjs

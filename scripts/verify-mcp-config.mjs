@@ -20,7 +20,7 @@ const exampleServerNames = [
   ...projectServerNames,
 ].sort();
 
-const vscodeServerNames = [
+const ideCloudflareServerNames = [
   'cloudflare',
   'cloudflare-bindings',
   'cloudflare-builds',
@@ -30,6 +30,8 @@ const vscodeServerNames = [
 
 const routingServerNames = [
   ...exampleServerNames,
+  'cloudflare',
+  'cloudflare-bindings',
   'product-design',
 ].sort();
 
@@ -43,7 +45,7 @@ const remoteUrls = {
   'cloudflare-observability': 'https://observability.mcp.cloudflare.com/mcp',
 };
 
-const vscodeCloudflareUrls = {
+const ideCloudflareUrls = {
   cloudflare: 'https://mcp.cloudflare.com/mcp',
   'cloudflare-docs': 'https://docs.mcp.cloudflare.com/mcp',
   'cloudflare-bindings': 'https://bindings.mcp.cloudflare.com/mcp',
@@ -131,13 +133,12 @@ function validateBrightData(relativePath, server) {
   assert(!('TOOLS' in (server?.env ?? {})), `${relativePath}:bright-data explicit tools are forbidden`);
 }
 
-function validateVscodeCloudflare(config) {
-  const servers = config.mcpServers;
-  validateExactSet('.vscode/mcp.json', servers, vscodeServerNames);
-  for (const [name, url] of Object.entries(vscodeCloudflareUrls)) {
-    assert(servers[name]?.url === url, `.vscode/mcp.json:${name} URL drifted`);
-    assert(!servers[name]?.headers, `.vscode/mcp.json:${name} must authenticate through the supported client`);
-    assert(!servers[name]?.env, `.vscode/mcp.json:${name} must not commit credentials`);
+function validateIdeCloudflare(relativePath, servers) {
+  validateExactSet(relativePath, servers, ideCloudflareServerNames);
+  for (const [name, url] of Object.entries(ideCloudflareUrls)) {
+    assert(servers[name]?.url === url, `${relativePath}:${name} URL drifted`);
+    assert(!servers[name]?.headers, `${relativePath}:${name} must authenticate through the supported client`);
+    assert(!servers[name]?.env, `${relativePath}:${name} must not commit credentials`);
   }
 }
 
@@ -165,6 +166,8 @@ function validateRouting(config) {
     github: ['bip-repo-truth', 'bip-release-gate'],
     supabase: ['bip-supabase-guardian', 'bip-privacy-redteam', 'bip-auth-onboarding'],
     playwright: ['bip-auth-onboarding', 'bip-release-gate'],
+    cloudflare: ['bip-worker-guardian', 'bip-privacy-redteam', 'bip-release-gate'],
+    'cloudflare-bindings': ['bip-worker-guardian', 'bip-privacy-redteam', 'bip-release-gate'],
     'cloudflare-builds': ['bip-worker-guardian', 'bip-release-gate'],
     'cloudflare-observability': ['bip-worker-guardian', 'bip-privacy-redteam'],
     figma: ['bip-companion-style-engine', 'bip-sekret-identity'],
@@ -186,6 +189,7 @@ function assertNoCommittedSecrets(relativePath, parsed) {
     /sk-(?:proj-)?[A-Za-z0-9_-]{20,}/,
     /Bearer\s+[A-Za-z0-9._-]{12,}/i,
     /SUPABASE_ACCESS_TOKEN/,
+    /SUPABASE_SECRET_KEY/,
     /SUPABASE_SERVICE_ROLE_KEY/,
     /CLOUDFLARE_API_TOKEN/,
     /NETDATA_CLOUD_API_TOKEN/,
@@ -198,6 +202,7 @@ function assertNoCommittedSecrets(relativePath, parsed) {
 const projectConfig = readJson('.mcp.json');
 const exampleConfig = readJson('.mcp.example.json');
 const vscodeConfig = readJson('.vscode/mcp.json');
+const cursorConfig = readJson('.cursor/mcp.json');
 const routingConfig = readJson('config/mcp-skill-routing.json');
 
 const projectServers = projectConfig.mcpServers;
@@ -212,7 +217,8 @@ validateSupabase('.mcp.example.json', exampleServers.supabase, 'YOUR_PROJECT_REF
 validatePlaywright('.mcp.json', projectServers.playwright);
 validatePlaywright('.mcp.example.json', exampleServers.playwright);
 validateBrightData('.mcp.example.json', exampleServers['bright-data']);
-validateVscodeCloudflare(vscodeConfig);
+validateIdeCloudflare('.vscode/mcp.json', vscodeConfig.servers);
+validateIdeCloudflare('.cursor/mcp.json', cursorConfig.mcpServers);
 validateRouting(routingConfig);
 
 assert(!projectServers['bright-data'], '.mcp.json must remain credential-free and omit bright-data');
@@ -224,9 +230,10 @@ for (const [relativePath, parsed] of [
   ['.mcp.json', projectConfig],
   ['.mcp.example.json', exampleConfig],
   ['.vscode/mcp.json', vscodeConfig],
+  ['.cursor/mcp.json', cursorConfig],
   ['config/mcp-skill-routing.json', routingConfig],
 ]) {
   assertNoCommittedSecrets(relativePath, parsed);
 }
 
-console.log('[verify:mcp] Bip Copilot MCP configuration, skill routing, client boundaries, and credential guards are valid.');
+console.log('[verify:mcp] Bip MCP client schemas, skill routing, authority boundaries, and credential guards are valid.');

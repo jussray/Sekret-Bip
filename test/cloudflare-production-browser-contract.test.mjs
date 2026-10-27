@@ -38,7 +38,9 @@ test('public production browser proof is anonymous and fails on Cloudflare Acces
   assert.match(productionFrontDoor, /cloudflareaccess\.com/);
   assert.match(productionFrontDoor, /\/cdn-cgi\/access\//);
   assert.match(productionFrontDoor, /web-welcome-enter/);
-  assert.match(productionFrontDoor, /app\.sekretbip\.net/);
+  assert.match(productionFrontDoor, /https:\/\/sekretbip\.net\//);
+  assert.match(productionFrontDoor, /hostname\)\.toBe\('sekretbip\.net'\)/);
+  assert.doesNotMatch(productionFrontDoor, /app\.sekretbip\.net/);
 });
 
 test('production launch proof binds Pages and Worker to the same release', () => {

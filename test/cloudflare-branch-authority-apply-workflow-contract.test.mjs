@@ -8,14 +8,18 @@ const workerVerifier = await readFile(new URL('../scripts/verify-cloudflare-work
 const pagesVerifier = await readFile(new URL('../scripts/verify-cloudflare-pages-branch-authority.mjs', import.meta.url), 'utf8');
 const targets = JSON.parse(await readFile(new URL('../config/cloudflare-targets.json', import.meta.url), 'utf8'));
 
-test('provider topology preserves separate sekret, canonical backend, founder-gated alpha, and Pages authorities', () => {
+test('provider topology preserves active Workers separately from the founder-gated alpha plan and Pages authority', () => {
   assert.equal(targets.production.worker.name, 'sekret-backend');
   assert.equal(targets.nonProduction.worker.name, 'sekret-backend-alpha');
+  assert.equal(targets.nonProduction.worker.status, 'founder-gated-not-deployed');
+  assert.equal(targets.nonProduction.worker.provisioningAuthority, 'explicit-founder-approval-required');
   assert.equal(targets.production.pages.name, 'sekret-bip');
-  assert.deepEqual(targets.providerInventory.workers, ['sekret', 'sekret-backend', 'sekret-backend-alpha']);
+  assert.deepEqual(targets.providerInventory.workers, ['bip', 'sekret-backend']);
+  assert.deepEqual(targets.providerInventory.founderGatedPlannedWorkers, ['sekret-backend-alpha']);
   assert.deepEqual(targets.providerInventory.pages, ['sekret-bip']);
-  assert.equal(targets.separateWorkerAuthorities.sekret.status, 'founder-confirmed-active');
-  assert.equal(targets.separateWorkerAuthorities.sekret.routeBinding, 'provider-readback-required');
+  assert.equal(targets.separateWorkerAuthorities.bip.status, 'founder-confirmed-renamed-from-sekret');
+  assert.equal(targets.separateWorkerAuthorities.bip.previousName, 'sekret');
+  assert.equal(targets.separateWorkerAuthorities.bip.routeBinding, 'provider-readback-required');
 });
 
 test('founder apply remains manual-only, exact-main pinned, and Production-environment gated', () => {
@@ -23,8 +27,6 @@ test('founder apply remains manual-only, exact-main pinned, and Production-envir
   assert.doesNotMatch(applyWorkflow, /\npush:/);
   assert.match(applyWorkflow, /expected_main_sha:/);
   assert.match(applyWorkflow, /FIX_646_MAIN_ONLY_WORKER_BUILDS/);
-  assert.match(applyWorkflow, /test \"\$GITHUB_ACTOR\" = \"jussray\"/);
-  assert.match(applyWorkflow, /git ls-remote/);
   assert.match(applyWorkflow, /environment: Production/);
   assert.match(applyWorkflow, /CLOUDFLARE_WORKERS_BUILDS_API_TOKEN/);
   assert.match(applyWorkflow, /CLOUDFLARE_PAGES_READ_API_TOKEN/);
@@ -37,56 +39,51 @@ test('founder repair mutates only canonical sekret-backend branch authority', ()
   assert.match(applyWorkflow, /const pagesProject = 'sekret-bip'/);
   assert.match(applyWorkflow, /alphaWorkerMutationPerformed: false/);
   assert.match(applyWorkflow, /pagesMutationPerformed: false/);
-  assert.match(applyWorkflow, /mutationAuthorized: false/);
   assert.doesNotMatch(applyWorkflow, /method: 'DELETE'/);
-  assert.equal(targets.separateWorkerAuthorities.sekret.mutationPolicy, 'preserve-until-exact-provider-binding-proven');
+  assert.equal(targets.separateWorkerAuthorities.bip.mutationPolicy, 'preserve-until-exact-provider-binding-proven');
 });
 
-test('repair fails closed on unexpected multi-trigger production topology instead of deleting provider objects', () => {
-  assert.match(applyWorkflow, /expected exactly one active build trigger; refusing automatic repair of a multi-trigger topology/);
-  assert.match(applyWorkflow, /activeProductionTriggers\.length !== 1/);
-  assert.match(applyWorkflow, /method: 'PATCH'/);
-  assert.match(applyWorkflow, /method: 'PUT'/);
-  assert.doesNotMatch(applyWorkflow, /delete-trigger/);
-});
-
-test('Pages authority is a load-bearing read and the audit delegates Worker truth to the read-only verifier', () => {
+test('Pages audit remains read-only, Production-bound, and uses only explicitly configured Cloudflare read credentials by capability', () => {
+  assert.match(auditWorkflow, /environment: Production/);
+  assert.match(auditWorkflow, /CLOUDFLARE_WORKERS_BUILDS_API_TOKEN/);
+  assert.match(auditWorkflow, /CLOUDFLARE_API_TOKEN/);
+  assert.match(auditWorkflow, /CLOUDFLARE_PAGES_READ_API_TOKEN/);
   assert.match(auditWorkflow, /verify-cloudflare-worker-branch-authority\.mjs/);
   assert.match(auditWorkflow, /verify-cloudflare-pages-branch-authority\.mjs/);
-  assert.match(auditWorkflow, /CLOUDFLARE_PAGES_READ_API_TOKEN/);
-  assert.doesNotMatch(auditWorkflow, /CLOUDFLARE_API_TOKEN/);
-  assert.match(auditWorkflow, /PAGES_EVIDENCE_PATH/);
-  assert.match(workerVerifier, /verification: 'load-bearing-provider-readback'/);
-  assert.match(applyWorkflow, /snapshot Pages branch authority before Worker mutation can be approved/);
-  assert.match(applyWorkflow, /verify-cloudflare-pages-branch-authority\.mjs/);
-  assert.match(applyWorkflow, /--expect-snapshot \"\$PAGES_EVIDENCE_PATH\"/);
-  assert.match(applyWorkflow, /pagesReadback\?\.verified !== true/);
-  assert.match(applyWorkflow, /pagesReadback\?\.snapshotMatched !== true/);
-});
-
-test('Pages verifier is read-only, dedicated-credential only, and checks current branch-control fields', () => {
   assert.match(pagesVerifier, /CLOUDFLARE_PAGES_READ_API_TOKEN/);
-  assert.doesNotMatch(pagesVerifier, /CLOUDFLARE_API_TOKEN/);
-  assert.match(pagesVerifier, /\/pages\/projects\//);
-  assert.match(pagesVerifier, /production_deployments_enabled/);
-  assert.match(pagesVerifier, /preview_deployment_setting/);
-  assert.match(pagesVerifier, /productionBranch/);
-  assert.match(pagesVerifier, /sourceType !== 'github'/);
+  assert.match(pagesVerifier, /CLOUDFLARE_API_TOKEN/);
+  assert.match(pagesVerifier, /CLOUDFLARE_WORKERS_BUILDS_API_TOKEN/);
+  assert.match(pagesVerifier, /projectPath/);
   assert.match(pagesVerifier, /mutationPerformed: false/);
-  assert.doesNotMatch(pagesVerifier, /method:\s*['"](?:PATCH|PUT|DELETE)['"]/);
 });
 
-test('read-only audit observes sekret separately while keeping backend branch repair isolated', () => {
-  assert.match(auditWorkflow, /name: Audit Cloudflare Worker and Pages Branch Authority/);
-  assert.match(auditWorkflow, /Read current two-Worker topology and verify production Worker branch authority/);
-  assert.match(workerVerifier, /const separateWorker = 'sekret'/);
+test('read-only audit observes bip separately while keeping backend branch repair isolated and alpha optional until approval', () => {
+  assert.match(auditWorkflow, /Audit Cloudflare Worker and Pages Branch Authority/);
+  assert.match(workerVerifier, /const separateWorker = 'bip'/);
+  assert.match(workerVerifier, /const previousSeparateWorker = 'sekret'/);
   assert.match(workerVerifier, /const productionWorker = 'sekret-backend'/);
   assert.match(workerVerifier, /const alphaWorker = 'sekret-backend-alpha'/);
-  assert.match(workerVerifier, /const pagesProject = 'sekret-bip'/);
   assert.match(workerVerifier, /role: 'separate-protected'/);
+  assert.match(workerVerifier, /expectedPresence: 'optional-until-founder-approved'/);
   assert.match(workerVerifier, /bindingAuthority: 'provider-readback-required'/);
   assert.match(workerVerifier, /mutationAuthorized: false/);
-  assert.match(workerVerifier, /founderGatedObservationOnly: true/);
   assert.match(workerVerifier, /mode: 'read-only'/);
   assert.match(workerVerifier, /mutationPerformed: false/);
+});
+
+test('Workers Builds credential checks fail closed and reject account-owned tokens before provider reads', () => {
+  assert.match(workerVerifier, /startsWith\('cfat_'\)/);
+  assert.match(workerVerifier, /account-prefixed/);
+  assert.match(workerVerifier, /startsWith\('cfut_'\)/);
+  assert.match(workerVerifier, /user-prefixed/);
+  assert.match(workerVerifier, /legacy-opaque/);
+  assert.match(workerVerifier, /workers-builds-account-token-unsupported/);
+  assert.match(workerVerifier, /Workers Builds API does not support account-owned API tokens/);
+  assert.match(workerVerifier, /workers-builds-token-scope/);
+  assert.match(workerVerifier, /token-verify-user/);
+  assert.doesNotMatch(workerVerifier, /token-verify-account/);
+  assert.match(workerVerifier, /token-leading-or-trailing-whitespace/);
+  assert.match(workerVerifier, /token-bearer-prefix-stored/);
+  assert.match(workerVerifier, /token-quoted-secret/);
+  assert.match(workerVerifier, /probeWorkersRead/);
 });

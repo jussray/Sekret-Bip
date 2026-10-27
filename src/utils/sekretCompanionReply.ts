@@ -54,13 +54,13 @@ export const SEKRET_COMPANIONS: Record<SekretCompanion['id'], SekretCompanion> =
   {
     raylene: {
       id: 'raylene',
-      name: 'Raylene',
+      name: 'Suhana',
       voice: 'soft big-sis energy',
       boundaries: ['no shame', 'no pressure', 'teen stays in control'],
     },
     rylane: {
       id: 'rylane',
-      name: 'Rylane',
+      name: 'Sy',
       voice: 'protective big-bro energy',
       boundaries: ['kind but direct', 'protective', 'not preachy'],
     },

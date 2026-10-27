@@ -1,0 +1,6 @@
+# GitHub Pages/Jekyll build boundary.
+# Architecture proposals contain React/TSX examples such as `style={{ ... }}`
+# that are valid source documentation but collide with Liquid syntax.
+# Keep the source document intact in-repo and exclude it from site rendering.
+exclude:
+  - docs/USER_ROOM_ARCHITECTURE.md

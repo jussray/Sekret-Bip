@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const PUBLIC_APEX_URL = 'https://sekretbip.net/';
+
 function isCloudflareAccessUrl(rawUrl: string) {
   try {
     const url = new URL(rawUrl);
@@ -23,14 +25,14 @@ test('anonymous public front door reaches Se’kret Bip without Cloudflare Acces
     }
   });
 
-  const response = await page.goto('/', { waitUntil: 'domcontentloaded' });
+  const response = await page.goto(PUBLIC_APEX_URL, { waitUntil: 'domcontentloaded' });
   expect(response, 'public front door must return a browser response').not.toBeNull();
   expect(response!.status(), 'public front door must not fail at transport').toBeLessThan(400);
 
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible({ timeout: 30_000 });
 
   const finalUrl = new URL(page.url());
-  expect(finalUrl.hostname).toBe('app.sekretbip.net');
+  expect(finalUrl.hostname).toBe('sekretbip.net');
   expect(isCloudflareAccessUrl(finalUrl.toString())).toBe(false);
 
   const accessNavigations = documentNavigations.filter(isCloudflareAccessUrl);

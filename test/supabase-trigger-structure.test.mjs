@@ -7,9 +7,11 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migrationsRoot = path.join(root, 'supabase', 'migrations');
 const baselinePath = path.join(root, 'security', 'supabase-trigger-baseline.json');
+const candidateReviewPath = path.join(root, 'security', 'supabase-trigger-candidate-reviews.json');
 const sprintPath = path.join(root, 'SPRINT.md');
 
 const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+const candidateReview = JSON.parse(fs.readFileSync(candidateReviewPath, 'utf8'));
 const sprint = fs.readFileSync(sprintPath, 'utf8');
 const migrations = fs
   .readdirSync(migrationsRoot)
@@ -53,6 +55,12 @@ function normalizeSearchPath(value) {
 function triggerKey(table, trigger) {
   return `${table}::${trigger}`;
 }
+
+const tc01RetiredSafetyTriggerKeys = new Set([
+  triggerKey('public.circle_posts', 'safety_scan_circle'),
+  triggerKey('public.journal_entries', 'safety_scan_journal'),
+  triggerKey('public.posts', 'safety_scan_posts'),
+]);
 
 function stripSqlComments(source) {
   let result = '';
@@ -344,13 +352,16 @@ function buildEffectiveState(inputMigrations) {
 
 const state = buildEffectiveState(migrations);
 const repositoryFunctions = new Map(
-  baseline.functions
+  [...baseline.functions, ...candidateReview.functions]
     .filter((item) => item.repositoryExpected !== false)
     .map((item) => [item.signature.toLowerCase(), item]),
 );
 const repositoryAttachments = new Map(
-  baseline.attachments
+  [...baseline.attachments, ...candidateReview.attachments]
     .filter((item) => item.repositoryExpected !== false)
+    .filter((item) => !tc01RetiredSafetyTriggerKeys.has(
+      triggerKey(item.table.toLowerCase(), item.trigger.toLowerCase()),
+    ))
     .map((item) => [
       triggerKey(item.table.toLowerCase(), item.trigger.toLowerCase()),
       item,
@@ -402,9 +413,41 @@ test('baseline separates repository truth, live catalog observation, and behavio
   assert.equal(baseline.verification.liveBehaviorVerified, false);
   assert.equal(baseline.verification.externalEffectsSafelyStubbed, false);
   assert.equal(baseline.functions.length, 14);
-  assert.equal(repositoryFunctions.size, 13);
   assert.equal(baseline.attachments.length, 18);
-  assert.equal(repositoryAttachments.size, 17);
+  assert.equal(candidateReview.schemaVersion, 1);
+  assert.equal(candidateReview.status, 'candidate_not_live');
+  assert.equal(candidateReview.sourceMigration, '20260919190000_auth_signup_onboarding_baseline.sql');
+  assert.equal(candidateReview.functions.length, 1);
+  assert.equal(candidateReview.attachments.length, 2);
+  assert.equal(repositoryFunctions.size, 14);
+  assert.equal(repositoryAttachments.size, 16);
+  assert.equal(candidateReview.functions[0].deployedLive, false);
+  assert.equal(candidateReview.functions[0].clientExecuteRevokedLive, false);
+});
+
+test('TC-01 retired private and mixed safety triggers stay historical-only', () => {
+  const historicalKeys = new Set(
+    baseline.attachments.map((item) => triggerKey(item.table.toLowerCase(), item.trigger.toLowerCase())),
+  );
+  const expectedRetired = [
+    'public.circle_posts::safety_scan_circle',
+    'public.journal_entries::safety_scan_journal',
+    'public.posts::safety_scan_posts',
+  ];
+
+  assert.deepEqual([...tc01RetiredSafetyTriggerKeys].sort(), expectedRetired);
+  for (const key of expectedRetired) {
+    assert.equal(historicalKeys.has(key), true, `${key} must remain preserved in historical live evidence`);
+    assert.equal(state.triggers.has(key), false, `${key} must stay retired from effective repository wiring`);
+  }
+
+  const currentSafetyAttachments = [...state.triggers.values()]
+    .filter((attachment) => attachment.function === 'public.trigger_safety_scan()')
+    .map((attachment) => triggerKey(attachment.table, attachment.trigger))
+    .sort();
+  assert.deepEqual(currentSafetyAttachments, [
+    'public.public_circle_posts::safety_scan_public_circle',
+  ]);
 });
 
 test('live-only legacy points trigger drift is explicit and remains unresolved', () => {
@@ -447,12 +490,6 @@ test('reviewed repository trigger functions pin search_path and revoke client EX
       normalizeSearchPath(reviewed.searchPath),
       `${signature} search_path changed without baseline review`,
     );
-    // clientExecuteRevokedLive asserts a verified LIVE catalog fact. A function
-    // that is reviewed and migration-complete but not yet deployed (deployedLive:
-    // false) must not claim that live fact — it must say so honestly instead of
-    // either lying (true) or being blocked from ever landing a reviewed baseline
-    // entry until it ships. Once deployed, re-run live catalog parity and flip
-    // deployedLive/clientExecuteRevokedLive to true together.
     if (reviewed.deployedLive === false) {
       assert.equal(
         reviewed.clientExecuteRevokedLive,

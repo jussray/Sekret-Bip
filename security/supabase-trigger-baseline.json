@@ -315,21 +315,27 @@
       "table": "public.circle_posts",
       "function": "public.trigger_safety_scan()",
       "timing": "AFTER",
-      "events": ["INSERT"]
+      "events": ["INSERT"],
+      "repositoryExpected": false,
+      "catalogDrift": "historical_live_only_tc01_retired"
     },
     {
       "trigger": "safety_scan_journal",
       "table": "public.journal_entries",
       "function": "public.trigger_safety_scan()",
       "timing": "AFTER",
-      "events": ["INSERT"]
+      "events": ["INSERT"],
+      "repositoryExpected": false,
+      "catalogDrift": "historical_live_only_tc01_retired"
     },
     {
       "trigger": "safety_scan_posts",
       "table": "public.posts",
       "function": "public.trigger_safety_scan()",
       "timing": "AFTER",
-      "events": ["INSERT"]
+      "events": ["INSERT"],
+      "repositoryExpected": false,
+      "catalogDrift": "historical_live_only_tc01_retired"
     },
     {
       "trigger": "safety_scan_public_circle",

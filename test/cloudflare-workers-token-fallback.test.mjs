@@ -90,6 +90,70 @@ test('falls back to the general Cloudflare token when the dedicated Builds token
   assert.doesNotMatch(retained, new RegExp(fallbackToken));
 });
 
+test('uses exact Workers Builds read capability when token verify returns provider code 6003', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sekret-workers-token-capability-'));
+  const evidencePath = path.join(dir, 'evidence.json');
+  const dedicatedToken = 'capability-proven-dedicated-token';
+  const verificationTokens = [];
+  const providerTokens = [];
+  const providerUrls = [];
+
+  const fetchImpl = async (url, options = {}) => {
+    const authorization = options.headers?.Authorization ?? '';
+    const token = authorization.replace(/^Bearer /, '');
+
+    if (url.endsWith('/user/tokens/verify')) {
+      verificationTokens.push(token);
+      assert.equal(token, dedicatedToken);
+      return {
+        ok: false,
+        statusText: 'Bad Request',
+        async json() {
+          return {
+            success: false,
+            errors: [{ code: 6003, message: 'Invalid request headers' }],
+          };
+        },
+      };
+    }
+
+    providerTokens.push(token);
+    providerUrls.push(url);
+    assert.equal(token, dedicatedToken);
+
+    if (url.includes('/workers/scripts?')) {
+      return response([{ id: 'sekret-backend', tag: WORKER_TAG }]);
+    }
+    if (url.endsWith(`/builds/workers/${WORKER_TAG}/triggers`)) {
+      return response([productionTrigger()]);
+    }
+    throw new Error(`Unexpected request: ${options.method || 'GET'} ${url}`);
+  };
+
+  const evidence = await reconcileWorkersBuildTrigger({
+    env: {
+      CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: dedicatedToken,
+      CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID,
+      CLOUDFLARE_BUILD_EVIDENCE_PATH: evidencePath,
+    },
+    apply: false,
+    fetchImpl,
+    now: () => new Date('2026-08-31T22:20:00.000Z'),
+  });
+
+  assert.deepEqual(verificationTokens, [dedicatedToken]);
+  assert.ok(providerUrls.filter((url) => url.includes('/workers/scripts?')).length >= 2);
+  assert.ok(providerUrls.filter((url) => url.endsWith(`/builds/workers/${WORKER_TAG}/triggers`)).length >= 2);
+  assert.ok(providerTokens.every((token) => token === dedicatedToken));
+  assert.equal(evidence.credential.selectedSource, 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN');
+  assert.equal(evidence.status, 'already-correct');
+  assert.equal(evidence.triggerVerified, true);
+  assert.equal(evidence.verified, true);
+
+  const retained = fs.readFileSync(evidencePath, 'utf8');
+  assert.doesNotMatch(retained, new RegExp(dedicatedToken));
+});
+
 test('still fails closed when every configured Cloudflare token is invalid', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sekret-workers-token-fail-closed-'));
   const evidencePath = path.join(dir, 'evidence.json');

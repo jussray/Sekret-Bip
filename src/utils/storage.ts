@@ -7,6 +7,7 @@
  * Import via: import { loadState, saveState } from '@/utils';
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearAllStudyProgress } from '@/bipJr/study/progressStore';
 
 const STORAGE_KEYS = {
   theme: 'theme', mood: 'mood', userSide: 'userSide',
@@ -36,6 +37,7 @@ const STORAGE_KEYS = {
   bipEnergyAdjustment: 'sekretbip_bip_energy_adjustment_v1',
   bipEnergyAdjustmentSeen: 'sekretbip_bip_energy_adjustment_seen_v1',
   bridgeResponsePreference: 'sekretbip_bridge_response_preference_v1',
+  savedContinuation: 'sekretbip_saved_continuation_v1',
 };
 
 const JSON_KEYS = new Set([
@@ -49,6 +51,7 @@ const JSON_KEYS = new Set([
   'parent_profile_data', 'dev_test_family_v1',
   'sekretbip_meaningful_return_receipts_v1',
   'sekretbip_bip_energy_adjustment_v1',
+  'sekretbip_saved_continuation_v1',
 ]);
 
 const PRIVATE_ACCOUNT_KEYS = [
@@ -93,6 +96,7 @@ const PRIVATE_ACCOUNT_KEYS = [
   STORAGE_KEYS.bipEnergyAdjustment,
   STORAGE_KEYS.bipEnergyAdjustmentSeen,
   STORAGE_KEYS.bridgeResponsePreference,
+  STORAGE_KEYS.savedContinuation,
   'sekretbip_first_visit_done',
   'parent_bridge_pending',
   'sekret_self_discovery_profile',
@@ -144,6 +148,7 @@ export const saveState = async (stateUpdates: Record<string, any>): Promise<void
 export async function clearPrivateAccountCache(): Promise<void> {
   try {
     await AsyncStorage.multiRemove([...PRIVATE_ACCOUNT_KEYS]);
+    await clearAllStudyProgress();
   } catch (error) {
     console.error('clearPrivateAccountCache error:', error);
   }

@@ -40,7 +40,10 @@ test('reconciliation follows the recorded canonical safety runtime contract', ()
 
   assert.match(coordinator, /\.eq\('user_id', user\.id\)/);
   assert.match(coordinator, /parent_notified_at/);
-  assert.match(edge, /\.insert\(\{[\s\S]*user_id,[\s\S]*source_table,[\s\S]*source_id:/i);
+  assert.match(
+    edge,
+    /\.insert\(\{[\s\S]*user_id:\s*metadata\.user_id,[\s\S]*source_table:\s*sourceTable,[\s\S]*source_id:\s*metadata\.record_id,/i,
+  );
   assert.match(edge, /parent_notified_at/);
 });
 

@@ -28,7 +28,11 @@ import {
 const MODE_KEY = 'sekretbip:daily-intentions:personalization:v1';
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CARD_WIDTH = Math.min(SCREEN_WIDTH - 28, 340);
-const COLLAPSED_CARD_WIDTH = Math.min(CARD_WIDTH, 174);
+const IS_NARROW_RAIL = SCREEN_WIDTH < 360;
+const COLLAPSED_CARD_WIDTH = IS_NARROW_RAIL ? Math.min(CARD_WIDTH, 118) : 108;
+const COLLAPSED_CARD_LEFT = IS_NARROW_RAIL ? 14 : Math.max(102, Math.round(SCREEN_WIDTH * 0.27));
+const COLLAPSED_CARD_BOTTOM = IS_NARROW_RAIL ? 126 : 26;
+const EXPANDED_CARD_BOTTOM = 104;
 
 type IntentionMode = 'basic' | 'personalized' | 'off';
 
@@ -163,7 +167,10 @@ export function DailyIntentionsCard({
   if (mode === 'off') {
     return (
       <TouchableOpacity
-        style={s.offPill}
+        style={[
+          s.offPill,
+          { left: COLLAPSED_CARD_LEFT, bottom: COLLAPSED_CARD_BOTTOM },
+        ]}
         onPress={() => setPrivacyOpen(true)}
         accessibilityRole="button"
         accessibilityLabel="Daily intentions are off. Open privacy settings."
@@ -186,8 +193,12 @@ export function DailyIntentionsCard({
     <View
       style={[
         s.card,
-        !expanded && s.cardCollapsed,
-        { width: expanded ? CARD_WIDTH : COLLAPSED_CARD_WIDTH },
+        expanded ? s.cardExpanded : s.cardCollapsed,
+        {
+          width: expanded ? CARD_WIDTH : COLLAPSED_CARD_WIDTH,
+          left: expanded ? 14 : COLLAPSED_CARD_LEFT,
+          bottom: expanded ? EXPANDED_CARD_BOTTOM : COLLAPSED_CARD_BOTTOM,
+        },
       ]}
       testID="daily-intentions-card"
     >
@@ -353,8 +364,6 @@ function ModeButton({
 const s = StyleSheet.create({
   card: {
     position: 'absolute',
-    left: 14,
-    bottom: 96,
     zIndex: 40,
     borderRadius: 18,
     borderWidth: 1,
@@ -367,6 +376,9 @@ const s = StyleSheet.create({
     shadowRadius: 14,
     shadowOffset: { width: 0, height: 7 },
     elevation: 9,
+  },
+  cardExpanded: {
+    borderRadius: 18,
   },
   cardCollapsed: {
     borderRadius: 999,
@@ -383,7 +395,7 @@ const s = StyleSheet.create({
   eyebrow: { color: '#c4b5fd', fontSize: 9, fontWeight: '800', letterSpacing: 1.7 },
   title: { color: '#fff', fontSize: 16, fontWeight: '800', marginTop: 2 },
   progressPill: { backgroundColor: 'rgba(196,181,253,0.13)', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 5 },
-  progressPillCollapsed: { paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
+  progressPillCollapsed: { paddingHorizontal: 6, paddingVertical: 4, marginLeft: 5 },
   progressText: { color: '#ddd6fe', fontSize: 11, fontWeight: '800' },
   divider: { height: 1, backgroundColor: 'rgba(196,181,253,0.16)', marginVertical: 10 },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 6, gap: 9 },
@@ -395,7 +407,7 @@ const s = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
   footerAction: { color: '#c4b5fd', fontSize: 10.5, fontWeight: '700' },
   trustLine: { color: 'rgba(221,214,254,0.57)', fontSize: 9.5, lineHeight: 14, marginTop: 8 },
-  offPill: { position: 'absolute', left: 14, bottom: 96, zIndex: 40, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(196,181,253,0.38)', backgroundColor: 'rgba(18,8,36,0.86)', paddingHorizontal: 13, paddingVertical: 8 },
+  offPill: { position: 'absolute', zIndex: 40, borderRadius: 99, borderWidth: 1, borderColor: 'rgba(196,181,253,0.38)', backgroundColor: 'rgba(18,8,36,0.86)', paddingHorizontal: 13, paddingVertical: 8 },
   offText: { color: '#c4b5fd', fontSize: 11, fontWeight: '800' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(4,2,12,0.72)', justifyContent: 'flex-end' },
   modalCard: { maxHeight: '82%', borderTopLeftRadius: 26, borderTopRightRadius: 26, backgroundColor: '#160b29', borderWidth: 1, borderColor: 'rgba(196,181,253,0.28)', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 28 },

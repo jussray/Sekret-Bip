@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "repository": "jussray/Sekret-Bip",
   "defaultPolicy": "deny-undeclared",
-  "scanRoots": ["app", "utils", "scripts", "supabase"],
+  "scanRoots": ["app", "src", "utils", "worker", "scripts", "supabase"],
   "allowedCookieWriters": [],
   "cookies": [],
   "nonCookieState": [
