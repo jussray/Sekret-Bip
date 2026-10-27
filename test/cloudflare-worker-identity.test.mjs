@@ -28,18 +28,23 @@ const RELEASE_MARKER_URL = 'https://app.sekretbip.net/.well-known/sekret-release
 // Worker instead of the canonical one.
 const ALPHA_ROUTED_PROFILES = new Set(['preview', 'parent-preview']);
 
-test('Wrangler targets the canonical Worker and retains version metadata as provenance', () => {
+test('Wrangler targets the canonical Worker and leaves production routing provider-managed', () => {
   assert.match(wrangler, new RegExp(`^name = "${WORKER_NAME}"$`, 'm'));
+  assert.match(wrangler, /^workers_dev = false$/m);
+  assert.doesNotMatch(wrangler, /^\s*route\s*=/m);
+  assert.doesNotMatch(wrangler, /^\s*routes\s*=/m);
+  assert.doesNotMatch(wrangler, /^\[\[routes\]\]$/m);
   assert.match(wrangler, /^\[version_metadata\]$/m);
   assert.match(wrangler, /^binding = "CF_VERSION_METADATA"$/m);
-  assert.match(wrangler, /^pattern = "api\.sekretbip\.net"$/m);
-  assert.match(wrangler, /^custom_domain = true$/m);
   assert.match(wrangler, /^\[build\]$/m);
   assert.match(wrangler, /^command = "node scripts\/write-worker-release-identity\.mjs"$/m);
 });
 
 test('production verification proves the exact Worker and Pages release', () => {
-  assert.ok(workflow.includes('npm run test:e2e:production'));
+  assert.ok(workflow.includes('npx playwright test'));
+  assert.ok(workflow.includes('--config=playwright.production.config.ts'));
+  assert.ok(workflow.includes('--grep-invert "production exposes the exact expected Pages and Worker release commit"'));
+  assert.ok(workflow.includes('--grep "production exposes the exact expected Pages and Worker release commit"'));
   assert.ok(workflow.includes('scripts/verify-cloudflare-native-deploy.mjs'));
   assert.ok(workflow.includes('scripts/publish-production-release-observation.mjs'));
   assert.ok(workflow.includes(`${PRODUCTION_WORKER_URL}/health`));
@@ -74,8 +79,13 @@ test('production Worker exposes baked runtime SHA independently of provider vers
 });
 
 test('production web and native clients use the canonical backend custom domain', () => {
-  assert.ok(productionEnv.includes(`EXPO_PUBLIC_BACKEND_URL=${PRODUCTION_WORKER_URL}`));
-  assert.equal(productionEnv.includes(LEGACY_WORKERS_DEV_URL), false);
+  // Require one complete canonical environment assignment, not a substring
+  // inside an attacker-controlled or unrelated URL.
+  const backends = productionEnv.split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith('EXPO_PUBLIC_BACKEND_URL='));
+  assert.deepEqual(backends, [`EXPO_PUBLIC_BACKEND_URL=${PRODUCTION_WORKER_URL}`]);
+  assert.equal(backends.some((line) => line === `EXPO_PUBLIC_BACKEND_URL=${LEGACY_WORKERS_DEV_URL}`), false);
 
   for (const [profileName, profile] of Object.entries(eas.build)) {
     const expected = ALPHA_ROUTED_PROFILES.has(profileName) ? ALPHA_WORKER_URL : PRODUCTION_WORKER_URL;

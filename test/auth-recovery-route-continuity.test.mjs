@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../app/(auth)/forgot-password.tsx', impo
 test('password recovery preserves the existing sign-in route and handles direct entry', () => {
   assert.match(
     source,
-    /function returnToSignIn\(\) \{\s*if \(router\.canGoBack\(\)\) \{\s*router\.back\(\);\s*return;\s*\}\s*router\.replace\('\/\(auth\)\/login'\);\s*\}/,
+    /function returnToSignIn\(\) \{\s*if \(router\.canGoBack\(\)\) \{\s*router\.back\(\);\s*return;\s*\}\s*router\.replace\(authRoute\('\/\(auth\)\/login', preferredSide\) as never\);\s*\}/,
   );
   const returnCalls = source.match(/onPress=\{returnToSignIn\}/g) ?? [];
   assert.equal(returnCalls.length, 2);

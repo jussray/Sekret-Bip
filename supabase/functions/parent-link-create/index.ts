@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getSupabasePublishableKey } from "../_shared/supabase-api-keys.ts";
 
 type ParentInviteRequest = {
   parentEmail?: string;
@@ -130,7 +131,7 @@ Deno.serve(async (req: Request) => {
   if (!authorization?.startsWith("Bearer ")) return json({ error: "unauthorized" }, 401);
 
   const url = Deno.env.get("SUPABASE_URL");
-  const key = Deno.env.get("SUPABASE_ANON_KEY");
+  const key = getSupabasePublishableKey();
   if (!url || !key) return json({ error: "server_config" }, 500);
 
   const db = createClient(url, key, {

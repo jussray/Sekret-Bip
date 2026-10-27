@@ -126,7 +126,7 @@ test('requires the live Worker release SHA to match the exact commit', () => {
   assert.equal(noProviderMetadata.versionTag, null);
 });
 
-test('classifies every exact-release blocker without weakening the gate', () => {
+test('classifies exact-release blockers while exact live runtime outranks a conflicting historical provider check', () => {
   assert.equal(classify([workerSuccess]), 'ready');
   assert.equal(classify([]), 'worker-missing');
   assert.equal(
@@ -135,7 +135,7 @@ test('classifies every exact-release blocker without weakening the gate', () => 
   );
   assert.equal(
     classify([{...workerSuccess, conclusion: 'failure'}]),
-    'worker-failed',
+    'ready-with-provider-check-conflict',
   );
   assert.equal(classify([workerSuccess], null), 'pages-marker-missing');
   assert.equal(

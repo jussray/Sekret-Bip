@@ -67,12 +67,30 @@
       ],
       "boundary": "Design inspection and handoff only. Use live app tokens and never expose Oracle, private identities, or user content."
     },
+    "cloudflare": {
+      "skills": [
+        "bip-repo-truth",
+        "bip-worker-guardian",
+        "bip-privacy-redteam",
+        "bip-release-gate"
+      ],
+      "boundary": "Cloudflare API MCP is mutation-capable. Prefer narrower docs, builds, observability, or bindings servers for inspection. Any deployment, route/domain, DNS, Access, binding, secret, account, or other provider mutation requires explicit founder approval and separate exact-release proof."
+    },
     "cloudflare-docs": {
       "skills": [
         "bip-repo-truth",
         "bip-worker-guardian"
       ],
       "boundary": "Public Cloudflare documentation only."
+    },
+    "cloudflare-bindings": {
+      "skills": [
+        "bip-repo-truth",
+        "bip-worker-guardian",
+        "bip-privacy-redteam",
+        "bip-release-gate"
+      ],
+      "boundary": "Workers Bindings inspection and build assistance only by default. Creating, updating, or deleting bindings or backing resources is a provider mutation requiring explicit founder approval. Never reveal secret values or treat binding presence as release proof."
     },
     "cloudflare-builds": {
       "skills": [

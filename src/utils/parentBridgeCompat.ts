@@ -71,10 +71,12 @@ export async function sendBridgeSignal(params: {
 }): Promise<void> {
   const sb = getSupabase();
   const userId = await uid();
-  if (!sb || !userId) return;
+  if (!sb || !userId) {
+    throw new Error('A permanent signed-in Teen account is required to send through Bridge.');
+  }
 
   const responsePreference = params.responsePreference ?? await loadBridgeResponsePreference();
-  await sb.from('bridge_signals').insert({
+  const { error } = await sb.from('bridge_signals').insert({
     teen_user_id: userId,
     char_key: params.charKey,
     share_type: params.shareType,
@@ -82,6 +84,7 @@ export async function sendBridgeSignal(params: {
     response_preference: responsePreference,
     sent_at: new Date().toISOString(),
   });
+  if (error) throw error;
 }
 
 export async function fetchParentNotes(): Promise<ParentNote[]> {

@@ -210,21 +210,21 @@ function normalizeLiveMigration(migration) {
   };
 }
 
-function embeddedIdentityMatches(live, required) {
-  return live.embeddedVersion === null || live.embeddedVersion === required.version;
+function embeddedIdentityMatches(live, expectedVersion) {
+  return live.embeddedVersion === null || live.embeddedVersion === expectedVersion;
 }
 
 function matchesCanonicalReceipt(live, required) {
   return live.version === required.version
     && live.name === required.name
-    && embeddedIdentityMatches(live, required);
+    && embeddedIdentityMatches(live, required.version);
 }
 
 function matchesAcceptedAlias(live, required, alias) {
   return Boolean(alias)
     && live.version === alias.liveVersion
     && live.name === required.name
-    && embeddedIdentityMatches(live, required);
+    && embeddedIdentityMatches(live, alias.liveVersion);
 }
 
 function isKnownLiveReceipt(live, requiredMigrations, acceptedAliases) {
@@ -412,14 +412,14 @@ export async function verifySupabaseProductionSchema(options = {}) {
   let response;
   try {
     response = await fetchImpl(
-      `https://api.supabase.com/v1/projects/${encodeURIComponent(config.projectRef)}/database/query/read-only`,
+      `https://api.supabase.com/v1/projects/${encodeURIComponent(config.projectRef)}/database/query`,
       {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${config.token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, read_only: true }),
       },
     );
   } catch (error) {

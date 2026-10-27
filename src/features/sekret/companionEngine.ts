@@ -14,6 +14,7 @@ import {
   type SekretHistoryTurn,
 } from '@/utils/api';
 import { buildSekretPresence } from '../../../services/sekretPresence';
+import { recoverSafetyResourcesFromUpstreamFallback } from '../../../services/sekretSafety';
 import { buildReplyRequest } from '@/services/ai/buildReplyRequest';
 import { emitEvent } from '@/features/activity/events';
 import { COMPANION_CURRICULUM } from '@/config/companionCurriculum';
@@ -103,7 +104,7 @@ export const COMPANION_PROFILES: Record<CompanionId, CompanionProfile> = {
     id:          'cloud',
     name:        'Cloud',
     emoji:       '☁️',
-    title:       'Sorian Birth-Cloud',
+    title:       'Cloud / The Calm',
     vibe:        'Majestic, soft, low-pressure, and present without pushing.',
     firstChatIntro: COMPANION_CURRICULUM.cloud.firstChatIntro,
     greeting:    COMPANION_CURRICULUM.cloud.greeting,
@@ -185,8 +186,19 @@ export async function sendCompanionMessage(
 
   const result = await fetchSekretBrainReply(request);
 
+  // fetchSekretBrainReply can return its own local fallback when the Worker is
+  // unavailable. If the input is high-risk and that upstream fallback lacks
+  // explicit crisis resources, recover them here before handing the reply to
+  // the UI — this is the same recovery already applied on the chat.ts and
+  // sekretReply.ts surfaces.
+  const safetyRecovery = recoverSafetyResourcesFromUpstreamFallback(
+    input.text,
+    result.reply,
+    result.replySource,
+  );
+
   return {
-    reply:                result.reply,
+    reply:                safetyRecovery.reply,
     safetyFlag:           result.safetyFlag,
     avatarState:          result.avatarState,
     tone:                 result.tone,

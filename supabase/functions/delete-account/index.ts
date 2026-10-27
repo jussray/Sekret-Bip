@@ -8,6 +8,7 @@
  * It never performs direct table deletes or deletes an Auth user.
  */
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getSupabasePublishableKey } from '../_shared/supabase-api-keys.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,7 +30,7 @@ Deno.serve(async (req: Request) => {
   if (!authorization) return json({ error: 'unauthorized' }, 401);
 
   const url = Deno.env.get('SUPABASE_URL');
-  const key = Deno.env.get('SUPABASE_ANON_KEY');
+  const key = getSupabasePublishableKey();
   if (!url || !key) return json({ error: 'server_config' }, 500);
 
   const db = createClient(url, key, {

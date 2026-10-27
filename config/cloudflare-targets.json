@@ -1,10 +1,12 @@
 {
-  "version": 3,
-  "reviewedAt": "2026-08-19",
+  "version": 5,
+  "reviewedAt": "2026-09-25",
   "providerInventory": {
     "workers": [
-      "sekret",
-      "sekret-backend",
+      "bip",
+      "sekret-backend"
+    ],
+    "founderGatedPlannedWorkers": [
       "sekret-backend-alpha"
     ],
     "pages": [
@@ -33,10 +35,13 @@
     }
   },
   "separateWorkerAuthorities": {
-    "sekret": {
+    "bip": {
       "kind": "worker",
-      "status": "founder-confirmed-active",
+      "status": "founder-confirmed-renamed-from-sekret",
+      "previousName": "sekret",
+      "providerIdentityReadback": "required",
       "routeBinding": "provider-readback-required",
+      "buildAuthority": "main-only-or-disabled",
       "mutationPolicy": "preserve-until-exact-provider-binding-proven"
     }
   },
@@ -44,7 +49,8 @@
     "worker": {
       "name": "sekret-backend-alpha",
       "config": "wrangler.alpha.toml",
-      "status": "founder-gated"
+      "status": "founder-gated-not-deployed",
+      "provisioningAuthority": "explicit-founder-approval-required"
     }
   },
   "legacyDashboardServices": [

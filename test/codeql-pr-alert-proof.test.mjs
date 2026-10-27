@@ -26,6 +26,13 @@ test('local CodeQL workflow analyzes every current default-setup language on the
   assert.match(workflow, /queries:\s*security-extended/);
 });
 
+test('security-sensitive workflow changes trigger local CodeQL proof', () => {
+  assert.match(workflow, /- '\.github\/workflows\/founder-shield\.yml'/);
+  assert.match(workflow, /- '\.github\/workflows\/product-design-playwright-proof\.yml'/);
+  assert.match(workflow, /- '\.github\/workflows\/codeql-pr-alert-proof\.yml'/);
+  assert.match(workflow, /- '\.github\/workflows\/pr-continuity\.yml'/);
+});
+
 test('local CodeQL action is immutable and never uploads competing Code Scanning results', () => {
   assert.match(workflow, new RegExp(`github/codeql-action/init@${CODEQL_SHA}`));
   assert.match(workflow, new RegExp(`github/codeql-action/analyze@${CODEQL_SHA}`));

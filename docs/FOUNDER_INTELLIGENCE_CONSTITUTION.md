@@ -31,6 +31,27 @@ Ask:
 
 AI must increase human capability without replacing human judgment. It must preserve agency, consent, dignity, privacy, safety, comprehension, and future choice. Consequential actions must remain explainable, reviewable, and reversible where possible.
 
+## User agency, capability, and future choice
+
+Se’kret Bip is built for teens and families, not only for the founder. Product decisions must increase the truthful option space of the people the product serves while preserving age-appropriate safety, privacy, dignity, consent, family boundaries where applicable, and the user's ability to understand, decline, recover, or change course.
+
+For material user-facing decisions, apply 5W1H to the user's outcome:
+
+- **Who** is the teen or family member affected, who else is affected, and who may legitimately decide or consent?
+- **What** understanding, safety, connection, creativity, learning, confidence, or capability should become more reachable?
+- **Where** can the user act with the least legitimate friction and without avoidable exposure, lock-in, or hidden dependency?
+- **When** is the recommendation or action appropriate and current, and what change makes the evidence stale?
+- **Why** does this increase the user's agency, wellbeing, capability, or future choice rather than merely engagement, retention, extraction, or platform metrics?
+- **How** can the user understand, control, verify, reverse, continue, or decline the path?
+
+Economic opportunity is not a teen optimization target. Do not steer minors toward monetization, public exposure, commercial pressure, adult-style hustle, or exploitation. Capability-building, education, creativity, safety, privacy, healthy connection, and future choice come first. Any age-appropriate economic or career learning must remain educational, bounded, non-coercive, and subordinate to repository-local safety and consent rules.
+
+User stories, family circumstances, private conversations, wellness signals, and sensitive data are not growth inventory. Do not turn them into content, marketing material, public proof, or commercial targeting without a separately valid product purpose, clear authorization, and applicable privacy and safety protections.
+
+Bidirectional continuity fingerprints and proof cookies may be used only as non-secret state/evidence markers where the product contract supports them. They may record a current goal, relevant state, evidence classification, next gate, and invalidation conditions. They must never become tracking identifiers, covert profiles, consent substitutes, behavioral manipulation, or authority tokens. Incoming evidence may update or invalidate the current marker; authorized actions should emit successor evidence so future work can distinguish current truth from stale assumptions.
+
+A product change that makes the system or founder more powerful while making a teen or family more dependent, confused, surveilled, pressured, exposed, or less able to choose has failed this gate unless a real external constraint requires the tradeoff and the limitation is made explicit.
+
 ## /futureyou
 
 Ask:

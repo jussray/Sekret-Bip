@@ -93,9 +93,22 @@ export function evaluateWorkerRuntime(health, expectedSha) {
   };
 }
 
+export function evaluateCloudflareDeploymentCompletion(checkEvaluation, releaseEvaluation, workerEvaluation) {
+  const workerCheckObserved = checkEvaluation.missing.length === 0;
+  const workerCheckTerminal = workerCheckObserved && checkEvaluation.pending.length === 0;
+  const providerCheckConflict = workerCheckTerminal
+    && checkEvaluation.unsuccessful.length > 0
+    && workerEvaluation.complete;
+
+  return {
+    complete: workerCheckTerminal && releaseEvaluation.complete && workerEvaluation.complete,
+    workerCheckObserved,
+    workerCheckTerminal,
+    providerCheckConflict,
+  };
+}
+
 export function classifyCloudflareReadiness(checkEvaluation, releaseEvaluation, workerEvaluation) {
-  if (checkEvaluation.failed.length > 0) return 'worker-failed';
-  if (checkEvaluation.unsuccessful.length > 0) return 'worker-unsuccessful';
   if (checkEvaluation.missing.length > 0) return 'worker-missing';
   if (checkEvaluation.pending.length > 0) return 'worker-pending';
   if (!releaseEvaluation.actualSha) return 'pages-marker-missing';
@@ -103,7 +116,12 @@ export function classifyCloudflareReadiness(checkEvaluation, releaseEvaluation, 
   if (!workerEvaluation?.healthAvailable) return 'worker-health-missing';
   if (!workerEvaluation.healthOk) return 'worker-health-unhealthy';
   if (!workerEvaluation.releaseSha) return 'worker-release-sha-missing';
-  if (!workerEvaluation.complete) return 'worker-release-sha-stale';
+  if (!workerEvaluation.complete) {
+    if (checkEvaluation.failed.length > 0) return 'worker-failed-awaiting-runtime';
+    if (checkEvaluation.unsuccessful.length > 0) return 'worker-unsuccessful-awaiting-runtime';
+    return 'worker-release-sha-stale';
+  }
+  if (checkEvaluation.unsuccessful.length > 0) return 'ready-with-provider-check-conflict';
   return 'ready';
 }
 
@@ -187,7 +205,8 @@ export function buildCloudflareEvidence({
   observerError = null,
 }) {
   const readinessState = classifyCloudflareReadiness(checkEvaluation, releaseEvaluation, workerEvaluation);
-  const complete = checkEvaluation.complete && releaseEvaluation.complete && workerEvaluation.complete;
+  const completion = evaluateCloudflareDeploymentCompletion(checkEvaluation, releaseEvaluation, workerEvaluation);
+  const complete = completion.complete;
   const optionalChecks = Object.fromEntries(
     OPTIONAL_CLOUDFLARE_CHECKS.map((name) => [name, publicCheckEvidence(selectNewestCheck(allCheckRuns, name))]),
   );
@@ -200,6 +219,7 @@ export function buildCloudflareEvidence({
     status,
     complete,
     readinessState,
+    providerCheckConflict: completion.providerCheckConflict,
     startedAt: new Date(startedAtMs).toISOString(),
     observedAt: new Date(observedAtMs).toISOString(),
     elapsedMs: Math.max(0, observedAtMs - startedAtMs),
@@ -246,7 +266,7 @@ function waitingFor(checkEvaluation, releaseEvaluation, workerEvaluation) {
   return [
     ...checkEvaluation.missing,
     ...checkEvaluation.pending,
-    ...checkEvaluation.unsuccessful,
+    ...(workerEvaluation.complete ? [] : checkEvaluation.unsuccessful),
     ...(releaseEvaluation.complete ? [] : [`Pages release marker ${releaseEvaluation.actualSha ?? 'missing'} -> ${releaseEvaluation.expectedSha}`]),
     ...(workerEvaluation.complete ? [] : [`Worker release SHA ${workerEvaluation.releaseSha ?? 'missing'} -> ${workerEvaluation.expectedSha}`]),
   ];
@@ -319,7 +339,8 @@ async function verifyCloudflareNativeDeploy() {
     releaseEvaluation = evaluateReleaseMarker(marker, sha);
     workerEvaluation = evaluateWorkerRuntime(workerHealth, sha);
     const readinessState = classifyCloudflareReadiness(checkEvaluation, releaseEvaluation, workerEvaluation);
-    const complete = checkEvaluation.complete && releaseEvaluation.complete && workerEvaluation.complete;
+    const completion = evaluateCloudflareDeploymentCompletion(checkEvaluation, releaseEvaluation, workerEvaluation);
+    const complete = completion.complete;
 
     latestEvidence = buildCloudflareEvidence({
       repository,
@@ -332,15 +353,9 @@ async function verifyCloudflareNativeDeploy() {
       allCheckRuns,
       startedAtMs,
       observedAtMs,
-      status: complete ? 'succeeded' : checkEvaluation.failed.length > 0 ? 'failed' : 'observing',
+      status: complete ? 'succeeded' : 'observing',
     });
     writeEvidence(evidencePath, latestEvidence);
-
-    if (checkEvaluation.failed.length > 0) {
-      throw new Error(
-        `Cloudflare Worker deployment failed (${readinessState}): ${checkEvaluation.failed.join(', ')}`,
-      );
-    }
 
     if (complete) {
       console.log(JSON.stringify(latestEvidence, null, 2));
