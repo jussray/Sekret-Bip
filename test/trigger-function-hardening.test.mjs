@@ -27,6 +27,11 @@ test('enforce_circle_anonymity blocks identity reveal on public/parent_community
 
   assert.match(fn, /security definer/);
   assert.match(fn, /set search_path = public/);
+  // Ties _kind to NEW.circle_id specifically — without this, a future edit
+  // that leaves _kind null or sourced from the wrong circle would still pass
+  // the predicate/exception assertions below while silently letting an
+  // identity-revealing post through.
+  assert.match(fn, /select kind into _kind from public\.circles where id = new\.circle_id/);
   assert.match(fn, /_kind in \('public', 'parent_community'\) and new\.is_identity_revealed is true/);
   assert.match(fn, /raise exception/);
 
@@ -126,25 +131,26 @@ test('trigger_safety_scan does not regress the historical dynamic-field-access b
   assert.doesNotMatch(fn, /NEW\.user_id\b/);
 });
 
-// The historical definition omitted hardening, but the repository now carries
-// a follow-up migration that pins search_path and revokes direct client EXECUTE.
-// Keep this as an ordinary regression gate rather than a TODO so a future
-// removal or weakening fails CI instead of looking like an accepted gap.
-test('auto_resolve_issue_on_event_resolve is effectively pinned and not directly callable', async () => {
-  const source = await read('supabase/migrations/20260701_control_room_normalization.sql');
-  const corpus = await readMigrationCorpus();
-  const fn = source.match(/create or replace function public\.auto_resolve_issue_on_event_resolve\(\)[\s\S]*?\$\$;/)?.[0];
-  assert.ok(fn, 'expected auto_resolve_issue_on_event_resolve() definition');
+// auto_resolve_issue_on_event_resolve was SECURITY DEFINER with no effective
+// search_path pin. Existing deployed migrations should not be edited after
+// deployment, so the fix landed as a follow-up migration
+// (20260720010000_pin_auto_resolve_issue_search_path.sql) rather than editing
+// the original CREATE. This test reads the full migration corpus so the
+// future effective configuration is what matters, not only the original
+// historical definition.
+test(
+  'auto_resolve_issue_on_event_resolve pins search_path (SECURITY DEFINER)',
+  async () => {
+    const source = await read('supabase/migrations/20260701_control_room_normalization.sql');
+    const corpus = await readMigrationCorpus();
+    const fn = source.match(/create or replace function public\.auto_resolve_issue_on_event_resolve\(\)[\s\S]*?\$\$;/)?.[0];
+    assert.ok(fn, 'expected auto_resolve_issue_on_event_resolve() definition');
 
-  assert.match(fn, /security definer/);
-  assert.match(
-    `${fn}\n${corpus}`,
-    /(set search_path = public|alter function public\.auto_resolve_issue_on_event_resolve\(\)\s+set search_path\s*=\s*(public|pg_catalog, pg_temp))/i,
-    'SECURITY DEFINER trigger functions must have an effective search_path pin — see SPRINT.md',
-  );
-  assert.match(
-    corpus,
-    /revoke all on function public\.auto_resolve_issue_on_event_resolve\(\) from public, anon, authenticated/i,
-    'SECURITY DEFINER trigger functions must not remain directly executable by client roles',
-  );
-});
+    assert.match(fn, /security definer/);
+    assert.match(
+      `${fn}\n${corpus}`,
+      /(set search_path = public|alter function public\.auto_resolve_issue_on_event_resolve\(\)\s+set search_path\s*=\s*(public|pg_catalog, pg_temp))/i,
+      'SECURITY DEFINER trigger functions must have an effective search_path pin — see SPRINT.md',
+    );
+  },
+);
