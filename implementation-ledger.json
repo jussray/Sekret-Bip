@@ -271,6 +271,8 @@
         "test/supabase-founder-guardian-authorization.test.mjs",
         "test/private-self-data-hardening.test.mjs",
         "test/retired-edge-functions.test.mjs",
+        "test/edge-function-auth-hardening.test.mjs",
+        "test/trigger-function-hardening.test.mjs",
         "e2e/smoke.spec.ts"
       ],
       "verification": {

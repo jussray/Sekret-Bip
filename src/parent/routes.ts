@@ -17,6 +17,7 @@ export const PARENT_ROUTES = {
   resources:        '/(parent)/resources',
   approvals:        '/(parent)/approvals',
   bipJr:            '/(parent)/bip-jr',
+  bipJrStudy:       '/(parent)/bip-jr-study',
   teenVerification: '/(parent)/teen-verification',
 } as const;
 
