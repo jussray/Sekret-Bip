@@ -92,3 +92,54 @@ test('provider failures do not echo response bodies or credentials',async()=>{
   const fetchImpl=async()=>({ok:false,status:401,text:async()=>('private provider payload')});
   await assert.rejects(createOpenAIKeyframe({...base,approvedForGeneration:true},registry,{apiKey:'private-secret',fetchImpl,outputPath:'/tmp/bip-no-output.png'}),error=>error.message==='openai_http_401');
 });
+test('existing output blocks paid provider request and preserves image',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'bip-test-'));
+  try{
+    const output=join(dir,'frame.png'),receipt=join(dir,'receipt.json'),original=Buffer.from('old-image');
+    await writeFile(output,original);
+    let requests=0;
+    await assert.rejects(
+      createOpenAIKeyframe({...base,approvedForGeneration:true},registry,{
+        apiKey:'dummy',outputPath:output,receiptPath:receipt,
+        fetchImpl:async()=>{requests++;return {ok:true,json:async()=>({data:[{b64_json:tinyPng.toString('base64')}]})};},
+      }),
+      {code:'EEXIST'},
+    );
+    assert.equal(requests,0,'an existing output must not spend credits');
+    assert.deepEqual(await readFile(output),original);
+    await assert.rejects(readFile(receipt),{code:'ENOENT'});
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('existing receipt blocks paid request and cleans output reservation',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'bip-test-'));
+  try{
+    const output=join(dir,'frame.png'),receipt=join(dir,'receipt.json'),original='existing receipt';
+    await writeFile(receipt,original);
+    let requests=0;
+    await assert.rejects(
+      createOpenAIKeyframe({...base,approvedForGeneration:true},registry,{
+        apiKey:'dummy',outputPath:output,receiptPath:receipt,
+        fetchImpl:async()=>{requests++;return {ok:true,json:async()=>({data:[{b64_json:tinyPng.toString('base64')}]})};},
+      }),
+      {code:'EEXIST'},
+    );
+    assert.equal(requests,0,'an existing receipt must not spend credits');
+    await assert.rejects(readFile(output),{code:'ENOENT'});
+    assert.equal(await readFile(receipt,'utf8'),original);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+test('failed provider request cleans both reserved destinations',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'bip-test-'));
+  try{
+    const output=join(dir,'frame.png'),receipt=join(dir,'receipt.json');
+    await assert.rejects(
+      createOpenAIKeyframe({...base,approvedForGeneration:true},registry,{
+        apiKey:'dummy',outputPath:output,receiptPath:receipt,
+        fetchImpl:async()=>({ok:false,status:429}),
+      }),
+      /openai_http_429/,
+    );
+    await assert.rejects(readFile(output),{code:'ENOENT'});
+    await assert.rejects(readFile(receipt),{code:'ENOENT'});
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
