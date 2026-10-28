@@ -223,18 +223,17 @@ if (isDirectExecution) {
   const outputDirectory = process.argv[2] || 'dist';
   const result = auditBuiltArtifact(outputDirectory);
   if (result.violations.length > 0) {
-    console.error('Built artifact leakage audit failed.');
+    console.error('ARTIFACT_LEAKAGE_AUDIT_FAILED');
     for (const receipt of buildSanitizedViolationReceipts(result.violations)) {
-      // receipt fields are already sanitized by buildSanitizedViolationReceipts:
-      // a coarse category, a safe/redacted path, and a truncated path hash —
-      // never a raw path, secret name, or secret value.
-      // bearer:disable javascript_lang_logger_leak
-      console.error(
-        `ARTIFACT_LEAKAGE_VIOLATION path=${receipt.path} path_sha256=${receipt.pathFingerprint} category=${receipt.category}`,
-      );
+      // One fixed event code per violation. Receipt fields (category,
+      // redacted path, truncated path hash) stay out of CI logs per the
+      // Sauce Guard changed-line logging rule; the count of lines is the
+      // only signal emitted here.
+      void receipt;
+      console.error('ARTIFACT_LEAKAGE_VIOLATION');
     }
     process.exitCode = 1;
   } else {
-    console.log('Built artifact leakage audit passed.');
+    console.log('ARTIFACT_LEAKAGE_AUDIT_PASSED');
   }
 }

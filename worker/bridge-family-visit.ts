@@ -238,7 +238,7 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
   try {
     body = await request.json() as FamilyVisitGenerateBody;
   } catch {
-    console.warn('[bridge-family-visit] invalid JSON request body');
+    console.warn('BRIDGE_FAMILY_VISIT_INVALID_JSON_BODY');
     return json({ error: 'Invalid JSON' }, 400, cors);
   }
 
@@ -340,7 +340,7 @@ export async function handleBridgeFamilyVisitSummaryGenerate(
     }, 200, cors);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'server_error';
-    console.error('[bridge-family-visit] summary generation failed');
+    console.error('BRIDGE_FAMILY_VISIT_SUMMARY_GENERATION_FAILED');
     if (message === 'user_jwt_required') return json({ error: message }, 403, cors);
     if (message === 'family_visit_evidence_changed' || message === 'family_visit_reflections_changed') {
       return json({ sessionId, status: 'blocked', failureCode: 'evidence_changed_retry' }, 409, cors);
