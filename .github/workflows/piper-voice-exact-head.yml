@@ -110,6 +110,16 @@ jobs:
             services/piper-tts \
             2>&1 | tee piper-evidence/container-build.log
 
+      - name: Verify Piper model path isolation in built container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$PWD/test/test_piper_model_security.py:/app/test_piper_model_security.py:ro" \
+            "sekret-piper:$EXPECTED_HEAD_SHA" \
+            python -m unittest -v test_piper_model_security \
+            2>&1 | tee piper-evidence/piper-model-security.log
+
       - name: Prove local Piper health, auth boundary, and Worker synthesis
         shell: bash
         run: |
