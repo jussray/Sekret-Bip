@@ -111,8 +111,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
     if (!process.argv.includes('--execute') && flag('--plan-out')) {
       const planPath=resolve(flag('--plan-out'));
       await mkdir(dirname(planPath),{recursive:true});
-      await writeFile(planPath,JSON.stringify(outcome,null,2)+'\
-',{flag:'wx'});
+      await writeFile(planPath,JSON.stringify(outcome,null,2),{flag:'wx'});
     }
     if (process.argv.includes('--execute')) console.log('BIP_OPENAI_STILL_CREATED_REVIEW_REQUIRED');
     else console.log('BIP_OPENAI_PREFLIGHT_OK');
