@@ -1,8 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import failureIdentity from './control-room-failure-identity.cjs';
 
-const { buildFailureIdentity, canonicalFailureKey } = failureIdentity;
 const root = process.cwd();
 const reportDir = path.join(root, 'reports', 'control-room');
 const reportPath = path.join(reportDir, 'github-failures-latest.json');
@@ -16,7 +14,7 @@ const mainBranch = process.env.CONTROL_ROOM_GITHUB_MAIN_BRANCH || 'main';
 const shouldIngest = process.env.CONTROL_ROOM_GITHUB_INGEST === '1';
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.EXPO_PUBLIC_SUPABASE_URL;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceRoleKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const FAILURE_CONCLUSIONS = new Set([
   'failure',
@@ -67,7 +65,7 @@ async function githubRequest(pathname) {
 async function supabaseRequest(pathname, options = {}) {
   if (!shouldIngest) return null;
   const url = required('SUPABASE_URL (or EXPO_PUBLIC_SUPABASE_URL)', supabaseUrl);
-  const key = required('SUPABASE_SERVICE_ROLE_KEY', serviceRoleKey);
+  const key = required('SUPABASE_SECRET_KEY (legacy SUPABASE_SERVICE_ROLE_KEY accepted during migration)', serviceRoleKey);
   const response = await fetch(`${url.replace(/\/$/, '')}${pathname}`, {
     ...options,
     headers: {
@@ -138,72 +136,17 @@ function isFailedRun(run, jobs) {
   return FAILURE_CONCLUSIONS.has(run.conclusion) || Boolean(failedJobConclusion(jobs));
 }
 
+function scopeKey(item) {
+  if (item.pr_number) return `pr-${item.pr_number}`;
+  return `branch-${String(item.head_ref || mainBranch).replace(/[^A-Za-z0-9_.-]+/g, '-')}`;
+}
+
 function scopeLabel(item) {
   return item.pr_number ? `PR #${item.pr_number}` : `branch ${item.head_ref || mainBranch}`;
 }
 
-function receiptFromEvidence(item, job, step = null) {
-  const infrastructureFailure = item.failure_class !== 'workflow_step_failure';
-  const rawFailureKey = infrastructureFailure
-    ? `workflow-infrastructure-${item.workflow_name}`
-    : step?.name || job?.name || item.workflow_name;
-  const identity = buildFailureIdentity({
-    repository: item.repository,
-    headSha: item.head_sha,
-    failureKey: canonicalFailureKey(rawFailureKey),
-    correlatable: true,
-    source: 'github_actions',
-    evidence: {
-      workflow_id: item.workflow_id,
-      workflow_name: item.workflow_name,
-      run_id: item.run_id,
-      run_attempt: item.run_attempt,
-      job_id: job?.id || null,
-      job_name: job?.name || null,
-      step_number: step?.number || null,
-      step_name: step?.name || null,
-      conclusion: step?.conclusion || job?.conclusion || item.conclusion,
-      failure_class: item.failure_class,
-    },
-  });
-
-  return {
-    ...identity,
-    run_id: item.run_id,
-    workflow_id: item.workflow_id,
-    workflow_name: item.workflow_name,
-    failure_class: item.failure_class,
-    severity: item.severity,
-    job_id: job?.id || null,
-    job_name: job?.name || null,
-    step_number: step?.number || null,
-    step_name: step?.name || null,
-    conclusion: step?.conclusion || job?.conclusion || item.conclusion,
-  };
-}
-
-function failureReceipts(item) {
-  if (item.failure_class !== 'workflow_step_failure') {
-    const failedJob = item.jobs.find((job) => FAILURE_CONCLUSIONS.has(job.conclusion)) || item.jobs[0] || null;
-    return [receiptFromEvidence(item, failedJob)];
-  }
-
-  const receipts = [];
-  for (const job of item.jobs) {
-    for (const step of job.failed_steps || []) {
-      receipts.push(receiptFromEvidence(item, job, step));
-    }
-    if (FAILURE_CONCLUSIONS.has(job.conclusion) && (!job.failed_steps || job.failed_steps.length === 0)) {
-      receipts.push(receiptFromEvidence(item, job));
-    }
-  }
-
-  if (receipts.length === 0) {
-    receipts.push(receiptFromEvidence(item, item.jobs[0] || null));
-  }
-
-  const unique = new Map(receipts.map((receipt) => [receipt.proof_cookie, receipt]));
-  return [...unique.values()];
+function fingerprint(item) {
+  return `github_actions:${item.repository}:${scopeKey(item)}:${item.workflow_id}:${item.head_sha}`;
 }
 
 async function listPullRequests(repo) {
@@ -323,8 +266,8 @@ async function collectFailures(repo) {
   return [...unique.values()].sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)));
 }
 
-function runMetadata(item) {
-  return {
+async function ingestFailure(item) {
+  const metadata = {
     source: 'github_actions',
     repository: item.repository,
     pr_number: item.pr_number,
@@ -342,30 +285,10 @@ function runMetadata(item) {
     event: item.event,
     conclusion: item.conclusion,
     failure_class: item.failure_class,
-  };
-}
-
-async function ingestReceipt(item, receipt) {
-  const metadata = {
-    ...runMetadata(item),
-    failure_key: receipt.failure_key,
-    incident_fingerprint: receipt.incident_fingerprint,
-    proof_cookie: receipt.proof_cookie,
-    correlatable: receipt.correlatable,
-    job_id: receipt.job_id,
-    job_name: receipt.job_name,
-    step_number: receipt.step_number,
-    step_name: receipt.step_name,
-    step_conclusion: receipt.conclusion,
-    authority: false,
-    merge_authority: false,
-    proof_satisfied: false,
-    browser_cookie: false,
-    authorizing: false,
+    jobs: item.jobs,
   };
 
   const label = scopeLabel(item);
-  const evidenceLabel = receipt.step_name || receipt.job_name || item.workflow_name;
   const inserted = await supabaseRequest('/rest/v1/audit_events', {
     method: 'POST',
     body: JSON.stringify({
@@ -373,28 +296,28 @@ async function ingestReceipt(item, receipt) {
       event_type: `github_actions_${item.failure_class}`,
       screen: item.pr_number ? `github-pr-${item.pr_number}` : `github-branch-${item.head_ref || mainBranch}`,
       severity: item.severity,
-      message: `${evidenceLabel} failed for ${label} at ${item.head_sha.slice(0, 12)}.`,
+      message: `${item.workflow_name} failed for ${label} at ${item.head_sha.slice(0, 12)}.`,
       metadata,
       resolved: false,
     }),
   });
 
   const eventId = Array.isArray(inserted) ? inserted[0]?.id : inserted?.id;
-  if (!eventId) throw new Error(`audit_events insert did not return an id for receipt ${receipt.proof_cookie}.`);
+  if (!eventId) throw new Error(`audit_events insert did not return an id for run ${item.run_id}.`);
 
   const infrastructureFailure = item.failure_class !== 'workflow_step_failure';
   await supabaseRequest('/rest/v1/rpc/upsert_control_room_issue', {
     method: 'POST',
     body: JSON.stringify({
-      p_fingerprint: receipt.incident_fingerprint,
+      p_fingerprint: fingerprint(item),
       p_source: 'github_actions',
       p_category: 'ci',
       p_severity: item.severity,
       p_status: 'open',
-      p_title: `${evidenceLabel} failed on ${label}`,
+      p_title: `${item.workflow_name} failed on ${label}`,
       p_summary: infrastructureFailure
         ? 'GitHub ended the run without executable step evidence. Treat this as a runner or workflow-startup failure, not a proven code regression.'
-        : `GitHub executed a failing proof step (${receipt.failure_key}). Reproduce the same failure key locally on the same clean exact head before treating local and GitHub evidence as one incident.`,
+        : 'GitHub executed workflow steps and reported a failure. The failing step evidence must be reproduced and resolved before merge.',
       p_suggested_fix: suggestedFix(item.failure_class),
       p_affected_surface: 'github-actions',
       p_affected_user_id: null,
@@ -403,24 +326,16 @@ async function ingestReceipt(item, receipt) {
     }),
   });
 
-  return {
-    run_id: item.run_id,
-    incident_fingerprint: receipt.incident_fingerprint,
-    proof_cookie: receipt.proof_cookie,
-    failure_key: receipt.failure_key,
-  };
+  return { run_id: item.run_id, fingerprint: fingerprint(item) };
 }
 
 const repo = sanitizeRepository(repository);
 const failures = await collectFailures(repo);
-const receipts = failures.flatMap((failure) => failureReceipts(failure));
 const ingested = [];
 
 if (shouldIngest) {
   for (const failure of failures) {
-    for (const receipt of failureReceipts(failure)) {
-      ingested.push(await ingestReceipt(failure, receipt));
-    }
+    ingested.push(await ingestFailure(failure));
   }
 }
 
@@ -434,18 +349,15 @@ const report = {
   requested_run_id: requestedRunId,
   main_branch: mainBranch,
   failure_count: failures.length,
-  receipt_count: receipts.length,
   pull_request_failure_count: failures.filter((item) => item.pr_number).length,
   main_push_failure_count: failures.filter((item) => !item.pr_number && item.event === 'push').length,
   infrastructure_failure_count: failures.filter((item) => item.failure_class !== 'workflow_step_failure').length,
   code_failure_count: failures.filter((item) => item.failure_class === 'workflow_step_failure').length,
   ingested_count: ingested.length,
   failures,
-  receipts,
   guardrails: [
     'Founder Control Room is the first escalation surface whenever GitHub fails.',
     'A run with no executed steps or logs is infrastructure evidence, not proof of a code regression.',
-    'Each failing GitHub job or step keeps its own non-authorizing proof receipt; compatible local and GitHub receipts may share only the source-neutral incident fingerprint.',
     'GitHub and Supabase credentials are read only from server-side environment variables and are never written to reports or issue metadata.',
     'This scanner cannot merge, deploy, alter repository code, or apply database migrations.',
   ],
@@ -456,7 +368,6 @@ console.log(JSON.stringify({
   report_path: path.relative(root, reportPath),
   mode: report.mode,
   failure_count: report.failure_count,
-  receipt_count: report.receipt_count,
   pull_request_failure_count: report.pull_request_failure_count,
   main_push_failure_count: report.main_push_failure_count,
   infrastructure_failure_count: report.infrastructure_failure_count,
