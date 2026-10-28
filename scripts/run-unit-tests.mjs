@@ -44,9 +44,10 @@ function reportWorkspaceTestContamination(trackedTests, physicalTests) {
   if (extras.length === 0) return;
 
   console.warn('CONTROL_ROOM_UNTRACKED_TEST_FILES');
-  for (const file of extras) {
+  for (let index = 0; index < extras.length; index += 1) {
     console.warn('CONTROL_ROOM_UNTRACKED_TEST_FILE');
   }
+  // untracked tests are non-authoritative and are not executed in GitHub Actions
   console.warn('CONTROL_ROOM_EXACT_HEAD_TEST_DISCOVERY');
 }
 
