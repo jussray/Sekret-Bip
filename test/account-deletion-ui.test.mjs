@@ -62,9 +62,9 @@ test('sweep script only processes expired, still-pending requests via the proces
 test('sweep workflow keeps bounded scheduled processing plus explicit production dispatch', () => {
   assert.match(sweepWorkflow, /schedule:/);
   assert.match(sweepWorkflow, /cron:/);
-  assert.match(sweepWorkflow, /workflow_dispatch:\\s*\\n\\s+inputs:/);
-  assert.match(sweepWorkflow, /check_only:[\\s\\S]*?default: true/);
-  assert.match(sweepWorkflow, /SWEEP_CHECK_ONLY:\\s*\\$\\{\\{\\s*github\\.event_name == 'workflow_dispatch' && inputs\\.check_only == true/);
+  assert.match(sweepWorkflow, /workflow_dispatch:\s*\n\s+inputs:/);
+  assert.match(sweepWorkflow, /check_only:[\s\S]*?default: true/);
+  assert.ok(sweepWorkflow.includes("SWEEP_CHECK_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.check_only == true }}"));
   assert.match(sweepWorkflow, /environment:\s*production/);
   assert.match(sweepWorkflow, /node scripts\/sweep-account-deletions\.mjs/);
   assert.match(sweepWorkflow, /SUPABASE_SERVICE_ROLE_KEY/);
