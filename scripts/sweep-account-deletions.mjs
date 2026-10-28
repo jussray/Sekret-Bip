@@ -33,6 +33,7 @@ export function logHttpStatusClass(status) {
     case 401: console.error('SAUCE_GUARD_DELETE_HTTP_401'); return;
     case 403: console.error('SAUCE_GUARD_DELETE_HTTP_403'); return;
     case 404: console.error('SAUCE_GUARD_DELETE_HTTP_404'); return;
+    case 406: console.error('SAUCE_GUARD_DELETE_HTTP_406'); return;
     case 409: console.error('SAUCE_GUARD_DELETE_HTTP_409'); return;
     case 500: console.error('SAUCE_GUARD_DELETE_HTTP_500'); return;
     default: console.error('SAUCE_GUARD_DELETE_HTTP_OTHER');
