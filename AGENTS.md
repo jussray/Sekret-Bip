@@ -1,5 +1,13 @@
 # Agent Instructions for Se'kret Bip
 
+## Mandatory Sauce Guard — founder-owned canonical skill
+
+Every contributor, AI agent (ChatGPT, Claude, Codex, Perplexity, and later assistants), reviewer, automation, or delegated writer touching this repository must follow the founder-owned `sauce-guard` skill **before any outward-facing communication** drawn from internal product work. Canonical source: `jussray/founder-control-room/.agents/skills/sauce-guard/SKILL.md`. Use the current canonical skill; this is a reference, not a replacement implementation or an approval to publish.
+
+Enforce: evidence before claims; classify each material claim CURRENT / HISTORICAL / STALE / SUPERSEDED / UNKNOWN; remove raw diffs, provider payloads, proprietary prompts/architecture, credentials, private teen/parent/customer content, and unapproved metrics; obtain **Current You**'s exact-copy approval; have FCR revalidate at publication; require provider readback for publication claims. Missing or inaccessible skill / absent approval means HOLD, never publish or share externally.
+
+**Separate machine-enforced log safety:** public posts and CI/job logs are different egress channels. Use the repository `scripts/audit-sauce-guard-logging.mjs` changed-line gate and fixed-event-code logs for any auth, account deletion, payment, teen, parent, safety, or provider interaction. Never log untrusted error messages, tokens, raw response bodies, identifiers, prompts, messages, or request payloads. A green log gate is not proof that Sauce Guard reviewed a public communication. Do not edit or bypass these rules to silence a scanner; resolve and review the finding.
+
 Use these instructions whenever an AI coding agent works in this repository.
 
 Before material planning, implementation, review, automation, publishing, deployment, migration, or cross-repository coordination, read [`AGENTS_FOUNDER_INTELLIGENCE.md`](./AGENTS_FOUNDER_INTELLIGENCE.md), which loads the Founder Intelligence Constitution and Se'kret Bip's heightened teen privacy, consent, safety, dignity, and anti-surveillance duties.
@@ -378,3 +386,14 @@ Verify that:
 - Playwright passed where applicable or the blocker is recorded;
 - Founder Control Room and Cloudflare truth were checked where applicable;
 - canonical Markdown and ledger truth were reconciled.
+
+## Reds rule — implant on sight (standing law, installed 2026-10-26)
+
+Any error or red that surfaces in this repository — CI/Actions failure,
+failing test, broken build, runtime defect — is diagnosed and fixed in the
+same flow it is seen, with the smallest reversible change, landed through
+this repo's normal gate and verified green on the exact head. A seen red is
+never parked as a report. Never merge over a blocked mandatory gate or a
+red exact head. A credential- or founder-gated red gets a full diagnosis
+plus the one unblocking action named — never silence, never a faked fix.
+Full charter: `.github/agents/reds-implant.agent.md`.

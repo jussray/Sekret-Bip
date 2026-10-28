@@ -23,7 +23,7 @@ test('the authoritative Expo config invokes the Cloudflare source bootstrap', ()
   assert.match(appConfig, /function prepareCloudflareReleaseSource\(\): void/);
   assert.match(appConfig, /process\.env\.CF_PAGES !== '1'/);
   assert.match(appConfig, /bootstrap-release-metadata-source\.mjs/);
-  assert.match(appConfig, /execFileSync\(process\.execPath, \[scriptPath\]/);
+  assert.match(appConfig, /execFileSync\(process\.execPath, \[scriptPath, \.\.\.args\]/);
   assert.match(appConfig, /prepareCloudflareReleaseSource\(\);/);
 });
 

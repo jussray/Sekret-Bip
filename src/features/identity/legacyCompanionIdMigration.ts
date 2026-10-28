@@ -1,13 +1,15 @@
 import { isNamedCompanionId, type NamedCompanionId } from './companionIds';
 
-export type LegacyPersistedCompanionId = 'raylene' | 'rylane' | 'cloud' | 'night';
+export type LegacyPersistedCompanionId = 'soft' | 'raylene' | 'rylane' | 'cloud' | 'night';
+export type LegacyWriteCompanionId = Exclude<LegacyPersistedCompanionId, 'soft'>;
 
 const LEGACY_TO_CANONICAL: Readonly<Record<string, NamedCompanionId>> = {
+  soft: 'suhana',
   raylene: 'suhana',
   rylane: 'sy',
 };
 
-const CANONICAL_TO_LEGACY: Readonly<Record<NamedCompanionId, LegacyPersistedCompanionId>> = {
+const CANONICAL_TO_LEGACY: Readonly<Record<NamedCompanionId, LegacyWriteCompanionId>> = {
   suhana: 'raylene',
   sy: 'rylane',
   cloud: 'cloud',
@@ -27,11 +29,12 @@ export function migratePersistedCompanionId(value: unknown): NamedCompanionId | 
 
 /**
  * Transitional write-boundary adapter for the current account-profile/Supabase
- * contract. Remove this mapping when durable profile persistence accepts the
- * canonical Suhana/Sy IDs directly.
+ * contract. `soft` is read-only legacy input and is never emitted on writes.
+ * Remove this mapping when durable profile persistence accepts the canonical
+ * Suhana/Sy IDs directly.
  */
 export function toLegacyPersistedCompanionId(
   value: NamedCompanionId,
-): LegacyPersistedCompanionId {
+): LegacyWriteCompanionId {
   return CANONICAL_TO_LEGACY[value];
 }

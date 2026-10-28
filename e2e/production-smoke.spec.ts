@@ -75,7 +75,9 @@ test('production Bip Jr front door renders and Enter reaches parent onboarding',
 
   await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('YOUR FAMILY. YOUR SPACE.', { exact: true })).toBeVisible();
-  await expect(page.getByText('Come on in.', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText('A calm family space for younger kids, with a grown-up beside them.', { exact: true }),
+  ).toBeVisible();
   await expect(page.getByTestId('web-welcome-suhana')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
