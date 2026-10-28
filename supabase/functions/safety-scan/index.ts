@@ -12,14 +12,15 @@
 // Security:
 //   • --no-verify-jwt: caller is Postgres trigger, no user JWT available
 //   • Shared secret guard: x-scan-secret must match SAFETY_SCAN_SECRET
-//   • Service role begins only after the source contract passes
+//   • Privileged Supabase access begins only after the source contract passes
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
-const SCAN_SECRET  = Deno.env.get('SAFETY_SCAN_SECRET')        ?? '';
-const OPENAI_KEY   = Deno.env.get('OPENAI_API_KEY')            ?? '';
-const SUPA_URL     = Deno.env.get('SUPABASE_URL')              ?? '';
-const SUPA_SVC_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const SCAN_SECRET  = Deno.env.get('SAFETY_SCAN_SECRET') ?? '';
+const OPENAI_KEY   = Deno.env.get('OPENAI_API_KEY') ?? '';
+const SUPA_URL     = Deno.env.get('SUPABASE_URL') ?? '';
+const SUPA_SVC_KEY = getSupabaseSecretKey() ?? '';
 
 const AUTOMATIC_SAFETY_ELIGIBLE_SOURCES = new Set(['public_circle_posts']);
 const PRIVATE_OR_MIXED_SOURCES = new Set([
@@ -179,6 +180,10 @@ Deno.serve(async (req: Request) => {
   if (!sourceTable) return reject('source_not_allowlisted');
   if (typeof metadata.record_id !== 'string' || typeof metadata.user_id !== 'string') {
     return reject('invalid_metadata');
+  }
+
+  if (!SUPA_URL || !SUPA_SVC_KEY) {
+    return new Response('server config', { status: 500 });
   }
 
   const supabase = createClient(SUPA_URL, SUPA_SVC_KEY, { auth: { persistSession: false } });
