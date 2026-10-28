@@ -97,13 +97,13 @@ function localFallback(
   }
 
   if (isShortContinuation) {
-    if (personalityId === 'rylane') return "Aight, I'm here. Talk.";
+    if (personalityId === 'rylane' || (personalityId as string) === 'sy') return "Aight, I'm here. Talk.";
     if (personalityId === 'cloud') return "Hey. No pressure — whatever you want to say, or nothing at all.";
     if (personalityId === 'night') return 'Still here. No rush.';
     return 'Hey! Random or did something actually happen?';
   }
 
-  if (personalityId === 'rylane') {
+  if (personalityId === 'rylane' || (personalityId as string) === 'sy') {
     if (angry) return mirror
       ? 'Yeah, that shit would set anybody off. Before you move on it, what line got crossed?'
       : 'Yeah, that would set anybody off. Before you move on it, what line got crossed?';
@@ -213,7 +213,7 @@ export async function sendMessage(
 
   const payload: CompanionReplyRequest = {
     userText: text,
-    characterId: personalityId === 'oracle' ? 'sekret' : personalityId,
+    characterId: personalityId === 'oracle' ? 'sekret' : personalityId === 'raylene' ? 'suhana' : personalityId === 'rylane' ? 'sy' : personalityId,
     surface: normalizedSurface ?? 'journal',
     mood,
     history: workerHistory,
