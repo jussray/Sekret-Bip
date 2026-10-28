@@ -94,7 +94,7 @@ test('raw Supabase and backend error strings are never forwarded into Family Vis
 });
 
 test('Family Visit failure logging is static and never serializes exception or credential-shaped data', () => {
-  assert.match(worker, /console\.error\('\[bridge-family-visit\] summary generation failed'\);/);
+  assert.match(worker, /console\.error\('BRIDGE_FAMILY_VISIT_SUMMARY_GENERATION_FAILED'\);/);
   assert.doesNotMatch(worker, /console\.error\([^\n]*(?:errorName|error\.message|OPENAI_API_KEY|apiKey|Authorization)/);
   assert.doesNotMatch(worker, /console\.warn\([^\n]*(?:OPENAI_API_KEY|apiKey|Authorization)/);
 });
