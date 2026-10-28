@@ -4,7 +4,7 @@
  * /makevideo remains the ONLY approved-media MP4 assembly stage.
  */
 import {createHash} from 'node:crypto';
-import {readFile,writeFile,mkdir,stat} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,stat,open,rm} from 'node:fs/promises';
 import {basename,dirname,extname,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
@@ -78,6 +78,16 @@ export async function createOpenAIKeyframe(spec,registry,{apiKey,fetchImpl=fetch
     for(const ref of plan._files) form.append('image[]',new Blob([ref.bytes],{type:ref.mime}),ref.filename);
     body=form;
   }
+  // Reserve all destinations atomically before any billable provider request.
+  // This prevents both output and receipt collisions from discarding paid results.
+  const targets=[resolve(outputPath),...(receiptPath?[resolve(receiptPath)]:[])];
+  const reserved=[];
+  let completed=false;
+  try{
+    for(const target of targets){
+      await mkdir(dirname(target),{recursive:true});
+      reserved.push({target,handle:await open(target,'wx',0o600)});
+    }
   let response;
   try{response=await fetchImpl(API+(plan.mode==='world-only'?'generations':'edits'),{method:'POST',headers,body,redirect:'error',signal:AbortSignal.timeout(120000)});}
   catch{deny('openai_request_failed');}
@@ -89,14 +99,17 @@ export async function createOpenAIKeyframe(spec,registry,{apiKey,fetchImpl=fetch
   const image=Buffer.from(b64,'base64');
   if(!image.length||image.length>30*1024*1024) deny('openai_image_invalid_size');
   if(!isImage(image,'image/png')) deny('openai_image_invalid_format');
-  await mkdir(dirname(resolve(outputPath)),{recursive:true});
-  await writeFile(outputPath,image,{flag:'wx'});
+  await reserved[0].handle.writeFile(image);
   const receipt={schema:'sekret-bip-openai-keyframe-receipt@v1',kind:'GENERATED_REVIEW_REQUIRED',shot:plan.shot,mode:plan.mode,model:MODEL,cast:plan.cast,inputReferenceSha256:plan.references,outputSha256:sha(image),outputBytes:image.length,sourceApprovalVerified:false,characterIdentityReviewed:false,videoEligible:false,finalApprovalEligible:false,neededNextGate:'approved-still-then-image-to-video-then-/makevideo'};
-  if(receiptPath){
-    await mkdir(dirname(resolve(receiptPath)),{recursive:true});
-    await writeFile(receiptPath,JSON.stringify(receipt,null,2)+'\n',{flag:'wx'});
-  }
+  if(receiptPath) await reserved[1].handle.writeFile(JSON.stringify(receipt,null,2)+'\n');
+  completed=true;
   return receipt;
+  }finally{
+    for(const entry of reserved){
+      await entry.handle.close();
+      if(!completed) await rm(entry.target,{force:true});
+    }
+  }
 }
 function flag(name){const i=process.argv.indexOf(name);return i>=0?process.argv[i+1]:null;}
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
