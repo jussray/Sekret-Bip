@@ -11,6 +11,8 @@ export interface PiperTtsEnv {
 
 export type PiperCharacterId = 'suhana' | 'sy' | 'cloud' | 'night' | 'sekret' | 'parentCoach';
 
+const PIPER_REQUEST_TIMEOUT_MS = 30_000;
+
 /**
  * These defaults must match the model stems baked into services/piper-tts/Dockerfile.
  * Environment overrides remain available so the provider can be swapped without
@@ -44,6 +46,7 @@ export async function synthesizeWithPiper(input: { text: string; characterId: Pi
   const response = await fetch(`${baseUrl}/synthesize`, {
     method: 'POST', headers,
     body: JSON.stringify({ text: input.text.slice(0, 4000), voice, format: 'wav' }),
+    signal: AbortSignal.timeout(PIPER_REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`Piper TTS ${response.status}`);
   return { bytes: new Uint8Array(await response.arrayBuffer()), contentType: response.headers.get('content-type') || 'audio/wav', voice };

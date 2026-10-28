@@ -4,7 +4,6 @@ import {
   isFounderPreviewEnabled,
 } from '@/constants/founderPreview';
 import { getSupabase } from '@/utils/supabase';
-import { applyBipEnergyFade } from './bipEnergy';
 import { subscribeToEvents, type ActivityEventType } from './events';
 
 export const POINTS_PER_EVENT: Partial<Record<ActivityEventType, number>> = {
@@ -172,13 +171,12 @@ export interface InitialCounts {
  * Initializes the server-owned points economy.
  *
  * The database trigger awards app-action points after a bip_events insert.
- * On teen login/session restore, Bip Energy may fade after time away using the
- * existing one-day grace, once-per-day, max-five, never-below-zero contract.
- * Bip Tickets and redeemed room items are separate permanent value and are
- * never removed by this adjustment.
+ * Teen return UX does not subtract points for time away. Existing balances,
+ * Bip Tickets, redeemed rewards, and unlocked room items remain intact.
+ * The legacy fade RPC is retained in migration history for provenance, but the
+ * teen client does not invoke it as a retention mechanic.
  */
 export function initPointLedger(_initialCounts?: InitialCounts): () => void {
-  void applyBipEnergyFade();
   return () => {};
 }
 

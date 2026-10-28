@@ -24,14 +24,10 @@ Never commit or paste the real API key in GitHub, Expo, Cloudflare public env, i
 
 ```txt
 RESEND_API_KEY=<real Resend API key beginning with re_>
-PARENT_INVITE_FROM_EMAIL=Se'kret Bip <invite@mail.sekretbip.com>
+PARENT_INVITE_FROM_EMAIL=Se'kret Bip <invite@sekretbip.net>
 ```
 
-Alternative sender only if the root domain is verified in Resend:
-
-```txt
-PARENT_INVITE_FROM_EMAIL=Se'kret Bip <invite@sekretbip.com>
-```
+The canonical sender domain is `sekretbip.net`. Do not substitute `sekretbip.com` or `mail.sekretbip.com` unless a future provider receipt proves that domain is owned, verified, and intentionally promoted.
 
 These values belong in Supabase Edge Function secrets for project `tbsevonvegdnlyjgplmm`.
 
@@ -77,7 +73,10 @@ Use `.mcp/resend.email.example.json` as the repo-safe template. Copy it into loc
 
 ## Release checklist
 
-- [ ] Verify `mail.sekretbip.com` or `sekretbip.com` in Resend DNS.
+- [ ] Verify `sekretbip.net` in Resend DNS.
+- [ ] Confirm DKIM TXT at `resend._domainkey` is green in Resend.
+- [ ] Confirm return-path/SPF MX at `send` is green in Resend.
+- [ ] Confirm SPF TXT at `send` is green in Resend.
 - [ ] Create a production Resend API key.
 - [ ] Store `RESEND_API_KEY` in Supabase Edge Function secrets.
 - [ ] Store `PARENT_INVITE_FROM_EMAIL` in Supabase Edge Function secrets.

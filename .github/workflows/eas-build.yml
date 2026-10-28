@@ -3,6 +3,10 @@ name: EAS Build
 on:
   workflow_dispatch:
     inputs:
+      target_sha:
+        description: Exact verified commit SHA to build
+        required: true
+        type: string
       app:
         description: App target to build
         required: true
@@ -30,7 +34,7 @@ on:
           - production
 
 concurrency:
-  group: eas-build-${{ github.ref }}-${{ inputs.app }}-${{ inputs.platform }}
+  group: eas-build-${{ inputs.target_sha }}-${{ inputs.app }}-${{ inputs.platform }}
   cancel-in-progress: false
 
 permissions:
@@ -38,10 +42,11 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ inputs.target_sha }}
 
 jobs:
   build:
-    name: Build ${{ inputs.app }} ${{ inputs.platform }}
+    name: Build ${{ inputs.app }} ${{ inputs.platform }} @ ${{ inputs.target_sha }}
     runs-on: ubuntu-latest
     env:
       EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
@@ -54,7 +59,24 @@ jobs:
       EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out exact verified candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$EXPECTED_HEAD_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'target_sha must be a lowercase 40-character commit SHA.' >&2
+            exit 1
+          }
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - uses: actions/setup-node@v4
         with:
@@ -62,6 +84,17 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      - name: Resolve pinned EAS CLI version
+        shell: bash
+        run: |
+          set -euo pipefail
+          eas_cli_version="$(node -p "require('./eas.json').cli.version")"
+          [[ "$eas_cli_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+            echo 'eas.json cli.version must be an exact x.y.z version.' >&2
+            exit 1
+          }
+          echo "EAS_CLI_VERSION=$eas_cli_version" >> "$GITHUB_ENV"
 
       - name: Resolve EAS profile
         id: profile
@@ -72,6 +105,9 @@ jobs:
           else
             echo "name=${{ inputs.channel }}" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Verify mobile store release contract
+        run: node scripts/verify-mobile-store-release.mjs
 
       - name: Verify required build secrets
         shell: bash
@@ -101,7 +137,8 @@ jobs:
       - name: Sync Supabase variables to EAS environment
         shell: bash
         run: |
-          npx eas-cli@latest env:create \
+          set -euo pipefail
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
             --environment "${{ inputs.channel }}" \
             --name EXPO_PUBLIC_SUPABASE_URL \
             --value "$EXPO_PUBLIC_SUPABASE_URL" \
@@ -110,7 +147,7 @@ jobs:
             --force \
             --non-interactive
 
-          npx eas-cli@latest env:create \
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
             --environment "${{ inputs.channel }}" \
             --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
             --value "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
@@ -119,5 +156,24 @@ jobs:
             --force \
             --non-interactive
 
-      - name: Queue EAS build
-        run: npx eas-cli@latest build --profile "${{ steps.profile.outputs.name }}" --platform "${{ inputs.platform }}" --non-interactive --no-wait
+      - name: Build exact verified candidate and wait for provider result
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" build \
+            --profile "${{ steps.profile.outputs.name }}" \
+            --platform "${{ inputs.platform }}" \
+            --non-interactive \
+            --wait \
+            --json \
+            | tee eas-build-result.json
+          test -s eas-build-result.json
+
+      - name: Upload EAS build receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-build-${{ inputs.app }}-${{ inputs.platform }}-${{ inputs.target_sha }}
+          path: eas-build-result.json
+          if-no-files-found: ignore
+          retention-days: 30

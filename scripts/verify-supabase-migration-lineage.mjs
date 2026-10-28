@@ -3,8 +3,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { PRODUCTION_HISTORY_RUNTIME_ALIASES } from './verify-supabase-production-schema.mjs';
+
 const MIGRATION_ROOT = 'supabase/migrations';
 const TIMESTAMPED_MIGRATION = /^(\d{14})_([a-z0-9][a-z0-9_]*)\.sql$/;
+const PRODUCTION_RECEIPT_MARKER = /^-- Production receipt marker for canonical migration (\d{14})\.\n-- Already applied to the linked Supabase project; no schema changes\.$/;
 
 function git(rootDir, ...args) {
   return execFileSync('git', args, {
@@ -51,10 +54,38 @@ function parseDiff(rootDir, baseRef, headRef) {
   });
 }
 
+function classifyProductionReceiptMarker({
+  rootDir,
+  headRef,
+  relativePath,
+  version,
+  name,
+  receiptAliases,
+  headPathSet,
+}) {
+  const contents = git(rootDir, 'show', `${headRef}:${relativePath}`);
+  const marker = contents.match(PRODUCTION_RECEIPT_MARKER);
+  if (!marker) return null;
+
+  const canonicalVersion = marker[1];
+  if (receiptAliases?.[canonicalVersion] !== version) return null;
+
+  const canonicalPath = `${MIGRATION_ROOT}/${canonicalVersion}_${name}.sql`;
+  if (!headPathSet.has(canonicalPath)) return null;
+
+  return {
+    path: relativePath,
+    liveVersion: version,
+    canonicalVersion,
+    canonicalPath,
+  };
+}
+
 export function verifyMigrationLineage({
   rootDir = process.cwd(),
   baseRef,
   headRef = 'HEAD',
+  productionReceiptAliases = PRODUCTION_HISTORY_RUNTIME_ALIASES,
 }) {
   if (!baseRef) throw new Error('baseRef is required');
 
@@ -63,6 +94,7 @@ export function verifyMigrationLineage({
 
   const basePaths = listMigrationPaths(rootDir, baseRef);
   const headPaths = listMigrationPaths(rootDir, headRef);
+  const headPathSet = new Set(headPaths);
   const baseTimestamped = basePaths
     .map((migrationPath) => ({ path: migrationPath, version: migrationVersion(migrationPath) }))
     .filter((entry) => entry.version);
@@ -85,6 +117,7 @@ export function verifyMigrationLineage({
 
   const violations = [];
   const additions = [];
+  const productionReceiptMarkers = [];
   const diff = parseDiff(rootDir, baseRef, headRef);
 
   for (const change of diff) {
@@ -149,6 +182,20 @@ export function verifyMigrationLineage({
     }
 
     const [, version, name] = match;
+    const receiptMarker = classifyProductionReceiptMarker({
+      rootDir,
+      headRef,
+      relativePath: change.path,
+      version,
+      name,
+      receiptAliases: productionReceiptAliases,
+      headPathSet,
+    });
+    if (receiptMarker) {
+      productionReceiptMarkers.push(receiptMarker);
+      continue;
+    }
+
     additions.push({ path: change.path, version, name });
 
     if (/^\d{14}_/.test(name)) {
@@ -208,10 +255,11 @@ export function verifyMigrationLineage({
   }
 
   additions.sort((a, b) => a.version.localeCompare(b.version));
+  productionReceiptMarkers.sort((a, b) => a.liveVersion.localeCompare(b.liveVersion));
   violations.sort((a, b) => `${a.path ?? ''}:${a.code}`.localeCompare(`${b.path ?? ''}:${b.code}`));
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     baseRef,
     headRef,
     baseMigrationCount: basePaths.length,
@@ -221,6 +269,8 @@ export function verifyMigrationLineage({
     baseMaxVersion,
     addedMigrationCount: additions.length,
     addedMigrations: additions,
+    productionReceiptMarkerCount: productionReceiptMarkers.length,
+    productionReceiptMarkers,
     violationCount: violations.length,
     violations,
     verified: violations.length === 0,

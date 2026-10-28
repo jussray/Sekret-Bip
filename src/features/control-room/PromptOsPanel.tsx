@@ -79,16 +79,23 @@ export default function PromptOsPanel() {
       </> : null}
 
       {panel === 'quality' ? <>
-        <View style={s.panel}><Text style={s.panelTitle}>AI Voice Authenticity</Text><Text style={s.bodyText}>Founder-only advisory linting. Live response retry or blocking stays off until false positives are measured.</Text><Text style={s.detail}>Source: ai_pattern_scan</Text><Text style={s.detail}>Category: ai_quality</Text></View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>{AVATAR_PERSONAS.map((item) => <Chip key={item} label={item} active={lintPersona === item} onPress={() => setLintPersona(item)} />)}</ScrollView>
-        <TextInput value={lintDraft} onChangeText={setLintDraft} placeholder="Paste an avatar draft to lint" placeholderTextColor="#6b7280" multiline style={[s.input, { minHeight: 140, textAlignVertical: 'top' }]} />
-        <View style={s.card}>
-          <View style={s.row}><Text style={s.cardTitle}>Lint result</Text><Text style={[s.status, { color: lintResult.severity === 'block' ? '#fb7185' : lintResult.severity === 'warn' ? '#facc15' : '#4ade80' }]}>{lintResult.severity}</Text></View>
-          <Text style={s.detail}>Score: {lintResult.score}</Text>
-          <Text style={s.bodyText}>{lintResult.summary}</Text>
-          {lintResult.hits.map((hit) => <Text key={hit.patternId} style={s.tags}>{hit.severity.toUpperCase()} · P{hit.patternId} {hit.patternName}: {hit.matches.join(', ')}</Text>)}
+        <View style={s.panel}>
+          <Text style={s.panelTitle}>Voice Integrity Audit</Text>
+          <Text style={s.bodyText}>Founder-only density-based voice review. It does not infer authorship and never blocks on one isolated style marker.</Text>
+          <Text style={s.detail}>Source: voice_density_scan</Text>
+          <Text style={s.detail}>Category: voice_quality</Text>
         </View>
-        <View style={s.card}><Text style={s.cardTitle}>Quality pipeline</Text><Text style={s.bodyText}>Prompt → persona rules → model response → pattern lint → safety checks → telemetry → Control Room issue.</Text></View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>{AVATAR_PERSONAS.map((item) => <Chip key={item} label={item} active={lintPersona === item} onPress={() => setLintPersona(item)} />)}</ScrollView>
+        <TextInput value={lintDraft} onChangeText={setLintDraft} placeholder="Paste an avatar draft to audit" placeholderTextColor="#6b7280" multiline style={[s.input, { minHeight: 140, textAlignVertical: 'top' }]} />
+        <View style={s.card}>
+          <View style={s.row}><Text style={s.cardTitle}>Voice audit</Text><Text style={[s.status, { color: lintResult.severity === 'warn' ? '#facc15' : '#4ade80' }]}>{lintResult.severity}</Text></View>
+          <Text style={s.detail}>Density score: {lintResult.score}</Text>
+          <Text style={s.detail}>Clustered: {lintResult.clustered ? 'yes' : 'no'}</Text>
+          <Text style={s.detail}>Authorship inference: {lintResult.authorshipInference}</Text>
+          <Text style={s.bodyText}>{lintResult.summary}</Text>
+          {lintResult.hits.map((hit) => <Text key={hit.patternId} style={s.tags}>{hit.severity.toUpperCase()} · P{hit.patternId} {hit.patternName} ×{hit.occurrences}: {hit.matches.join(', ')}</Text>)}
+        </View>
+        <View style={s.card}><Text style={s.cardTitle}>Quality pipeline</Text><Text style={s.bodyText}>Prompt → persona rules → model response → voice-density audit → safety checks → telemetry → Control Room issue.</Text></View>
       </> : null}
 
       {panel === 'deployments' ? <>

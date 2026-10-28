@@ -11,12 +11,15 @@ on:
       - 'scripts/control-room-server.mjs'
       - 'scripts/playwright-executable.mjs'
       - 'src/features/control-room/FounderOperatorPanel.tsx'
+      - 'src/features/control-room/PromptOsPanel.tsx'
       - 'src/screens/DevControlRoomScreen.tsx'
+      - 'src/services/ai/aiPatternLinter.ts'
       - 'src/services/controlRoomFounderOperator.ts'
       - 'src/services/controlRoomLocalAgent.ts'
       - 'src/types/controlRoomFounderOperator.ts'
       - 'test/control-room-core-contract.test.mjs'
       - 'test/control-room-founder-operator-*.test.mjs'
+      - 'test/voice-density-audit-contract.test.mjs'
       - 'playwright.founder-operator.config.ts'
       - 'e2e-founder-operator/**'
       - '.github/workflows/founder-operator-exact-head.yml'
@@ -61,6 +64,9 @@ jobs:
 
       - name: Run focused Founder Operator contracts and persistence proof
         run: npm run test:founder-operator
+
+      - name: Run voice-density behavioral regressions
+        run: node --test test/voice-density-audit-contract.test.mjs
 
       - name: Run inherited Control Room process and frontend contracts
         run: npm run test:control-room-core

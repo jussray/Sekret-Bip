@@ -3,8 +3,13 @@ import { fetchSekretBrainReply, type SekretAvatarState } from './api';
 import {
   getSekretFallback,
   isArrivalMessage,
-  keepSekretReply,
+  guardSekretReply,
 } from '../../services/sekretVoice';
+import {
+  getLocalSafetyFallback,
+  recoverSafetyResourcesFromUpstreamFallback,
+  shouldBypassReplyGuard,
+} from '../../services/sekretSafety';
 import { normalizeSekretPersonality } from '../../services/sekretPresence';
 import { buildReplyRequest } from '../services/ai/buildReplyRequest';
 import type { PagesTab } from '../../screens/PagesScreen';
@@ -135,7 +140,8 @@ export async function fetchPagesReplyDetails(input: {
   const history = input.history ?? [];
   const historyLength = history.length;
   const personality = normalizeSekretPersonality(avatarKey);
-  const fallback = getSekretFallback(personality, input.text);
+  const localSafetyFallback = getLocalSafetyFallback(input.text);
+  const fallback = localSafetyFallback ?? getSekretFallback(personality, input.text);
   const isArrival = isArrivalMessage(input.text, historyLength);
 
   // isArrival is forwarded to the Worker inside phaseInstruction so the Worker
@@ -189,24 +195,56 @@ export async function fetchPagesReplyDetails(input: {
 
     setAvatarState(avatarKey, nextState);
 
-    const guardedReply = keepSekretReply(response.reply, fallback);
-    const guardBlocked = guardedReply !== (response.reply ?? '').trim();
+    // fetchSekretBrainReply can return its own local fallback when the Worker is
+    // unavailable. If the input is high-risk and that upstream fallback lacks
+    // explicit crisis resources, recover them here before the voice guard runs.
+    const safetyRecovery = recoverSafetyResourcesFromUpstreamFallback(
+      input.text,
+      response.reply,
+      response.replySource,
+    );
+    const replyForGuard = safetyRecovery.reply;
+    const guardBypass = shouldBypassReplyGuard(
+      replyForGuard,
+      response.safetyFlag || safetyRecovery.substituted,
+    );
+    const { reply: guardedReply, blocked: guardBlocked } = guardBypass.bypass
+      ? { reply: replyForGuard, blocked: false }
+      : guardSekretReply(replyForGuard, fallback);
+    const safetyBackstopTriggered = guardBypass.reason === 'crisis-resource-backstop';
 
     if (__DEV__ && guardBlocked) {
       console.warn('[fetchPagesReplyDetails] keepSekretReply blocked Worker reply.', {
         companion: avatarKey,
-        blocked: (response.reply ?? '').slice(0, 80),
-        substituted: guardedReply.slice(0, 80),
+        blockedReplyLength: replyForGuard.length,
+        substitutedReplyLength: guardedReply.length,
       });
     }
 
+    if (__DEV__ && safetyRecovery.substituted) {
+      console.warn('[fetchPagesReplyDetails] upstream fallback lacked crisis resources — local safety fallback substituted.', {
+        companion: avatarKey,
+        surface: 'journal',
+      });
+    } else if (__DEV__ && safetyBackstopTriggered) {
+      console.warn('[fetchPagesReplyDetails] crisis-resource backstop bypassed reply guard because safetyFlag was missing.', {
+        companion: avatarKey,
+        surface: 'journal',
+      });
+    }
+
+    const fallbackUsed = guardBlocked || safetyRecovery.substituted;
     return {
       reply: guardedReply,
       tone: response.tone,
       avatarState: nextState,
-      replySource: 'worker',
-      fallbackUsed: false,
-      fallbackReason: null,
+      replySource: fallbackUsed ? 'local-fallback' : 'worker',
+      fallbackUsed,
+      fallbackReason: safetyRecovery.substituted
+        ? 'Upstream fallback lacked crisis resources; local safety fallback used'
+        : guardBlocked
+          ? 'Reply guard replaced Worker reply with character fallback'
+          : null,
     };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);

@@ -53,6 +53,25 @@ test('Production Gate obeys the exact-head supply-chain and scheduler boundary i
   assert.match(content, /test\/production-authority-workflow-contracts\.test\.mjs/);
 });
 
+test('GitHub merge membrane evaluates untrusted PRs only from trusted base source', () => {
+  const content = workflow('github-merge-membrane.yml');
+
+  assertPinnedNodeWorkflow(content);
+  assertCancelsSupersededRuns(content);
+  assertKnownWorkingProofRunner(content);
+  assert.match(content, /\n  pull_request_target:\n/);
+  assert.doesNotMatch(content, /\n  pull_request:\n/);
+  assert.match(content, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(content, /TRUSTED_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(content, /ref: \$\{\{ env\.TRUSTED_BASE_SHA \}\}/);
+  assert.doesNotMatch(content, /ref: \$\{\{ env\.EXPECTED_HEAD_SHA \}\}/);
+  assert.match(content, /contents: read/);
+  assert.match(content, /checks: read/);
+  assert.match(content, /pull-requests: read/);
+  assert.doesNotMatch(content, /contents: write|pull-requests: write|actions: write/);
+  assert.match(content, /node scripts\/verify-github-merge-membrane\.mjs/);
+});
+
 test('Product Design proof uses a deterministic runner and cancels superseded UX evidence', () => {
   const content = workflow('product-design-playwright-proof.yml');
 
@@ -62,7 +81,7 @@ test('Product Design proof uses a deterministic runner and cancels superseded UX
   assert.match(content, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
 });
 
-test('Founder Shield is credential-minimal, immutable, deterministic, and cancels stale heads', () => {
+test('Founder Shield proves the anonymous public edge with minimal credentials and deterministic evidence', () => {
   const content = workflow('founder-shield.yml');
 
   assert.match(content, new RegExp(`actions/checkout@${CHECKOUT_SHA}`));
@@ -73,26 +92,33 @@ test('Founder Shield is credential-minimal, immutable, deterministic, and cancel
   assertKnownWorkingProofRunner(content);
   assert.match(content, /ref: \$\{\{ env\.EXPECTED_HEAD_SHA \}\}/);
 
-  assert.match(content, /verify-live-edge:\s*\n\s*name: Verify authenticated live edge on main/);
-  assert.match(content, /if: github\.event_name == 'push'/);
-  assert.match(content, /environment: Production/);
-  assert.match(content, /CLOUDFLARE_ACCESS_CLIENT_ID: \$\{\{ secrets\.CLOUDFLARE_ACCESS_CLIENT_ID \}\}/);
-  assert.match(content, /CLOUDFLARE_ACCESS_CLIENT_SECRET: \$\{\{ secrets\.CLOUDFLARE_ACCESS_CLIENT_SECRET \}\}/);
-  assert.match(content, /CF-Access-Client-Id: \$CLOUDFLARE_ACCESS_CLIENT_ID/);
-  assert.match(content, /CF-Access-Client-Secret: \$CLOUDFLARE_ACCESS_CLIENT_SECRET/);
+  assert.ok(content.includes('verify-live-edge:\n    name: Verify anonymous live edge on main'));
+  assert.ok(content.includes("if: github.event_name == 'push'"));
+  assert.ok(content.includes('environment: Production'));
+  assert.ok(content.includes('https://sekretbip.net/.well-known/sekret-release.json'));
+  assert.ok(content.includes('commitSha: expected'));
+  assert.ok(content.includes("deploymentProvider: 'cloudflare-pages'"));
+  assert.ok(content.includes("canonicalUrl: 'https://sekretbip.net'"));
+  assert.ok(content.includes("host === 'cloudflareaccess.com'"));
+  assert.ok(content.includes("host.endsWith('.cloudflareaccess.com')"));
+  assert.ok(content.includes("path.startsWith('/cdn-cgi/access/')"));
+  assert.equal(content.includes('CLOUDFLARE_ACCESS_CLIENT_ID'), false);
+  assert.equal(content.includes('CLOUDFLARE_ACCESS_CLIENT_SECRET'), false);
+  assert.equal(content.toLowerCase().includes('cf-access-client-id:'), false);
+  assert.equal(content.toLowerCase().includes('cf-access-client-secret:'), false);
   assert.equal(
     (content.match(/--output \/dev\/null/g) || []).length,
     3,
-    'authenticated live-edge response bodies must not be retained',
+    'non-release public-edge response bodies must not be retained',
   );
   assert.doesNotMatch(
     content,
     /--output artifacts\/founder-shield-live\/.*\.body/,
-    'authenticated response bodies must not enter retained evidence',
+    'public-edge response bodies must not enter retained evidence',
   );
   assert.ok(
     content.includes('set-cookie|cookie|authorization|proxy-authorization|cf-authorization|cf-access-token|cf-access-client-id|cf-access-client-secret'),
-    'Founder Shield must redact reusable Access/session credentials from retained response headers',
+    'Founder Shield must redact reusable session or access credentials if providers emit them in response headers',
   );
   assert.match(content, /\[REDACTED\]/);
 });

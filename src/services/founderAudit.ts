@@ -66,7 +66,7 @@ export const founderAuditPlaybook: FounderAuditCard[] = [
     category: 'structure',
     severity: 'critical',
     title: 'Create one companion runtime orchestrator',
-    summary: 'Raylene, Rylane, Cloud, Night, Voice Bip, Circle replies, Bridge, and Oracle should not each own separate AI logic.',
+    summary: 'Suhana, Sy, Cloud, Night, Voice Bip, Circle replies, Bridge, and Oracle should not each own separate AI logic.',
     fix: 'Move context building, memory retrieval, safety gating, model call, response shaping, and audit logging into one Worker route.',
     source: 'static-playbook',
   },
@@ -120,7 +120,7 @@ export const founderAuditPlaybook: FounderAuditCard[] = [
     category: 'product',
     severity: 'warning',
     title: 'Audit companion quality and persona drift',
-    summary: 'Raylene, Rylane, Cloud, Night, and Oracle need checks for tone, recall, safety, and whether replies still feel like Se’kret Bip.',
+    summary: 'Suhana, Sy, Cloud, Night, and Oracle need checks for tone, recall, safety, and whether replies still feel like Se’kret Bip.',
     fix: 'Add eval cards for persona drift, wrong companion name, stale fallback, unsafe advice, low empathy, and memory mismatch.',
     source: 'static-playbook',
   },
@@ -155,6 +155,41 @@ export async function getCurrentFounderProfile(): Promise<FounderProfile | null>
 
   if (error || !data) return null;
   return data as FounderProfile;
+}
+
+/**
+ * Founder lookup used during post-auth routing. Unlike the read-only dashboard
+ * helper above, this path must distinguish "not a founder" from "founder state
+ * could not be verified". A provider/read failure after successful Supabase
+ * authentication therefore fails closed instead of silently routing a founder
+ * into public teen/parent onboarding.
+ */
+export async function getCurrentFounderProfileForRouting(): Promise<FounderProfile | null> {
+  if (!isSupabaseConfigured) {
+    throw new Error('Signed in, but we could not verify your account access. Please try again.');
+  }
+  const sb = getSupabase();
+  if (!sb) {
+    throw new Error('Signed in, but we could not verify your account access. Please try again.');
+  }
+
+  const { data: authData, error: authError } = await sb.auth.getUser();
+  if (authError) {
+    throw new Error('Signed in, but we could not verify your account access. Please try again.');
+  }
+  const userId = authData.user?.id;
+  if (!userId) throw new Error('A permanent signed-in account is required.');
+
+  const { data, error } = await sb
+    .from('app_profiles')
+    .select('user_id,email,role,can_view_audits,can_manage_app,exclude_from_analytics')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error('Signed in, but we could not verify your account access. Please try again.');
+  }
+  return data ? data as FounderProfile : null;
 }
 
 export async function getFounderBusinessSnapshot(): Promise<FounderBusinessSnapshot | null> {

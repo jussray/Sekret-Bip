@@ -1,0 +1,389 @@
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+import {
+  ALWAYS_REQUIRED_CHECKS,
+  assessPullRequestTrust,
+  evaluateExpectedChecks,
+  expectedChecksForChangedFiles,
+  extractPullRequestPaths,
+  globMatches,
+} from '../scripts/verify-github-merge-membrane.mjs';
+
+const SHA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const BASE_SHA = 'ccccccccccccccccccccccccccccccccccccccc';
+
+function trustedPullRequest(overrides = {}) {
+  return {
+    head: { sha: SHA },
+    base: { ref: 'main', sha: BASE_SHA },
+    mergeable_state: 'clean',
+    ...overrides,
+  };
+}
+const mergeMembraneSource = readFileSync('scripts/verify-github-merge-membrane.mjs', 'utf8');
+const releaseGateSource = readFileSync('.agents/skills/bip-release-gate/SKILL.md', 'utf8');
+
+function run(name, conclusion = 'success', app = 'github-actions', overrides = {}) {
+  return {
+    id: Math.floor(Math.random() * 100000),
+    name,
+    head_sha: SHA,
+    status: 'completed',
+    conclusion,
+    started_at: '2026-09-05T08:00:00Z',
+    completed_at: '2026-09-05T08:01:00Z',
+    app: { slug: app },
+    ...overrides,
+  };
+}
+
+test('trust assessment passes a clean, exact-head, correctly-based PR through unchanged', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest(),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.deepEqual(verdict, { ok: true, mergeabilityKnown: true });
+});
+
+for (const mergeableState of ['unstable', 'blocked', 'has_hooks']) {
+  test(`trust assessment treats mergeable_state=${mergeableState} as known and safe`, () => {
+    const verdict = assessPullRequestTrust({
+      pullRequest: trustedPullRequest({ mergeable_state: mergeableState }),
+      expectedSha: SHA,
+      trustedBaseSha: BASE_SHA,
+    });
+    assert.deepEqual(verdict, { ok: true, mergeabilityKnown: true });
+  });
+}
+
+for (const mergeableState of ['unknown', null, undefined, '']) {
+  test(`trust assessment treats mergeable_state=${mergeableState} as not yet known, not as safe`, () => {
+    // GitHub computes mergeable_state asynchronously. Accepting "unknown" as
+    // equivalent to a confirmed-safe state would let an actually-behind or
+    // actually-dirty PR slip through during the window before GitHub reveals
+    // the real value -- the exact race the P1 review finding on this PR
+    // described. Callers must keep polling, not proceed, while this is false.
+    const verdict = assessPullRequestTrust({
+      pullRequest: trustedPullRequest({ mergeable_state: mergeableState }),
+      expectedSha: SHA,
+      trustedBaseSha: BASE_SHA,
+    });
+    assert.deepEqual(verdict, { ok: true, mergeabilityKnown: false });
+  });
+}
+
+test('trust assessment rejects a PR that is behind its base before spending the poll timeout', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ mergeable_state: 'behind' }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^PR_BEHIND_BASE/);
+  assert.match(verdict.message, /Merge the latest main into this branch and push/);
+  // The message may still mention rebase, but only as a warning that it
+  // needs a force-push and separate founder approval -- never as a bare
+  // "rebase ... and push" instruction, which would omit that gate.
+  assert.doesNotMatch(verdict.message, /\brebase\b[^.]*\band push\b/i);
+  assert.match(verdict.message, /rebase[\s\S]*force-push[\s\S]*founder approval/i);
+});
+
+test('trust assessment rejects a PR with an unresolved merge conflict', () => {
+  const verdict = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ mergeable_state: 'dirty' }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(verdict.ok, false);
+  assert.match(verdict.message, /^PR_MERGE_CONFLICT/);
+  assert.match(verdict.message, /Resolve the merge conflict/);
+});
+
+test('trust assessment rejects a head SHA mismatch, a non-main base, and a stale trusted base', () => {
+  const headMismatch = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ head: { sha: 'deadbeef' } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(headMismatch.ok, false);
+  assert.match(headMismatch.message, /^PR_HEAD_SHA_MISMATCH/);
+
+  const wrongBaseRef = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ base: { ref: 'not-main', sha: BASE_SHA } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(wrongBaseRef.ok, false);
+  assert.match(wrongBaseRef.message, /^TRUSTED_BASE_INVALID/);
+
+  const staleTrustedBase = assessPullRequestTrust({
+    pullRequest: trustedPullRequest({ base: { ref: 'main', sha: 'ddddddddddddddddddddddddddddddddddddddd' } }),
+    expectedSha: SHA,
+    trustedBaseSha: BASE_SHA,
+  });
+  assert.equal(staleTrustedBase.ok, false);
+  assert.match(staleTrustedBase.message, /^TRUSTED_BASE_SHA_MISMATCH/);
+});
+
+test('glob matcher handles exact paths, stars, and recursive prefixes', () => {
+  assert.equal(globMatches('src/a.ts', 'src/**'), true);
+  assert.equal(globMatches('src/nested/a.ts', 'src/**'), true);
+  assert.equal(globMatches('src/a.ts', 'src/*.ts'), true);
+  assert.equal(globMatches('src/nested/a.ts', 'src/*.ts'), false);
+  assert.equal(globMatches('wrangler.toml', 'wrangler.toml'), true);
+  assert.equal(globMatches('docs/readme.md', 'wrangler.toml'), false);
+});
+
+test('path parser understands the current proof workflow contracts', () => {
+  const productSource = readFileSync('.github/workflows/product-design-playwright-proof.yml', 'utf8');
+  const shieldSource = readFileSync('.github/workflows/founder-shield.yml', 'utf8');
+  const productPaths = extractPullRequestPaths(productSource);
+  const shieldPaths = extractPullRequestPaths(shieldSource);
+
+  assert.ok(productPaths.includes('src/**'));
+  assert.ok(productPaths.includes('.github/workflows/founder-shield.yml'));
+  assert.ok(shieldPaths.includes('worker/auth.ts'));
+  assert.ok(shieldPaths.includes('.github/workflows/founder-shield.yml'));
+});
+
+test('docs-only changes require the universal machine membrane without inventing Playwright work', () => {
+  const expected = expectedChecksForChangedFiles(['docs/example.md'], {
+    '.github/workflows/product-design-playwright-proof.yml': ['src/**'],
+    '.github/workflows/founder-shield.yml': ['worker/**'],
+  });
+
+  assert.deepEqual(expected, [...ALWAYS_REQUIRED_CHECKS]);
+});
+
+test('rendered and security changes require their path-sensitive proof checks', () => {
+  const patterns = {
+    '.github/workflows/product-design-playwright-proof.yml': ['src/**', 'worker/**', '.github/workflows/founder-shield.yml'],
+    '.github/workflows/founder-shield.yml': ['worker/**', '.github/workflows/founder-shield.yml'],
+  };
+
+  assert.deepEqual(
+    expectedChecksForChangedFiles(['src/screens/Home.tsx'], patterns),
+    [...ALWAYS_REQUIRED_CHECKS, 'product-design-proof'],
+  );
+
+  assert.deepEqual(
+    expectedChecksForChangedFiles(['worker/auth.ts'], patterns),
+    [...ALWAYS_REQUIRED_CHECKS, 'product-design-proof', 'verify-founder-shield'],
+  );
+});
+
+test('a PR cannot weaken its own conditional proof scope to avoid that proof', () => {
+  const trustedBasePatterns = {
+    '.github/workflows/product-design-playwright-proof.yml': ['src/**'],
+    '.github/workflows/founder-shield.yml': ['worker/**'],
+  };
+
+  assert.deepEqual(
+    expectedChecksForChangedFiles(
+      ['.github/workflows/product-design-playwright-proof.yml'],
+      trustedBasePatterns,
+    ),
+    [...ALWAYS_REQUIRED_CHECKS, 'product-design-proof'],
+  );
+
+  assert.deepEqual(
+    expectedChecksForChangedFiles(
+      ['.github/workflows/founder-shield.yml'],
+      trustedBasePatterns,
+    ),
+    [...ALWAYS_REQUIRED_CHECKS, 'verify-founder-shield'],
+  );
+});
+
+test('exact-head trusted GitHub Actions checks must all exist and pass', () => {
+  const expectedChecks = [...ALWAYS_REQUIRED_CHECKS, 'product-design-proof'];
+  const good = expectedChecks.map((name) => run(name));
+
+  const passed = evaluateExpectedChecks({ expectedChecks, checkRuns: good, expectedSha: SHA });
+  assert.equal(passed.ready, true);
+  assert.deepEqual(passed.failed, []);
+  assert.deepEqual(passed.missing, []);
+
+  const spoofed = good.filter((item) => item.name !== 'product-design-proof');
+  spoofed.push(run('product-design-proof', 'success', 'cloudflare-workers-and-pages'));
+  const spoofedVerdict = evaluateExpectedChecks({ expectedChecks, checkRuns: spoofed, expectedSha: SHA });
+  assert.equal(spoofedVerdict.ready, false);
+  assert.deepEqual(spoofedVerdict.missing, ['product-design-proof']);
+
+  const failed = good.map((item) => item.name === 'repository-truth' ? run(item.name, 'failure') : item);
+  const failedVerdict = evaluateExpectedChecks({ expectedChecks, checkRuns: failed, expectedSha: SHA });
+  assert.equal(failedVerdict.terminalFailure, true);
+  assert.deepEqual(failedVerdict.failed, ['repository-truth']);
+});
+
+test('Attack 2000 cannot promote missing, pending, failed, stale, or spoofed proof', () => {
+  const expectedChecks = [...ALWAYS_REQUIRED_CHECKS, 'product-design-proof'];
+  const good = expectedChecks.map((name) => run(name));
+
+  const missing = evaluateExpectedChecks({
+    expectedChecks,
+    checkRuns: good.filter((item) => item.name !== 'deploy'),
+    expectedSha: SHA,
+  });
+  assert.equal(missing.ready, false);
+  assert.equal(missing.terminalFailure, false);
+  assert.deepEqual(missing.missing, ['deploy']);
+
+  const pending = evaluateExpectedChecks({
+    expectedChecks,
+    checkRuns: good.map((item) => item.name === 'deploy'
+      ? run('deploy', null, 'github-actions', { status: 'in_progress', conclusion: null })
+      : item),
+    expectedSha: SHA,
+  });
+  assert.equal(pending.ready, false);
+  assert.deepEqual(pending.pending, ['deploy']);
+
+  const failed = evaluateExpectedChecks({
+    expectedChecks,
+    checkRuns: good.map((item) => item.name === 'deploy' ? run('deploy', 'failure') : item),
+    expectedSha: SHA,
+  });
+  assert.equal(failed.ready, false);
+  assert.equal(failed.terminalFailure, true);
+  assert.deepEqual(failed.failed, ['deploy']);
+
+  const stale = evaluateExpectedChecks({
+    expectedChecks,
+    checkRuns: good.map((item) => ({ ...item, head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' })),
+    expectedSha: SHA,
+  });
+  assert.equal(stale.ready, false);
+  assert.deepEqual(stale.missing, expectedChecks);
+
+  const spoofed = evaluateExpectedChecks({
+    expectedChecks,
+    checkRuns: good
+      .filter((item) => item.name !== 'product-design-proof')
+      .concat(run('product-design-proof', 'success', 'cloudflare-workers-and-pages')),
+    expectedSha: SHA,
+  });
+  assert.equal(spoofed.ready, false);
+  assert.deepEqual(spoofed.missing, ['product-design-proof']);
+});
+
+test('Attack 2000 release contract is falsification-first and non-authorizing', () => {
+  assert.match(releaseGateSource, /Attack 2000 is mandatory for merge, beta, controlled production mutation, and public-release decisions/);
+  assert.match(releaseGateSource, /not a literal claim that 2,000 tests executed/);
+  for (const field of ['CLAIM', 'SUBJECT', 'AUTHORITY', 'EVIDENCE', 'FALSIFIER', 'RESULT', 'ROLLBACK']) {
+    assert.match(releaseGateSource, new RegExp(`\\*\\*${field}\\*\\*`));
+  }
+  assert.match(releaseGateSource, /user-visible Playwright that did not actually execute when applicable/);
+  assert.match(releaseGateSource, /Supabase migration-history, schema, RLS, or runtime contradiction/);
+  assert.match(releaseGateSource, /Cloudflare Pages\/Worker\/provider readback contradiction/);
+  assert.match(releaseGateSource, /Attack 2000 may only preserve or reduce confidence/);
+  assert.match(releaseGateSource, /never manufactures merge, deploy, publication, spending, deletion, auth, or provider authority/);
+  assert.match(releaseGateSource, /failed verification can be a successful Attack 2000 outcome/);
+});
+
+test('newer queued exact-head rerun supersedes older success by creation order', () => {
+  const expectedChecks = ['deploy'];
+  const olderSuccess = run('deploy', 'success', 'github-actions', {
+    id: 100,
+    created_at: '2026-09-05T08:00:00Z',
+    started_at: '2026-09-05T08:00:05Z',
+    completed_at: '2026-09-05T08:03:00Z',
+  });
+  const newerQueued = run('deploy', null, 'github-actions', {
+    id: 101,
+    status: 'queued',
+    conclusion: null,
+    created_at: '2026-09-05T08:02:00Z',
+    started_at: null,
+    completed_at: null,
+  });
+
+  const verdict = evaluateExpectedChecks({
+    expectedChecks,
+    checkRuns: [olderSuccess, newerQueued],
+    expectedSha: SHA,
+  });
+
+  assert.equal(verdict.ready, false);
+  assert.equal(verdict.terminalFailure, false);
+  assert.deepEqual(verdict.pending, ['deploy']);
+  assert.deepEqual(verdict.failed, []);
+  assert.equal(verdict.observed[0].id, '101');
+});
+
+test('stale-head success cannot satisfy current-head authority', () => {
+  const expectedChecks = [...ALWAYS_REQUIRED_CHECKS];
+  const stale = expectedChecks.map((name) => run(name, 'success', 'github-actions', {
+    head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+  }));
+
+  const verdict = evaluateExpectedChecks({ expectedChecks, checkRuns: stale, expectedSha: SHA });
+  assert.equal(verdict.ready, false);
+  assert.deepEqual(verdict.missing, expectedChecks);
+});
+
+test('merge-membrane receipt persists only trusted or bounded proof data', () => {
+  assert.match(mergeMembraneSource, /const trustedBaseSha = normalizeSha\(env\.TRUSTED_BASE_SHA\)/);
+  assert.match(mergeMembraneSource, /observedBaseSha !== trustedBaseSha/);
+  assert.match(mergeMembraneSource, /trustedBase: trustedBaseSha/);
+  assert.match(mergeMembraneSource, /const outputPath = DEFAULT_OUTPUT/);
+  assert.match(mergeMembraneSource, /MERGE_MEMBRANE_EVIDENCE_PATH must be/);
+  assert.doesNotMatch(mergeMembraneSource, /\n\s+changedFiles,\n\s+expectedChecks,/);
+  assert.match(mergeMembraneSource, /schemaVersion: 3/);
+});
+
+test('merge-membrane reassesses PR trust on every poll iteration, not only before the loop', () => {
+  const loopStart = mergeMembraneSource.indexOf('while (Date.now() - startedAt < timeoutMs)');
+  assert.notEqual(loopStart, -1, 'expected the merge-membrane poll loop');
+  const loopEnd = mergeMembraneSource.indexOf('await sleep(pollMs);', loopStart);
+  assert.notEqual(loopEnd, -1, 'expected the poll loop body to end with a sleep');
+  const loopBody = mergeMembraneSource.slice(loopStart, loopEnd);
+
+  // main (and therefore this PR's behind/dirty state) can change during the
+  // up-to-22-minute poll window; a stale pre-loop assessment must not be
+  // trusted to still hold by the time the loop accepts a "ready" verdict.
+  assert.match(loopBody, /fetchPullRequest\(/);
+  assert.match(loopBody, /assessPullRequestTrust\(/);
+});
+
+test('merge-membrane never evaluates or accepts checks while mergeability is unknown', () => {
+  const gateStart = mergeMembraneSource.indexOf('if (!currentTrust.mergeabilityKnown)');
+  assert.notEqual(gateStart, -1, 'expected a mergeabilityKnown gate in the poll loop');
+  const gateEnd = mergeMembraneSource.indexOf('const checkRuns = await fetchCheckRuns', gateStart);
+  assert.notEqual(gateEnd, -1, 'expected the gate to precede the check-run fetch');
+  const gateBody = mergeMembraneSource.slice(gateStart, gateEnd);
+
+  // A rerun on an already-green head must not be accepted before GitHub
+  // resolves mergeable_state -- the gate must skip straight to the next
+  // poll (sleep + continue) rather than falling through to evaluate checks.
+  assert.match(gateBody, /await sleep\(pollMs\);/);
+  assert.match(gateBody, /continue;/);
+});
+
+test('PR continuity evaluates the live head with trusted base code', () => {
+  const source = readFileSync('.github/workflows/pr-continuity.yml', 'utf8');
+  const exactHeadJob = source.slice(
+    source.indexOf('  exact-head-audit:'),
+    source.indexOf('  metadata-receipt:'),
+  );
+
+  assert.match(exactHeadJob, /Check out trusted PR base evaluator/);
+  assert.match(
+    exactHeadJob,
+    /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/,
+  );
+  assert.doesNotMatch(
+    exactHeadJob,
+    /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/,
+  );
+  assert.match(
+    exactHeadJob,
+    /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/,
+  );
+  assert.match(exactHeadJob, /TRUSTED_BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(exactHeadJob, /test "\$actual" = "\$TRUSTED_BASE_SHA"/);
+  assert.match(exactHeadJob, /run: node scripts\/pr-continuity\.mjs audit/);
+});

@@ -17,13 +17,18 @@ test('Production Smoke runs live Playwright only after verified current producti
   assert.match(content, /actions: read/);
   assert.match(
     content,
-    /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/,
+    /EXPECTED_HEAD_SHA: \$\{\{ github\.sha \}\}/,
   );
   assert.match(
     content,
     /EXPECTED_RELEASE_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/,
   );
-  assert.doesNotMatch(content, /github\.event\.workflow_run\.head_sha \|\| github\.sha/);
+  assert.match(
+    content,
+    /WORKFLOW_HEAD_SHA: \$\{\{ github\.sha \}\}/,
+  );
+  assert.doesNotMatch(content, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
+  assert.doesNotMatch(content, /ref: \$\{\{ github\.event\.workflow_run\.head_sha \}\}/);
   assert.match(content, /github\.event\.workflow_run\.head_branch == 'main'/);
   assert.match(content, /github\.event\.workflow_run\.conclusion == 'success'/);
   assert.match(content, /group: production-smoke-main/);
@@ -37,13 +42,22 @@ test('Production Smoke runs live Playwright only after verified current producti
   assert.match(content, /target\.conclusion === "skipped"/);
   assert.doesNotMatch(content, /!target \|\| target\.conclusion === "skipped"/);
   assert.match(content, /should_run=\$\{value\}/);
+  assert.match(content, /target\.status !== "completed"/);
   assert.match(content, /target\.conclusion !== "success"/);
-  assert.match(content, /UPSTREAM_HEAD_SHA !== process\.env\.CURRENT_MAIN/);
-  assert.match(content, /steps\.upstream\.outputs\.should_run == 'true'/);
+  assert.match(content, /target\.head_sha !== process\.env\.UPSTREAM_HEAD_SHA/);
+  assert.match(content, /does not belong to the release SHA/);
+  assert.match(content, /UPSTREAM_HEAD_SHA !== process\.env\.WORKFLOW_HEAD_SHA/);
+  assert.match(content, /WORKFLOW_HEAD_SHA !== process\.env\.CURRENT_MAIN/);
+  assert.match(content, /name: Classify production smoke eligibility/);
+  assert.ok(content.includes('should_run: ${{ steps.upstream.outputs.should_run }}'));
+  assert.match(content, /needs: classify/);
+  assert.ok(content.includes("if: needs.classify.outputs.should_run == 'true'"));
+  assert.ok(!content.includes("if: steps.upstream.outputs.should_run == 'true'"));
   assert.match(content, /ref: \$\{\{ env\.EXPECTED_HEAD_SHA \}\}/);
   assert.match(content, /persist-credentials: false/);
   assert.match(content, /actual="\$\(git rev-parse HEAD\)"/);
   assert.match(content, /test "\$actual" = "\$EXPECTED_HEAD_SHA"/);
+  assert.match(content, /test "\$EXPECTED_HEAD_SHA" = "\$EXPECTED_RELEASE_SHA"/);
   assert.match(content, /Reverify exact live release identities after smoke/);
   assert.match(
     content,

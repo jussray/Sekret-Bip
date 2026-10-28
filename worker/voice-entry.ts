@@ -2,11 +2,23 @@ import observedWorker from './observed-index';
 import emailRouter from './email-router';
 import { WORKER_RELEASE_SHA } from './release-identity.generated';
 import { authenticate, type AuthEnv, type Principal } from './auth';
+import {
+  firebaseAppCheckMode,
+  verifyFirebaseAppCheck,
+  type FirebaseAppCheckEnv,
+  type FirebaseAppCheckVerification,
+} from './firebase-app-check';
 import { emitWorkerTelemetry, type WorkerTelemetryEvent } from './telemetry';
 import { persistAuditEvent, type AuditPersistEnv } from './audit/persist-event';
 import { normalizeReplyActor, resolveRuntimeStyle } from './runtime-style';
 import { selectVoiceRoute, type CharacterId } from './voice-routing';
 import { synthesizeRoutedVoice, type VoiceProviderEnv } from './voice-providers';
+import { handleBipProviderRequest } from './provider-route';
+import {
+  evaluateFounderOperationKillSwitch,
+  stableHttpOperationId,
+} from '../shared/founder-operation-kill-switch.js';
+import { shouldPassThroughToFrontend } from '../shared/frontend-host-passthrough.js';
 
 interface MinimalExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -22,11 +34,13 @@ interface WorkerVersionMetadata {
   timestamp: string;
 }
 
-interface Env extends AuthEnv, VoiceProviderEnv {
+interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv {
   ALLOWED_ORIGINS?: string;
   VOICE_PROVIDER_MODE?: 'legacy' | 'cloudflare-only' | 'hybrid';
   SEKRET_RATE_LIMITER?: RateLimit;
   CF_VERSION_METADATA?: WorkerVersionMetadata;
+  FOUNDER_OPERATION_KILL_SWITCH?: string;
+  FOUNDER_OPERATION_KILL_SWITCH_REASON?: string;
 }
 
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -65,7 +79,7 @@ function corsHeaders(request: Request, env: Env): Record<string, string> {
     ...securityHeaders(),
     'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Firebase-AppCheck',
     'Access-Control-Max-Age': '600',
     Vary: 'Origin',
   };
@@ -101,6 +115,49 @@ function hasJsonContentType(request: Request): boolean {
   return contentType === 'application/json' || contentType.endsWith('+json');
 }
 
+function founderGuardedOperation(request: Request): { scope: string; operation: string } | null {
+  if (request.method === 'OPTIONS') return null;
+  const pathname = new URL(request.url).pathname;
+  if (request.method === 'GET' && pathname === '/health') return null;
+
+  if (pathname.endsWith('/api/sekret/reply')) return { scope: 'companion', operation: 'sekret:reply' };
+  if (pathname.endsWith('/api/sekret/voice')) return { scope: 'companion', operation: 'sekret:voice' };
+  if (pathname.endsWith('/api/sekret/transcribe')) return { scope: 'companion', operation: 'sekret:transcribe' };
+  if (pathname.endsWith('/api/bridge/summary/generate')) return { scope: 'bridge', operation: 'bridge:summary-generate' };
+  if (pathname.includes('/api/')) return { scope: 'api', operation: stableHttpOperationId(request.method, pathname) };
+  return { scope: 'worker', operation: stableHttpOperationId(request.method, pathname) };
+}
+
+function founderPauseResponse(cors: Record<string, string>): Response {
+  return json(
+    {
+      error: "Se'kret Bip is temporarily paused by the founder.",
+      code: 'FOUNDER_OPERATION_PAUSED',
+      retryable: false,
+    },
+    503,
+    { ...cors, 'Cache-Control': 'no-store', 'Retry-After': '60' },
+  );
+}
+
+function enforceFounderOperationKillSwitch(
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Response | null {
+  const guarded = founderGuardedOperation(request);
+  if (!guarded) return null;
+
+  const decision = evaluateFounderOperationKillSwitch({
+    rawValue: env.FOUNDER_OPERATION_KILL_SWITCH,
+    rawReason: env.FOUNDER_OPERATION_KILL_SWITCH_REASON,
+    ...guarded,
+  });
+  if (!decision.blocked) return null;
+
+  return founderPauseResponse(cors);
+}
+
 function requiresPreciseLipSync(body: Record<string, unknown>): boolean {
   return body.requiresPreciseLipSync === true
     || body.includeTiming === true
@@ -112,6 +169,68 @@ function protectionUnavailable(cors: Record<string, string>): Response {
     { error: 'request protection temporarily unavailable', retryable: true },
     503,
     { ...cors, 'Retry-After': '30' },
+  );
+}
+
+function appCheckObservationStatus(result: FirebaseAppCheckVerification): number {
+  if (result.status === 'valid' || result.status === 'disabled') return 200;
+  if (result.status === 'verification_error') return 503;
+  return 401;
+}
+
+function observeAppCheck(
+  request: Request,
+  result: FirebaseAppCheckVerification,
+  mode: ReturnType<typeof firebaseAppCheckMode>,
+  started: number,
+): void {
+  const url = new URL(request.url);
+  const requestId = request.headers.get('CF-Ray') || undefined;
+  const event: WorkerTelemetryEvent = {
+    fingerprint: `worker_app_check_${result.status}`,
+    route: url.pathname,
+    method: request.method,
+    status: appCheckObservationStatus(result),
+    duration_ms: Date.now() - started,
+    provider: 'firebase',
+    operation: 'app_check',
+    error_name: result.reason,
+    request_id: requestId,
+    fallback_used: false,
+    retry_count: 0,
+    trace_id: requestId || crypto.randomUUID(),
+    policy_version: 'firebase-app-check-v1',
+    decision: mode === 'observe' || result.status === 'valid' ? 'allow' : 'block',
+    violation_codes: result.reason ? [`app_check_${result.reason}`] : undefined,
+  };
+  // Never log the bearer App Check token or decoded token body. Cloudflare
+  // receives only the privacy-safe verification classification and reason.
+  emitWorkerTelemetry(event);
+}
+
+function appCheckDenied(
+  result: FirebaseAppCheckVerification,
+  cors: Record<string, string>,
+): Response {
+  if (result.status === 'verification_error') {
+    return json(
+      {
+        error: 'app attestation verification temporarily unavailable',
+        code: result.reason ?? 'verification_error',
+        retryable: true,
+      },
+      503,
+      { ...cors, 'Retry-After': '30' },
+    );
+  }
+  return json(
+    {
+      error: 'app attestation required',
+      code: result.reason ?? 'app_check_failed',
+      retryable: false,
+    },
+    401,
+    cors,
   );
 }
 
@@ -260,6 +379,10 @@ async function handleVoice(
 
 export default {
   async fetch(request: Request, env: Env, ctx: MinimalExecutionContext): Promise<Response> {
+    // A Worker route on a public frontend host must never replace the Pages
+    // welcome UI with a backend JSON response; hand page loads to the origin.
+    if (shouldPassThroughToFrontend(request.method, request.url)) return fetch(request);
+
     const started = Date.now();
     const cors = corsHeaders(request, env);
     const blocked = originRejected(request, env, cors);
@@ -292,6 +415,12 @@ export default {
       }
     }
 
+    const founderPaused = enforceFounderOperationKillSwitch(request, env, cors);
+    if (founderPaused) return founderPaused;
+
+    const providerResponse = await handleBipProviderRequest(request, env, cors);
+    if (providerResponse) return providerResponse;
+
     const isProtectedApiPost = request.method === 'POST' && path.includes('/api/');
     let downstreamEnv = env;
 
@@ -300,6 +429,18 @@ export default {
       if (!auth.ok) {
         const denied = json({ error: auth.error }, auth.status, cors);
         return observeFrontDoorDenial(request, denied, env, ctx, started, 'worker_auth_failure');
+      }
+
+      const appCheckMode = firebaseAppCheckMode(env);
+      if (appCheckMode !== 'off') {
+        const appCheck = await verifyFirebaseAppCheck(request, env);
+        observeAppCheck(request, appCheck, appCheckMode, started);
+        if (
+          appCheckMode === 'invalid'
+          || (appCheckMode === 'enforce' && appCheck.status !== 'valid')
+        ) {
+          return appCheckDenied(appCheck, cors);
+        }
       }
 
       const limited = await enforceRateLimit(request, env, auth.principal, cors);
@@ -318,7 +459,21 @@ export default {
     return withSecurityHeaders(response, cors);
   },
 
-  async email(message: Parameters<typeof emailRouter.email>[0]): Promise<void> {
+  async email(message: Parameters<typeof emailRouter.email>[0], env: Env): Promise<void> {
+    const decision = evaluateFounderOperationKillSwitch({
+      rawValue: env.FOUNDER_OPERATION_KILL_SWITCH,
+      rawReason: env.FOUNDER_OPERATION_KILL_SWITCH_REASON,
+      scope: 'email',
+      operation: 'email:inbound',
+    });
+    if (decision.blocked) {
+      const rejectable = message as Parameters<typeof emailRouter.email>[0] & { setReject?: (reason: string) => void };
+      if (typeof rejectable.setReject === 'function') {
+        rejectable.setReject("Se'kret Bip email processing is temporarily paused.");
+        return;
+      }
+      throw new Error('FOUNDER_OPERATION_PAUSED');
+    }
     await emailRouter.email(message);
   },
 };

@@ -1,11 +1,26 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { cloudflareRequestFailure, cloudflareHasErrorCode, safeCloudflareErrorReason } from './cloudflare-provider-error.mjs';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const SHA_PATTERN = /^[0-9a-f]{40}$/i;
 export const DESIRED_BUILD_COMMAND = '';
 export const DESIRED_DEPLOY_COMMAND = 'npm run deploy:api:production';
+export const DESIRED_PATH_INCLUDES = Object.freeze(['*']);
+export const DESIRED_PATH_EXCLUDES = Object.freeze([
+  '.agents/**',
+  '.ai-skills/**',
+  '.control-room/**',
+  '.github/**',
+  'artifacts/**',
+  'control-room/**',
+  'docs/**',
+  'e2e/**',
+  'screenshots/**',
+  'test/**',
+  '*.md',
+]);
 export const DEFAULT_EVIDENCE_PATH = 'artifacts/cloudflare-workers-build-trigger.json';
 
 function clean(value) {
@@ -17,15 +32,13 @@ function normalizeSha(value) {
   return SHA_PATTERN.test(sha) ? sha : null;
 }
 
-function normalizeBranches(value) {
+function normalizeStrings(value) {
   if (!Array.isArray(value)) return [];
   return [...new Set(value.map(clean).filter(Boolean))];
 }
 
-function normalizePaths(value) {
-  if (!Array.isArray(value)) return [];
-  return [...new Set(value.map(clean).filter(Boolean))];
-}
+const normalizeBranches = normalizeStrings;
+const normalizePaths = normalizeStrings;
 
 function sameStrings(left, right) {
   return left.length === right.length && left.every((value, index) => value === right[index]);
@@ -65,18 +78,21 @@ export function configFromEnv(env = process.env) {
   };
 }
 
-function errorText(payload, fallback) {
-  const messages = payload?.errors
-    ?.map((error) => {
-      const code = error?.code === undefined ? '' : `code=${error.code} `;
-      return `${code}${error?.message || ''}`.trim();
-    })
-    .filter(Boolean);
-  return messages?.length ? messages.join('; ') : fallback;
-}
+
 
 function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
+  return safeCloudflareErrorReason(error);
+}
+
+function safeWorkerRequestOperation(requestPath) {
+  if (requestPath === '/user/tokens/verify') return 'token-verify';
+  if (/^\/accounts\/[^/]+\/workers\/scripts(?:\?|$)/.test(requestPath)) {
+    return 'workers-scripts-read';
+  }
+  if (/^\/accounts\/[^/]+\/builds\/workers\/[^/]+\/triggers(?:\?|$)/.test(requestPath)) {
+    return 'workers-ci-read';
+  }
+  return null;
 }
 
 async function cfRequest(config, requestPath, options = {}, fetchImpl = fetch) {
@@ -91,9 +107,7 @@ async function cfRequest(config, requestPath, options = {}, fetchImpl = fetch) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success === false) {
-    throw new Error(
-      `Cloudflare ${options.method || 'GET'} ${requestPath} failed: ${errorText(payload, response.statusText)}`,
-    );
+    throw cloudflareRequestFailure(payload, response.status, safeWorkerRequestOperation(requestPath));
   }
   return payload;
 }
@@ -106,13 +120,43 @@ async function verifyUserScopedToken(config, fetchImpl) {
   return payload.result;
 }
 
+function canFallbackFromVerifyFailure(error) {
+  return cloudflareHasErrorCode(error, 6003);
+}
+
+async function discoverWorker(config, fetchImpl) {
+  const payload = await cfRequest(
+    config,
+    `/accounts/${config.accountId}/workers/scripts?per_page=100`,
+    {},
+    fetchImpl,
+  );
+  return selectWorkerScript(payload?.result, config.workerName);
+}
+
+async function listTriggers(config, workerTag, fetchImpl) {
+  const payload = await cfRequest(
+    config,
+    `/accounts/${config.accountId}/builds/workers/${workerTag}/triggers`,
+    {},
+    fetchImpl,
+  );
+  return Array.isArray(payload?.result) ? payload.result : [];
+}
+
+async function proveWorkersBuildsReadCapability(config, fetchImpl) {
+  const worker = await discoverWorker(config, fetchImpl);
+  await listTriggers(config, worker.tag, fetchImpl);
+  return worker;
+}
+
 async function selectActiveUserScopedToken(config, fetchImpl) {
   const candidates = config.tokenCandidates?.length
     ? config.tokenCandidates
     : config.token
       ? [{ source: 'configured-token', token: config.token }]
       : [];
-  const failures = [];
+  let lastProviderFailure = null;
 
   for (const candidate of candidates) {
     const candidateConfig = {
@@ -123,14 +167,35 @@ async function selectActiveUserScopedToken(config, fetchImpl) {
     try {
       await verifyUserScopedToken(candidateConfig, fetchImpl);
       return candidateConfig;
-    } catch (error) {
-      failures.push(`${candidate.source}: ${errorMessage(error)}`);
+    } catch (verifyError) {
+      if (verifyError?.auditCode === 'CLOUDFLARE_PROVIDER_REQUEST_FAILED') {
+        lastProviderFailure = verifyError;
+      }
+      if (!canFallbackFromVerifyFailure(verifyError)) {
+        continue;
+      }
+
+      try {
+        await proveWorkersBuildsReadCapability(candidateConfig, fetchImpl);
+        return candidateConfig;
+      } catch (capabilityError) {
+        if (capabilityError?.auditCode === 'CLOUDFLARE_PROVIDER_REQUEST_FAILED') {
+          lastProviderFailure = capabilityError;
+        }
+      }
     }
   }
 
-  throw new Error(
-    `CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED: ${failures.join('; ') || 'no token candidates configured'}`,
-  );
+  // Retain a bounded provider code/status from the last failed candidate, never
+  // the candidate's label, token, provider message, or thrown exception text.
+  const selectionError = new Error('CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED');
+  selectionError.auditCode = 'CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED';
+  if (lastProviderFailure) {
+    selectionError.providerStatus = lastProviderFailure.providerStatus;
+    selectionError.providerCodes = lastProviderFailure.providerCodes;
+    selectionError.providerOperation = lastProviderFailure.providerOperation;
+  }
+  throw selectionError;
 }
 
 export function selectWorkerScript(scripts, workerName) {
@@ -164,9 +229,11 @@ export function selectProductionTrigger(triggers) {
     .filter((trigger) => !trigger?.deleted_on && explicitlyIncludesMain(trigger));
 
   if (candidates.length !== 1) {
-    throw new Error(
+    const failure = new Error(
       `PRODUCTION_TRIGGER_SELECTION_FAILED: expected one explicit main trigger, found ${candidates.length}.`,
     );
+    failure.auditCode = 'PRODUCTION_TRIGGER_SELECTION_FAILED';
+    throw failure;
   }
 
   const trigger = candidates[0];
@@ -181,15 +248,22 @@ export function selectPreviewTrigger(triggers, productionTrigger) {
     .filter((trigger) => !trigger?.deleted_on && clean(trigger?.trigger_uuid) !== productionUuid);
 
   if (candidates.length > 1) {
-    throw new Error(
+    const failure = new Error(
       `NON_PRODUCTION_TRIGGER_SELECTION_FAILED: expected at most one active preview trigger, found ${candidates.length}.`,
     );
+    failure.auditCode = 'NON_PRODUCTION_TRIGGER_SELECTION_FAILED';
+    throw failure;
   }
   const preview = candidates[0] ?? null;
   if (preview && !clean(preview?.trigger_uuid)) {
     throw new Error('NON_PRODUCTION_TRIGGER_UUID_MISSING.');
   }
   return preview;
+}
+
+function exposesWatchPaths(trigger) {
+  return Object.prototype.hasOwnProperty.call(trigger ?? {}, 'path_includes')
+    || Object.prototype.hasOwnProperty.call(trigger ?? {}, 'path_excludes');
 }
 
 export function buildTriggerPlan(
@@ -207,8 +281,11 @@ export function buildTriggerPlan(
   const previousPathExcludes = normalizePaths(trigger?.path_excludes);
   const desiredBranchIncludes = ['main'];
   const desiredBranchExcludes = [];
+  const desiredPathIncludes = [...DESIRED_PATH_INCLUDES];
+  const desiredPathExcludes = [...DESIRED_PATH_EXCLUDES];
   const desiredBuild = reconcileBuildCommand ? clean(desiredBuildCommand) : null;
   const desiredDeploy = clean(desiredDeployCommand);
+  const watchPathsManaged = exposesWatchPaths(trigger);
   if (!desiredDeploy) throw new Error('DESIRED_DEPLOY_COMMAND_MISSING.');
 
   const patch = {};
@@ -217,6 +294,12 @@ export function buildTriggerPlan(
   }
   if (!sameStrings(previousBranchExcludes, desiredBranchExcludes)) {
     patch.branch_excludes = desiredBranchExcludes;
+  }
+  if (watchPathsManaged && !sameStrings(previousPathIncludes, desiredPathIncludes)) {
+    patch.path_includes = desiredPathIncludes;
+  }
+  if (watchPathsManaged && !sameStrings(previousPathExcludes, desiredPathExcludes)) {
+    patch.path_excludes = desiredPathExcludes;
   }
   if (reconcileBuildCommand && previousBuildCommand !== desiredBuild) patch.build_command = desiredBuild;
   if (previousDeployCommand !== desiredDeploy) patch.deploy_command = desiredDeploy;
@@ -241,38 +324,20 @@ export function buildTriggerPlan(
     pathExcludes: previousPathExcludes,
     desiredBranchIncludes,
     desiredBranchExcludes,
+    desiredPathIncludes,
+    desiredPathExcludes,
     previousBuildCommand: previousBuildCommand || null,
     previousDeployCommand: previousDeployCommand || null,
     reconcileBuildCommand,
     desiredBuildCommand: desiredBuild,
     desiredDeployCommand: desiredDeploy,
-    watchPathsMode: 'observe-only',
+    watchPathsMode: watchPathsManaged ? 'enforced' : 'provider-fields-absent',
     nonProductionTrigger,
     nonProductionBuildsEnabled: Boolean(nonProductionTrigger),
     changeRequired: Object.keys(patch).length > 0 || Boolean(nonProductionTrigger),
     productionPatchRequired: Object.keys(patch).length > 0,
     patch: Object.keys(patch).length > 0 ? patch : null,
   };
-}
-
-async function discoverWorker(config, fetchImpl) {
-  const payload = await cfRequest(
-    config,
-    `/accounts/${config.accountId}/workers/scripts?per_page=100`,
-    {},
-    fetchImpl,
-  );
-  return selectWorkerScript(payload?.result, config.workerName);
-}
-
-async function listTriggers(config, workerTag, fetchImpl) {
-  const payload = await cfRequest(
-    config,
-    `/accounts/${config.accountId}/builds/workers/${workerTag}/triggers`,
-    {},
-    fetchImpl,
-  );
-  return Array.isArray(payload?.result) ? payload.result : [];
 }
 
 async function patchTrigger(config, triggerUuid, patch, fetchImpl) {
@@ -306,7 +371,7 @@ async function writeEvidence(evidencePath, evidence) {
 
 function initialEvidence(config, apply, now) {
   return {
-    schemaVersion: 8,
+    schemaVersion: 9,
     generatedAt: now().toISOString(),
     accountId: config.accountId || null,
     credential: {
@@ -330,9 +395,11 @@ function initialEvidence(config, apply, now) {
     desired: {
       branchIncludes: ['main'],
       branchExcludes: [],
+      pathIncludes: [...DESIRED_PATH_INCLUDES],
+      pathExcludes: [...DESIRED_PATH_EXCLUDES],
       buildCommand: config.reconcileBuildCommand ? config.desiredBuildCommand : null,
       deployCommand: config.desiredDeployCommand || null,
-      watchPathsMode: 'observe-only',
+      watchPathsMode: 'enforced',
       nonProductionBuildsEnabled: false,
     },
     targetBuild: {
@@ -389,6 +456,13 @@ async function verifyDesiredTrigger(config, workerTag, plan, fetchImpl) {
       `BRANCH_CONTROL_READBACK_MISMATCH: expected main-only production trigger; observed includes=${JSON.stringify(observedBranchIncludes)} excludes=${JSON.stringify(observedBranchExcludes)}.`,
     );
   }
+  if (plan.watchPathsMode === 'enforced'
+      && (!sameStrings(observedPathIncludes, plan.desiredPathIncludes)
+        || !sameStrings(observedPathExcludes, plan.desiredPathExcludes))) {
+    throw new Error(
+      `WATCH_PATH_READBACK_MISMATCH: expected includes=${JSON.stringify(plan.desiredPathIncludes)} excludes=${JSON.stringify(plan.desiredPathExcludes)}; observed includes=${JSON.stringify(observedPathIncludes)} excludes=${JSON.stringify(observedPathExcludes)}.`,
+    );
+  }
   if (plan.reconcileBuildCommand && observedBuildCommand !== plan.desiredBuildCommand) {
     throw new Error(
       `BUILD_COMMAND_READBACK_MISMATCH: expected ${plan.desiredBuildCommand || '<empty>'}, observed ${observedBuildCommand || '<empty>'}.`,
@@ -414,9 +488,29 @@ function rollbackPatch(plan) {
   const patch = {};
   if (plan.patch?.branch_includes !== undefined) patch.branch_includes = plan.branchIncludes;
   if (plan.patch?.branch_excludes !== undefined) patch.branch_excludes = plan.branchExcludes;
+  if (plan.patch?.path_includes !== undefined) patch.path_includes = plan.pathIncludes;
+  if (plan.patch?.path_excludes !== undefined) patch.path_excludes = plan.pathExcludes;
   if (plan.patch?.build_command !== undefined) patch.build_command = plan.previousBuildCommand ?? '';
   if (plan.patch?.deploy_command !== undefined) patch.deploy_command = plan.previousDeployCommand ?? '';
   return patch;
+}
+
+function rollbackMatches(plan, trigger) {
+  const branchIncludes = normalizeBranches(trigger?.branch_includes);
+  const branchExcludes = normalizeBranches(trigger?.branch_excludes);
+  const pathIncludes = normalizePaths(trigger?.path_includes);
+  const pathExcludes = normalizePaths(trigger?.path_excludes);
+  const buildCommand = clean(trigger?.build_command);
+  const deployCommand = clean(trigger?.deploy_command);
+
+  return (
+    (plan.patch?.branch_includes === undefined || sameStrings(branchIncludes, plan.branchIncludes))
+    && (plan.patch?.branch_excludes === undefined || sameStrings(branchExcludes, plan.branchExcludes))
+    && (plan.patch?.path_includes === undefined || sameStrings(pathIncludes, plan.pathIncludes))
+    && (plan.patch?.path_excludes === undefined || sameStrings(pathExcludes, plan.pathExcludes))
+    && (plan.patch?.build_command === undefined || buildCommand === (plan.previousBuildCommand ?? ''))
+    && (plan.patch?.deploy_command === undefined || deployCommand === (plan.previousDeployCommand ?? ''))
+  );
 }
 
 export async function reconcileWorkersBuildTrigger({
@@ -492,6 +586,8 @@ export async function reconcileWorkersBuildTrigger({
     evidence.desired = {
       branchIncludes: plan.desiredBranchIncludes,
       branchExcludes: plan.desiredBranchExcludes,
+      pathIncludes: plan.desiredPathIncludes,
+      pathExcludes: plan.desiredPathExcludes,
       buildCommand: plan.reconcileBuildCommand ? plan.desiredBuildCommand : null,
       deployCommand: plan.desiredDeployCommand,
       watchPathsMode: plan.watchPathsMode,
@@ -559,19 +655,7 @@ export async function reconcileWorkersBuildTrigger({
           await patchTrigger(providerConfig, plan.triggerUuid, patch, fetchImpl);
           const rollbackTriggers = await listTriggers(providerConfig, worker.tag, fetchImpl);
           const rollbackTrigger = selectProductionTrigger(rollbackTriggers);
-          const rollbackBranchIncludes = normalizeBranches(rollbackTrigger?.branch_includes);
-          const rollbackBranchExcludes = normalizeBranches(rollbackTrigger?.branch_excludes);
-          const rollbackBuildCommand = clean(rollbackTrigger?.build_command);
-          const rollbackDeployCommand = clean(rollbackTrigger?.deploy_command);
-          const branchesRestored = (
-            (plan.patch?.branch_includes === undefined || sameStrings(rollbackBranchIncludes, plan.branchIncludes))
-            && (plan.patch?.branch_excludes === undefined || sameStrings(rollbackBranchExcludes, plan.branchExcludes))
-          );
-          const buildRestored = plan.patch?.build_command === undefined
-            || rollbackBuildCommand === (plan.previousBuildCommand ?? '');
-          const deployRestored = plan.patch?.deploy_command === undefined
-            || rollbackDeployCommand === (plan.previousDeployCommand ?? '');
-          evidence.rollback.succeeded = branchesRestored && buildRestored && deployRestored;
+          evidence.rollback.succeeded = rollbackMatches(plan, rollbackTrigger);
         } catch (rollbackError) {
           evidence.rollback.succeeded = false;
           evidence.rollback.error = errorMessage(rollbackError);

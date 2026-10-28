@@ -42,8 +42,10 @@ test('production Bip Jr journey hands off to the parent-controlled entry without
     await expect(page.getByText('YOUR FAMILY. YOUR SPACE.', { exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await page.getByTestId('web-welcome-enter').click();
-    await expect(page).toHaveURL(/\/parent-splash(?:\?|$)/);
-    await expect(page.getByRole('button', { name: "Se'kret Bip — enter your parent space" })).toBeVisible({ timeout: 30_000 });
+    await expect(page).toHaveURL(/\/parent-welcome(?:\?|$)/);
+    await expect(page.getByRole('button', { name: 'Create my Parent account' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'I already have an account' })).toBeVisible({ timeout: 30_000 });
+    await expectNoHorizontalOverflow(page);
     await testInfo.attach('production-bip-jr-journey.png', { body: await page.screenshot({ fullPage: true, animations: 'disabled' }), contentType: 'image/png' });
   });
 });
@@ -53,8 +55,8 @@ test('production Parent journey reaches sign-in and keeps approvals protected', 
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'networkidle' });
     await page.getByTestId('web-welcome-enter').click();
-    await expect(page).toHaveURL(/\/parent-splash(?:\?|$)/);
-    await page.getByRole('button', { name: "Se'kret Bip — enter your parent space" }).click();
+    await expect(page).toHaveURL(/\/parent-welcome(?:\?|$)/);
+    await page.getByRole('button', { name: 'I already have an account' }).click();
     await expect(page).toHaveURL(/\/login(?:\?|$)/);
     await expect(page.getByRole('button', { name: /log in/i })).toBeVisible({ timeout: 30_000 });
     await page.goto('/approvals', { waitUntil: 'networkidle' });

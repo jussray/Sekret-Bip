@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -19,6 +19,8 @@ import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
 
 const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
+const TEEN_CUE_REST_OPACITY = 0.62;
+const GRID_POSITIONS = ['20%', '40%', '60%', '80%'] as const;
 
 export type WelcomeAudience = 'teen' | 'bip-jr';
 
@@ -54,6 +56,11 @@ function getPreviewAudience(defaultAudience: WelcomeAudience): WelcomeAudience {
   return defaultAudience;
 }
 
+function getInitialReducedMotionPreference(): boolean | null {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return null;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export function WebWelcomeScreen({
   onEnter,
   variant = 'teen',
@@ -62,13 +69,16 @@ export function WebWelcomeScreen({
 }: WebWelcomeScreenProps) {
   const { width, height } = useWindowDimensions();
   const [aboutOpen, setAboutOpen] = useState(false);
-  const [reduceMotion, setReduceMotion] = useState<boolean | null>(null);
+  const [reduceMotion, setReduceMotion] = useState<boolean | null>(getInitialReducedMotionPreference);
+  const defaultAudience = audience ?? welcomeAudienceForAccountSide(variant);
+  const [activeAudience, setActiveAudience] = useState<WelcomeAudience>(() =>
+    getPreviewAudience(defaultAudience),
+  );
+  const [heroLoadedFor, setHeroLoadedFor] = useState<WelcomeAudience | null>(null);
   const motionEnabled = reduceMotion === false;
   const compact = width < 520;
   const shortViewport = compact && height < 700;
   const shellHeight = compact ? height : Math.min(height, 900);
-  const defaultAudience = audience ?? welcomeAudienceForAccountSide(variant);
-  const activeAudience = getPreviewAudience(defaultAudience);
   const entrySide = accountSideForWelcomeAudience(activeAudience);
   const isBipJr = activeAudience === 'bip-jr';
   const heroContract = isBipJr
@@ -81,8 +91,21 @@ export function WebWelcomeScreen({
       : heroContract.desktopHeight;
   const worldPulse = useRef(new Animated.Value(0)).current;
   const heroDrift = useRef(new Animated.Value(0)).current;
+  // A first paint at full opacity would flash before the reveal effect starts.
+  const firstFrameReveal = motionEnabled ? 0 : 1;
+  const audienceCopyReveal = useRef(new Animated.Value(firstFrameReveal)).current;
+  const audienceHeroReveal = useRef(new Animated.Value(firstFrameReveal)).current;
+  const audienceCuesReveal = useRef(new Animated.Value(firstFrameReveal)).current;
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+      const query = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const update = () => setReduceMotion(query.matches);
+      update();
+      query.addEventListener?.('change', update);
+      return () => query.removeEventListener?.('change', update);
+    }
+
     let mounted = true;
 
     AccessibilityInfo.isReduceMotionEnabled()
@@ -155,6 +178,80 @@ export function WebWelcomeScreen({
     };
   }, [heroDrift, motionEnabled, worldPulse]);
 
+  // Reset before the first paint of each audience (not in a passive effect).
+  // A slow image cannot be revealed until its current Image mount has finished loading.
+  // Characters remain in their approved composite art; never redraw or cover Cloud.
+  useLayoutEffect(() => {
+    const values = [audienceCopyReveal, audienceHeroReveal, audienceCuesReveal];
+    values.forEach(value => value.stopAnimation());
+
+    if (!motionEnabled) {
+      values.forEach(value => value.setValue(1));
+      return;
+    }
+
+    values.forEach(value => value.setValue(0));
+    const copyReveal = Animated.timing(audienceCopyReveal, {
+      toValue: 1,
+      duration: FRONT_DOOR_MOTION.audienceRevealDurationMs,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    copyReveal.start();
+    return () => copyReveal.stop();
+  }, [activeAudience, audienceCopyReveal, audienceHeroReveal, audienceCuesReveal, motionEnabled]);
+
+  useEffect(() => {
+    if (!motionEnabled || heroLoadedFor !== activeAudience) return;
+
+    // Copy can reveal immediately; the image and subsequent cues wait for image load.
+    const reveal = Animated.sequence([
+      Animated.delay(FRONT_DOOR_MOTION.audienceRevealStaggerMs),
+      Animated.stagger(FRONT_DOOR_MOTION.audienceRevealStaggerMs, [
+        Animated.timing(audienceHeroReveal, {
+          toValue: 1,
+          duration: FRONT_DOOR_MOTION.audienceRevealDurationMs,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(audienceCuesReveal, {
+          toValue: 1,
+          duration: FRONT_DOOR_MOTION.audienceRevealDurationMs,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+    reveal.start();
+    return () => reveal.stop();
+  }, [activeAudience, audienceHeroReveal, audienceCuesReveal, heroLoadedFor, motionEnabled]);
+
+  const audienceRevealStyle = (value: Animated.Value, restOpacity = 1) => ({
+    opacity: motionEnabled
+      ? value.interpolate({ inputRange: [0, 1], outputRange: [0, restOpacity] })
+      : restOpacity,
+    transform: [{
+      translateY: motionEnabled
+        ? value.interpolate({
+            inputRange: [0, 1],
+            outputRange: FRONT_DOOR_MOTION.audienceRevealTranslateY,
+          })
+        : 0,
+    }],
+  });
+
+  const audienceHeroRevealStyle = {
+    opacity: motionEnabled ? audienceHeroReveal : 1,
+    transform: [{
+      scale: motionEnabled
+        ? audienceHeroReveal.interpolate({
+            inputRange: [0, 1],
+            outputRange: FRONT_DOOR_MOTION.audienceHeroScale,
+          })
+        : 1,
+    }],
+  };
+
   const ambientMotionStyle = motionEnabled
     ? {
         opacity: worldPulse.interpolate({
@@ -174,6 +271,7 @@ export function WebWelcomeScreen({
         opacity: 0.84,
         transform: [{ scale: 1 }],
       };
+
   const heroMotionStyle = motionEnabled
     ? {
         transform: [
@@ -194,6 +292,7 @@ export function WebWelcomeScreen({
     : {
         transform: [{ translateY: 0 }, { scale: 1 }],
       };
+
   const sparkMotionStyle = motionEnabled
     ? {
         opacity: worldPulse.interpolate({
@@ -223,7 +322,9 @@ export function WebWelcomeScreen({
   const copy = isBipJr
     ? {
         eyebrow: 'YOUR FAMILY. YOUR SPACE.',
-        subtitle: 'A playful family space where everyone can stay connected and every child still has room to grow.',
+        title: 'A softer doorway for growing together.',
+        lead: 'Bip Jr. + Family',
+        subtitle: 'A calm family space for younger kids, with a grown-up beside them.',
         hero: BIP_JR_HERO,
         heroLabel: 'The Bip Jr family welcome artwork',
         cues: [
@@ -233,11 +334,17 @@ export function WebWelcomeScreen({
         ],
         cueLabel: 'Bip Jr world cues: set up together, stay connected, room to grow',
         note: 'Made for real family rhythms.',
+        enterText: 'Enter with a grown-up',
         enterLabel: 'Bip Jr family welcome — continue to family setup',
+        switchText: 'Looking for Teen space? →',
+        switchLabel: "Switch to the Se'kret Bip Teen welcome",
+        nextAudience: 'teen' as WelcomeAudience,
       }
     : {
-        eyebrow: 'YOUR PEOPLE. YOUR PEACE.',
-        subtitle: 'A close-knit world where teens and parents can stay connected without losing their own space.',
+        eyebrow: 'PUBLIC PREVIEW',
+        title: 'Your people.\nYour peace.',
+        lead: 'A safe little world where kids, teens, and parents can stay close—without losing their own space.',
+        subtitle: 'Come on in.',
         hero: TEEN_HERO,
         heroLabel: 'Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together',
         cues: [
@@ -246,14 +353,19 @@ export function WebWelcomeScreen({
           { symbol: '✦', label: 'keep your space' },
         ],
         cueLabel: "Se'kret Bip world cues: start quiet, stay close, keep your space",
-        note: '☁  stay awhile. start when you’re ready.',
+        note: 'YOUR PEOPLE. YOUR PEACE.',
+        enterText: 'Enter Se’kret Bip',
         enterLabel: "Se'kret Bip teen welcome — continue to age setup",
+        switchText: 'Looking for Bip Jr. + Family? →',
+        switchLabel: 'Switch to the Bip Jr and Family welcome',
+        nextAudience: 'bip-jr' as WelcomeAudience,
       };
 
   return (
     <View style={[styles.page, { minHeight: height }]}>
       <Animated.View pointerEvents="none" style={[styles.ambientTop, ambientMotionStyle]} />
       <Animated.View pointerEvents="none" style={[styles.ambientBottom, ambientMotionStyle]} />
+
       <View
         pointerEvents="none"
         testID="web-welcome-living-world"
@@ -265,11 +377,26 @@ export function WebWelcomeScreen({
         <Animated.Text style={[styles.livingStar, sparkMotionStyle]}>✦</Animated.Text>
         <Animated.Text style={[styles.livingCloud, sparkMotionStyle]}>☁</Animated.Text>
       </View>
+
       <View
         testID="web-welcome-shell"
         accessibilityLabel={isBipJr ? 'Bip Jr welcome' : "Se'kret Bip teen welcome"}
         style={[styles.shell, { height: shellHeight }, compact && styles.shellCompact]}
       >
+        <View
+          pointerEvents="none"
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+          style={styles.gridLayer}
+        >
+          {GRID_POSITIONS.map(position => (
+            <View key={`v-${position}`} style={[styles.gridLineVertical, { left: position }]} />
+          ))}
+          {GRID_POSITIONS.map(position => (
+            <View key={`h-${position}`} style={[styles.gridLineHorizontal, { top: position }]} />
+          ))}
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -287,20 +414,26 @@ export function WebWelcomeScreen({
               <Text style={styles.roundButtonText}>i</Text>
             </Pressable>
 
-            <View style={styles.wordmark}>
+            <View
+              accessible
+              accessibilityLabel="Se'kret Bip"
+              style={styles.brandLockup}
+            >
               <LinearGradient
-                colors={FRONT_DOOR_THEME.gradient.wordmark}
-                style={styles.wordmarkBadge}
+                colors={FRONT_DOOR_THEME.gradient.action}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.brandMark}
               >
-                <Text style={styles.wordmarkHeart}>♡</Text>
+                <Text style={styles.brandHeart}>♡</Text>
               </LinearGradient>
-              <Text style={styles.wordmarkText}>{isBipJr ? 'BIP JR' : 'SE’KRET BIP'}</Text>
+              <Text style={styles.wordmarkText}>SE’KRET BIP</Text>
             </View>
 
             <View
               accessible={false}
               importantForAccessibility="no-hide-descendants"
-              style={styles.decorativeSpark}
+              style={styles.sparkButton}
             >
               <Animated.Text style={[styles.decorativeSparkText, sparkMotionStyle]}>✦</Animated.Text>
             </View>
@@ -320,44 +453,58 @@ export function WebWelcomeScreen({
             </View>
           )}
 
-          <View style={styles.copy}>
-            <Text testID="web-welcome-eyebrow" style={styles.eyebrow}>{copy.eyebrow}</Text>
-            <View style={styles.titleRow}>
-              <Text style={styles.title}>Come on in.</Text>
-              <Animated.Text style={[styles.spark, sparkMotionStyle]}>✦</Animated.Text>
-            </View>
-            <Text style={styles.subtitle}>{copy.subtitle}</Text>
-          </View>
+          <Animated.View
+            testID="web-welcome-copy-reveal"
+            style={[styles.copy, isBipJr && styles.copyBipJr, audienceRevealStyle(audienceCopyReveal)]}
+          >
+            <Text
+              testID="web-welcome-eyebrow"
+              style={[styles.eyebrow, isBipJr && styles.eyebrowBipJr]}
+            >
+              {copy.eyebrow}
+            </Text>
+            <Text style={[styles.title, isBipJr && styles.titleBipJr]}>{copy.title}</Text>
+            <Text style={[styles.lead, isBipJr && styles.leadBipJr]}>{copy.lead}</Text>
+            <Text style={[styles.subtitle, isBipJr && styles.subtitleBipJr]}>{copy.subtitle}</Text>
+          </Animated.View>
 
           <View
             testID="web-welcome-hero-safe-area"
             style={{ paddingBottom: heroContract.bottomGap }}
           >
-            <Animated.View
-              testID="web-welcome-hero-motion"
-              style={[
-                styles.heroWrap,
-                { height: heroHeight },
-                isBipJr && styles.heroWrapBipJr,
-                heroMotionStyle,
-              ]}
-            >
-              <Animated.View style={[styles.heroGlow, ambientMotionStyle]} />
-              <Image
-                testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
-                source={copy.hero}
-                resizeMode={isBipJr ? 'contain' : 'cover'}
-                style={[styles.hero, isBipJr && styles.heroBipJr]}
-                accessibilityLabel={copy.heroLabel}
-              />
+            <Animated.View testID="web-welcome-hero-reveal" style={audienceHeroRevealStyle}>
+              <Animated.View
+                testID="web-welcome-hero-motion"
+                style={[
+                  styles.heroWrap,
+                  { height: heroHeight },
+                  isBipJr && styles.heroWrapBipJr,
+                  heroMotionStyle,
+                ]}
+              >
+                <Animated.View style={[styles.heroGlow, ambientMotionStyle]} />
+                <Image
+                  key={activeAudience}
+                  onLoadEnd={() => setHeroLoadedFor(activeAudience)}
+                  testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
+                  source={copy.hero}
+                  resizeMode="contain"
+                  style={[styles.hero, isBipJr && styles.heroBipJr]}
+                  accessibilityLabel={copy.heroLabel}
+                />
+              </Animated.View>
             </Animated.View>
           </View>
 
-          <View
+          <Animated.View
             testID="web-welcome-world-cues"
             accessible
             accessibilityLabel={copy.cueLabel}
-            style={styles.worldCues}
+            style={[
+              styles.worldCues,
+              !isBipJr && styles.worldCuesTeen,
+              audienceRevealStyle(audienceCuesReveal, isBipJr ? 1 : TEEN_CUE_REST_OPACITY),
+            ]}
           >
             {copy.cues.map(cue => (
               <View
@@ -370,9 +517,9 @@ export function WebWelcomeScreen({
                 <Text style={styles.worldCueLabel}>{cue.label}</Text>
               </View>
             ))}
-          </View>
+          </Animated.View>
 
-          <Text style={styles.handNote}>{copy.note}</Text>
+          <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
 
           <Pressable
             testID="web-welcome-enter"
@@ -387,10 +534,7 @@ export function WebWelcomeScreen({
                 end={{ x: 1, y: 0.5 }}
                 style={[styles.enterButton, pressed && styles.enterPressed]}
               >
-                <Text style={styles.enterText}>Enter Se’kret Bip</Text>
-                <View style={styles.enterHeartBadge}>
-                  <Text style={styles.enterHeart}>♡</Text>
-                </View>
+                <Text style={styles.enterText}>{copy.enterText}</Text>
               </LinearGradient>
             )}
           </Pressable>
@@ -407,6 +551,19 @@ export function WebWelcomeScreen({
               <Text style={styles.signInText}>Sign in</Text>
             </Pressable>
           )}
+
+          <Pressable
+            testID="web-welcome-audience-switch"
+            accessibilityRole="button"
+            accessibilityLabel={copy.switchLabel}
+            onPress={() => {
+              setHeroLoadedFor(null);
+              setActiveAudience(copy.nextAudience);
+            }}
+            style={({ pressed }) => [styles.audienceSwitch, pressed && styles.controlPressed]}
+          >
+            <Text style={styles.audienceSwitchText}>{copy.switchText}</Text>
+          </Pressable>
         </ScrollView>
       </View>
     </View>
@@ -455,7 +612,7 @@ const styles = StyleSheet.create({
     right: 42,
     color: color.lilacLight,
     fontSize: 34,
-    opacity: 0.72,
+    opacity: 0.36,
     textShadowColor: color.heroGlow,
     textShadowRadius: 18,
   },
@@ -465,7 +622,7 @@ const styles = StyleSheet.create({
     left: 28,
     color: color.pinkLight,
     fontSize: 22,
-    opacity: 0.68,
+    opacity: 0.48,
     textShadowColor: color.ambientPink,
     textShadowRadius: 16,
   },
@@ -475,7 +632,7 @@ const styles = StyleSheet.create({
     right: 34,
     color: color.textHigh,
     fontSize: 26,
-    opacity: 0.28,
+    opacity: 0.2,
     textShadowColor: color.heroGlow,
     textShadowRadius: 18,
   },
@@ -487,7 +644,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
     borderRadius: RADIUS.xxl + SPACE[2],
-    backgroundColor: color.shell,
+    backgroundColor: '#0D071E',
     boxShadow: FRONT_DOOR_THEME.shadow.shell as never,
   },
   shellCompact: {
@@ -495,9 +652,31 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.none,
     borderWidth: 0,
   },
+  gridLayer: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    opacity: 0.22,
+  },
+  gridLineVertical: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: 'rgba(226,210,255,0.08)',
+  },
+  gridLineHorizontal: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 1,
+    backgroundColor: 'rgba(226,210,255,0.08)',
+  },
   scrollContent: {
     flexGrow: 1,
-    paddingBottom: SPACE[7],
+    paddingBottom: SPACE[5],
   },
   topBar: {
     minHeight: 78,
@@ -508,12 +687,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
+  brandLockup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACE[2],
+  },
+  brandMark: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 6px 18px rgba(200,100,255,0.28)' as never,
+  },
+  brandHeart: {
+    color: color.textHigh,
+    fontSize: 19,
+    lineHeight: 22,
+    fontWeight: '900',
+  },
+  wordmarkText: {
+    color: color.textHigh,
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 3,
+  },
   roundButton: {
-    width: 44,
-    height: 44,
+    width: 42,
+    height: 42,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    borderColor: color.borderStrong,
+    borderColor: color.border,
+    backgroundColor: color.surfaceSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  roundButtonText: {
+    color: color.textHigh,
+    fontSize: TYPE.lg,
+    fontWeight: '500',
+    fontFamily: 'Georgia',
+  },
+  sparkButton: {
+    width: 42,
+    height: 42,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: color.border,
     backgroundColor: color.surfaceSoft,
     alignItems: 'center',
     justifyContent: 'center',
@@ -521,47 +742,13 @@ const styles = StyleSheet.create({
   controlPressed: {
     opacity: 0.72,
   },
-  roundButtonText: {
-    color: color.textHigh,
-    fontSize: TYPE.xl,
-    fontWeight: TYPE.bold,
-  },
-  decorativeSpark: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   decorativeSparkText: {
     color: color.pinkLight,
-    fontSize: TYPE.xl,
-  },
-  wordmark: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACE[2.5],
-  },
-  wordmarkBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  wordmarkHeart: {
-    color: color.textHigh,
     fontSize: TYPE.lg,
-    fontWeight: TYPE.bold,
-  },
-  wordmarkText: {
-    color: color.textHigh,
-    fontSize: TYPE.sm,
-    fontWeight: '900',
-    letterSpacing: 3.2,
   },
   aboutPanel: {
     marginHorizontal: SPACE[5],
-    marginBottom: SPACE[3],
+    marginBottom: SPACE[2],
     paddingHorizontal: SPACE[4],
     paddingVertical: SPACE[3],
     borderRadius: RADIUS.lg,
@@ -573,61 +760,104 @@ const styles = StyleSheet.create({
     color: color.textHigh,
     fontSize: TYPE.sm,
     fontWeight: '800',
-    textAlign: 'center',
   },
   aboutBody: {
     color: color.textMid,
     fontSize: TYPE.xs,
     lineHeight: 17,
-    textAlign: 'center',
-    marginTop: SPACE[1.5],
+    marginTop: SPACE[1],
   },
   copy: {
     alignItems: 'center',
-    paddingHorizontal: SPACE[7],
-    paddingTop: SPACE[3],
+    paddingHorizontal: 28,
+    paddingTop: SPACE[2],
+  },
+  copyBipJr: {
+    alignItems: 'flex-start',
+    paddingHorizontal: SPACE[5],
   },
   eyebrow: {
     color: color.eyebrow,
-    fontSize: TYPE.xs,
+    fontSize: 11,
+    lineHeight: 18,
     fontWeight: '800',
-    letterSpacing: 3.2,
+    letterSpacing: 2.3,
+    textTransform: 'uppercase',
+    textAlign: 'center',
   },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginTop: SPACE[3],
+  eyebrowBipJr: {
+    textAlign: 'left',
+    letterSpacing: 1.1,
   },
   title: {
     color: color.textHigh,
     fontFamily: 'Georgia',
-    fontSize: 48,
-    lineHeight: 54,
-    letterSpacing: -2,
+    fontSize: 52,
+    lineHeight: 50,
+    fontWeight: '400',
+    letterSpacing: -2.2,
+    marginTop: SPACE[2],
+    maxWidth: 360,
+    textAlign: 'center',
+    textShadowColor: 'rgba(153,119,255,0.26)',
+    textShadowRadius: 24,
   },
-  spark: {
-    color: color.pinkLight,
-    fontSize: TYPE.lg,
-    marginLeft: SPACE[2],
+  titleBipJr: {
+    fontFamily: undefined,
+    fontSize: 36,
+    lineHeight: 40,
+    fontWeight: '900',
+    letterSpacing: -1.2,
+    textAlign: 'left',
+  },
+  lead: {
+    color: color.textMid,
+    fontSize: 15,
+    lineHeight: 23,
+    fontWeight: '400',
+    maxWidth: 346,
+    marginTop: SPACE[3],
+    textAlign: 'center',
+  },
+  leadBipJr: {
+    color: color.lilacLight,
+    fontSize: TYPE.xl,
+    lineHeight: 28,
+    fontWeight: '800',
     marginTop: SPACE[1],
+    textAlign: 'left',
   },
   subtitle: {
+    color: color.lilacLight,
+    fontSize: TYPE.sm,
+    lineHeight: 20,
+    fontWeight: '700',
+    maxWidth: 350,
+    marginTop: SPACE[2],
+    textAlign: 'center',
+  },
+  subtitleBipJr: {
     color: color.textMid,
     fontSize: TYPE.base,
-    lineHeight: 23,
-    textAlign: 'center',
-    maxWidth: 350,
-    marginTop: SPACE[2.5],
+    lineHeight: 22,
+    fontWeight: '400',
+    textAlign: 'left',
   },
   heroWrap: {
+    marginHorizontal: 0,
     marginTop: SPACE[1],
     overflow: 'hidden',
     justifyContent: 'flex-end',
+    borderRadius: RADIUS.none,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
   },
   heroWrapBipJr: {
     marginHorizontal: SPACE[5],
-    marginTop: SPACE[3.5],
-    borderRadius: RADIUS.xxl + SPACE[1.5],
+    marginTop: SPACE[4],
+    borderRadius: RADIUS.xxl,
+    borderWidth: 1,
+    borderColor: color.border,
     backgroundColor: color.shellRaised,
   },
   heroGlow: {
@@ -635,7 +865,7 @@ const styles = StyleSheet.create({
     width: 340,
     height: 340,
     left: '50%',
-    top: 35,
+    top: 20,
     marginLeft: -170,
     borderRadius: RADIUS.pill,
     backgroundColor: color.heroGlow,
@@ -643,30 +873,38 @@ const styles = StyleSheet.create({
   hero: {
     width: '100%',
     height: '100%',
+    alignSelf: 'center',
+    transform: [{ translateX: 0 }],
   },
   heroBipJr: {
-    borderRadius: RADIUS.xxl + SPACE[1.5],
+    width: '100%',
+    transform: [{ translateX: 0 }],
+    borderRadius: RADIUS.xxl,
   },
   worldCues: {
     marginHorizontal: SPACE[5],
-    marginBottom: SPACE[3],
+    marginBottom: SPACE[2],
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'center',
     gap: SPACE[2],
   },
+  worldCuesTeen: {
+    opacity: TEEN_CUE_REST_OPACITY,
+    marginTop: -SPACE[2],
+  },
   worldCue: {
-    minHeight: 38,
+    minHeight: 32,
     paddingHorizontal: SPACE[3],
     borderRadius: RADIUS.pill,
     borderWidth: 1,
     borderColor: color.border,
-    backgroundColor: color.surfaceSoft,
+    backgroundColor: 'rgba(255,255,255,0.035)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACE[1.5],
+    gap: SPACE[1],
   },
   worldCueSymbol: {
     color: color.pinkLight,
@@ -676,7 +914,6 @@ const styles = StyleSheet.create({
     color: color.textMid,
     fontSize: TYPE.xs,
     fontWeight: '800',
-    letterSpacing: 0.4,
   },
   handNote: {
     color: color.textMid,
@@ -686,16 +923,22 @@ const styles = StyleSheet.create({
     marginBottom: SPACE[3],
     paddingHorizontal: SPACE[5],
   },
+  handNoteTeen: {
+    color: color.textLow,
+    fontSize: 10,
+    fontStyle: 'normal',
+    fontWeight: '800',
+    letterSpacing: 1.8,
+    opacity: 0.72,
+  },
   enterButton: {
-    minHeight: 72,
-    marginHorizontal: SPACE[8],
-    borderRadius: RADIUS.xxl,
+    minHeight: 54,
+    marginHorizontal: SPACE[5],
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
     borderColor: color.borderStrong,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACE[4],
     boxShadow: FRONT_DOOR_THEME.shadow.action as never,
   },
   enterPressed: {
@@ -704,31 +947,21 @@ const styles = StyleSheet.create({
   },
   enterText: {
     color: color.textHigh,
-    fontSize: TYPE.xl,
-    fontWeight: '800',
-  },
-  enterHeartBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: RADIUS.pill,
-    backgroundColor: color.badge,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  enterHeart: {
-    color: color.textHigh,
-    fontSize: 28,
-    lineHeight: 32,
+    fontSize: TYPE.base,
+    fontWeight: '900',
   },
   signInButton: {
     minHeight: 48,
-    marginHorizontal: SPACE[8],
-    marginTop: SPACE[2.5],
+    marginHorizontal: SPACE[5],
+    marginTop: SPACE[2],
     borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: color.border,
+    backgroundColor: color.surfaceSoft,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: SPACE[1.5],
+    gap: SPACE[1],
   },
   signInPressed: {
     opacity: 0.7,
@@ -741,6 +974,17 @@ const styles = StyleSheet.create({
     color: color.lilacLight,
     fontSize: TYPE.sm,
     fontWeight: '900',
-    textDecorationLine: 'underline',
+  },
+  audienceSwitch: {
+    minHeight: 48,
+    marginHorizontal: SPACE[5],
+    marginTop: SPACE[2],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  audienceSwitchText: {
+    color: color.textMid,
+    fontSize: TYPE.sm,
+    fontWeight: '700',
   },
 });

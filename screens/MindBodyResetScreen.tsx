@@ -40,9 +40,9 @@ const AVATAR_ASSETS: Record<string, any> = {
 };
 
 const CHARACTER_NAMES: Record<string, string> = {
-  raylene: 'Raylene',
-  soft: 'Raylene',
-  rylane: 'Rylane',
+  raylene: 'Suhana',
+  soft: 'Suhana',
+  rylane: 'Sy',
   cloud: 'Cloud',
   night: 'Night',
 };
@@ -82,7 +82,7 @@ export function MindBodyResetScreen({
   const isMind = screen === 'mindReset';
   const [activeTool, setActiveTool] = useState<ResetTool | null>(null);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
-  const companionName = CHARACTER_NAMES[selectedSekret] ?? 'Raylene';
+  const companionName = CHARACTER_NAMES[selectedSekret] ?? 'Suhana';
   const charKey: Character = ['raylene', 'rylane', 'cloud', 'night'].includes(selectedSekret)
     ? selectedSekret as Character
     : 'raylene';

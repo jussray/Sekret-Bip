@@ -1,10 +1,15 @@
 export const FRONT_DOOR_MOTION = Object.freeze({
-  arrivalDurationMs: 1100,
+  arrivalDurationMs: 900,
   arrivalOpacity: [0.18, 1],
   arrivalTranslateY: [28, 0],
   arrivalScale: [0.985, 1],
   pulseDurationMs: 3200,
   driftDurationMs: 4200,
+  // Stage the existing Teen and Bip Jr family artwork without changing its composition.
+  audienceRevealDurationMs: 640,
+  audienceRevealStaggerMs: 130,
+  audienceRevealTranslateY: [12, 0],
+  audienceHeroScale: [0.985, 1],
   reducedPulseRestValue: 0.35,
   ambientOpacity: [0.72, 1],
   ambientScale: [1, 1.08],

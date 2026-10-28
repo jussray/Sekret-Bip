@@ -23,6 +23,15 @@ test('Product Design proof cannot skip a fresh main SHA because of push path fil
   assert.doesNotMatch(push, /^\s+paths:/m, 'main visual proof must not be path-filtered');
 });
 
+test('production browser-proof workflow changes trigger exact-head Product Design Playwright', () => {
+  const pullRequest = sectionBetween('  pull_request:', '  push:');
+  assert.match(
+    pullRequest,
+    /- '\.github\/workflows\/deploy-cloudflare\.yml'/,
+    'changes to the production verification workflow must regenerate real browser proof',
+  );
+});
+
 test('Product Design proof remains exact-head and failure-preserving', () => {
   for (const required of [
     'EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}',
@@ -34,11 +43,13 @@ test('Product Design proof remains exact-head and failure-preserving', () => {
     'path: artifacts/product-design-playwright',
     'if-no-files-found: error',
     'retention-days: 30',
+    'e2e/privacy-wording-accuracy.spec.ts',
     'e2e/room-canonical-display.spec.ts',
     'e2e/canonical-companion-identity.spec.ts',
     'e2e/guardrails.spec.ts',
     'test/founder-visual-authority-contract.test.mjs',
     'test/pages-companion-asset-contract.test.mjs',
+    'test/companion-display-name-canon.test.mjs',
   ]) {
     assert.ok(workflow.includes(required), `missing Product Design workflow contract: ${required}`);
   }
