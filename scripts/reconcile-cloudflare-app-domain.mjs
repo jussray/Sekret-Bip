@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { cloudflareRequestFailure } from './cloudflare-provider-error.mjs';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const EVIDENCE_PATH = 'artifacts/cloudflare-app-domain-routing-evidence.json';
@@ -18,15 +19,7 @@ export function configFromEnv(env = process.env) {
   };
 }
 
-function errorText(payload, fallback) {
-  const messages = payload?.errors
-    ?.map((error) => {
-      const code = error?.code === undefined ? '' : `code=${error.code} `;
-      return `${code}${error?.message || ''}`.trim();
-    })
-    .filter(Boolean);
-  return messages?.length ? messages.join('; ') : fallback;
-}
+
 
 async function cfRequest(config, path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -40,9 +33,7 @@ async function cfRequest(config, path, options = {}) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success === false) {
-    throw new Error(
-      `Cloudflare ${options.method || 'GET'} ${path} failed: ${errorText(payload, response.statusText)}`,
-    );
+    throw cloudflareRequestFailure(payload, response.status);
   }
 
   return payload;
@@ -193,6 +184,7 @@ export function isCloudflareAccessUrl(value) {
 }
 
 function probeLooksLikeCloudflareAccess(probe) {
+  if (probe?.accessRedirect === true) return true;
   const finalUrl = probe?.finalUrl || probe?.url || '';
   if (isCloudflareAccessUrl(finalUrl)) return true;
 
@@ -200,17 +192,63 @@ function probeLooksLikeCloudflareAccess(probe) {
   return body.includes('cloudflare access') && (body.includes('login') || body.includes('sign in'));
 }
 
-async function runtimeProbe(url) {
-  const response = await fetch(url, { redirect: 'follow' });
+/**
+ * Return a fixed classification instead of persisting arbitrary public-page
+ * HTML, Cloudflare Access content, session details, or an error payload.
+ */
+export function safeRuntimeBodyFingerprint(body) {
+  const normalized = String(body || '').toLowerCase();
+  if (normalized.includes('cloudflare access')
+      && (normalized.includes('login') || normalized.includes('sign in'))) {
+    return 'cloudflare access login';
+  }
+  if (/"error"\s*:\s*"method not allowed"/i.test(String(body || ''))) {
+    return '"error":"Method not allowed"';
+  }
+  return 'unclassified';
+}
+
+/**
+ * The evidence receipt needs origin identity, not credential-bearing URL paths,
+ * auth redirects, URL usernames/passwords, query strings or fragments.
+ * Invalid or non-HTTP(S) URLs retain no attacker-supplied bytes.
+ */
+/**
+ * Persist a fixed media type category, never arbitrary response header fields
+ * that could carry credentials or user-originated bytes.
+ */
+export function safeProbeContentType(value) {
+  const mediaType = String(value || '').split(';', 1)[0].trim().toLowerCase();
+  if (mediaType === 'text/html') return 'text/html';
+  if (mediaType === 'application/json') return 'application/json';
+  return 'other';
+}
+
+export function safeProbeUrl(value) {
+  try {
+    const parsed = new URL(String(value || ''));
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:'
+      ? parsed.origin
+      : 'unverified-url';
+  } catch {
+    return 'unverified-url';
+  }
+}
+
+export async function runtimeProbe(url, fetchImpl = fetch) {
+  const response = await fetchImpl(url, { redirect: 'follow' });
   const body = await response.text();
+  // A redirected response with no final URL cannot prove the requested origin.
+  const finalUrl = response.url || (response.redirected === true ? '' : url);
   return {
-    url,
-    requestedUrl: url,
-    finalUrl: response.url || url,
+    url: safeProbeUrl(url),
+    requestedUrl: safeProbeUrl(url),
+    finalUrl: safeProbeUrl(finalUrl),
+    accessRedirect: isCloudflareAccessUrl(finalUrl),
     redirected: response.redirected === true,
     status: response.status,
-    contentType: response.headers.get('content-type') || '',
-    bodyFingerprint: body.replace(/[\r\n]+/g, '').slice(0, 240),
+    contentType: safeProbeContentType(response.headers.get('content-type')),
+    bodyFingerprint: safeRuntimeBodyFingerprint(body),
   };
 }
 
@@ -237,9 +275,9 @@ async function verifyBackend(config) {
   }
 
   return {
-    url: config.apiHealthUrl,
+    url: safeProbeUrl(config.apiHealthUrl),
     status: response.status,
-    contentType: response.headers.get('content-type') || '',
+    contentType: safeProbeContentType(response.headers.get('content-type')),
     ok: true,
     worker: config.workerName,
   };
@@ -283,10 +321,14 @@ function assertSafeBindings(classification, config) {
 }
 
 export function appProbeIsFrontend(probe) {
-  if (!probe || probe.status < 200 || probe.status >= 400) return false;
+  if (!probe || probe.status < 200 || probe.status >= 300) return false;
   if (probeLooksLikeCloudflareAccess(probe)) return false;
-  if (probe.contentType.toLowerCase().startsWith('application/json')) return false;
-  return !probe.bodyFingerprint.includes('"error":"Method not allowed"');
+  // An unrelated HTML redirect does not prove the canonical Pages origin.
+  const requestedOrigin = safeProbeUrl(probe.requestedUrl || probe.url);
+  const observedOrigin = safeProbeUrl(probe.finalUrl || probe.url);
+  if (requestedOrigin === 'unverified-url' || observedOrigin !== requestedOrigin) return false;
+  if (safeProbeContentType(probe.contentType) !== 'text/html') return false;
+  return !String(probe.bodyFingerprint || '').includes('"error":"Method not allowed"');
 }
 
 async function waitForFrontend(config, attempts = 24, delayMs = 5000) {
@@ -493,26 +535,9 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const config = configFromEnv(env);
   const apply = argv.includes('--apply');
 
-  console.log(
-    JSON.stringify(
-      {
-        mode: apply ? 'apply' : 'plan',
-        zone: config.zoneName,
-        hostname: config.hostname,
-        pagesProject: config.pagesProject,
-        backendWorker: config.workerName,
-        appUrl: config.appUrl,
-        apiHealthUrl: config.apiHealthUrl,
-        deleteScope: 'exact-host Worker domain/route only',
-        wildcardPolicy: 'fail-closed for every broad route regardless of owner',
-        pagesPrecondition: 'target domain must already be active on canonical Pages project',
-        applyAuthority: 'bounded workflow_dispatch or one-shot parent-bound repository approval',
-        evidenceArtifact: EVIDENCE_PATH,
-      },
-      null,
-      2,
-    ),
-  );
+  // Dynamic CLI plan fields can contain untrusted provider/env data.
+  // The fixed event preserves an observable non-mutating plan boundary.
+  console.log('CLOUDFLARE_APP_DOMAIN_PLAN_READY');
 
   if (!apply) return;
   await reconcileCloudflareAppDomain(config);

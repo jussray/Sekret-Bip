@@ -13,10 +13,12 @@ import { persistAuditEvent, type AuditPersistEnv } from './audit/persist-event';
 import { normalizeReplyActor, resolveRuntimeStyle } from './runtime-style';
 import { selectVoiceRoute, type CharacterId } from './voice-routing';
 import { synthesizeRoutedVoice, type VoiceProviderEnv } from './voice-providers';
+import { handleBipProviderRequest } from './provider-route';
 import {
   evaluateFounderOperationKillSwitch,
   stableHttpOperationId,
 } from '../shared/founder-operation-kill-switch.js';
+import { shouldPassThroughToFrontend } from '../shared/frontend-host-passthrough.js';
 
 interface MinimalExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -377,6 +379,10 @@ async function handleVoice(
 
 export default {
   async fetch(request: Request, env: Env, ctx: MinimalExecutionContext): Promise<Response> {
+    // A Worker route on a public frontend host must never replace the Pages
+    // welcome UI with a backend JSON response; hand page loads to the origin.
+    if (shouldPassThroughToFrontend(request.method, request.url)) return fetch(request);
+
     const started = Date.now();
     const cors = corsHeaders(request, env);
     const blocked = originRejected(request, env, cors);
@@ -411,6 +417,9 @@ export default {
 
     const founderPaused = enforceFounderOperationKillSwitch(request, env, cors);
     if (founderPaused) return founderPaused;
+
+    const providerResponse = await handleBipProviderRequest(request, env, cors);
+    if (providerResponse) return providerResponse;
 
     const isProtectedApiPost = request.method === 'POST' && path.includes('/api/');
     let downstreamEnv = env;
