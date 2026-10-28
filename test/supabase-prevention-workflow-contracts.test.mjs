@@ -81,6 +81,6 @@ test('Supabase fresh replay restores registry fallbacks when setup-cli exports G
 
   // The action exports SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io. Passing this
   // override to the CLI disables its built-in alternate registry candidates.
-  assert.match(content, /env -u SUPABASE_INTERNAL_IMAGE_REGISTRY supabase start -x "\\$excluded_services"/);
-  assert.doesNotMatch(content, /SUPABASE_INTERNAL_IMAGE_REGISTRY:\\s*ghcr\\.io/);
+  assert.ok(content.includes('env -u SUPABASE_INTERNAL_IMAGE_REGISTRY supabase start -x "$excluded_services"'));
+  assert.ok(!content.includes('SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io'));
 });
