@@ -26,15 +26,14 @@ test('restrictive Parent Community policies call only private classifiers', () =
   }
   assert.match(migration, /private\.is_parent_community_circle_id\(circle_id\)/);
   assert.match(migration, /private\.is_parent_community_post_id\(post_id\)/);
+  // Bound the slice to the policy section. The migration intentionally revokes and drops the
+  // legacy public classifiers AFTER the policies, so an unbounded slice to EOF would match them.
   const policyStart = migration.indexOf('drop policy if exists parent_community_membership_rpc_only');
-  const cleanupStart = migration.indexOf(
-    'revoke all on function public.is_parent_community_circle_id(uuid)',
-    policyStart,
-  );
-  assert.notEqual(policyStart, -1);
-  assert.notEqual(cleanupStart, -1);
+  const policyEnd = migration.indexOf('revoke all on function public.is_parent_community_circle_id');
+  assert.ok(policyStart >= 0, 'policy section start must exist');
+  assert.ok(policyEnd > policyStart, 'legacy classifier revoke must follow the policy section');
   assert.doesNotMatch(
-    migration.slice(policyStart, cleanupStart),
+    migration.slice(policyStart, policyEnd),
     /public\.is_parent_community_(?:circle|post)_id/,
   );
 });
