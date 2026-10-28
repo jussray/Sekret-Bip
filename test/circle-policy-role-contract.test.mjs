@@ -123,7 +123,7 @@ function executableSqlOnly(sql) {
 function readPolicyRoles(sql) {
   const rolesByPolicy = new Map();
   const executable = executableSqlOnly(sql);
-  const statementPattern = /\b(create|alter)\s+policy\s+(?:"((?:[^"]|"")*)"|([A-Za-z_][A-Za-z0-9_$]*))\s+on\s+([A-Za-z0-9_.$"]+)([\s\S]*?);/giu;
+  const statementPattern = /\b(create|alter)\s+policy\s+(?:(?:U&)?"((?:[^"]|"")*)"|([A-Za-z_][A-Za-z0-9_$]*))\s+on\s+([A-Za-z0-9_.$"]+)([\s\S]*?);/giu;
 
   for (const match of executable.matchAll(statementPattern)) {
     const verb = match[1].toLowerCase();
@@ -152,6 +152,52 @@ function readPolicyRoles(sql) {
 
   return rolesByPolicy;
 }
+
+// This migration is a closed-form RLS repair, not a general SQL program.
+// Checking its entire executable shape prevents procedural SQL and transaction
+// tricks from escaping a partial PostgreSQL lexer/role-list parser.
+function assertExactCircleRepairMigration(sql) {
+  const executable = executableSqlOnly(sql);
+  const approved = [
+    ['circles select owner or member', 'public\\.circles'],
+    ['circles insert own', 'public\\.circles'],
+    ['posts select by circle visibility', 'public\\.posts'],
+    ['posts insert by author', 'public\\.posts'],
+  ];
+  const statements = approved.map(([name, table]) => (
+    'alter\\s+policy\\s+"' + name + '"\\s+on\\s+' + table + '\\s+to\\s+authenticated\\s*;\\s*'
+  )).join('');
+  const exactPattern = new RegExp('^\\s*begin\\s*;\\s*' + statements + 'commit\\s*;\\s*$', 'u');
+  assert.match(
+    executable,
+    exactPattern,
+    'Circle repair migration must contain only BEGIN, its four exact authenticated policy changes, and COMMIT; extra executable SQL is forbidden',
+  );
+}
+
+test('Circle repair migration executes only its four approved authenticated role changes', () => {
+  assertExactCircleRepairMigration(migration);
+});
+
+test('Circle repair rejects unexpected executable SQL and transaction changes', () => {
+  const injectedStatements = [
+    "do $$ begin execute 'alter policy \"circles select owner or member\" on public.circles to public'; end $$;",
+    'alter policy U&"circles select owner or member" UESCAPE \'!\' on public.circles to public;',
+    'create policy "unsafe" on public.circles for select to public using (true);',
+    'alter policy "circles insert own" on public.circles to authenticated, public;',
+    'alter policy "circles select owner or member" on public.circles to public;',
+    'alter policy "CIRCLES SELECT OWNER OR MEMBER" on public.circles to authenticated;',
+    'rollback;',
+  ];
+  for (const injected of injectedStatements) {
+    const altered = migration.replace(/\bcommit;\s*$/u, injected + '\ncommit;');
+    assert.notEqual(altered, migration, 'regression fixture must change the migration');
+    assert.throws(() => assertExactCircleRepairMigration(altered), /Circle repair migration must contain only/u);
+  }
+  assert.doesNotThrow(() => assertExactCircleRepairMigration(
+    migration.replace('begin;', '/* harmless SQL comment */\nbegin;'),
+  ));
+});
 
 const requiredPolicies = [
   ['circles select owner or member', 'public.circles'],
@@ -236,6 +282,14 @@ test('role guard detects unquoted policy identifiers', () => {
   const sample = 'create policy unsafe_unquoted on public.circles for select to public using (true);';
   assert.deepEqual(
     readPolicyRoles(sample).get('public.circles::unsafe_unquoted'),
+    ['public'],
+  );
+});
+
+test('role guard detects Unicode-escaped quoted policy identifiers', () => {
+  const sample = 'alter policy U&"circles select owner or member" on public.circles to public;';
+  assert.deepEqual(
+    readPolicyRoles(sample).get('public.circles::circles select owner or member'),
     ['public'],
   );
 });
