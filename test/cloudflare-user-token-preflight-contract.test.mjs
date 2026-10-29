@@ -48,3 +48,14 @@ test('Cloudflare credential preflight reports shape and provider status without 
   assert.match(workflow, /READ_PROBE source=\$\{candidate\.source\}/);
   assert.doesNotMatch(workflow, /console\.log\([^\n]*(?:candidate\.raw|normalized\.token|CF_APP_DOMAIN_TOKEN|CF_ACCESS_TOKEN|CF_API_TOKEN|CF_BUILD_TOKEN)/);
 });
+
+test('credential preflight reads the same Production-scoped slots as the failing audit jobs', () => {
+  assert.match(workflow, /jobs:[\s\S]*?verify-token:[\s\S]*?environment: Production/);
+  assert.match(workflow, /CF_PAGES_READ_TOKEN: \$\{\{ secrets\.CLOUDFLARE_PAGES_READ_API_TOKEN \}\}/);
+  assert.match(workflow, /CF_APP_BINDING_READ_TOKEN: \$\{\{ secrets\.CLOUDFLARE_APP_BINDING_READ_API_TOKEN \}\}/);
+  assert.match(workflow, /source: 'CLOUDFLARE_PAGES_READ_API_TOKEN'/);
+  assert.match(workflow, /source: 'CLOUDFLARE_APP_BINDING_READ_API_TOKEN'/);
+  assert.match(workflow, /CLOUDFLARE_SCOPED_AUDIT_CREDENTIALS_MISSING/);
+  assert.match(workflow, /CLOUDFLARE_SCOPED_AUDIT_CREDENTIALS_UNVERIFIED/);
+  assert.doesNotMatch(workflow, /console\.log\([^\n]*(?:candidate\.raw|normalized\.token|CF_PAGES_READ_TOKEN|CF_APP_BINDING_READ_TOKEN)/);
+});
