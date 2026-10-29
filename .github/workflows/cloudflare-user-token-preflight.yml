@@ -1,12 +1,8 @@
 name: Cloudflare User Token Preflight
 
 on:
-  push:
-    branches:
-      - fix/cloudflare-build-cost-guard
-    paths:
-      - .github/workflows/cloudflare-user-token-preflight.yml
-      - test/cloudflare-user-token-preflight-contract.test.mjs
+  # A trusted operator explicitly initiates this read-only diagnostic on main.
+  # Do not run Production-environment secrets from a feature-branch push.
   workflow_dispatch:
 
 permissions:
@@ -14,7 +10,9 @@ permissions:
 
 jobs:
   verify-token:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    environment: Production
     timeout-minutes: 5
     env:
       CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -23,6 +21,8 @@ jobs:
       CF_ACCESS_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
       CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CF_BUILD_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+      CF_PAGES_READ_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_READ_API_TOKEN }}
+      CF_APP_BINDING_READ_TOKEN: ${{ secrets.CLOUDFLARE_APP_BINDING_READ_API_TOKEN }}
     steps:
       - name: Verify Cloudflare credential transport and read authority
         shell: bash
@@ -80,10 +80,29 @@ jobs:
             { source: 'CLOUDFLARE_ACCESS_API_TOKEN', raw: process.env.CF_ACCESS_TOKEN },
             { source: 'CLOUDFLARE_API_TOKEN', raw: process.env.CF_API_TOKEN },
             { source: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', raw: process.env.CF_BUILD_TOKEN },
+            { source: 'CLOUDFLARE_PAGES_READ_API_TOKEN', raw: process.env.CF_PAGES_READ_TOKEN },
+            { source: 'CLOUDFLARE_APP_BINDING_READ_API_TOKEN', raw: process.env.CF_APP_BINDING_READ_TOKEN },
           ];
+          // Each audit must have its OWN active scoped credential.
+          // A broad token covering probes must never hide a missing dedicated slot.
+          const scopedProbeRequirements = new Map([
+            ['CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', ['workers-scripts']],
+            ['CLOUDFLARE_PAGES_READ_API_TOKEN', ['pages-project']],
+            ['CLOUDFLARE_ACCESS_API_TOKEN', ['zone-access-apps']],
+            ['CLOUDFLARE_APP_BINDING_READ_API_TOKEN', ['zone-identity','pages-domains','worker-domains','worker-routes']],
+          ]);
+          const missingAuditNames = [...scopedProbeRequirements.keys()]
+            .filter((name) => !String(candidates.find((x) => x.source === name)?.raw || '').trim());
+          if (missingAuditNames.length) {
+            // Source names only, never token contents. Fail before any provider traffic.
+            throw new Error('CLOUDFLARE_SCOPED_AUDIT_CREDENTIALS_MISSING: ' + missingAuditNames.join(','));
+          }
+          const auditedSources = new Map();
 
           const probes = [
             { name: 'zone-identity', path: `/zones/${zoneId}` },
+            { name: 'pages-project', path: `/accounts/${accountId}/pages/projects/sekret-bip` },
+            { name: 'workers-scripts', path: `/accounts/${accountId}/workers/scripts` },
             { name: 'pages-domains', path: `/accounts/${accountId}/pages/projects/sekret-bip/domains` },
             { name: 'worker-domains', path: `/accounts/${accountId}/workers/domains?hostname=app.sekretbip.net` },
             { name: 'worker-routes', path: `/zones/${zoneId}/workers/routes` },
@@ -134,8 +153,10 @@ jobs:
               console.log(`TOKEN_VERIFY source=${candidate.source} result=failed shape=${shape} provider=${summarize(verify.body, verify.response.status)}`);
               continue;
             }
-            console.log(`TOKEN_VERIFY source=${candidate.source} result=ok shape=${shape} status=${verify.body?.result?.status ?? 'unknown'}`);
-
+            const active = String(verify.body?.result?.status || '').toLowerCase() === 'active';
+            if (!active) continue;
+            console.log(`TOKEN_VERIFY source=${candidate.source} result=ok shape=${shape} status=active`);
+            const passedProbes = new Set();
             for (const probe of probes) {
               const result = await request(normalized.token, probe.path);
               if (!result.response.ok || result.body?.success === false) {
@@ -143,10 +164,21 @@ jobs:
                 continue;
               }
               covered.add(probe.name);
+              passedProbes.add(probe.name);
               console.log(`READ_PROBE source=${candidate.source} probe=${probe.name} result=ok`);
+            }
+            const required = scopedProbeRequirements.get(candidate.source);
+            if (required && required.every((name) => passedProbes.has(name))
+                && (candidate.source !== 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN' || shape !== 'account-prefixed')) {
+              auditedSources.set(candidate.source, true);
             }
           }
 
+          const unverifiedAudits = [...scopedProbeRequirements.keys()]
+            .filter((name) => !auditedSources.has(name));
+          if (unverifiedAudits.length) {
+            throw new Error('CLOUDFLARE_SCOPED_AUDIT_CREDENTIALS_UNVERIFIED: ' + unverifiedAudits.join(','));
+          }
           const missing = probes.map((probe) => probe.name).filter((name) => !covered.has(name));
           if (missing.length) {
             throw new Error(`CLOUDFLARE_READ_AUTHORITY_INCOMPLETE missing=${missing.join(',')}`);
