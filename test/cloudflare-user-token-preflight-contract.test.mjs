@@ -70,5 +70,7 @@ test('PR contract checking cannot read Production credentials', () => {
 test('Cloudflare preflight does not forward provider message bodies into CI logs', () => {
   assert.doesNotMatch(workflow, /entry\?\.message/);
   assert.match(workflow, /entry\?\.code/);
-  assert.doesNotMatch(workflow, /console\.(?:log|error)\([^\n]*(?:verify\.body|result\.body|response\.text)/);
+  assert.doesNotMatch(workflow, /provider=\$\{(?:verify|result)\.body/);
+  assert.doesNotMatch(workflow, /console\.(?:log|error)\([^\n]*\$\{(?:verify|result)\.body/);
+  assert.match(workflow, /provider=\$\{summarize\((?:verify|result)\.body,/);
 });
