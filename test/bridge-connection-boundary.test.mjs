@@ -54,3 +54,17 @@ test('production side switching requires an explicit internal flag', async () =>
   assert.match(teen, /EXPO_PUBLIC_ENABLE_SIDE_SWITCH/);
   assert.match(parent, /EXPO_PUBLIC_ENABLE_SIDE_SWITCH/);
 });
+
+test('S2Tell shares only the teen-approved rewrite, not the original private draft', async () => {
+  const service = await read('src/features/bridge/bridgeShareCompat.ts');
+  const composer = await read('src/features/bridge/S2TellBridgeScreen.tsx');
+  const start = service.indexOf('export async function sendS2TellShare(');
+  const end = service.indexOf('export async function fetchBridgeShares(');
+  assert.ok(start >= 0 && end > start, 'S2Tell send boundary must be present');
+  const send = service.slice(start, end);
+  assert.match(send, /rewrite:\s*params\.text\.trim\(\)/);
+  assert.doesNotMatch(send, /\braw\s*:/, 'the private draft must not enter the shared payload');
+  assert.doesNotMatch(send, /\braw\?\s*:/, 'the send API must not accept the private draft');
+  assert.match(composer, /sendS2TellShare\(\{\s*text:\s*rewrite\.trim\(\),\s*tone\s*\}\)/);
+  assert.doesNotMatch(service, /\braw\?\s*:\s*string/, 'raw draft must not be part of the shared data type');
+});
