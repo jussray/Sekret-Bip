@@ -66,3 +66,9 @@ test('PR contract checking cannot read Production credentials', () => {
   assert.match(workflow, /verify-token:[\s\S]*?if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /node --test test\/cloudflare-user-token-preflight-contract\.test\.mjs/);
 });
+
+test('Cloudflare preflight does not forward provider message bodies into CI logs', () => {
+  assert.doesNotMatch(workflow, /entry\?\.message/);
+  assert.match(workflow, /entry\?\.code/);
+  assert.doesNotMatch(workflow, /console\.(?:log|error)\([^\n]*(?:verify\.body|result\.body|response\.text)/);
+});
