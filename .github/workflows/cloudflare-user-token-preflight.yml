@@ -132,11 +132,13 @@ jobs:
           const covered = new Set();
 
           const summarize = (body, status) => {
+            // Provider messages and raw response bodies are untrusted input.
+            // Retain only numeric HTTP/error codes in the diagnostic log.
             const errors = Array.isArray(body?.errors) ? body.errors : [];
-            const provider = errors
-              .map((entry) => `${entry?.code ?? 'unknown'}:${entry?.message ?? 'provider error'}`)
-              .join(';');
-            return provider || `HTTP ${status}`;
+            const codes = errors
+              .map((entry) => Number(entry?.code))
+              .filter((code) => Number.isSafeInteger(code) && code >= 0);
+            return `HTTP ${Number(status) || 0} provider-codes=${codes.slice(0, 3).join(',') || 'none'}`;
           };
 
           const request = async (token, path) => {
