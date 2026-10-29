@@ -60,7 +60,7 @@ export default function S2TellBridgeScreen() {
     if (!rewrite.trim()) return;
     setSending(true);
     setMessage('');
-    const ok = await sendS2TellShare({ raw: raw.trim(), text: rewrite.trim(), tone });
+    const ok = await sendS2TellShare({ text: rewrite.trim(), tone });
     setSending(false);
     if (!ok) {
       setMessage('This could not reach Parent Bridge. Make sure your parent account is linked and try again.');
