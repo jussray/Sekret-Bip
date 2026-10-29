@@ -6,7 +6,6 @@ export interface BridgeShare {
   user_id: string;
   payload: {
     kind?: string;
-    raw?: string;
     text?: string;
     rewrite?: string;
     tone?: string;
@@ -24,7 +23,6 @@ async function permanentUserId(): Promise<string | null> {
 }
 
 export async function sendS2TellShare(params: {
-  raw?: string;
   text: string;
   tone?: string;
 }): Promise<boolean> {
@@ -37,7 +35,6 @@ export async function sendS2TellShare(params: {
     id: Date.now(),
     payload: {
       kind: 's2tell',
-      raw: params.raw ?? null,
       rewrite: params.text.trim(),
       tone: params.tone ?? null,
     },
