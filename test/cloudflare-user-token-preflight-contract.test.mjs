@@ -59,3 +59,10 @@ test('credential preflight reads the same Production-scoped slots as the failing
   assert.match(workflow, /CLOUDFLARE_SCOPED_AUDIT_CREDENTIALS_UNVERIFIED/);
   assert.doesNotMatch(workflow, /console\.log\([^\n]*(?:candidate\.raw|normalized\.token|CF_PAGES_READ_TOKEN|CF_APP_BINDING_READ_TOKEN)/);
 });
+
+test('PR contract checking cannot read Production credentials', () => {
+  assert.match(workflow, /pull_request:[\s\S]*?paths:/);
+  assert.match(workflow, /contract:[\s\S]*?if: github\.event_name == 'pull_request'/);
+  assert.match(workflow, /verify-token:[\s\S]*?if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /node --test test\/cloudflare-user-token-preflight-contract\.test\.mjs/);
+});
