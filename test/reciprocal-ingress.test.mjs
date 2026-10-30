@@ -6,3 +6,20 @@ test('obvious probe enters hallway without logging raw source IP', async () => {
 test('ordinary browser traffic stays on the normal application path', async () => { const observation = await observeFetchRequest(request('/', { 'user-agent': 'Mozilla/5.0' }), {}, 'test-service'); assert.equal(observation.verdict, 'OBSERVE'); assert.equal(observation.meaningful, false); assert.equal(observation.hallway.active, false); assert.equal(observation.hallway.logicalExpansion, 0); assert.equal(syntheticFetchResponse(observation), null); });
 test('claimed crawler identity is not treated as verified identity', async () => { const observation = await observeFetchRequest(request('/robots.txt', { 'user-agent': 'Googlebot/2.1' }), {}, 'test-service'); assert.equal(observation.verdict, 'CLAIMED_AUTOMATION'); assert.equal(observation.technicalIdentity.claimedCrawler, 'googlebot'); assert.equal(observation.technicalIdentity.verifiedBot, false); assert.equal(observation.technicalIdentity.attributionConfidence, 'low'); });
 test('source address is never fingerprinted without a server-held secret', async () => { const observation = await observeFetchRequest(request('/api/test', { 'user-agent': 'curl/8.0', 'cf-connecting-ip': '198.51.100.19' }), {}, 'test-service'); assert.equal(observation.verdict, 'UNKNOWN_AUTOMATION'); assert.equal(observation.technicalIdentity.actorFingerprint, null); });
+
+test('missing trusted evidence produces fail-closed synthetic response',async()=>{
+  const o=await observeFetchRequest(request('/.env',{'user-agent':'curl/8.0','cf-connecting-ip':'203.0.113.88'}),{},'test-service');
+  assert.equal(o.unit.unitVerdict,'PROOF_INSUFFICIENT');
+  assert.equal(o.unit.artOfWar.mayContain,false);
+  const response=syntheticFetchResponse(o);
+  assert.equal(response?.status,503);
+  assert.deepEqual(await response.json(),{error:'temporarily_unavailable'});
+});
+test('provider-verified crawler is not trapped based solely on a probe-shaped path',async()=>{
+  const req=request('/.env',{'user-agent':'ExampleBot','cf-connecting-ip':'203.0.113.77'});
+  req.cf={botManagement:{verifiedBot:true,score:99}};
+  const o=await observeFetchRequest(req,{RECIPROCAL_DEFENSE_SECRET:'test-only-secret'},'test-service');
+  assert.equal(o.unit.artOfWar.mayContain,false);
+  assert.equal(o.unit.unitVerdict,'SAFE_TO_ALLOW_POLICY');
+  assert.equal(syntheticFetchResponse(o),null);
+});
