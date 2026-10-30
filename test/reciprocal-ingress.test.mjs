@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FULL_ATTACK_UNIT, observeFetchRequest, syntheticFetchResponse, reciprocalContainmentEnabled } from '../security/reciprocal-ingress.mjs';
+import { FULL_ATTACK_UNIT, observeFetchRequest, syntheticFetchResponse, reciprocalContainmentEnabled, reciprocalTelemetryRecord } from '../security/reciprocal-ingress.mjs';
 function request(path = '/', headers = {}) { return new Request(`https://example.test${path}`, { headers }); }
 test('obvious probe enters hallway without logging raw source IP', async () => { const sourceIp = '203.0.113.7'; const observation = await observeFetchRequest(request('/.env', { 'user-agent': 'curl/8.0', 'cf-connecting-ip': sourceIp }), { RECIPROCAL_DEFENSE_SECRET: 'test-only-secret' }, 'test-service'); assert.equal(observation.verdict, 'HALLWAY'); assert.equal(observation.meaningful, true); assert.deepEqual(observation.attackUnit, [...FULL_ATTACK_UNIT]); assert.equal(observation.hallway.baseExpansion, 48_000); assert.ok(observation.hallway.randomExpansion >= 0 && observation.hallway.randomExpansion <= 47_999); assert.ok(observation.hallway.logicalExpansion >= 48_000 && observation.hallway.logicalExpansion <= 95_999); assert.equal(observation.hallway.productionExposure, 0); assert.equal(observation.hallway.realCustomerData, false); assert.equal(observation.hallway.realCredentials, false); assert.ok(observation.technicalIdentity.actorFingerprint); assert.equal(JSON.stringify(observation).includes(sourceIp), false); const response = syntheticFetchResponse(observation); assert.equal(response?.status, 404); assert.deepEqual(await response.json(), { error: 'not_found' }); });
 test('ordinary browser traffic stays on the normal application path', async () => { const observation = await observeFetchRequest(request('/', { 'user-agent': 'Mozilla/5.0' }), {}, 'test-service'); assert.equal(observation.verdict, 'OBSERVE'); assert.equal(observation.meaningful, false); assert.equal(observation.hallway.active, false); assert.equal(observation.hallway.logicalExpansion, 0); assert.equal(syntheticFetchResponse(observation), null); });
@@ -35,4 +35,20 @@ test('incomplete evidence must not replace ordinary application traffic with 503
   const normal=await observeFetchRequest(request('/',{'user-agent':'Mozilla/5.0'}),{},'test-service');
   assert.equal(normal.unit.artOfWar.mayContain,false);
   assert.equal(syntheticFetchResponse(normal),null);
+});
+
+test('security telemetry emits only bounded non-identifying summaries',async()=>{
+  const ip='203.0.113.244';
+  const ua='curl/8.0 synthetic-marker-should-not-appear-in-logs';
+  const o=await observeFetchRequest(request('/.env',{'user-agent':ua,'cf-connecting-ip':ip}),{RECIPROCAL_DEFENSE_SECRET:'test-only-secret'},'test-service');
+  const record=reciprocalTelemetryRecord(o);
+  assert.equal(record.contract,'juss/reciprocal-telemetry@v1');
+  assert.equal(record.hallwayActive,true);
+  assert.equal(record.hasActorFingerprint,true);
+  const serialized=JSON.stringify(record);
+  assert.equal(serialized.includes(ip),false);
+  assert.equal(serialized.includes(ua),false);
+  assert.equal(serialized.includes('test-only-secret'),false);
+  assert.equal(serialized.includes(o.technicalIdentity.actorFingerprint),false);
+  assert.equal(reciprocalTelemetryRecord({meaningful:false}),null);
 });
