@@ -1,0 +1,4 @@
+Contact: mailto:support@jussco.company
+Expires: 2027-06-30T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://sekretbip.net/.well-known/security.txt
