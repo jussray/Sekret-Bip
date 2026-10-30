@@ -1,4 +1,5 @@
-export function reciprocalContainmentEnabled(env={}){return env?.RECIPROCAL_DEFENSE_MODE==='contain'&&typeof env?.RECIPROCAL_DEFENSE_SECRET==='string'&&env.RECIPROCAL_DEFENSE_SECRET.trim().length>0;}
+function usableSecretPresent(value){if(typeof value!=='string')return false;return value.trim().length>0;}
+export function reciprocalContainmentEnabled(env={}){if(env?.RECIPROCAL_DEFENSE_MODE!=='contain')return false;return usableSecretPresent(env?.RECIPROCAL_DEFENSE_SECRET);}
 import { ATTACK_UNIT_MEMBERS, runFullAttackUnit } from './full-attack-unit.mjs';
 const HALLWAY_BASE_EXPANSION=48_000,HALLWAY_RANDOM_MAX=47_999;export const FULL_ATTACK_UNIT=ATTACK_UNIT_MEMBERS;
 const AUTOMATION_UA=/(bot|crawler|spider|scanner|headless|curl|wget|python-requests|go-http-client|httpclient|zgrab|sqlmap|nikto|masscan|nmap)/i;const CLAIMS=Object.freeze([['googlebot',/googlebot/i],['bingbot',/bingbot/i],['applebot',/applebot/i],['gptbot',/gptbot/i],['chatgpt-user',/chatgpt-user/i],['claudebot',/claudebot/i]]);const PROBE_PATHS=Object.freeze(['/.env','/.git','/.aws','/.ssh','/wp-admin','/wp-login.php','/phpmyadmin','/server-status','/etc/passwd','/vendor/phpunit','/actuator','/.well-known/security.txt~']);
