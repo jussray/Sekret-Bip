@@ -25,36 +25,32 @@ test('Cloudflare branch-authority workflow is read-only, exact-main gated, Produ
   assert.match(workerVerifier, /expectedPresence: 'optional-until-founder-approved'/);
   assert.match(workerVerifier, /alphaMatches\.length > 1/);
   assert.match(workerVerifier, /account-prefixed/);
-  assert.match(workerVerifier, /probe = accountOwned \? 'token-verify-account' : 'token-verify-user'/);
+  assert.match(workerVerifier, /workers-builds-account-token-unsupported/);
+  assert.match(workerVerifier, /token-verify-user/);
+  assert.doesNotMatch(workerVerifier, /token-verify-account/);
   assert.match(workerVerifier, /builds\/workers\/\$\{separateTag\}\/triggers/);
   assert.match(workerVerifier, /builds\/workers\/\$\{productionTag\}\/triggers/);
   assert.match(workerVerifier, /separateBuildConnectionMainOnly/);
   assert.doesNotMatch(workflow, /method:\s*['\"]?(?:PUT|PATCH|DELETE)/i);
 });
 
-test('Worker authority verifier accepts account-owned token through account verification before topology checks', async () => {
+test('Worker authority verifier rejects account-owned tokens before any provider request', async () => {
   const originalFetch = globalThis.fetch;
   const envKeys = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_WORKERS_BUILDS_API_TOKEN','CLOUDFLARE_API_TOKEN','EVIDENCE_PATH','GITHUB_REF','GITHUB_SHA'];
   const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
   const tempDir = await mkdtemp(join(tmpdir(), 'bip-cloudflare-account-token-'));
   const evidencePath = join(tempDir, 'receipt.json');
-  const accountId = 'test-account';
   const dedicated = 'cfat_account_owned_token';
   const seen = [];
-  process.env.CLOUDFLARE_ACCOUNT_ID = accountId;
+  process.env.CLOUDFLARE_ACCOUNT_ID = 'test-account';
   process.env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN = dedicated;
   delete process.env.CLOUDFLARE_API_TOKEN;
   process.env.EVIDENCE_PATH = evidencePath;
   process.env.GITHUB_REF = 'refs/heads/main';
   process.env.GITHUB_SHA = '1111111111111111111111111111111111111111';
-  globalThis.fetch = async (url, options = {}) => {
-    const text = String(url);
-    seen.push(text);
-    const auth = String(options.headers?.Authorization || '').replace(/^Bearer /, '');
-    assert.equal(auth, dedicated);
-    if (text.endsWith(`/accounts/${accountId}/tokens/verify`)) return { ok: true, status: 200, json: async () => ({ success: true, result: { status: 'active' } }) };
-    if (text.endsWith(`/accounts/${accountId}/workers/scripts`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
-    throw new Error(`Unexpected request: ${text}`);
+  globalThis.fetch = async (url) => {
+    seen.push(String(url));
+    throw new Error(`Provider request must not occur for account-owned Workers Builds credential: ${url}`);
   };
   let thrown;
   try { await import(`${workerVerifierUrl.href}?cfat-test=${Date.now()}`); } catch (error) { thrown = error; }
@@ -67,27 +63,26 @@ test('Worker authority verifier accepts account-owned token through account veri
   }
   try {
     assert.ok(thrown instanceof Error);
-    assert.ok(seen.some((url) => url.endsWith(`/accounts/${accountId}/tokens/verify`)));
-    assert.ok(!seen.some((url) => url.endsWith('/user/tokens/verify')));
+    assert.equal(seen.length, 0);
     const raw = await readFile(evidencePath, 'utf8');
     const receipt = JSON.parse(raw);
-    assert.equal(receipt.failure?.code, 'worker-identity-mismatch');
-    assert.equal(receipt.credential.selectedShape, 'account-prefixed');
-    assert.ok(receipt.credential.attempts.some((attempt) => attempt.probe === 'token-verify-account' && attempt.result === 'accepted'));
+    assert.equal(receipt.failure?.code, 'workers-builds-account-token-unsupported');
+    assert.equal(receipt.failure?.tokenShape, 'account-prefixed');
+    assert.equal(receipt.credential.selectedShape, null);
+    assert.ok(receipt.credential.attempts.some((attempt) => attempt.probe === 'workers-builds-token-scope' && attempt.result === 'rejected-preflight'));
     assert.equal(raw.includes(dedicated), false);
   } finally { await rm(tempDir, { recursive: true, force: true }); }
 });
 
-test('Worker authority verifier falls back from user to account verification for legacy opaque tokens', async () => {
+test('Worker authority verifier does not fall back to account verification for legacy opaque tokens', async () => {
   const originalFetch = globalThis.fetch;
   const envKeys = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_WORKERS_BUILDS_API_TOKEN','CLOUDFLARE_API_TOKEN','EVIDENCE_PATH','GITHUB_REF','GITHUB_SHA'];
   const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
-  const tempDir = await mkdtemp(join(tmpdir(), 'bip-cloudflare-legacy-account-token-'));
+  const tempDir = await mkdtemp(join(tmpdir(), 'bip-cloudflare-legacy-user-token-'));
   const evidencePath = join(tempDir, 'receipt.json');
-  const accountId = 'legacy-account';
-  const dedicated = 'legacyOpaqueAccountTokenValue1234567890';
+  const dedicated = 'legacyOpaqueTokenValue1234567890';
   const seen = [];
-  process.env.CLOUDFLARE_ACCOUNT_ID = accountId;
+  process.env.CLOUDFLARE_ACCOUNT_ID = 'legacy-account';
   process.env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN = dedicated;
   delete process.env.CLOUDFLARE_API_TOKEN;
   process.env.EVIDENCE_PATH = evidencePath;
@@ -99,12 +94,10 @@ test('Worker authority verifier falls back from user to account verification for
     const auth = String(options.headers?.Authorization || '').replace(/^Bearer /, '');
     assert.equal(auth, dedicated);
     if (text.endsWith('/user/tokens/verify')) return { ok: false, status: 400, json: async () => ({ success: false, errors: [{ code: 6003 }] }) };
-    if (text.endsWith(`/accounts/${accountId}/tokens/verify`)) return { ok: true, status: 200, json: async () => ({ success: true, result: { status: 'active' } }) };
-    if (text.endsWith(`/accounts/${accountId}/workers/scripts`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     throw new Error(`Unexpected request: ${text}`);
   };
   let thrown;
-  try { await import(`${workerVerifierUrl.href}?legacy-account-test=${Date.now()}`); } catch (error) { thrown = error; }
+  try { await import(`${workerVerifierUrl.href}?legacy-user-test=${Date.now()}`); } catch (error) { thrown = error; }
   finally {
     globalThis.fetch = originalFetch;
     for (const key of envKeys) {
@@ -114,14 +107,15 @@ test('Worker authority verifier falls back from user to account verification for
   }
   try {
     assert.ok(thrown instanceof Error);
-    assert.ok(seen.some((url) => url.endsWith('/user/tokens/verify')));
-    assert.ok(seen.some((url) => url.endsWith(`/accounts/${accountId}/tokens/verify`)));
+    assert.equal(seen.length, 1);
+    assert.ok(seen[0].endsWith('/user/tokens/verify'));
     const raw = await readFile(evidencePath, 'utf8');
     const receipt = JSON.parse(raw);
-    assert.equal(receipt.failure?.code, 'worker-identity-mismatch');
-    assert.equal(receipt.credential.selectedShape, 'legacy-opaque');
+    assert.equal(receipt.failure?.code, 'token-not-active-or-invalid');
+    assert.equal(receipt.failure?.tokenShape, 'legacy-opaque');
+    assert.equal(receipt.credential.selectedShape, null);
     assert.ok(receipt.credential.attempts.some((attempt) => attempt.probe === 'token-verify-user' && attempt.result === 'rejected'));
-    assert.ok(receipt.credential.attempts.some((attempt) => attempt.probe === 'token-verify-account' && attempt.result === 'accepted'));
+    assert.equal(receipt.credential.attempts.some((attempt) => attempt.probe === 'token-verify-account'), false);
     assert.equal(raw.includes(dedicated), false);
   } finally { await rm(tempDir, { recursive: true, force: true }); }
 });
