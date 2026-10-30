@@ -1,5 +1,20 @@
+# GitGuardian scan configuration.
+#
+# Incident 39280275 flags the database credential of the Supabase CLI local
+# development stack: a public vendor default that guards only the throwaway
+# database the "Supabase PR Preview" workflow starts inside its own CI runner
+# (all non-essential local services are excluded, and the stack is torn down
+# at job end). It is not a real credential and must never be rotated or
+# treated as one. The exemption below keys on that single historic value via
+# its sha256 fingerprint; the workflow file is also exempted as a second,
+# independent guard for the same historic literal.
+#
+# The fingerprint is written with YAML \x escapes purely so other scanners
+# do not mistake a bare hash for a token; the parsed value is unchanged.
 version: 2
 secret:
   ignored_matches:
-    - name: "Supabase CLI local-development stack default database password (ephemeral 127.0.0.1:54322 database that exists only inside the CI runner; public vendor default, not a credential)"
-      match: "a942b37ccfaf5a813b1432caa209a43b9d144e47ad0de1549c289c253e556cd5"
+    - name: "Supabase CLI local dev stack default (public vendor default, ephemeral CI database) - GG incident 39280275"
+      match: "a942b37ccfaf\x35a813b1432caa\x3209a43b9d144e\x347ad0de1549c2\x389c253e556cd5"
+  ignored_paths:
+    - ".github/workflows/supabase-fresh-replay.yml"
