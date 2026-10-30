@@ -1,0 +1,21 @@
+{
+  "schema": "sekret-bip-openai-keyframe@v1",
+  "shot": 2,
+  "mode": "character-edit",
+  "prompt": "Use the approved reference to preserve the exact character identity against an approved environment. No new people or text.",
+  "size": "1024x1536",
+  "quality": "high",
+  "cast": [
+    "cloud"
+  ],
+  "references": [
+    {
+      "key": "cloud",
+      "path": "/secure/approved-cloud-reference.png",
+      "sha256": "REPLACE_WITH_REAL_SHA256_FROM_APPROVED_FILE",
+      "authority": "character-authority",
+      "approved": true
+    }
+  ],
+  "approvedForGeneration": false
+}
