@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FULL_ATTACK_UNIT, observeFetchRequest, syntheticFetchResponse } from '../security/reciprocal-ingress.mjs';
+import { FULL_ATTACK_UNIT, observeFetchRequest, syntheticFetchResponse, reciprocalContainmentEnabled } from '../security/reciprocal-ingress.mjs';
 function request(path = '/', headers = {}) { return new Request(`https://example.test${path}`, { headers }); }
 test('obvious probe enters hallway without logging raw source IP', async () => { const sourceIp = '203.0.113.7'; const observation = await observeFetchRequest(request('/.env', { 'user-agent': 'curl/8.0', 'cf-connecting-ip': sourceIp }), { RECIPROCAL_DEFENSE_SECRET: 'test-only-secret' }, 'test-service'); assert.equal(observation.verdict, 'HALLWAY'); assert.equal(observation.meaningful, true); assert.deepEqual(observation.attackUnit, [...FULL_ATTACK_UNIT]); assert.equal(observation.hallway.baseExpansion, 48_000); assert.ok(observation.hallway.randomExpansion >= 0 && observation.hallway.randomExpansion <= 47_999); assert.ok(observation.hallway.logicalExpansion >= 48_000 && observation.hallway.logicalExpansion <= 95_999); assert.equal(observation.hallway.productionExposure, 0); assert.equal(observation.hallway.realCustomerData, false); assert.equal(observation.hallway.realCredentials, false); assert.ok(observation.technicalIdentity.actorFingerprint); assert.equal(JSON.stringify(observation).includes(sourceIp), false); const response = syntheticFetchResponse(observation); assert.equal(response?.status, 404); assert.deepEqual(await response.json(), { error: 'not_found' }); });
 test('ordinary browser traffic stays on the normal application path', async () => { const observation = await observeFetchRequest(request('/', { 'user-agent': 'Mozilla/5.0' }), {}, 'test-service'); assert.equal(observation.verdict, 'OBSERVE'); assert.equal(observation.meaningful, false); assert.equal(observation.hallway.active, false); assert.equal(observation.hallway.logicalExpansion, 0); assert.equal(syntheticFetchResponse(observation), null); });
@@ -22,4 +22,17 @@ test('provider-verified crawler is not trapped based solely on a probe-shaped pa
   assert.equal(o.unit.artOfWar.mayContain,false);
   assert.equal(o.unit.unitVerdict,'SAFE_TO_ALLOW_POLICY');
   assert.equal(syntheticFetchResponse(o),null);
+});
+
+test('production defaults to observe-only and containment needs explicit provider mode plus key',()=>{
+  assert.equal(reciprocalContainmentEnabled({}),false);
+  assert.equal(reciprocalContainmentEnabled({RECIPROCAL_DEFENSE_MODE:'observe',RECIPROCAL_DEFENSE_SECRET:'held-key'}),false);
+  assert.equal(reciprocalContainmentEnabled({RECIPROCAL_DEFENSE_MODE:'contain'}),false);
+  assert.equal(reciprocalContainmentEnabled({RECIPROCAL_DEFENSE_MODE:'contain',RECIPROCAL_DEFENSE_SECRET:'   '}),false);
+  assert.equal(reciprocalContainmentEnabled({RECIPROCAL_DEFENSE_MODE:'contain',RECIPROCAL_DEFENSE_SECRET:'held-key'}),true);
+});
+test('incomplete evidence must not replace ordinary application traffic with 503',async()=>{
+  const normal=await observeFetchRequest(request('/',{'user-agent':'Mozilla/5.0'}),{},'test-service');
+  assert.equal(normal.unit.artOfWar.mayContain,false);
+  assert.equal(syntheticFetchResponse(normal),null);
 });
