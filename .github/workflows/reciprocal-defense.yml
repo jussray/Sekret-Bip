@@ -32,6 +32,6 @@ jobs:
         run: |
           grep -q '^main = "worker/voice-entry.ts"' wrangler.toml
           grep -q "reciprocalContainmentEnabled(env)" worker/voice-entry.ts
-          grep -q "RECIPROCAL_DEFENSE_MODE === 'contain'" security/reciprocal-ingress.mjs
+          grep -Fq "RECIPROCAL_DEFENSE_MODE==='contain'" security/reciprocal-ingress.mjs
           grep -q "export \* from '../worker/voice-entry'" security/sekret-edge-entry.ts
           grep -q "runFullAttackUnit" security/reciprocal-ingress.mjs
