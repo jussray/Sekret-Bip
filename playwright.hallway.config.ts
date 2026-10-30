@@ -8,7 +8,11 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: 'line',
+  reporter: [
+    ['line'],
+    ['json', { outputFile: 'artifacts/hallway-worker-preview/results.json' }],
+  ],
+  outputDir: 'artifacts/hallway-worker-preview/test-results',
   use: {
     baseURL: 'http://127.0.0.1:8799',
     trace: 'retain-on-failure',
