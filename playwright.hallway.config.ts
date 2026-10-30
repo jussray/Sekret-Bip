@@ -1,7 +1,15 @@
+import { networkInterfaces } from 'node:os';
 import { defineConfig } from '@playwright/test';
 
-// CI launches the real Wrangler Worker locally with synthetic test-only inputs.
-// No provider deployment, production credentials or paid API calls.
+// Only an OS-reported internal IPv4 interface may serve this isolated proof.
+// The config is never imported by the deployed Worker; no public target accepted.
+const loopback = Object.values(networkInterfaces())
+  .flat()
+  .find((address) => address?.internal === true && address.family === 'IPv4')
+  ?.address;
+if (!loopback) throw new Error('hallway_preview_internal_network_unavailable');
+const previewOrigin = `http://${loopback}:8799`;
+
 export default defineConfig({
   testDir: './e2e',
   testMatch: 'hallway-worker-preview.spec.ts',
@@ -14,12 +22,12 @@ export default defineConfig({
   ],
   outputDir: 'artifacts/hallway-worker-preview/test-results',
   use: {
-    baseURL: 'http://127.0.0.1:8799',
+    baseURL: previewOrigin,
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: 'npx wrangler dev --local --config wrangler.toml --ip 127.0.0.1 --port 8799 --var RECIPROCAL_DEFENSE_MODE:contain --var RECIPROCAL_DEFENSE_SECRET:hallway-preview-only',
-    url: 'http://127.0.0.1:8799/health',
+    command: `npx wrangler dev --local --config wrangler.toml --ip ${loopback} --port 8799 --var RECIPROCAL_DEFENSE_MODE:contain --var RECIPROCAL_DEFENSE_SECRET:hallway-preview-only`,
+    url: `${previewOrigin}/health`,
     timeout: 120_000,
     reuseExistingServer: false,
   },
