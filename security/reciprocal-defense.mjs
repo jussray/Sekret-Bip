@@ -1,4 +1,4 @@
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 
 export const HALLWAY_BASE_EXPANSION = 48_000;
 export const HALLWAY_RANDOM_MAX = 47_999;
@@ -88,7 +88,14 @@ export function reciprocalDefenseStep(input, secret) {
 export function verifyReciprocalDefenseReceipt(result) {
   if (!result || result.schema !== "juss/reciprocal-defense@v1") return false;
   const { receipt, ...decision } = result;
-  return receipt === digest(decision)
+  if (typeof receipt !== "string") return false;
+  const provided = Buffer.from(receipt, "utf8");
+  const expected = Buffer.from(digest(decision), "utf8");
+  if (provided.length !== expected.length) {
+    timingSafeEqual(expected, expected);
+    return false;
+  }
+  return timingSafeEqual(provided, expected)
     && result.attackUnit.length === FULL_ATTACK_UNIT.length
     && FULL_ATTACK_UNIT.every((flow) => result.attackUnit.includes(flow))
     && result.hallway.baseExpansion === HALLWAY_BASE_EXPANSION
