@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  classifyPlaywrightEvidence,
   detectPlaywrightAvailability,
   parsePlaywrightJsonFile,
   writeReports,
@@ -26,6 +27,17 @@ test('Playwright JSON reporter counts are normalized from retained evidence', ()
   fs.rmSync(directory, { recursive: true, force: true });
 });
 
+test('skipped Playwright tests are browser evidence but never complete green proof', () => {
+  assert.deepEqual(
+    classifyPlaywrightEvidence(0, null, { passed: 9, failed: 0, skipped: 1, timedOut: 0, total: 10 }),
+    { status: 'warning', browserProof: true, completeBrowserProof: false },
+  );
+  assert.deepEqual(
+    classifyPlaywrightEvidence(0, null, { passed: 10, failed: 0, skipped: 0, timedOut: 0, total: 10 }),
+    { status: 'pass', browserProof: true, completeBrowserProof: true },
+  );
+});
+
 test('forced fallback is explicit and never claims browser proof', async () => {
   const availability = await detectPlaywrightAvailability({
     rootDir: process.cwd(),
@@ -42,6 +54,7 @@ test('frontend reports retain browser artifact paths and distinguish fallback ev
     mode: 'fallback-verify-local',
     evidenceLevel: 'non-browser-fallback',
     browserProof: false,
+    completeBrowserProof: false,
     status: 'pass',
     exitCode: 0,
     durationMs: 12,
@@ -56,9 +69,11 @@ test('frontend reports retain browser artifact paths and distinguish fallback ev
     generatedAt: '2026-07-24T08:00:00.000Z',
   });
   assert.equal(report.run.browserProof, false);
+  assert.equal(report.run.completeBrowserProof, false);
   assert.equal(JSON.parse(fs.readFileSync(jsonPath, 'utf8')).run.evidenceLevel, 'non-browser-fallback');
   const markdown = fs.readFileSync(mdPath, 'utf8');
   assert.match(markdown, /Browser proof: \*\*NO\*\*/);
+  assert.match(markdown, /Complete browser proof: \*\*NO\*\*/);
   assert.match(markdown, /must not be described as browser or Playwright proof/);
   fs.rmSync(outputDir, { recursive: true, force: true });
 });

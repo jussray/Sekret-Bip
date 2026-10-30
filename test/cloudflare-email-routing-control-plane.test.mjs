@@ -7,6 +7,8 @@ import {
   buildWorkerRule,
   configFromEnv,
   findDuplicateSupportedRules,
+  main,
+  maskEmail,
 } from '../scripts/reconcile-cloudflare-email-routing.mjs';
 
 const REQUIRED_ALIASES = [
@@ -70,6 +72,12 @@ test('email routing workflow is manual, secrets-backed, token-type-aware, and re
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /^\s*push:/m);
   assert.doesNotMatch(workflow, /^\s*schedule:/m);
+  assert.match(workflow, /cloudflare-email-routing-production/);
+  assert.match(workflow, /cloudflare-email-routing-noop-\{0\}/);
+  assert.match(workflow, /github\.run_id/);
+  assert.match(workflow, /github\.event\.issue\.number == 1066/);
+  assert.match(workflow, /github\.event\.comment\.user\.login == github\.repository_owner/);
+  assert.match(workflow, /github\.event\.comment\.body == '\/apply-resend-dns'/);
   assert.match(workflow, /secrets\.CLOUDFLARE_API_TOKEN/);
   assert.match(workflow, /secrets\.CLOUDFLARE_ZONE_ID/);
   assert.match(workflow, /secrets\.CLOUDFLARE_ACCOUNT_ID/);
@@ -118,4 +126,22 @@ test('email routing workflow is manual, secrets-backed, token-type-aware, and re
   assert.match(reconciler, /cloudflare-email-routing-evidence\.json/);
   assert.match(reconciler, /catchAllDesired:\s*'disabled'/);
   assert.doesNotMatch(reconciler, /method:\s*['"]DELETE['"]/);
+});
+
+test('Cloudflare email routing never logs the full destination inbox', async () => {
+  assert.equal(maskEmail('private.founder@example.com'), 'p***@example.com');
+  assert.equal(maskEmail(''), '[redacted]');
+  assert.equal(maskEmail('not-an-email'), '[redacted]');
+
+  const lines = [];
+  const original = console.log;
+  console.log = (...args) => lines.push(args.join(' '));
+  try {
+    await main([], { BIP_EMAIL_DESTINATION: 'private.founder@example.com' });
+  } finally {
+    console.log = original;
+  }
+  const output = lines.join('\n');
+  assert.equal(output.includes('private.founder@example.com'), false);
+  assert.match(output, /p\*\*\*@example\.com/);
 });

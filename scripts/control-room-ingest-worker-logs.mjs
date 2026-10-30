@@ -4,7 +4,7 @@ import path from 'node:path';
 const inputPath = process.env.CLOUDFLARE_WORKER_LOG_PATH;
 const reportOnly = process.env.CONTROL_ROOM_REPORT_ONLY === 'true';
 const supabaseUrl = process.env.SUPABASE_URL;
-const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const reportPath = path.join(process.cwd(), 'artifacts', 'control-room', 'worker-logs-report.json');
 
 const allowed = new Set([

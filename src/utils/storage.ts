@@ -7,6 +7,7 @@
  * Import via: import { loadState, saveState } from '@/utils';
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearAllStudyProgress } from '@/bipJr/study/progressStore';
 
 const STORAGE_KEYS = {
   theme: 'theme', mood: 'mood', userSide: 'userSide',
@@ -147,6 +148,7 @@ export const saveState = async (stateUpdates: Record<string, any>): Promise<void
 export async function clearPrivateAccountCache(): Promise<void> {
   try {
     await AsyncStorage.multiRemove([...PRIVATE_ACCOUNT_KEYS]);
+    await clearAllStudyProgress();
   } catch (error) {
     console.error('clearPrivateAccountCache error:', error);
   }
