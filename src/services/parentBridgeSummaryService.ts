@@ -11,13 +11,17 @@ function unavailable<T>(): RelationshipResult<T> {
   return { ok: false, code: 'not_configured', message: 'Bridge Summaries are not available yet.' };
 }
 
+function serverError<T>(message = 'Bridge Summaries could not complete that action.'): RelationshipResult<T> {
+  return { ok: false, code: 'server_error', message };
+}
+
 export async function fetchParentBridgeSummaryInbox(audience: 'founder' | 'internal' | 'beta' | 'public' = 'public'): Promise<RelationshipResult<BridgeSummaryListItem[]>> {
   if (!isRelationshipFeatureAvailable('bridgeSummaries', audience)) return unavailable();
   const sb = getSupabase();
   if (!sb) return unavailable();
 
   const { data: requests, error: requestError } = await sb.from('bridge_share_requests').select('id,teen_user_id,parent_user_id,status,expires_at').in('status', ['ready', 'viewed']).order('created_at', { ascending: false });
-  if (requestError) return { ok: false, code: 'server_error', message: requestError.message };
+  if (requestError) return serverError('Bridge Summaries could not be loaded.');
 
   const requestRows = (requests ?? []) as ParentRequestRow[];
   if (requestRows.length === 0) return { ok: true, value: [] };
@@ -27,8 +31,8 @@ export async function fetchParentBridgeSummaryInbox(audience: 'founder' | 'inter
     sb.from('bridge_summaries').select('id,request_id,themes,conversation_starters,limitations,generated_at,used_fallback').in('request_id', requestIds),
     sb.from('bridge_summary_views').select('summary_id,viewed_at'),
   ]);
-  if (summaryError) return { ok: false, code: 'server_error', message: summaryError.message };
-  if (viewError) return { ok: false, code: 'server_error', message: viewError.message };
+  if (summaryError) return serverError('Bridge Summaries could not be loaded.');
+  if (viewError) return serverError('Bridge Summary view status could not be loaded.');
 
   const summariesByRequest = new Map((summaries ?? []).map((row) => { const summary = row as ParentSummaryRow; return [summary.request_id, summary] as const; }));
   const viewsBySummary = new Map((views ?? []).map((row) => { const view = row as ParentViewRow; return [view.summary_id, view.viewed_at] as const; }));
@@ -54,10 +58,10 @@ export async function markBridgeSummaryViewed(summaryId: string, audience: 'foun
   if (!parentUserId) return { ok: false, code: 'not_authenticated', message: 'Sign in to view Bridge summaries.' };
 
   const { data: existing, error: existingError } = await sb.from('bridge_summary_views').select('summary_id').eq('summary_id', summaryId).eq('parent_user_id', parentUserId).maybeSingle();
-  if (existingError) return { ok: false, code: 'server_error', message: existingError.message };
+  if (existingError) return serverError('Bridge Summary view status could not be loaded.');
   if (existing) return { ok: true, value: { viewed: true } };
 
   const { error: viewError } = await sb.from('bridge_summary_views').insert({ summary_id: summaryId, parent_user_id: parentUserId });
-  if (viewError) return { ok: false, code: 'server_error', message: viewError.message };
+  if (viewError) return serverError('Bridge Summary could not be marked as viewed.');
   return { ok: true, value: { viewed: true } };
 }
