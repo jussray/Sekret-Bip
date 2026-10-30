@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import {
+  blockPublicCircleAuthor,
   createPublicCirclePost,
   isHeavyCircleText,
   loadPublicCircleFeed,
@@ -133,27 +134,45 @@ export default function PublicCircleFeedV2() {
     }
   }
 
-  function confirmReport(item: PublicCircleFeedItem) {
-    Alert.alert(
-      'Report this bip?',
-      'It will disappear from your feed while the report is reviewed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Report',
-          style: 'destructive',
-          onPress: () => {
-            void reportPublicCirclePost(item.id)
-              .then(() => {
-                setItems(current => current.filter(post => post.id !== item.id));
-                setCirclePosts(current => current.filter(post => post.id !== item.id));
-              })
-              .catch(caught => {
-                setError(caught instanceof Error ? caught.message : 'The report was not submitted.');
-              });
-          },
+  function removeItem(itemId: number) {
+    setItems(current => current.filter(post => post.id !== itemId));
+    setCirclePosts(current => current.filter(post => post.id !== itemId));
+  }
+
+  function confirmModeration(item: PublicCircleFeedItem) {
+    const actions = [
+      { text: 'Cancel', style: 'cancel' as const },
+      {
+        text: 'Report',
+        style: 'destructive' as const,
+        onPress: () => {
+          void reportPublicCirclePost(item.id)
+            .then(() => removeItem(item.id))
+            .catch(caught => {
+              setError(caught instanceof Error ? caught.message : 'The report was not submitted.');
+            });
         },
-      ],
+      },
+    ];
+
+    if (!item.isOwnPost) {
+      actions.splice(1, 0, {
+        text: 'Block account',
+        style: 'destructive' as const,
+        onPress: () => {
+          void blockPublicCircleAuthor(item.id)
+            .then(() => removeItem(item.id))
+            .catch(caught => {
+              setError(caught instanceof Error ? caught.message : 'The account was not blocked.');
+            });
+        },
+      });
+    }
+
+    Alert.alert(
+      'Circle safety options',
+      'Report this bip for review, or block the account so you no longer see each other in Open Bip.',
+      actions,
     );
   }
 
@@ -251,7 +270,12 @@ export default function PublicCircleFeedV2() {
                 <Text style={styles.author}>{item.nickname}</Text>
                 <Text style={styles.meta}>{createdAt.toLocaleDateString()} · {createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
               </View>
-              <TouchableOpacity onPress={() => confirmReport(item)} hitSlop={10}>
+              <TouchableOpacity
+                onPress={() => confirmModeration(item)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel="Circle safety options"
+              >
                 <Text style={styles.report}>•••</Text>
               </TouchableOpacity>
             </View>
