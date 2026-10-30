@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "targets": {
+    "sekret-bip-production": {
+      "repository": "jussray/Sekret-Bip",
+      "environment": "production",
+      "projectRef": "tbsevonvegdnlyjgplmm",
+      "projectUrl": "https://tbsevonvegdnlyjgplmm.supabase.co"
+    }
+  }
+}

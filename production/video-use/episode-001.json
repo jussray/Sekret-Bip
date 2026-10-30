@@ -2,6 +2,12 @@
   "$schema": "sekret-bip-video-master@v1",
   "episode": "season-01/01-the-bridge-that-listens.md",
   "title": "The Bridge That Listens",
+  "delivery": {
+    "platform": "youtube",
+    "audience": "young-children",
+    "aspectRatio": "16:9",
+    "toneArc": ["curious", "magical", "playful", "exciting", "reassuring"]
+  },
   "editor": {
     "adapter": "video-use",
     "repository": "browser-use/video-use",
@@ -10,19 +16,21 @@
   "master": {
     "container": "mp4",
     "codec": "h264",
-    "width": 1080,
-    "height": 1920,
+    "width": 1920,
+    "height": 1080,
     "fps": 30,
-    "durationSeconds": 25,
-    "durationToleranceSeconds": 0.2
+    "durationSeconds": 64,
+    "durationToleranceSeconds": 0.5
   },
   "sourcePolicy": {
-    "requiredShots": [1, 2, 3, 4, 5, 6, 7],
+    "requiredShots": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     "requireApprovedShotEvidence": true,
     "allowUnapprovedSource": false,
     "allowIdentityRegeneration": false,
     "allowInventedCharacters": false,
-    "allowWorldAuthorityAsCharacterAuthority": false
+    "allowWorldAuthorityAsCharacterAuthority": false,
+    "allowedVisualExecutionLanes": ["approved-existing-bip", "higgsfield-existing", "google-gemini-with-exact-references"],
+    "providerOutputCreatesAuthority": false
   },
   "postProduction": {
     "allow": [
@@ -34,20 +42,26 @@
       "logo",
       "closing-line",
       "color-adjustment",
-      "deterministic-motion-graphics"
+      "deterministic-motion-graphics",
+      "widescreen-reframe-without-identity-change"
     ],
     "forbid": [
       "face-regeneration",
       "character-substitution",
       "new-character-generation",
       "world-rule-rewrite",
-      "baked-generated-typography-as-canon"
+      "baked-generated-typography-as-canon",
+      "fear-or-danger-reframing",
+      "harsh-audio-stinger"
     ]
   },
   "proof": {
     "metadataVerification": "required",
     "playwrightPlayback": "required",
     "continuityReview": "required",
+    "toneReview": "required",
+    "audioClarityReview": "required",
+    "youtubeTargetIdentityReview": "required-before-publish",
     "finalMasterApprovalAfterAllProof": true
   }
 }

@@ -31,6 +31,23 @@ test('canonical video provider registry is fail-closed and valid', () => {
   assert.match(result.stdout, /VIDEO_PROVIDER_REGISTRY_OK/);
 });
 
+test('Gemini animation lane is registered but cannot self-promote to production', () => {
+  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+  const gemini = registry.providers.find((provider) => provider.id === 'openart-gemini-omni-1-1-flash');
+  assert.ok(gemini, 'Gemini provider candidate must be registered');
+  assert.equal(gemini.kind, 'external-service');
+  assert.equal(gemini.modelId, 'gemini-omni-1-1-flash');
+  assert.equal(gemini.task, 'image-to-video');
+  assert.equal(gemini.canaryEligible, true);
+  assert.equal(gemini.productionEligible, false);
+  assert.equal(gemini.identityCanaryPassed, false);
+  assert.equal(gemini.requiresApprovedKeyframe, true);
+  assert.equal(gemini.textOnlyIdentityAllowed, false);
+  assert.equal(gemini.requiresIdentityQa, true);
+  assert.equal(gemini.requiresPlaywrightPlayback, true);
+  assert.equal(gemini.requiresCostPreflight, true);
+});
+
 test('Hugging Face canary selection chooses the permissive I2V candidate without production authority', () => {
   const result = run(['--select-canary']);
   assert.equal(result.status, 0, result.stderr);

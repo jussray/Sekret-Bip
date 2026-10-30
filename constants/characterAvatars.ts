@@ -1,7 +1,7 @@
 // CHARACTER AVATARS — full-size avatar art ONLY.
 // Not stickers, not backgrounds. The companion/mascot presence images.
 //
-// Raylene, Rylane, and Night are identity-locked to the approved canonical
+// Suhana, Sy, and Night are identity-locked to the approved canonical
 // masters. Until new matching poses are approved, all human companion states
 // intentionally resolve through their canonical alias file.
 
