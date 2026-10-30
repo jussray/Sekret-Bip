@@ -23,6 +23,7 @@ export const PRODUCTION_HISTORY_RUNTIME_ALIASES = Object.freeze({
   '20260901000500': '20260901000535',
   '20260925082000': '20260915180126',
   '20260925082100': '20260917195220',
+  '20261006025600': '20261006031559',
 });
 
 export const PRODUCTION_PGJWT_POLICY = Object.freeze({
@@ -120,6 +121,23 @@ export function evaluatePgjwtPolicy(row, options = {}) {
   };
 }
 
+export const SOCIAL_GUARD_EXPECTED_TABLES = Object.freeze(["friendships","circles","circle_members","circle_posts","posts","post_comments","post_reactions","crews","crew_check_ins","crew_check_in_shares","crew_encouragements","scrapbook_entries","parent_mood_summaries","parent_notes"]);
+
+// Runtime authorization witness: query policy metadata only, never user rows.
+export function evaluateSocialGuardPolicies(row, options = {}) {
+  const rawCount = row?.social_guard_policy_count ?? row?.socialGuardPolicyCount;
+  const observed = rawCount !== null && rawCount !== undefined;
+  const count = observed ? Number(rawCount) : null;
+  return {
+    observed,
+    count: Number.isInteger(count) ? count : null,
+    expected: SOCIAL_GUARD_EXPECTED_TABLES.length,
+    verified: observed
+      ? Number.isInteger(count) && count === SOCIAL_GUARD_EXPECTED_TABLES.length
+      : Boolean(options.allowInjectedFallback),
+  };
+}
+
 export function buildReadOnlyQuery() {
   return `select
   coalesce(max(version), '') as live_max_version,
@@ -140,7 +158,39 @@ export function buildReadOnlyQuery() {
     from pg_extension
     where extname = 'pgjwt'
     limit 1
-  ) as pgjwt_version
+  ) as pgjwt_version,
+  (
+    select count(distinct p.tablename)
+    from pg_policies p
+    join pg_namespace ns on ns.nspname = p.schemaname
+    join pg_class tbl on tbl.relnamespace = ns.oid and tbl.relname = p.tablename
+    where p.schemaname = 'public'
+      and p.tablename = any(array[
+        'friendships',
+        'circles',
+        'circle_members',
+        'circle_posts',
+        'posts',
+        'post_comments',
+        'post_reactions',
+        'crews',
+        'crew_check_ins',
+        'crew_check_in_shares',
+        'crew_encouragements',
+        'scrapbook_entries',
+        'parent_mood_summaries',
+        'parent_notes'
+      ])
+      and p.policyname = p.tablename || '_permanent_accounts_only'
+      and p.permissive = 'RESTRICTIVE'
+      and p.cmd = 'ALL'
+      and 'authenticated' = any(p.roles)
+      and p.qual like '%is_anonymous%'
+      and p.with_check like '%is_anonymous%'
+      and p.qual like '%IS FALSE%'
+      and p.with_check like '%IS FALSE%'
+      and tbl.relrowsecurity
+  ) as social_guard_policy_count
 from supabase_migrations.schema_migrations;`;
 }
 
@@ -175,6 +225,9 @@ function initialEvidence(config, supabaseIdentity = null) {
     pgjwtInstalled: null,
     pgjwtVersion: null,
     pgjwtPolicy: PRODUCTION_PGJWT_POLICY,
+    socialGuardObserved: false,
+    socialGuardCount: null,
+    socialGuardExpected: SOCIAL_GUARD_EXPECTED_TABLES.length,
     requiredCanonicalVersions: [],
     representedCanonicalVersions: [],
     acceptedAliasVersions: [],
@@ -401,6 +454,10 @@ export async function verifySupabaseProductionSchema(options = {}) {
   const policy = evaluatePgjwtPolicy(row, {
     allowInjectedFallback: Boolean(options.fetchImpl) && options.requirePgjwtState !== true,
   });
+  const socialGuard = evaluateSocialGuardPolicies(row, {
+    // Synthetic API fixtures may omit the catalog readback; actual CLI/provider runs may not.
+    allowInjectedFallback: Boolean(options.fetchImpl) && options.requireSocialGuardState !== true,
+  });
 
   evidence.authorityFloorVersion = evaluated.authorityFloorVersion;
   evidence.expectedVersion = evaluated.expectedVersion;
@@ -408,15 +465,18 @@ export async function verifySupabaseProductionSchema(options = {}) {
   evidence.pgjwtObserved = policy.observed;
   evidence.pgjwtInstalled = policy.installed;
   evidence.pgjwtVersion = policy.version;
+  evidence.socialGuardObserved = socialGuard.observed;
+  evidence.socialGuardCount = socialGuard.count;
   evidence.requiredCanonicalVersions = evaluated.requiredCanonicalVersions;
   evidence.representedCanonicalVersions = evaluated.representedCanonicalVersions;
   evidence.acceptedAliasVersions = evaluated.acceptedAliasVersions;
   evidence.missingCanonicalVersions = evaluated.missingCanonicalVersions;
   evidence.unexpectedRecentVersions = evaluated.unexpectedRecentVersions;
-  evidence.verified = evaluated.verified && policy.verified;
+  evidence.verified = evaluated.verified && policy.verified && socialGuard.verified;
   evidence.status = !evaluated.verified
     ? 'schema-drift'
-    : (policy.verified ? 'verified' : 'extension-policy-drift');
+    : (!policy.verified ? 'extension-policy-drift'
+      : (socialGuard.verified ? 'verified' : 'authorization-drift'));
   evidence.checkedAt = new Date().toISOString();
   await writeEvidence(config.evidencePath, evidence);
 
@@ -437,6 +497,14 @@ export async function verifySupabaseProductionSchema(options = {}) {
       'SUPABASE_EXTENSION_POLICY_DRIFT: '
       + `pgjwt expected installed=${policy.expectedInstalled} version=${policy.expectedVersion ?? 'none'}, `
       + `live installed=${policy.installed} version=${policy.version ?? 'none'}, observed=${policy.observed}.`,
+    );
+  }
+
+  if (!socialGuard.verified) {
+    throw new Error(
+      'SUPABASE_SOCIAL_RLS_GUARD_DRIFT: '
+      + `observed=${socialGuard.observed}, guarded=${socialGuard.count ?? 'unknown'}, `
+      + `required=${socialGuard.expected}; production release remains blocked.`,
     );
   }
 

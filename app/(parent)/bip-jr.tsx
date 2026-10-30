@@ -11,6 +11,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { router } from 'expo-router';
 
 import {
   archiveOwnBipJrProfile,
@@ -19,6 +20,9 @@ import {
   type BipJrAgeBand,
   type BipJrChildProfile,
 } from '@/services/bipJr';
+import { PARENT_ROUTES } from '@/parent/routes';
+import type { ActiveStudyChild } from '@/bipJr/study/progress';
+import { setActiveStudyChild } from '@/bipJr/study/progressStore';
 
 const AGE_BANDS: Array<{ value: BipJrAgeBand; label: string }> = [
   { value: '5-7', label: 'Ages 5–7' },
@@ -87,6 +91,17 @@ export default function BipJrParentRoute() {
     }
   }
 
+  async function openStudyBuddy(child: ActiveStudyChild | null) {
+    setError('');
+    try {
+      await setActiveStudyChild(child);
+    } catch {
+      setError('Study Buddy could not be opened for this child on this device. Please try again.');
+      return;
+    }
+    router.push(PARENT_ROUTES.bipJrStudy as never);
+  }
+
   async function archiveProfile(profile: BipJrChildProfile) {
     const doArchive = async () => {
       setSaving(true);
@@ -135,6 +150,18 @@ export default function BipJrParentRoute() {
           </Text>
         </View>
 
+        <TouchableOpacity
+          style={styles.studyCard}
+          onPress={() => void openStudyBuddy(null)}
+          accessibilityRole="button"
+          accessibilityLabel="Open Study Buddy practice"
+        >
+          <Text style={styles.studyTitle}>📚 Study Buddy · practice together</Text>
+          <Text style={styles.truthBody}>
+            Reviewed reading, math, science, Spanish and study-skill steps for ages 5–12. Scripted, no AI calls, no classmates. Progress stays on this device.
+          </Text>
+        </TouchableOpacity>
+
         <Text style={styles.section}>YOUR BIP JR PROFILES</Text>
         {loading ? (
           <ActivityIndicator size="small" />
@@ -150,6 +177,14 @@ export default function BipJrParentRoute() {
                 <Text style={styles.profileName}>{profile.display_alias}</Text>
                 <Text style={styles.profileMeta}>Bip Jr · ages {profile.age_band}</Text>
               </View>
+              <TouchableOpacity
+                style={styles.practiceButton}
+                onPress={() => void openStudyBuddy({ id: profile.id, ageBand: profile.age_band })}
+                accessibilityRole="button"
+                accessibilityLabel={`Practice Study Buddy with ${profile.display_alias}`}
+              >
+                <Text style={styles.practiceText}>Practice</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.archiveButton}
                 disabled={saving}
@@ -239,6 +274,10 @@ const styles = StyleSheet.create({
   title: { color: '#fff', fontSize: 38, lineHeight: 43, fontWeight: '900', marginBottom: 14 },
   body: { color: '#b7c9bf', fontSize: 15, lineHeight: 23, marginBottom: 18 },
   truthCard: { borderRadius: 20, borderWidth: 1, borderColor: '#a7f3d033', backgroundColor: 'rgba(17,37,28,0.90)', padding: 17, marginBottom: 24 },
+  practiceButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 12, marginRight: 8 },
+  practiceText: { color: '#c4b5fd', fontSize: 13, fontWeight: '900' },
+  studyCard: { borderRadius: 20, borderWidth: 1, borderColor: '#bca7ff55', backgroundColor: 'rgba(28,20,52,0.90)', padding: 17, marginBottom: 24 },
+  studyTitle: { color: '#ede9fe', fontSize: 15, fontWeight: '900', marginBottom: 6 },
   truthTitle: { color: '#d1fae5', fontSize: 15, fontWeight: '900', marginBottom: 6 },
   truthBody: { color: '#93aa9d', fontSize: 12, lineHeight: 18 },
   section: { color: '#85aa96', fontSize: 10, fontWeight: '900', letterSpacing: 1.7, marginBottom: 10, marginTop: 8 },
