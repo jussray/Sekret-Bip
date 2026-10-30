@@ -1,3 +1,9 @@
+import {
+  emitReciprocalTelemetry,
+  observeFetchRequest,
+  reciprocalContainmentEnabled,
+  syntheticFetchResponse,
+} from '../security/reciprocal-ingress.mjs';
 import observedWorker from './observed-index';
 import emailRouter from './email-router';
 import { WORKER_RELEASE_SHA } from './release-identity.generated';
@@ -41,6 +47,8 @@ interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv {
   CF_VERSION_METADATA?: WorkerVersionMetadata;
   FOUNDER_OPERATION_KILL_SWITCH?: string;
   FOUNDER_OPERATION_KILL_SWITCH_REASON?: string;
+  RECIPROCAL_DEFENSE_MODE?: 'off' | 'observe' | 'contain';
+  RECIPROCAL_DEFENSE_SECRET?: string;
 }
 
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -388,6 +396,18 @@ export default {
     const blocked = originRejected(request, env, cors);
     if (blocked) return blocked;
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+    // The canonical front door remains authoritative. No diversion unless
+    // provider-held configuration explicitly enables contained synthetic traffic.
+    if (env.RECIPROCAL_DEFENSE_MODE === 'observe' || env.RECIPROCAL_DEFENSE_MODE === 'contain') {
+      const defense = await observeFetchRequest(request, env, 'sekret-backend');
+      emitReciprocalTelemetry(defense, ctx);
+      if (reciprocalContainmentEnabled(env)) {
+        const synthetic = syntheticFetchResponse(defense);
+        if (synthetic) return synthetic;
+      }
+    }
+
 
     const path = new URL(request.url).pathname;
     if (request.method === 'GET' && path === '/health') {

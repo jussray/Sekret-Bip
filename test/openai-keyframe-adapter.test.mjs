@@ -143,3 +143,16 @@ test('failed provider request cleans both reserved destinations',async()=>{
     await assert.rejects(readFile(receipt),{code:'ENOENT'});
   }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('reference reader rejects files above the 20 MiB approved-image cap',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'bip-keyframe-limit-'));
+  try{
+    const path=join(dir,'cloud.png');
+    const oversized=Buffer.alloc(20*1024*1024+1);
+    await writeFile(path,oversized);
+    const spec={...base,mode:'character-edit',cast:['cloud'],references:[
+      {key:'cloud',path,sha256:sha(oversized),authority:'character-authority',approved:true},
+    ]};
+    await assert.rejects(planOpenAIKeyframe(spec,registry),/reference_file_invalid/);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});

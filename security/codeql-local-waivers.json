@@ -32,16 +32,6 @@
       "rationale": "These four results are static SQL source-contract regex construction in tests, not runtime validation of external input."
     },
     {
-      "id": "worker-identity-test-url-substring",
-      "language": "javascript-typescript",
-      "ruleId": "js/incomplete-url-substring-sanitization",
-      "path": "test/cloudflare-worker-identity.test.mjs",
-      "messageIncludes": "can be anywhere in the URL",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The check asserts absence of a repository-owned legacy URL in a static environment file; it does not authorize or validate a runtime URL."
-    },
-    {
       "id": "agent-discovery-test-url-anchor",
       "language": "javascript-typescript",
       "ruleId": "js/regex/missing-regexp-anchor",
@@ -100,26 +90,6 @@
       "maxMatches": 1,
       "expiresAt": "2027-01-10T00:00:00Z",
       "rationale": "The assertion verifies fixed production endpoint literals in workflow/config source and is not a runtime URL trust decision."
-    },
-    {
-      "id": "pages-domain-array-membership",
-      "language": "javascript-typescript",
-      "ruleId": "js/incomplete-url-substring-sanitization",
-      "path": "scripts/verify-cloudflare-pages-branch-authority.mjs",
-      "messageIncludes": "can be anywhere in the URL",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The reported includes call is Array.prototype.includes over Cloudflare's domains array, so it requires exact element equality with app.sekretbip.net. It is not substring matching on a URL string and therefore cannot accept an attacker-controlled hostname prefix or suffix."
-    },
-    {
-      "id": "pages-domain-array-membership-test",
-      "language": "javascript-typescript",
-      "ruleId": "js/incomplete-url-substring-sanitization",
-      "path": "test/cloudflare-pages-branch-authority.test.mjs",
-      "messageIncludes": "can be anywhere in the URL",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "This is an exact Array.prototype.includes assertion over normalized provider-domain fixtures in a unit test. It neither parses nor authorizes runtime URLs."
     },
     {
       "id": "public-front-door-static-url-assertions",

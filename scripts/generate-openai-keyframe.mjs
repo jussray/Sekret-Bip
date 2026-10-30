@@ -4,7 +4,7 @@
  * /makevideo remains the ONLY approved-media MP4 assembly stage.
  */
 import {createHash} from 'node:crypto';
-import {readFile,writeFile,mkdir,stat,open,rm} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,open,rm} from 'node:fs/promises';
 import {basename,dirname,extname,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
@@ -47,11 +47,16 @@ export async function planOpenAIKeyframe(spec,registry){
       const path=resolve(ref.path),mime=MIME[extname(path).toLowerCase()];
       if(!mime) deny('reference_file_type_invalid');
       let bytes;
+      let handle;
       try{
-        const info=await stat(path);
+        // Inspect and read the same opened file, not a pathname that could change.
+        handle=await open(path,'r');
+        const info=await handle.stat();
         if(!info.isFile()||info.size>20*1024*1024) deny('reference_file_invalid');
-        bytes=await readFile(path);
+        bytes=await handle.readFile();
+        if(bytes.length>20*1024*1024) deny('reference_file_invalid');
       }catch(error){if(error.message==='reference_file_invalid') throw error;deny('reference_file_missing');}
+      finally{if(handle) await handle.close();}
       if(sha(bytes)!==ref.sha256.toLowerCase()) deny('reference_sha256_mismatch');
       if(!isImage(bytes,mime)) deny('reference_file_invalid_format');
       files.push({key,filename:basename(path),sha256:ref.sha256.toLowerCase(),mime,bytes});

@@ -1,0 +1,67 @@
+name: Reciprocal Defense Contract
+on:
+  push:
+    branches:
+      - feat/reciprocal-defense-hallway
+    paths:
+      - security/reciprocal-defense.mjs
+      - security/reciprocal-ingress.mjs
+      - security/full-attack-unit.mjs
+      - security/*-edge-entry.*
+      - worker/voice-entry.ts
+      - test/reciprocal-defense.test.mjs
+      - test/reciprocal-ingress.test.mjs
+      - test/full-attack-unit.test.mjs
+      - e2e/hallway-worker-preview.spec.ts
+      - playwright.hallway.config.ts
+      - wrangler.toml
+      - .github/workflows/reciprocal-defense.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reciprocal-defense:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify reciprocal defense, ingress, and full-unit invariants
+        run: node --test test/reciprocal-defense.test.mjs test/reciprocal-ingress.test.mjs test/full-attack-unit.test.mjs
+      - name: Verify Se'kret Bip edge wiring
+        run: |
+          grep -q '^main = "worker/voice-entry.ts"' wrangler.toml
+          grep -q "reciprocalContainmentEnabled(env)" worker/voice-entry.ts
+          grep -Fq "RECIPROCAL_DEFENSE_MODE==='contain'" security/reciprocal-ingress.mjs
+          grep -q "export \* from '../worker/voice-entry'" security/sekret-edge-entry.ts
+          grep -q "runFullAttackUnit" security/reciprocal-ingress.mjs
+
+  hallway-worker-preview:
+    name: Local Wrangler hallway Playwright proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Assert exact branch head
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run local-only canonical Worker Playwright proof
+        run: npx playwright test --config=playwright.hallway.config.ts
+      - name: Publish isolated preview evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hallway-worker-preview-${{ github.sha }}
+          path: artifacts/hallway-worker-preview/
+          if-no-files-found: warn
