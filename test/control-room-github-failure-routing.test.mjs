@@ -104,3 +104,14 @@ test('scan and ingest commands are explicitly exposed', () => {
     'node --test test/control-room-github-failure-routing.test.mjs',
   );
 });
+
+
+test('historical failure and skip rehearsals fail closed without making healthy PRs red', () => {
+  assert.match(exactGate, /echo "available=false" >> "\$GITHUB_OUTPUT"/);
+  assert.match(exactGate, /failure-rehearsal proof is unavailable and carries no authority/);
+  assert.match(exactGate, /skip-rehearsal proof is unavailable and carries no authority/);
+  assert.match(exactGate, /if: steps\.failed-run\.outputs\.available == 'true'/);
+  assert.match(exactGate, /if: steps\.skipped-run\.outputs\.available == 'true'/);
+  assert.doesNotMatch(exactGate, /test -n "\$run_id"/);
+  assert.doesNotMatch(exactGate, /test -n "\$head_sha"/);
+});
