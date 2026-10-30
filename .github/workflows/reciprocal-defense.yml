@@ -8,6 +8,7 @@ on:
       - security/reciprocal-ingress.mjs
       - security/full-attack-unit.mjs
       - security/*-edge-entry.*
+      - worker/voice-entry.ts
       - test/reciprocal-defense.test.mjs
       - test/reciprocal-ingress.test.mjs
       - test/full-attack-unit.test.mjs
@@ -29,6 +30,8 @@ jobs:
         run: node --test test/reciprocal-defense.test.mjs test/reciprocal-ingress.test.mjs test/full-attack-unit.test.mjs
       - name: Verify Se'kret Bip edge wiring
         run: |
-          grep -q '^main = "security/sekret-edge-entry.ts"' wrangler.toml
+          grep -q '^main = "worker/voice-entry.ts"' wrangler.toml
+          grep -q "reciprocalContainmentEnabled(env)" worker/voice-entry.ts
+          grep -q "RECIPROCAL_DEFENSE_MODE === 'contain'" security/reciprocal-ingress.mjs
           grep -q "export \* from '../worker/voice-entry'" security/sekret-edge-entry.ts
           grep -q "runFullAttackUnit" security/reciprocal-ingress.mjs
