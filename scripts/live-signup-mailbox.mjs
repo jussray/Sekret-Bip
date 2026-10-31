@@ -123,8 +123,7 @@ async function createMailbox() {
       mailboxMode: mode,
       confirmation: 'external-owned-mailbox',
     });
-    console.log(`Owned Bip signup proof mailbox: ${OWNED_BIP_ADDRESS}`);
-    console.log(`Disposable live signup username: ${username}`);
+    console.log('Owned Bip signup proof mailbox selected; identifiers recorded in live-signup-proof-account.json.');
     return;
   }
 
@@ -174,8 +173,7 @@ async function createMailbox() {
   });
 
   console.log(`Disposable mailbox provider: Mail.tm (${PROVIDER_URL})`);
-  console.log(`Disposable live signup email: ${address}`);
-  console.log(`Disposable live signup username: ${username}`);
+  console.log('Disposable live signup mailbox created; identifiers recorded in live-signup-proof-account.json.');
 }
 
 async function confirmMailbox() {
@@ -183,7 +181,7 @@ async function confirmMailbox() {
   const address = required('LIVE_ONBOARDING_EMAIL');
 
   if (mode === 'bip_routed') {
-    console.log(`Owned Bip confirmation is waiting in ${address}; successful returning sign-in is the authoritative confirmation proof.`);
+    console.log('Owned Bip confirmation is waiting in the owned mailbox; successful returning sign-in is the authoritative confirmation proof.');
     return;
   }
 
@@ -216,7 +214,7 @@ async function confirmMailbox() {
   }
 
   if (!confirmationUrl || !message) {
-    throw new Error(`No signup confirmation message reached disposable mailbox ${address} before timeout`);
+    throw new Error('No signup confirmation message reached the disposable mailbox before timeout');
   }
 
   const confirmation = await fetch(confirmationUrl, {
@@ -249,8 +247,7 @@ async function confirmMailbox() {
   });
 
   console.log(`Signup confirmation accepted with HTTP ${confirmation.status}.`);
-  console.log(`Confirmation host: ${confirmationHost}`);
-  console.log(`Redirect host: ${redirectHost || 'none'}`);
+  console.log('Confirmation and redirect hosts recorded in live-signup-confirmation.json.');
 }
 
 async function recordOwnedConfirmation() {
@@ -262,7 +259,7 @@ async function recordOwnedConfirmation() {
     confirmationStatus: 'proved_by_returning_signin',
     confirmedAt: new Date().toISOString(),
   });
-  console.log(`Owned Bip mailbox confirmation proved by successful returning sign-in for ${address}.`);
+  console.log('Owned Bip mailbox confirmation proved by successful returning sign-in.');
 }
 
 async function cleanupMailbox() {
