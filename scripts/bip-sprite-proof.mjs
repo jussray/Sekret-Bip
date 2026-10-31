@@ -17,8 +17,6 @@ const SHA_RE = /^[0-9a-f]{40}$/;
 const script = fileURLToPath(import.meta.url);
 const repositoryRoot = path.resolve(path.dirname(script), '..');
 const receiptRoot = '/home/sprite/.sprite-proof/receipts';
-// This sandbox home is intentionally isolated from the operator's credentialed profile.
-fs.mkdirSync('/home/sprite/.bip-sprite-home', { recursive: true, mode: 0o700 });
 
 export function parseRequest(argv) {
   if (argv.length !== 4 || argv[0] !== '--mission' || argv[2] !== '--sha') {
@@ -79,6 +77,8 @@ export function runProof({ mission, sha }, { root = repositoryRoot, spawn = spaw
 function main() {
   try {
     const req = parseRequest(process.argv.slice(2));
+    // Private Sprite CLI only. Importing this module in CI must be side-effect-free.
+    fs.mkdirSync('/home/sprite/.bip-sprite-home', { recursive: true, mode: 0o700 });
     const receipt = runProof(req);
     fs.mkdirSync(receiptRoot, { recursive: true, mode: 0o700 });
     const destination = path.join(receiptRoot, req.sha + '-' + req.mission + '.json');
