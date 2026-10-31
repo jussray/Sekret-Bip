@@ -84,10 +84,16 @@ function main() {
     const destination = path.join(receiptRoot, req.sha + '-' + req.mission + '.json');
     // Repeated runs update the same bounded proof slot, never a repo file.
     fs.writeFileSync(destination, JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
-    console.log(JSON.stringify({ receipt: destination, status: receipt.status, sha: receipt.source.sha, mission: receipt.mission }));
+    console.log('BIP_SPRITE_PROOF_RECEIPT_WRITTEN');
     if (receipt.status !== 'pass') process.exitCode = 1;
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    if (error instanceof Error && error.message === 'FOUNDER_OPERATION_PAUSED') {
+      console.error('FOUNDER_OPERATION_PAUSED');
+    } else if (error instanceof Error && error.message === 'BIP_SPRITE_EXACT_HEAD_MISMATCH') {
+      console.error('BIP_SPRITE_EXACT_HEAD_MISMATCH');
+    } else {
+      console.error('BIP_SPRITE_PROOF_BLOCKED');
+    }
     process.exitCode = 1;
   }
 }
