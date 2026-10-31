@@ -50,6 +50,7 @@ A separate `workflow_run` watcher inspects completed runs from:
 - Quality Gate;
 - Type Check;
 - Implementation Evidence;
+- Founder Shield;
 - Playwright Smoke and Guardrails;
 - Production Smoke;
 - Live Signup Proof;

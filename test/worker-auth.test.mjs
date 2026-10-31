@@ -12,6 +12,34 @@ const auth = fs.readFileSync(new URL('../worker/auth.ts', import.meta.url), 'utf
 const index = fs.readFileSync(new URL('../worker/index.ts', import.meta.url), 'utf8');
 const voiceEntry = fs.readFileSync(new URL('../worker/voice-entry.ts', import.meta.url), 'utf8');
 
+test('front-door limiter accepts only explicit boolean outcomes', async () => {
+  // Execute the real limiter body without loading unrelated voice providers.
+  const start = voiceEntry.indexOf('async function enforceRateLimit(');
+  const end = voiceEntry.indexOf('\nfunction withoutRateLimiter', start);
+  assert.ok(start >= 0 && end > start);
+  const functionSource = voiceEntry.slice(start, end).trim();
+  const bodyStart = functionSource.indexOf('): Promise<Response | null> {');
+  assert.ok(bodyStart > 0);
+  const body = functionSource.slice(bodyStart + '): Promise<Response | null> {'.length, -1);
+  const enforce = new Function('json', 'protectionUnavailable',
+    'return async function(request, env, principal, cors) {' + body + '}')(
+    (body, status, headers) => Response.json(body, { status, headers }),
+    (headers) => Response.json({ error: 'request protection temporarily unavailable', retryable: true },
+      { status: 503, headers: { ...headers, 'Retry-After': '30' } }),
+  );
+  const request = new Request('https://local.invalid/api/sekret/reply', { method: 'POST' });
+  for (const outcome of [{ success: 'true' }, { success: 1 }, {}, null]) {
+    const result = await enforce(request, { SEKRET_RATE_LIMITER: { limit: async () => outcome } },
+      { kind: 'user', userId: 'synthetic-user' }, {});
+    assert.equal(result?.status, 503);
+    assert.equal(result.headers.get('Retry-After'), '30');
+  }
+  assert.equal(await enforce(request, { SEKRET_RATE_LIMITER: { limit: async () => ({ success: true }) } },
+    { kind: 'user', userId: 'synthetic-user' }, {}), null);
+  assert.equal((await enforce(request, { SEKRET_RATE_LIMITER: { limit: async () => ({ success: false }) } },
+    { kind: 'user', userId: 'synthetic-user' }, {})).status, 429);
+});
+
 const bearerLine = auth.split('\n').find((line) => line.includes('Bearer') && line.includes('exec'));
 assert.ok(bearerLine, 'extractBearer must use a Bearer regex');
 const rawRegex = bearerLine.replace(/^.*=\s*/, '').replace(/\.exec.*$/, '').trim();
