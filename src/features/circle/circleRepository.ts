@@ -7,7 +7,6 @@ export type CircleReactionCounts = Record<CircleReactionKey, number>;
 
 export interface PublicCircleFeedItem {
   id: number;
-  userId: string;
   nickname: string;
   avatarEmoji: string;
   text: string;
@@ -98,10 +97,13 @@ function mapFeedItem(
   row: PublicFeedRpcRow,
   profiles: Map<string, CircleProfileRow>,
 ): PublicCircleFeedItem {
+  // Anonymous-participation boundary: the author's account id is used only
+  // transiently to resolve the pseudonymous Circle profile. It is never
+  // published on the feed item, so an anonymous post exposes no account
+  // identifier to other users.
   const profile = profiles.get(row.author_user_id);
   return {
     id: Number(row.post_id),
-    userId: row.author_user_id,
     nickname: profile?.nickname?.trim() || 'anonymous bip',
     avatarEmoji: profile?.avatar_emoji?.trim() || '🌙',
     text: row.post_text,
