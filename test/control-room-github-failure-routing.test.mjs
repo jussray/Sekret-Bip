@@ -75,6 +75,10 @@ test('CI and major workflow failures invoke the scanner automatically without re
   assert.match(watcher, /github\.event\.workflow_run\.id/);
 
   const watchedWorkflowBlock = watcher.match(/workflows:\s*([\s\S]*?)\n\s*types:/)?.[1] || '';
+  assert.match(watchedWorkflowBlock, /^\s*- Founder Shield\s*$/m,
+    'Founder Shield security failures and skipped witnesses must enter the existing router');
+  assert.match(docs, /^- Founder Shield;$/m,
+    'documented watched workflows must include the security audit path');
   assert.doesNotMatch(watchedWorkflowBlock, /Founder Control Room GitHub Failure Router/);
   assert.doesNotMatch(watchedWorkflowBlock, /GitHub Failure Routing Exact-Head Gate/);
   assert.match(exactGate, /select\(\.name != "GitHub Failure Routing Exact-Head Gate"\)/);
