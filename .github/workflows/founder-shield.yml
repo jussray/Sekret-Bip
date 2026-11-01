@@ -84,7 +84,7 @@ jobs:
     if: github.event_name == 'push'
     needs: verify-founder-shield
     runs-on: ubuntu-22.04
-    timeout-minutes: 5
+    timeout-minutes: 7
     environment: Production
     steps:
       - name: Capture anonymous live public edge evidence
@@ -110,7 +110,7 @@ jobs:
           release_url="https://sekretbip.net/.well-known/sekret-release.json"
           release_json=""
           observed_release_sha=""
-          for release_attempt in $(seq 1 16); do
+          for release_attempt in $(seq 1 36); do
             : > "$release_headers"
             : > "$release_body"
             release_result=""
@@ -145,7 +145,7 @@ jobs:
             fi
             printf 'release marker pending attempt=%s status=%s observed=%s expected=%s\n' \
               "$release_attempt" "$release_status" "${observed_release_sha:-missing}" "${EXPECTED_HEAD_SHA,,}"
-            if [[ "$release_attempt" -lt 16 ]]; then
+            if [[ "$release_attempt" -lt 36 ]]; then
               sleep 6
             fi
           done

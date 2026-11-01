@@ -7,6 +7,7 @@ on:
       - Quality Gate
       - Type Check
       - Implementation Evidence
+      - Founder Shield
       - Playwright Smoke and Guardrails
       - Production Smoke
       - Live Signup Proof
