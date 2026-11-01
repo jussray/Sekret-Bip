@@ -248,10 +248,12 @@ async function enforceRateLimit(
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
   const key = principal.kind === 'user' ? `user:${principal.userId}` : `ip:${ip}`;
   try {
-    const { success } = await env.SEKRET_RATE_LIMITER.limit({ key });
+    const outcome = await env.SEKRET_RATE_LIMITER.limit({ key });
+    if (!outcome || typeof outcome.success !== 'boolean') return protectionUnavailable(cors);
+    const { success } = outcome;
     return success ? null : json({ error: 'rate limit exceeded', retryable: true }, 429, cors);
-  } catch (error) {
-    console.error('[voice-entry:rate-limit]', error);
+  } catch {
+    console.error('SEKRET_RATE_LIMIT_UNAVAILABLE');
     return protectionUnavailable(cors);
   }
 }
