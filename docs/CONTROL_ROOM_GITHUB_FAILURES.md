@@ -1,5 +1,15 @@
 # Founder Control Room — GitHub Failure Routing
 
+## Security-check repair boundary
+
+Unused CodeQL exceptions belong in non-authorizing retirement history; only
+the active waivers array can suppress a finding. A recurring retired finding
+must block again. Retirement never removes a genuine unwaived security result.
+The optional keyframe adapter reads approved references through one checked
+file descriptor with a bounded read and guaranteed cleanup, preserving hash,
+format and generation-approval checks. Regression tests exercise those
+boundaries; a fresh hosted scan must independently verify the repaired source.
+
 ## Permanent operating rule
 
 Every GitHub failure **and every skipped proof witness** must be checked against Founder Control Room first.

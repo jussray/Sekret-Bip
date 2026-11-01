@@ -32,16 +32,6 @@
       "rationale": "These four results are static SQL source-contract regex construction in tests, not runtime validation of external input."
     },
     {
-      "id": "worker-identity-test-url-substring",
-      "language": "javascript-typescript",
-      "ruleId": "js/incomplete-url-substring-sanitization",
-      "path": "test/cloudflare-worker-identity.test.mjs",
-      "messageIncludes": "can be anywhere in the URL",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The check asserts absence of a repository-owned legacy URL in a static environment file; it does not authorize or validate a runtime URL."
-    },
-    {
       "id": "agent-discovery-test-url-anchor",
       "language": "javascript-typescript",
       "ruleId": "js/regex/missing-regexp-anchor",
@@ -102,26 +92,6 @@
       "rationale": "The assertion verifies fixed production endpoint literals in workflow/config source and is not a runtime URL trust decision."
     },
     {
-      "id": "pages-domain-array-membership",
-      "language": "javascript-typescript",
-      "ruleId": "js/incomplete-url-substring-sanitization",
-      "path": "scripts/verify-cloudflare-pages-branch-authority.mjs",
-      "messageIncludes": "can be anywhere in the URL",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The reported includes call is Array.prototype.includes over Cloudflare's domains array, so it requires exact element equality with app.sekretbip.net. It is not substring matching on a URL string and therefore cannot accept an attacker-controlled hostname prefix or suffix."
-    },
-    {
-      "id": "pages-domain-array-membership-test",
-      "language": "javascript-typescript",
-      "ruleId": "js/incomplete-url-substring-sanitization",
-      "path": "test/cloudflare-pages-branch-authority.test.mjs",
-      "messageIncludes": "can be anywhere in the URL",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "This is an exact Array.prototype.includes assertion over normalized provider-domain fixtures in a unit test. It neither parses nor authorizes runtime URLs."
-    },
-    {
       "id": "public-front-door-static-url-assertions",
       "language": "javascript-typescript",
       "ruleId": "js/regex/missing-regexp-anchor",
@@ -150,6 +120,54 @@
       "maxMatches": 2,
       "expiresAt": "2027-01-10T00:00:00Z",
       "rationale": "Static source assertions that worker/provider-runtime.ts contains the fixed provider endpoint literals. They do not validate or authorize any runtime URL. Replacing them with String.includes trips js/incomplete-url-substring-sanitization instead."
+    }
+  ],
+  "retiredWaivers": [
+    {
+      "id": "worker-identity-test-url-substring",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-url-substring-sanitization",
+      "path": "test/cloudflare-worker-identity.test.mjs",
+      "messageIncludes": "can be anywhere in the URL",
+      "maxMatches": 1,
+      "expiresAt": "2027-01-10T00:00:00Z",
+      "rationale": "The check asserts absence of a repository-owned legacy URL in a static environment file; it does not authorize or validate a runtime URL."
+    },
+    {
+      "id": "pages-domain-array-membership",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-url-substring-sanitization",
+      "path": "scripts/verify-cloudflare-pages-branch-authority.mjs",
+      "messageIncludes": "can be anywhere in the URL",
+      "maxMatches": 1,
+      "expiresAt": "2027-01-10T00:00:00Z",
+      "rationale": "The reported includes call is Array.prototype.includes over Cloudflare's domains array, so it requires exact element equality with app.sekretbip.net. It is not substring matching on a URL string and therefore cannot accept an attacker-controlled hostname prefix or suffix."
+    },
+    {
+      "id": "pages-domain-array-membership-test",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-url-substring-sanitization",
+      "path": "test/cloudflare-pages-branch-authority.test.mjs",
+      "messageIncludes": "can be anywhere in the URL",
+      "maxMatches": 1,
+      "expiresAt": "2027-01-10T00:00:00Z",
+      "rationale": "This is an exact Array.prototype.includes assertion over normalized provider-domain fixtures in a unit test. It neither parses nor authorizes runtime URLs."
+    }
+  ],
+  "retirementEvidence": [
+    {
+      "retiredAt": "2026-11-01",
+      "sourceHeadSha": "7bd754e992fb4f94b68e1e625b37cc887615c3ff",
+      "runId": 41327051061,
+      "jobId": 124909077961,
+      "artifactId": 13092255179,
+      "artifactSha256": "08e3f754ea77bf45a335b6c1ac5badce7dac90c60443b6c900559c939945e5c5",
+      "waiverIds": [
+        "pages-domain-array-membership",
+        "pages-domain-array-membership-test",
+        "worker-identity-test-url-substring"
+      ],
+      "reason": "The exact-head CodeQL SARIF contains no matching findings. Archived entries cannot waive a recurrence; only waivers is an active exception set."
     }
   ]
 }
