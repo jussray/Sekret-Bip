@@ -157,11 +157,11 @@
   "retirementEvidence": [
     {
       "retiredAt": "2026-11-01",
-      "sourceHeadSha": "7bd754e992fb4f94b68e1e625b37cc887615c3ff",
+      "sourceCommitUrl": "https://github.com/jussray/Sekret-Bip/commit/7bd754e992fb4f94b68e1e625b37cc887615c3ff",
       "runId": 41327051061,
       "jobId": 124909077961,
       "artifactId": 13092255179,
-      "artifactSha256": "08e3f754ea77bf45a335b6c1ac5badce7dac90c60443b6c900559c939945e5c5",
+      "artifactDigest": "sha256:08e3f754ea77bf45a335b6c1ac5badce7dac90c60443b6c900559c939945e5c5",
       "waiverIds": [
         "pages-domain-array-membership",
         "pages-domain-array-membership-test",
