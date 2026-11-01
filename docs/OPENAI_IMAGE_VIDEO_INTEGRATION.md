@@ -52,3 +52,45 @@ node --test test/openai-keyframe-adapter.test.mjs
 Tests use simulated provider outputs and do not prove live API access, approved imagery, animation, or end-to-end playback. Remove/revert only these additive script, test, docs and example files to roll back. No Expo/Cloudflare production deployment is required for this operator-side CLI.
 
 Official docs: https://developers.openai.com/api/docs/guides/image-generation
+## Explicit storyboard timing and source audio
+
+For a new approved timed master, add a top-level `timeline` array to the existing
+`sekret-bip-video-master@v1` manifest. Each required shot occurs exactly once;
+array order is playback order. Each entry contains `shot`, positive
+`durationSeconds`, and optional nonnegative `sourceStartSeconds` (default zero).
+Durations and in-points must align to the master frame rate, and total duration
+must equal `master.durationSeconds`. Example for a two-second synthetic check:
+
+```json
+"timeline": [
+  {"shot": 2, "durationSeconds": 0.75, "sourceStartSeconds": 0.25},
+  {"shot": 1, "durationSeconds": 1.25}
+]
+```
+
+For a 60-second 30fps Short with six ten-second shots, use six timeline entries
+of ten seconds and `master.durationSeconds: 60`. This is a timing example, not
+founder approval of a new episode, source, character, or manifest.
+
+Explicit timelines reject sources shorter than their selected range rather
+than freezing the last frame to disguise missing footage. Each clip is
+normalized independently before assembly. Its embedded audio is retained;
+sources with no audio stream receive silence only for their own segment.
+An explicit `--audio` remains an approved external soundtrack replacement, not
+an audio mixer. Timed mode rejects external audio shorter than the master and
+never loops dialogue. Only legacy mode retains looping-to-master behavior.
+Intermediate timed segments use lossless PCM audio so repeated AAC encoder
+padding does not accumulate between cuts. The final MP4 encodes AAC once.
+
+Manifests without `timeline` retain legacy aggregate-duration padding/trimming
+and silent fallback unless external audio is supplied. Do not use that legacy
+mode to claim storyboard cut-time or source-sound fidelity. The renderer
+receipt records the actual timeline and audio mode. Descriptor approval plus
+matching hashes is not an independent human identity/continuity review, and
+final master approval remains separate.
+
+Focused verification: `node --test test/video-render-master.test.mjs` decodes
+synthetic picture colors and audio frequencies around unequal reordered cuts,
+checks mixed audible/silent sources, rejects incomplete timelines and short
+footage, and retains the legacy renderer test. These checks do not prove
+production character fidelity, spoken lip sync, provider access, or publication.

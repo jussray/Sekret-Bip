@@ -73,14 +73,36 @@ function probeMedia(path) {
   return {
     width: Number(video.width || 0),
     height: Number(video.height || 0),
-    durationSeconds: Number(parsed.format?.duration || video.duration || 0),
+    durationSeconds: Number(video.duration || parsed.format?.duration || 0),
+    hasAudio: (parsed.streams || []).some((stream) => stream.codec_type === 'audio'),
     fps: parseRate(video.avg_frame_rate || video.r_frame_rate),
     codec: video.codec_name || null,
   };
 }
 
+function storyboardTimeline(manifest) {
+  if (manifest.timeline === undefined) return null;
+  const timeline = manifest.timeline;
+  const required = manifest.sourcePolicy.requiredShots.map(Number);
+  if (!Array.isArray(timeline) || timeline.length !== required.length) fail('TIMELINE_SHOTS_INVALID');
+  const seen = new Set();
+  let frames = 0;
+  for (const item of timeline) {
+    const shot = Number(item?.shot), seconds = Number(item?.durationSeconds), start = Number(item?.sourceStartSeconds ?? 0);
+    if (!required.includes(shot) || seen.has(shot)) fail('TIMELINE_SHOTS_INVALID');
+    seen.add(shot);
+    if (!Number.isFinite(seconds) || seconds <= 0 || !Number.isFinite(start) || start < 0) fail('TIMELINE_TIME_INVALID');
+    const shotFrames = seconds * Number(manifest.master.fps);
+    if (Math.abs(shotFrames - Math.round(shotFrames)) > 1e-6 || Math.abs(start * Number(manifest.master.fps) - Math.round(start * Number(manifest.master.fps))) > 1e-6) fail('TIMELINE_MUST_ALIGN_TO_FRAMES');
+    frames += Math.round(shotFrames);
+  }
+  if (Math.abs(frames - Number(manifest.master.durationSeconds) * Number(manifest.master.fps)) > 1e-6) fail('TIMELINE_MASTER_DURATION_MISMATCH');
+  return timeline.map((item) => ({ shot: Number(item.shot), durationSeconds: Number(item.durationSeconds), sourceStartSeconds: Number(item.sourceStartSeconds ?? 0) }));
+}
+
 export async function renderBipVideoMaster({ manifest, sources, outputPath, receiptPath = null, audioPath = null }) {
   assertManifestPolicy(manifest);
+  const timeline = storyboardTimeline(manifest);
   if (!Array.isArray(sources)) fail('SOURCES_MUST_BE_AN_ARRAY');
   if (!isAbsolute(String(outputPath || '')) || extname(String(outputPath)).toLowerCase() !== '.mp4') fail('OUTPUT_PATH_MUST_BE_ABSOLUTE_MP4');
   if (audioPath && (!isAbsolute(String(audioPath)) || !existsSync(String(audioPath)))) fail('AUDIO_PATH_INVALID');
@@ -101,6 +123,17 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
     return { kind: 'CAPABILITY_UNAVAILABLE', reason: 'ffmpeg and ffprobe binaries are required on PATH' };
   }
 
+  if (timeline && audioPath) {
+    const audioProbe = spawnSync(process.env.FFPROBE_BIN || 'ffprobe', [
+      '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', audioPath,
+    ], { encoding: 'utf8' });
+    if (audioProbe.status !== 0) fail('AUDIO_PROBE_FAILED');
+    const parsed = JSON.parse(audioProbe.stdout || '{}');
+    const stream = (parsed.streams || []).find((entry) => entry.codec_type === 'audio');
+    const duration = Number(stream?.duration || parsed.format?.duration || 0);
+    if (!stream || !Number.isFinite(duration) || duration + 0.001 < Number(manifest.master.durationSeconds)) fail('EXTERNAL_AUDIO_TOO_SHORT_FOR_TIMELINE');
+  }
+
   const verifiedSources = [];
   for (const shot of requiredShots) {
     const source = sourceByShot.get(shot);
@@ -108,6 +141,13 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
     if (actualSha256 !== String(source.sha256).toLowerCase()) fail(`SHOT_${shot}_HASH_MISMATCH`, 'BIP_VIDEO_SOURCE_STALE');
     const probe = probeMedia(source.path);
     verifiedSources.push({ shot, path: source.path, sha256: actualSha256, probe });
+  }
+
+  if (timeline) {
+    for (const item of timeline) {
+      const source = verifiedSources.find((entry) => entry.shot === item.shot);
+      if (!Number.isFinite(source.probe.durationSeconds) || source.probe.durationSeconds + 0.001 < item.sourceStartSeconds + item.durationSeconds) fail(`SHOT_${item.shot}_TOO_SHORT_FOR_TIMELINE`);
+    }
   }
 
   const workDir = await mkdtemp(join(tmpdir(), 'sekret-bip-video-'));
@@ -119,6 +159,26 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
       await copyFile(source.path, localPath);
       localSources.push(localPath);
     }
+    // Explicit storyboards normalize each shot independently so cut points and
+    // embedded dialogue/SFX cannot be replaced by aggregate padding or silence.
+    if (timeline) {
+      localSources.length = 0;
+      for (const item of timeline) {
+        const source = verifiedSources.find((entry) => entry.shot === item.shot);
+        const copied = join(workDir, `shot-${String(item.shot).padStart(3, '0')}${extname(source.path).toLowerCase() || '.mp4'}`);
+        if (await sha256File(copied) !== source.sha256) fail(`SHOT_${item.shot}_HASH_MISMATCH`, 'BIP_VIDEO_SOURCE_STALE');
+        const normalized = join(workDir, `normalized-${item.shot}.mkv`);
+        const args = ['-nostdin', '-y', '-ss', String(item.sourceStartSeconds), '-i', copied];
+        if (!source.probe.hasAudio) args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
+        const master = manifest.master;
+        args.push('-t', String(item.durationSeconds), '-map', '0:v:0', '-map', source.probe.hasAudio ? '0:a:0' : '1:a:0',
+          '-vf', `scale=${master.width}:${master.height}:force_original_aspect_ratio=increase,crop=${master.width}:${master.height},fps=${master.fps},setpts=PTS-STARTPTS,format=yuv420p`,
+          '-af', 'aresample=48000,apad', '-ac', '2', '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p', '-c:a', 'pcm_s16le', '-ar', '48000', normalized);
+        const result = spawnSync(process.env.FFMPEG_BIN || 'ffmpeg', args, { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+        if (result.status !== 0) fail('FFMPEG_SHOT_NORMALIZATION_FAILED', 'BIP_VIDEO_RENDER_FAILED');
+        localSources.push(normalized);
+      }
+    }
     const concatPath = join(workDir, 'concat.txt');
     await writeFile(concatPath, `${localSources.map((path) => `file '${basename(path)}'`).join('\n')}\n`, 'utf8');
 
@@ -129,18 +189,21 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
       `scale=${master.width}:${master.height}:force_original_aspect_ratio=increase`,
       `crop=${master.width}:${master.height}`,
       `fps=${master.fps}`,
-      `tpad=stop_mode=clone:stop_duration=${duration}`,
+      ...(timeline ? [] : [`tpad=stop_mode=clone:stop_duration=${duration}`]),
       `trim=duration=${duration}`,
       'setpts=PTS-STARTPTS',
       'format=yuv420p',
     ].join(',');
 
     const args = ['-nostdin', '-y', '-f', 'concat', '-safe', '1', '-i', concatPath];
-    if (audioPath) args.push('-stream_loop', '-1', '-i', audioPath);
-    else args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
+    if (audioPath) {
+      if (!timeline) args.push('-stream_loop', '-1');
+      args.push('-i', audioPath);
+    }
+    else if (!timeline) args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
     args.push(
       '-t', String(duration),
-      '-map', '0:v:0', '-map', '1:a:0',
+      '-map', '0:v:0', '-map', timeline && !audioPath ? '0:a:0' : '1:a:0',
       '-vf', videoFilter,
       '-r', String(master.fps), '-fps_mode', 'cfr',
       '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p',
@@ -176,7 +239,9 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
       sourceShots: verifiedSources.map(({ shot, sha256: sourceSha256 }) => ({ shot, sha256: sourceSha256 })),
       identityRegenerationUsed: false,
       inventedCharactersUsed: false,
-      audioMode: audioPath ? 'approved-external-audio' : 'silent-fallback',
+      audioMode: audioPath ? 'approved-external-audio' : timeline ? 'approved-source-audio-with-silence-for-missing-streams' : 'silent-fallback',
+      timeline: timeline || null,
+      sourceApprovalBasis: 'caller-approved-descriptors-and-matching-content-hashes; independent human review remains required',
       ffmpegVersion: capability.ffmpegVersion,
       ffprobeVersion: capability.ffprobeVersion,
       finalApprovalEligible: false,
