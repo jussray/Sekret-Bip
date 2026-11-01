@@ -1,0 +1,73 @@
+{
+  "$schema": "sekret-bip-video-master@v1",
+  "episode": "operator-supplied-approved-short",
+  "title": "60-second vertical Short timing template",
+  "delivery": {
+    "platform": "youtube",
+    "aspectRatio": "9:16",
+    "status": "template-not-approved-production"
+  },
+  "editor": {
+    "role": "post-production-only"
+  },
+  "master": {
+    "container": "mp4",
+    "codec": "h264",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationSeconds": 60,
+    "durationToleranceSeconds": 0.1
+  },
+  "sourcePolicy": {
+    "requiredShots": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "requireApprovedShotEvidence": true,
+    "allowUnapprovedSource": false,
+    "allowIdentityRegeneration": false,
+    "allowInventedCharacters": false,
+    "allowWorldAuthorityAsCharacterAuthority": false,
+    "providerOutputCreatesAuthority": false
+  },
+  "proof": {
+    "metadataVerification": "required",
+    "playwrightPlayback": "required",
+    "continuityReview": "required",
+    "toneReview": "required",
+    "audioClarityReview": "required",
+    "youtubeTargetIdentityReview": "required-before-publish",
+    "finalMasterApprovalAfterAllProof": true
+  },
+  "timeline": [
+    {
+      "shot": 1,
+      "durationSeconds": 10
+    },
+    {
+      "shot": 2,
+      "durationSeconds": 10
+    },
+    {
+      "shot": 3,
+      "durationSeconds": 10
+    },
+    {
+      "shot": 4,
+      "durationSeconds": 10
+    },
+    {
+      "shot": 5,
+      "durationSeconds": 10
+    },
+    {
+      "shot": 6,
+      "durationSeconds": 10
+    }
+  ]
+}

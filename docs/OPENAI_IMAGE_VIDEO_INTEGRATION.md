@@ -94,3 +94,77 @@ synthetic picture colors and audio frequencies around unequal reordered cuts,
 checks mixed audible/silent sources, rejects incomplete timelines and short
 footage, and retains the legacy renderer test. These checks do not prove
 production character fidelity, spoken lip sync, provider access, or publication.
+
+## Resumable operator production command
+
+`npm run video:produce -- --manifest /secure/approved-short.json --sources /secure/approved-sources.json --run-dir /secure/bip-short-run`
+
+The checked-in `examples/video-short-60s.manifest.json` is a six-shot 1080×1920,
+30fps, 60-second timing template only. Copy it into the private production area
+and obtain the required exact manifest and shot approvals before use. It contains
+no approved character references or footage and grants no generation permission.
+
+The operator command composes the existing renderer, encoded-master verifier,
+and Playwright playback verifier. It requires an explicit timeline and existing
+MP4 source descriptors. Missing or unapproved moving clips return `BLOCKED`;
+it never fabricates motion from a still or silently calls a paid provider.
+The private run directory must initially be empty. Keep it out of Git/public
+assets because renderer and verifier receipts contain operator filesystem paths.
+The command produces `master.mp4`, stage receipts, and `production-run.json`.
+
+A failed browser lane preserves successful render and metadata stages. Install
+the existing Playwright browser with `npm run setup:video:playback`, then rerun
+the identical command to resume. Missing Chromium, missing dependencies, decode
+failures, or absent/mismatched receipts remain blocked, never passed by waiver.
+The package's existing Playwright dependency must be installed before setup.
+
+Resumption verifies current approved input bytes, descriptors, manifest, optional
+audio and runtime script fingerprints; each skipped stage requires the exact
+unchanged MP4 and receipt hashes. Changed bound inputs require a new empty run
+directory. A modified or unowned master is rejected instead of overwritten.
+Do not edit state/receipts to manufacture proof or flip source approval flags.
+Run state is local technical continuity evidence, not a signed authority token,
+identity review, final master approval, or publication permission.
+
+FCR may orchestrate an authorized generation job and return its clip artifacts
+and execution receipts. An operator must review those clips against the exact
+Bip reference/storyboard and then prepare the normal approved source descriptors
+with actual MP4 SHA-256 hashes. Feed those reviewed descriptors to `video:produce`.
+FCR success and a provider receipt never autoapprove a Bip source. This CLI does
+not enable a provider, spend credits, publish to YouTube, or deploy application code.
+After technical proof, character continuity, lip sync, tone/audio clarity,
+founder final-master approval, and separate publication authority remain required.
+
+`npm run test:video:production` executes real FFmpeg rendering and metadata
+verification with synthetic inputs. Its injected playback-process cases test
+resume/failure bookkeeping only; they do not claim a real Chromium playback.
+
+The runner acquires an exclusive `production-run.lock` before reading/writing run
+state or media; concurrent invocations fail closed. A crashed process can leave
+that lock behind. Do not clear it automatically: inspect process ownership and
+partial outputs first. If a failed render leaves an unowned/partial master,
+retain it for inspection and use a new empty run directory; the runner will not
+overwrite it or claim successful recovery. Only the lock created by the current
+invocation is released during normal cleanup.
+
+To bridge a completed FCR job to Bip's existing source format, use:
+
+```text
+npm run video:import:clips -- --project sekret-bip --mapping /secure/clip-mapping.json --output /secure/approved-sources.json
+npm run video:produce -- --manifest /secure/approved-short.json --sources /secure/approved-sources.json --run-dir /secure/bip-short-run
+```
+
+The private mapping has a `shots` array. Each entry supplies `shot`, a local
+`receiptPath` for the successful `fcr/media-job@v1` job receipt, a local
+`mediaPath` for the materialized MP4, and a local `reviewPath` for a separate
+`sekret-bip-media-review@v1` human review. The review must bind the exact project,
+job, input fingerprint, shot, MP4 hash, independent review ID and review time,
+and explicitly approve identity, continuity and audio. A provider URL alone
+returns `NEEDS_MATERIALIZATION`; no arbitrary network download is performed.
+The importer refuses existing output files and never creates the human review.
+Operator-supplied review fields are an evidence requirement, not cryptographic
+proof of a human's identity; preserve the underlying approved review separately.
+The imported descriptors retain only SHA-256 fingerprints of the exact job
+receipt and separate human-review record in `approvalEvidence`. The production
+run binds those fields with the descriptor fingerprint; it does not copy raw
+reviewer identity or review text into its state.

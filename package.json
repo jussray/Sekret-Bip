@@ -76,7 +76,11 @@
     "control-room:github-failures:scan": "node scripts/control-room-ingest-github-failures.mjs",
     "control-room:github-failures:ingest": "CONTROL_ROOM_GITHUB_INGEST=1 node scripts/control-room-ingest-github-failures.mjs",
     "test:github-failure-routing": "node --test test/control-room-github-failure-routing.test.mjs",
-    "configure:mcp:codex-cloudflare": "node scripts/configure-codex-cloudflare-mcp.mjs"
+    "configure:mcp:codex-cloudflare": "node scripts/configure-codex-cloudflare-mcp.mjs",
+    "video:produce": "node scripts/run-video-production.mjs",
+    "setup:video:playback": "playwright install chromium",
+    "test:video:production": "node --test test/video-production-run.test.mjs test/media-job-clips-import.test.mjs",
+    "video:import:clips": "node scripts/import-media-job-clips.mjs"
   },
   "dependencies": {
     "@expo/log-box": "^56.0.13",
