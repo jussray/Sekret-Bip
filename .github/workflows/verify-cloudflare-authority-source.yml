@@ -5,6 +5,8 @@ on:
     paths:
       - 'scripts/verify-cloudflare-worker-branch-authority.mjs'
       - 'worker/companion-entry.ts'
+      - 'worker/companion-internal-proof.ts'
+      - 'test/bip-companion-internal-proof.test.mjs'
       - 'wrangler.bip.toml'
       - 'test/bip-companion-isolation.test.mjs'
       - 'scripts/run-with-normalized-cloudflare-token.mjs'
@@ -16,6 +18,8 @@ on:
     paths:
       - 'scripts/verify-cloudflare-worker-branch-authority.mjs'
       - 'worker/companion-entry.ts'
+      - 'worker/companion-internal-proof.ts'
+      - 'test/bip-companion-internal-proof.test.mjs'
       - 'wrangler.bip.toml'
       - 'test/bip-companion-isolation.test.mjs'
       - 'scripts/run-with-normalized-cloudflare-token.mjs'
@@ -55,6 +59,7 @@ jobs:
           test/cloudflare-branch-authority-workflow-contract.test.mjs
           test/cloudflare-branch-authority-apply-workflow-contract.test.mjs
           test/bip-companion-isolation.test.mjs
+          test/bip-companion-internal-proof.test.mjs
 
   companion-compile-proof:
     name: Isolated bip Worker Wrangler dry-run (no deploy)
