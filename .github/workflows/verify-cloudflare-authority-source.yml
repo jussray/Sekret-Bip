@@ -1,0 +1,50 @@
+name: Verify Cloudflare Authority Source
+
+on:
+  push:
+    paths:
+      - 'scripts/verify-cloudflare-worker-branch-authority.mjs'
+      - 'scripts/run-with-normalized-cloudflare-token.mjs'
+      - 'test/cloudflare-token-verification-fallback.test.mjs'
+      - 'test/cloudflare-branch-authority-workflow-contract.test.mjs'
+      - 'test/cloudflare-branch-authority-apply-workflow-contract.test.mjs'
+      - '.github/workflows/verify-cloudflare-authority-source.yml'
+  pull_request:
+    paths:
+      - 'scripts/verify-cloudflare-worker-branch-authority.mjs'
+      - 'scripts/run-with-normalized-cloudflare-token.mjs'
+      - 'test/cloudflare-token-verification-fallback.test.mjs'
+      - 'test/cloudflare-branch-authority-workflow-contract.test.mjs'
+      - 'test/cloudflare-branch-authority-apply-workflow-contract.test.mjs'
+      - '.github/workflows/verify-cloudflare-authority-source.yml'
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  source-proof:
+    name: Cloudflare authority source regressions
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the exact source head without persisted credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          fetch-depth: 1
+      - name: Require exact checkout
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+      - name: Set up Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Run secretless Cloudflare source and authority regression tests
+        run: >-
+          node --test
+          test/cloudflare-token-verification-fallback.test.mjs
+          test/cloudflare-branch-authority-workflow-contract.test.mjs
+          test/cloudflare-branch-authority-apply-workflow-contract.test.mjs
