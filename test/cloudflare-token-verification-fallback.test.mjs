@@ -197,3 +197,54 @@ test('Worker authority verifier accepts a wrapped user token only after provider
     assert.equal(receipt.includes(suppliedTransport), false);
   } finally { await rm(tmp, { recursive: true, force: true }); }
 });
+
+test('Worker authority verifier rejects generic bip deploy commands that target the default backend config', async () => {
+  const originalFetch = globalThis.fetch;
+  const envKeys = ['CLOUDFLARE_ACCOUNT_ID', 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', 'CLOUDFLARE_API_TOKEN', 'EVIDENCE_PATH', 'GITHUB_REF', 'GITHUB_SHA'];
+  const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
+  const tmp = await mkdtemp(join(tmpdir(), 'bip-cloudflare-transport-proof-'));
+  const evidencePath = join(tmp, 'receipt.json');
+  const validToken = 'cfut_synthetic_read_only_user_token';
+  const suppliedTransport = '  "Bearer ' + validToken + '"  ';
+  const acct = 'synthetic-account';
+  const tags = { bip: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'sekret-backend': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' };
+  const observed = [];
+  process.env.CLOUDFLARE_ACCOUNT_ID = acct;
+  process.env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN = suppliedTransport;
+  delete process.env.CLOUDFLARE_API_TOKEN;
+  process.env.EVIDENCE_PATH = evidencePath;
+  process.env.GITHUB_REF = 'refs/heads/main';
+  process.env.GITHUB_SHA = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+  globalThis.fetch = async (url, options = {}) => {
+    const p = String(url);
+    const auth = String(options.headers?.Authorization || '');
+    assert.equal(auth, 'Bearer ' + validToken);
+    observed.push(p);
+    if (p.endsWith('/user/tokens/verify')) return { ok: true, status: 200, json: async () => ({ success: true, result: { status: 'active' } }) };
+    if (p.endsWith('/accounts/' + acct + '/workers/scripts')) return { ok: true, status: 200, json: async () => ({ success: true, result: Object.entries(tags).map(([id, tag]) => ({ id, tag })) }) };
+    if (p.endsWith('/builds/workers/' + tags.bip + '/triggers')) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ branch_includes: ['main'], branch_excludes: [], build_command: '', deploy_command: 'npx wrangler deploy' }] }) };
+    if (p.endsWith('/builds/workers/' + tags.bip + '/builds?per_page=50')) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
+    if (p.endsWith('/builds/workers/' + tags['sekret-backend'] + '/triggers')) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ branch_includes: ['main'], branch_excludes: [], build_command: '', deploy_command: 'npm run deploy:api:production' }] }) };
+    if (p.endsWith('/builds/workers/' + tags['sekret-backend'] + '/builds?per_page=50')) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
+    throw new Error('Unexpected probe path');
+  };
+  let thrown;
+  try { await import(workerVerifierUrl.href + '?wrapped-user-token-proof=' + Date.now()); }
+  catch (error) { thrown = error; }
+  finally {
+    globalThis.fetch = originalFetch;
+    for (const key of envKeys) {
+      if (originalEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = originalEnv[key];
+    }
+  }
+  try {
+    assert.ok(thrown instanceof Error);
+    assert.ok(observed.some((p) => p.endsWith('/user/tokens/verify')));
+    assert.ok(observed.some((p) => p.endsWith('/workers/scripts')));
+    const receipt = await readFile(evidencePath, 'utf8');
+    assert.equal(JSON.parse(receipt).failure?.code, 'separate-worker-build-authority-not-verified');
+    assert.equal(receipt.includes(validToken), false);
+    assert.equal(receipt.includes(suppliedTransport), false);
+  } finally { await rm(tmp, { recursive: true, force: true }); }
+});
