@@ -114,3 +114,25 @@ test('local CodeQL proof preserves exact-head, waiver, and evidence boundaries',
   assert.match(workflow, /node scripts\/codeql-pr-alert-proof\.mjs/);
   assert.match(workflow, /retention-days:\s*30/);
 });
+
+test('retired exact-head waiver history cannot suppress recurring findings', () => {
+  const waiverDocument = JSON.parse(fs.readFileSync(new URL('../security/codeql-local-waivers.json', import.meta.url), 'utf8'));
+  const retiredIds = [
+    'worker-identity-test-url-substring',
+    'pages-domain-array-membership',
+    'pages-domain-array-membership-test',
+  ];
+  for (const id of retiredIds) {
+    assert.equal(waiverDocument.waivers.some((entry) => entry.id === id), false,
+      'an unused exception must leave the active waiver set');
+    const retired = waiverDocument.retiredWaivers.find((entry) => entry.id === id);
+    assert.ok(retired, 'retirement retains the original exception provenance');
+    const recurrence = { ruleId: retired.ruleId, path: retired.path, message: retired.messageIncludes };
+    const result = applyFindingWaivers([recurrence], {
+      schemaVersion: 1, waivers: [], retiredWaivers: [retired],
+    }, { language: retired.language, now: new Date('2026-11-01T16:36:21Z') });
+    assert.equal(result.blockingFindings.length, 1);
+    assert.equal(result.waivedFindings.length, 0);
+    assert.deepEqual(result.waiverErrors, []);
+  }
+});
