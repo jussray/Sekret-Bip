@@ -25,6 +25,20 @@ function fail(message) {
   process.exit(1);
 }
 
+// The numeric HTTP status is logged as a fixed class, never as body, header or provider text.
+// Each branch is a literal fixed event so the changed-line Sauce Guard gate can verify it.
+export function logHttpStatusClass(status) {
+  switch (status) {
+    case 400: console.error('SAUCE_GUARD_DELETE_HTTP_400'); return;
+    case 401: console.error('SAUCE_GUARD_DELETE_HTTP_401'); return;
+    case 403: console.error('SAUCE_GUARD_DELETE_HTTP_403'); return;
+    case 404: console.error('SAUCE_GUARD_DELETE_HTTP_404'); return;
+    case 409: console.error('SAUCE_GUARD_DELETE_HTTP_409'); return;
+    case 500: console.error('SAUCE_GUARD_DELETE_HTTP_500'); return;
+    default: console.error('SAUCE_GUARD_DELETE_HTTP_OTHER');
+  }
+}
+
 // The table's canonical migration lives in public. Without Accept-Profile,
 // a PostgREST deployment defaulting to api queries the wrong namespace.
 export async function fetchExpiredPendingRequests({
@@ -49,6 +63,7 @@ export async function fetchExpiredPendingRequests({
 
   const body = await response.text();
   if (!response.ok) {
+    logHttpStatusClass(response.status);
     let code = 'unknown';
     try { code = String(JSON.parse(body)?.code || 'unknown'); } catch { /* never echo raw API bodies */ }
     if (code === 'PGRST205' || code === 'PGRST106') {
@@ -97,6 +112,7 @@ async function main() {
       console.log('SAUCE_GUARD_DELETE_REQUEST_PROCESSED');
     } else {
       console.error('SAUCE_GUARD_DELETE_REQUEST_FAILED');
+      logHttpStatusClass(result.status);
     }
   }
 
