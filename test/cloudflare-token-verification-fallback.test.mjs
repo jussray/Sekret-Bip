@@ -171,7 +171,7 @@ test('Worker authority verifier accepts a wrapped user token only after provider
     observed.push(p);
     if (p.endsWith('/user/tokens/verify')) return { ok: true, status: 200, json: async () => ({ success: true, result: { status: 'active' } }) };
     if (p.endsWith('/accounts/' + acct + '/workers/scripts')) return { ok: true, status: 200, json: async () => ({ success: true, result: Object.entries(tags).map(([id, tag]) => ({ id, tag })) }) };
-    if (p.endsWith('/builds/workers/' + tags.bip + '/triggers')) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ branch_includes: ['main'], branch_excludes: [], build_command: '', deploy_command: 'npm run deploy:bip' }] }) };
+    if (p.endsWith('/builds/workers/' + tags.bip + '/triggers')) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     if (p.endsWith('/builds/workers/' + tags.bip + '/builds?per_page=50')) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     if (p.endsWith('/builds/workers/' + tags['sekret-backend'] + '/triggers')) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ branch_includes: ['main'], branch_excludes: [], build_command: '', deploy_command: 'npm run deploy:api:production' }] }) };
     if (p.endsWith('/builds/workers/' + tags['sekret-backend'] + '/builds?per_page=50')) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
@@ -193,6 +193,7 @@ test('Worker authority verifier accepts a wrapped user token only after provider
     assert.ok(observed.some((p) => p.endsWith('/workers/scripts')));
     const receipt = await readFile(evidencePath, 'utf8');
     assert.equal(JSON.parse(receipt).status, 'verified');
+    assert.equal(JSON.parse(receipt).separateWorker.buildConnectionState, 'disabled');
     assert.equal(receipt.includes(validToken), false);
     assert.equal(receipt.includes(suppliedTransport), false);
   } finally { await rm(tmp, { recursive: true, force: true }); }

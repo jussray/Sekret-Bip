@@ -365,8 +365,30 @@ const separateBuildConnectionMainOnly = separateActiveTriggers.length === 1 && J
 // "wrangler deploy" trigger for bip can therefore deploy the wrong Worker.
 // Treat a dedicated, named bip deployment command as necessary (not sufficient)
 // for release authority; its script/config and runtime still need separate proof.
+// A command string is not evidence of a deployable, isolated Worker. The
+// dedicated script, Wrangler target, and entrypoint must exist on this head.
+// Additional provider binding and runtime proof remain independent release gates.
+function localBipDeployContractPresent() {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+    if (manifest?.scripts?.['deploy:bip'] !== 'wrangler deploy --config wrangler.bip.toml') return false;
+    const config = fs.readFileSync(new URL('../wrangler.bip.toml', import.meta.url), 'utf8');
+    if (!/^name\s*=\s*"bip"\s*$/m.test(config)) return false;
+    if (!/^main\s*=\s*"worker\/companion-entry.ts"\s*$/m.test(config)) return false;
+    if (!/^workers_dev\s*=\s*false\s*$/m.test(config)) return false;
+    if (/^\s*(?:routes?\s*=|\[\[routes\]\])/m.test(config)) return false;
+    if (/SUPABASE_SERVICE_ROLE_KEY/.test(config)) return false;
+    return fs.existsSync(new URL('../worker/companion-entry.ts', import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+const dedicatedDeployContractPresent = localBipDeployContractPresent();
 const separateDeployCommandTargetsBip = separateBuildConnectionDisabled
-  || (separateBuildConnectionMainOnly && separateDeployCommand === 'npm run deploy:bip');
+  || (separateBuildConnectionMainOnly
+    && separateDeployCommand === 'npm run deploy:bip'
+    && dedicatedDeployContractPresent);
 const separateVerifiedSafeBuildAuthority = (separateBuildConnectionDisabled
   || (separateBuildConnectionMainOnly && separateDeployCommandTargetsBip))
   && separateActiveNonMainBuilds.length === 0;
@@ -399,6 +421,7 @@ receipt.separateWorker.deployCommand = separateDeployCommand;
 receipt.separateWorker.buildCommand = separateBuildCommand;
 receipt.separateWorker.activeNonMainBuildCount = separateActiveNonMainBuilds.length;
 receipt.separateWorker.buildConnectionState = separateBuildConnectionDisabled ? 'disabled' : separateBuildConnectionMainOnly ? 'main-only' : 'unsafe-or-ambiguous';
+receipt.separateWorker.dedicatedDeployContractPresent = dedicatedDeployContractPresent;
 receipt.separateWorker.deployCommandTargetsBip = separateDeployCommandTargetsBip;
 receipt.separateWorker.verifiedSafeBuildAuthority = separateVerifiedSafeBuildAuthority;
 receipt.productionWorker.activeTriggerCount = activeTriggers.length;
