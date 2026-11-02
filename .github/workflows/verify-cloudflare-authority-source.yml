@@ -4,6 +4,9 @@ on:
   push:
     paths:
       - 'scripts/verify-cloudflare-worker-branch-authority.mjs'
+      - 'worker/companion-entry.ts'
+      - 'wrangler.bip.toml'
+      - 'test/bip-companion-isolation.test.mjs'
       - 'scripts/run-with-normalized-cloudflare-token.mjs'
       - 'test/cloudflare-token-verification-fallback.test.mjs'
       - 'test/cloudflare-branch-authority-workflow-contract.test.mjs'
@@ -12,6 +15,9 @@ on:
   pull_request:
     paths:
       - 'scripts/verify-cloudflare-worker-branch-authority.mjs'
+      - 'worker/companion-entry.ts'
+      - 'wrangler.bip.toml'
+      - 'test/bip-companion-isolation.test.mjs'
       - 'scripts/run-with-normalized-cloudflare-token.mjs'
       - 'test/cloudflare-token-verification-fallback.test.mjs'
       - 'test/cloudflare-branch-authority-workflow-contract.test.mjs'
@@ -48,3 +54,4 @@ jobs:
           test/cloudflare-token-verification-fallback.test.mjs
           test/cloudflare-branch-authority-workflow-contract.test.mjs
           test/cloudflare-branch-authority-apply-workflow-contract.test.mjs
+          test/bip-companion-isolation.test.mjs
