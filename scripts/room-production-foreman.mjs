@@ -25,7 +25,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.log(`\nSe’kret Bip room production foreman\n\nUsage:\n  npm run room:foreman:plan\n  npm run room:foreman:verify\n  npm run room:foreman:interactive -- --tool canva\n\nThe foreman never types passwords, bypasses MFA/CAPTCHAs, publishes, merges, or performs destructive editor actions.\n`);
+  console.log('ROOM_FOREMAN_USAGE');
 }
 
 function readJson(filePath) {
@@ -256,7 +256,7 @@ async function runInteractiveTool(tool, manifest, runDir, args) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 });
     await page.screenshot({ path: path.join(evidenceDir, `${tool}-workspace.png`), fullPage: true });
     if (!args.headless && args.holdMs > 0) {
-      console.log(`[${tool}] Complete login or approval manually. Waiting ${args.holdMs}ms before checkpoint capture.`);
+      console.log('ROOM_FOREMAN_MANUAL_LOGIN_WAIT');
       await page.waitForTimeout(args.holdMs);
       await page.screenshot({ path: path.join(evidenceDir, `${tool}-checkpoint.png`), fullPage: true });
     }
@@ -285,7 +285,7 @@ async function main() {
   if (args.mode === 'plan') {
     const queue = buildQueue(manifest, promptPack);
     results.push({ status: 'pass', label: 'manifest', detail: `${queue.length} vertical-slice jobs validated.` });
-    for (const item of queue) console.log(`${item.kind.padEnd(15)} ${item.pose ?? item.phase} -> ${item.file}`);
+    for (const item of queue) console.log('ROOM_FOREMAN_QUEUE_ITEM');
   } else if (args.mode === 'verify') {
     results.push(...verifyAssets({ rootDir, manifest, promptPack }));
   } else if (args.mode === 'interactive') {
@@ -301,14 +301,14 @@ async function main() {
   const blocking = hasBlockingResults(results);
   const report = { runId, mode: args.mode, tool: args.tool, manifest: path.relative(rootDir, manifestPath), startedAt, finishedAt: new Date().toISOString(), status: blocking ? 'attention-required' : 'pass', results };
   writeReports(runDir, report);
-  console.log(`\nRoom foreman status: ${report.status}`);
-  console.log(`Report: ${path.join(runDir, 'run-report.md')}`);
+  console.log('ROOM_FOREMAN_FINISHED');
+  console.log('ROOM_FOREMAN_REPORT_WRITTEN');
   if (blocking) process.exitCode = 1;
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) main().catch(error => {
-  console.error(`Room foreman failed: ${error instanceof Error ? error.message : String(error)}`);
+  console.error('ROOM_FOREMAN_FAILED');
   process.exitCode = 1;
 });
 

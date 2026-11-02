@@ -1,57 +1,6 @@
 name: Playwright Smoke and Guardrails
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'app/**'
-      - 'components/**'
-      - 'screens/**'
-      - 'src/**'
-      - 'worker/**'
-      - 'e2e/**'
-      - 'assets/**'
-      - 'config/leonardo/night-asset-prompt-pack.json'
-      - 'config/room-production.manifest.json'
-      - 'scripts/room-production-foreman.mjs'
-      - 'scripts/verify-cloudflare-native-deploy.mjs'
-      - 'scripts/write-release-metadata.mjs'
-      - 'test/cloudflare-native-deploy.test.mjs'
-      - 'test/release-metadata.test.mjs'
-      - 'test/room-production-contract.test.mjs'
-      - 'playwright.config.ts'
-      - 'playwright.auth-transport.config.ts'
-      - 'playwright.production.config.ts'
-      - 'playwright.founder-preview.config.ts'
-      - 'playwright.room.config.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/playwright.yml'
-  pull_request:
-    paths:
-      - 'app/**'
-      - 'components/**'
-      - 'screens/**'
-      - 'src/**'
-      - 'worker/**'
-      - 'e2e/**'
-      - 'assets/**'
-      - 'config/leonardo/night-asset-prompt-pack.json'
-      - 'config/room-production.manifest.json'
-      - 'scripts/room-production-foreman.mjs'
-      - 'scripts/verify-cloudflare-native-deploy.mjs'
-      - 'scripts/write-release-metadata.mjs'
-      - 'test/cloudflare-native-deploy.test.mjs'
-      - 'test/release-metadata.test.mjs'
-      - 'test/room-production-contract.test.mjs'
-      - 'playwright.config.ts'
-      - 'playwright.auth-transport.config.ts'
-      - 'playwright.production.config.ts'
-      - 'playwright.founder-preview.config.ts'
-      - 'playwright.room.config.ts'
-      - 'package.json'
-      - 'package-lock.json'
-      - '.github/workflows/playwright.yml'
   workflow_dispatch:
     inputs:
       target_sha:
@@ -202,5 +151,6 @@ jobs:
             artifacts/playwright-smoke/
             playwright-report-founder-preview/
             test-results/
+            .room-foreman/runs/
           if-no-files-found: warn
           retention-days: 14

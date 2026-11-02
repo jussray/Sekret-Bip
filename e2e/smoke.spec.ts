@@ -194,6 +194,9 @@ test('parent signup deep link exposes accessible account creation controls', asy
   await expect(page.getByRole('button', { name: 'Next' })).toBeVisible();
 });
 
+test('protected teen routes remain behind the account and verification boundary', async ({ page }) => {
+  await page.goto('/circle?bipDevSide=teen');
+  await expect(page).toHaveURL(/\/guardian-verification(?:\?|$)/, { timeout: 30_000 });
   await expect(page.getByText('GUARDIAN ACCESS')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Guardian verification required.')).toBeVisible();
   await expect(page.getByText(/Linking to a teen is a separate consent step/)).toBeVisible();
