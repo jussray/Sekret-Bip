@@ -12,6 +12,7 @@ on:
           - account-request-cancel
           - account-delete
           - parent-link-revoke
+          - runtime-contract-health
       confirm_project:
         description: Type tbsevonvegdnlyjgplmm to confirm the target project
         required: true
@@ -86,7 +87,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          if [ "${{ inputs.function_name }}" = "account-delete" ]; then
+          if [ "${{ inputs.function_name }}" = "account-delete" ] || [ "${{ inputs.function_name }}" = "runtime-contract-health" ]; then
             supabase functions deploy "${{ inputs.function_name }}" \
               --project-ref tbsevonvegdnlyjgplmm \
               --no-verify-jwt
