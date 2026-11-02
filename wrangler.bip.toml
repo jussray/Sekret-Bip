@@ -1,0 +1,8 @@
+# Source-only isolation scaffold. This must NOT be applied to the existing
+# protected bip Worker until companion behavior, authorization, release
+# identity, binding, and rollback have independently passed release gates.
+name = "bip"
+main = "worker/companion-entry.ts"
+compatibility_date = "2026-06-13"
+workers_dev = false
+preview_urls = false
