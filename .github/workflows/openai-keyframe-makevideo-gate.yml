@@ -1,0 +1,63 @@
+name: OpenAI Keyframe to Makevideo Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/generate-openai-keyframe.mjs'
+      - 'test/openai-keyframe-adapter.test.mjs'
+      - 'docs/OPENAI_IMAGE_VIDEO_INTEGRATION.md'
+      - 'examples/openai-keyframe-*.json'
+      - '.github/workflows/openai-keyframe-makevideo-gate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/generate-openai-keyframe.mjs'
+      - 'test/openai-keyframe-adapter.test.mjs'
+      - 'docs/OPENAI_IMAGE_VIDEO_INTEGRATION.md'
+      - 'examples/openai-keyframe-*.json'
+      - '.github/workflows/openai-keyframe-makevideo-gate.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  keyframe-gate:
+    name: Exact-head image and makevideo handoff tests
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Prove exact source
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Use Node 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Parse-check adapter
+        run: node --check scripts/generate-openai-keyframe.mjs
+      - name: Run focused image, identity and handoff regression tests
+        run: node --test test/openai-keyframe-adapter.test.mjs
+      - name: Preflight without provider calls or credits
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          node scripts/generate-openai-keyframe.mjs \
+            --spec examples/openai-keyframe-world.spec.json \
+            --registry sekret-bip-character-canon/registry.json \
+            --plan-out artifacts/openai-keyframe-preflight.json
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const p=JSON.parse(fs.readFileSync("artifacts/openai-keyframe-preflight.json","utf8"));
+            if (p.kind!=="PREFLIGHT_ONLY" || p.videoEligible!==false || p.finalApprovalEligible!==false || p.approvedForGeneration!==false) process.exit(1);
+          '
