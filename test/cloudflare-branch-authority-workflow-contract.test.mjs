@@ -150,7 +150,7 @@ test('Worker authority verifier retains the previous general read token when the
     assert.equal(auth, general);
     if (text.endsWith('/user/tokens/verify')) return { ok: true, status: 200, json: async () => ({ success: true, result: { status: 'active' } }) };
     if (text.endsWith(`/accounts/${accountId}/workers/scripts`)) return { ok: true, status: 200, json: async () => ({ success: true, result: Object.entries(tags).map(([id, tag]) => ({ id, tag })) }) };
-    if (text.endsWith(`/builds/workers/${tags.bip}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ trigger_uuid:'bip-trigger', branch_includes:['main'], branch_excludes:[], build_command:'', deploy_command:'npm run deploy:bip', deleted_on:null }] }) };
+    if (text.endsWith(`/builds/workers/${tags.bip}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     if (text.endsWith(`/builds/workers/${tags.bip}/builds?per_page=50`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     if (text.endsWith(`/builds/workers/${tags['sekret-backend']}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ trigger_uuid:'prod-trigger', branch_includes:['main'], branch_excludes:[], build_command:'', deploy_command:'npm run deploy:api:production', deleted_on:null }] }) };
     if (text.endsWith(`/builds/workers/${tags['sekret-backend']}/builds?per_page=50`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
@@ -180,7 +180,7 @@ test('Worker authority verifier retains the previous general read token when the
   } finally { await rm(tempDir, { recursive: true, force: true }); }
 });
 
-test('Worker authority verifier requires the dedicated user token and verifies main-only Builds authority by Worker tag', async () => {
+test('Worker authority verifier requires the dedicated user token and verifies the disabled bip build connector and main-only backend by Worker tag', async () => {
   const originalFetch = globalThis.fetch;
   const envKeys = ['CLOUDFLARE_ACCOUNT_ID','CLOUDFLARE_WORKERS_BUILDS_API_TOKEN','CLOUDFLARE_API_TOKEN','EVIDENCE_PATH','GITHUB_REF','GITHUB_SHA'];
   const originalEnv = Object.fromEntries(envKeys.map((key) => [key, process.env[key]]));
@@ -202,7 +202,7 @@ test('Worker authority verifier requires the dedicated user token and verifies m
     const text = String(url);
     if (text.endsWith('/user/tokens/verify')) return { ok: true, status: 200, json: async () => ({ success: true, result: { status: 'active' } }) };
     if (text.includes(`/accounts/${accountId}/workers/scripts`)) return { ok: true, status: 200, json: async () => ({ success: true, result: Object.entries(tags).map(([id, tag]) => ({ id, tag })) }) };
-    if (text.endsWith(`/builds/workers/${tags.bip}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ trigger_uuid:'bip-trigger', branch_includes:['main'], branch_excludes:[], build_command:'', deploy_command:'npm run deploy:bip', deleted_on:null }] }) };
+    if (text.endsWith(`/builds/workers/${tags.bip}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     if (text.endsWith(`/builds/workers/${tags.bip}/builds?per_page=50`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     if (text.endsWith(`/builds/workers/${tags['sekret-backend']}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ trigger_uuid:'prod-trigger', branch_includes:['main'], branch_excludes:[], build_command:'', deploy_command:'npm run deploy:api:production', deleted_on:null }] }) };
     if (text.endsWith(`/builds/workers/${tags['sekret-backend']}/builds?per_page=50`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
@@ -228,8 +228,9 @@ test('Worker authority verifier requires the dedicated user token and verifies m
     assert.equal(receipt.separateWorker.name, 'bip');
     assert.equal(receipt.separateWorker.previousName, 'sekret');
     assert.equal(receipt.separateWorker.scriptTag, tags.bip);
-    assert.equal(receipt.separateWorker.buildConnectionState, 'main-only');
+    assert.equal(receipt.separateWorker.buildConnectionState, 'disabled');
     assert.equal(receipt.separateWorker.verifiedSafeBuildAuthority, true);
+    assert.equal(receipt.separateWorker.dedicatedDeployContractPresent, false);
     assert.equal(receipt.productionWorker.scriptTag, tags['sekret-backend']);
     assert.equal(receipt.productionWorker.verifiedMainOnly, true);
     assert.equal(receipt.alphaWorker.observed, true);
@@ -260,7 +261,7 @@ test('Worker authority verifier treats an undeployed founder-gated alpha as vali
     const text = String(url);
     if (text.endsWith('/user/tokens/verify')) return { ok: true, status: 200, json: async () => ({ success: true, result: { status: 'active' } }) };
     if (text.endsWith(`/accounts/${accountId}/workers/scripts`)) return { ok: true, status: 200, json: async () => ({ success: true, result: Object.entries(tags).map(([id, tag]) => ({ id, tag })) }) };
-    if (text.endsWith(`/builds/workers/${tags.bip}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ trigger_uuid:'bip-trigger', branch_includes:['main'], branch_excludes:[], build_command:'', deploy_command:'npm run deploy:bip', deleted_on:null }] }) };
+    if (text.endsWith(`/builds/workers/${tags.bip}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     if (text.endsWith(`/builds/workers/${tags.bip}/builds?per_page=50`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
     if (text.endsWith(`/builds/workers/${tags['sekret-backend']}/triggers`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [{ trigger_uuid:'prod-trigger', branch_includes:['main'], branch_excludes:[], build_command:'', deploy_command:'npm run deploy:api:production', deleted_on:null }] }) };
     if (text.endsWith(`/builds/workers/${tags['sekret-backend']}/builds?per_page=50`)) return { ok: true, status: 200, json: async () => ({ success: true, result: [] }) };
