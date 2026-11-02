@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,readFile,rm,writeFile,mkdir,open,rename} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -10,6 +10,69 @@ const registry={characters:[{key:'cloud',status:'approved',higgsfield_element_id
 const base={schema:'sekret-bip-openai-keyframe@v1',shot:1,prompt:'Cinematic empty violet courtyard.',size:'1024x1536',quality:'medium',mode:'world-only',cast:[],approvedForGeneration:false};
 const tinyPng=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9WlQEX4AAAAASUVORK5CYII=','base64');
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+
+async function interceptReferenceStat(t,path,afterStat){
+  const probe=await open(path,'r'),prototype=Object.getPrototypeOf(probe),original=prototype.stat;
+  await probe.close();
+  const observed={calls:0,handle:null,readCalls:0,readBytes:0},originalRead=prototype.read;
+  t.mock.method(prototype,'read',async function(...args){
+    const result=await originalRead.apply(this,args);
+    observed.readCalls++;observed.readBytes+=result.bytesRead;
+    return result;
+  });
+  t.mock.method(prototype,'stat',async function(...args){
+    const info=await original.apply(this,args);
+    observed.calls++;observed.handle=this;
+    await afterStat();
+    return info;
+  });
+  return observed;
+}
+const referenceSpec=(path,bytes=tinyPng)=>({...base,mode:'character-edit',cast:['cloud'],references:[
+  {key:'cloud',path,sha256:sha(bytes),authority:'character-authority',approved:true},
+]});
+
+test('reference validation rejects directories and files above the byte limit',async()=>{
+  const dir=await mkdtemp(join(tmpdir(),'bip-reference-'));
+  try{
+    const directory=join(dir,'directory.png');await mkdir(directory);
+    await assert.rejects(planOpenAIKeyframe(referenceSpec(directory),registry),/reference_file_invalid/);
+    const oversized=join(dir,'large.png'),handle=await open(oversized,'w');
+    try{await handle.truncate(20*1024*1024+1);}finally{await handle.close();}
+    await assert.rejects(planOpenAIKeyframe(referenceSpec(oversized),registry),/reference_file_invalid/);
+  }finally{await rm(dir,{recursive:true,force:true});}
+});
+
+test('reference validation reads the checked descriptor after path replacement and closes it',async(t)=>{
+  const dir=await mkdtemp(join(tmpdir(),'bip-reference-'));
+  try{
+    const path=join(dir,'cloud.png');await writeFile(path,tinyPng);
+    const observed=await interceptReferenceStat(t,path,async()=>{
+      await rename(path,join(dir,'original.png'));
+      await writeFile(path,Buffer.from('replacement is not the approved image'));
+    });
+    const plan=await planOpenAIKeyframe(referenceSpec(path),registry);
+    assert.equal(observed.calls,1,'validation must stat the opened reference descriptor');
+    assert.deepEqual(plan._files[0].bytes,tinyPng);
+    assert.equal(observed.handle.fd,-1,'success must close the reference descriptor');
+  }finally{t.mock.restoreAll();await rm(dir,{recursive:true,force:true});}
+});
+
+test('concurrent reference growth is bounded and fails closed with descriptor cleanup',async(t)=>{
+  const dir=await mkdtemp(join(tmpdir(),'bip-reference-'));
+  try{
+    const path=join(dir,'cloud.png');await writeFile(path,tinyPng);
+    const observed=await interceptReferenceStat(t,path,async()=>{
+      const writer=await open(path,'r+');
+      try{await writer.truncate(21*1024*1024);}finally{await writer.close();}
+    });
+    await assert.rejects(planOpenAIKeyframe(referenceSpec(path),registry),/reference_file_invalid/);
+    assert.equal(observed.calls,1);
+    assert.ok(observed.readCalls>0,'reference content must use bounded descriptor reads');
+    assert.equal(observed.readBytes,20*1024*1024+1,'growth reads at most one sentinel byte beyond the limit');
+    assert.equal(observed.handle.fd,-1,'rejection must close the reference descriptor');
+  }finally{t.mock.restoreAll();await rm(dir,{recursive:true,force:true});}
+});
 
 test('dry-run does not enable video or make provider requests',async()=>{
   const plan=await planOpenAIKeyframe(base,registry);
@@ -141,18 +204,5 @@ test('failed provider request cleans both reserved destinations',async()=>{
     );
     await assert.rejects(readFile(output),{code:'ENOENT'});
     await assert.rejects(readFile(receipt),{code:'ENOENT'});
-  }finally{await rm(dir,{recursive:true,force:true});}
-});
-
-test('reference reader rejects files above the 20 MiB approved-image cap',async()=>{
-  const dir=await mkdtemp(join(tmpdir(),'bip-keyframe-limit-'));
-  try{
-    const path=join(dir,'cloud.png');
-    const oversized=Buffer.alloc(20*1024*1024+1);
-    await writeFile(path,oversized);
-    const spec={...base,mode:'character-edit',cast:['cloud'],references:[
-      {key:'cloud',path,sha256:sha(oversized),authority:'character-authority',approved:true},
-    ]};
-    await assert.rejects(planOpenAIKeyframe(spec,registry),/reference_file_invalid/);
   }finally{await rm(dir,{recursive:true,force:true});}
 });

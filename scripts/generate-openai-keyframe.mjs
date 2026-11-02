@@ -4,6 +4,7 @@
  * /makevideo remains the ONLY approved-media MP4 assembly stage.
  */
 import {createHash} from 'node:crypto';
+import {constants as FS_FLAGS} from 'node:fs';
 import {readFile,writeFile,mkdir,open,rm} from 'node:fs/promises';
 import {basename,dirname,extname,resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
@@ -46,17 +47,24 @@ export async function planOpenAIKeyframe(spec,registry){
       if(typeof ref.path!=='string'||!ref.path.trim()) deny('reference_path_required');
       const path=resolve(ref.path),mime=MIME[extname(path).toLowerCase()];
       if(!mime) deny('reference_file_type_invalid');
-      let bytes;
-      let handle;
+      let bytes,referenceHandle;
       try{
-        // Inspect and read the same opened file, not a pathname that could change.
-        handle=await open(path,'r');
-        const info=await handle.stat();
-        if(!info.isFile()||info.size>20*1024*1024) deny('reference_file_invalid');
-        bytes=await handle.readFile();
-        if(bytes.length>20*1024*1024) deny('reference_file_invalid');
+        // Nonblocking open keeps POSIX FIFOs from hanging before the file check.
+        // Platforms without O_NONBLOCK retain regular read-only open semantics.
+        referenceHandle=await open(path,FS_FLAGS.O_RDONLY|(FS_FLAGS.O_NONBLOCK??0));
+        const info=await referenceHandle.stat(),limit=20*1024*1024;
+        if(!info.isFile()||info.size>limit) deny('reference_file_invalid');
+        const buffer=Buffer.alloc(limit+1);
+        let length=0;
+        while(length<buffer.length){
+          const {bytesRead}=await referenceHandle.read(buffer,length,buffer.length-length,null);
+          if(bytesRead===0) break;
+          length+=bytesRead;
+        }
+        if(length>limit) deny('reference_file_invalid');
+        bytes=Buffer.from(buffer.subarray(0,length));
       }catch(error){if(error.message==='reference_file_invalid') throw error;deny('reference_file_missing');}
-      finally{if(handle) await handle.close();}
+      finally{await referenceHandle?.close();}
       if(sha(bytes)!==ref.sha256.toLowerCase()) deny('reference_sha256_mismatch');
       if(!isImage(bytes,mime)) deny('reference_file_invalid_format');
       files.push({key,filename:basename(path),sha256:ref.sha256.toLowerCase(),mime,bytes});
@@ -133,7 +141,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
     }
     if (process.argv.includes('--execute')) console.log('BIP_OPENAI_STILL_CREATED_REVIEW_REQUIRED');
     else console.log('BIP_OPENAI_PREFLIGHT_OK');
-  }catch(error){
+  }catch{
     console.error('BIP_OPENAI_KEYFRAME_BLOCKED');
     process.exitCode=1;
   }
