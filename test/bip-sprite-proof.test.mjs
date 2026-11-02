@@ -50,12 +50,38 @@ test('fixed runner uses shell=false and a sanitized environment', () => {
   const calls = [];
   const spawn = (command, args, opts) => {
     calls.push({ command, args, opts });
-    return calls.length === 1 ? { status: 0, stdout: sha + '\n', stderr: '' } : { status: 0, stdout: 'test passed', stderr: '' };
+    return calls.length === 1 ? { status: 0, stdout: sha + '\n', stderr: '' } : calls.length === 2 ? { status: 0, stdout: '', stderr: '' } : { status: 0, stdout: 'test passed', stderr: '' };
   };
   const receipt = runProof({ mission: 'companion-contract', sha }, { spawn, env: { GITHUB_TOKEN: 'secret' }, now: () => '2026-10-31' });
   assert.equal(receipt.status, 'pass');
+  assert.equal(calls.length, 3);
+  assert.equal(calls[1].command, 'git');
+  assert.equal(calls[1].args[0], 'status');
+  assert.equal(calls[2].command, 'node');
+  assert.equal(calls[2].opts.shell, false);
+  assert.equal(calls[2].opts.env.GITHUB_TOKEN, undefined);
+});
+
+test('modified tracked source blocks exact-SHA proof before any mission runs', () => {
+  const calls = [];
+  const spawn = (command, args) => {
+    calls.push({ command, args });
+    if (args[0] === 'rev-parse') return { status: 0, stdout: sha + '\n', stderr: '' };
+    if (args[0] === 'status') return { status: 0, stdout: ' M scripts/bip-sprite-proof.mjs\n', stderr: '' };
+    throw new Error('mission must not run on dirty source');
+  };
+  assert.throws(() => runProof({ mission: 'repo-truth', sha }, { spawn }), /BIP_SPRITE_DIRTY_CHECKOUT/);
   assert.equal(calls.length, 2);
-  assert.equal(calls[1].command, 'node');
-  assert.equal(calls[1].opts.shell, false);
-  assert.equal(calls[1].opts.env.GITHUB_TOKEN, undefined);
+});
+
+test('source cleanliness probe failures block proof rather than passing', () => {
+  const calls = [];
+  const spawn = (command, args) => {
+    calls.push({ command, args });
+    if (args[0] === 'rev-parse') return { status: 0, stdout: sha + '\n', stderr: '' };
+    if (args[0] === 'status') return { status: 128, stdout: '', stderr: 'probe failed' };
+    throw new Error('mission must not run if source cleanliness is unknown');
+  };
+  assert.throws(() => runProof({ mission: 'agent-contract', sha }, { spawn }), /BIP_SPRITE_DIRTY_CHECK_FAILED/);
+  assert.equal(calls.length, 2);
 });

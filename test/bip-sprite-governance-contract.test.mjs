@@ -24,3 +24,14 @@ test('GitHub workflow uses exact-head read-only checks rather than secret-based 
   assert.match(workflow, /node --test test\/bip-sprite-proof\.test\.mjs/);
   assert.doesNotMatch(workflow, /secrets\.|CLOUDFLARE_API_TOKEN|SUPABASE_SERVICE_ROLE_KEY|curl\s/);
 });
+
+test('PR template includes required evidence sections while retaining safety checklist', () => {
+  const template = readFileSync(new URL('../.github/pull_request_template.md', import.meta.url), 'utf8');
+  const workflow = readFileSync(new URL('../.github/workflows/repo-reality.yml', import.meta.url), 'utf8');
+  for (const heading of ['Scope', 'Verification', 'Evidence', 'Limits', 'Rollback']) {
+    assert.match(template, new RegExp('^### ' + heading + '\\s*$', 'm'));
+  }
+  assert.match(template, /Safety — teen-facing flows/);
+  assert.match(template, /No hardcoded credentials/);
+  assert.ok(workflow.includes('body = re.sub(r"<!--.*?-->", "", body, flags=re.S)'));
+});
