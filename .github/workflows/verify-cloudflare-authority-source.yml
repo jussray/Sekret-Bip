@@ -86,6 +86,8 @@ jobs:
           cache: 'npm'
       - name: Install locked dependencies without lifecycle scripts
         run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Type-check the new internal proof contract without touching other source
+        run: ./node_modules/.bin/tsc --noEmit --skipLibCheck --target ES2022 --module ESNext --moduleResolution Bundler --lib es2022,dom --types node worker/companion-internal-proof.ts
       - name: Compile isolated bip without Cloudflare credentials or provider writes
         run: npx --no-install wrangler deploy --config wrangler.bip.toml --dry-run --outdir /tmp/bip-companion-dryrun
       - name: Ensure generated companion bundle contains no privileged platform modules
