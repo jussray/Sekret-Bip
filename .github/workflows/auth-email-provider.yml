@@ -34,6 +34,9 @@ jobs:
   reconcile-auth-email:
     name: Plan or apply production Auth email
     runs-on: ubuntu-latest
+    # Founder-owned provider credentials live in the `Production` Actions environment.
+    # The Resend key is stored there as the secret `login` and mapped to RESEND_API_KEY.
+    environment: Production
     timeout-minutes: 10
     steps:
       - name: Normalize and validate dispatch contract
@@ -115,7 +118,7 @@ jobs:
         if: inputs.apply == true
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.login }}
         shell: bash
         run: |
           set -euo pipefail
@@ -126,7 +129,7 @@ jobs:
         if: inputs.apply == true
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_API_KEY: ${{ secrets.login }}
         run: node scripts/configure-supabase-auth-email.mjs --apply
 
       - name: Upload redacted provider receipt

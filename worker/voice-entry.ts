@@ -1,3 +1,9 @@
+import {
+  emitReciprocalTelemetry,
+  observeFetchRequest,
+  reciprocalContainmentEnabled,
+  syntheticFetchResponse,
+} from '../security/reciprocal-ingress.mjs';
 import observedWorker from './observed-index';
 import emailRouter from './email-router';
 import { WORKER_RELEASE_SHA } from './release-identity.generated';
@@ -18,6 +24,7 @@ import {
   evaluateFounderOperationKillSwitch,
   stableHttpOperationId,
 } from '../shared/founder-operation-kill-switch.js';
+import { shouldPassThroughToFrontend } from '../shared/frontend-host-passthrough.js';
 
 interface MinimalExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -40,6 +47,8 @@ interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv {
   CF_VERSION_METADATA?: WorkerVersionMetadata;
   FOUNDER_OPERATION_KILL_SWITCH?: string;
   FOUNDER_OPERATION_KILL_SWITCH_REASON?: string;
+  RECIPROCAL_DEFENSE_MODE?: 'off' | 'observe' | 'contain';
+  RECIPROCAL_DEFENSE_SECRET?: string;
 }
 
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -247,10 +256,12 @@ async function enforceRateLimit(
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
   const key = principal.kind === 'user' ? `user:${principal.userId}` : `ip:${ip}`;
   try {
-    const { success } = await env.SEKRET_RATE_LIMITER.limit({ key });
+    const outcome = await env.SEKRET_RATE_LIMITER.limit({ key });
+    if (!outcome || typeof outcome.success !== 'boolean') return protectionUnavailable(cors);
+    const { success } = outcome;
     return success ? null : json({ error: 'rate limit exceeded', retryable: true }, 429, cors);
-  } catch (error) {
-    console.error('[voice-entry:rate-limit]', error);
+  } catch {
+    console.error('SEKRET_RATE_LIMIT_UNAVAILABLE');
     return protectionUnavailable(cors);
   }
 }
@@ -378,11 +389,26 @@ async function handleVoice(
 
 export default {
   async fetch(request: Request, env: Env, ctx: MinimalExecutionContext): Promise<Response> {
+    // A Worker route on a public frontend host must never replace the Pages
+    // welcome UI with a backend JSON response; hand page loads to the origin.
+    if (shouldPassThroughToFrontend(request.method, request.url)) return fetch(request);
+
     const started = Date.now();
     const cors = corsHeaders(request, env);
     const blocked = originRejected(request, env, cors);
     if (blocked) return blocked;
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+    // Default-off, synthetic-only containment. Preserve canonical Worker routing.
+    if (env.RECIPROCAL_DEFENSE_MODE === 'observe' || env.RECIPROCAL_DEFENSE_MODE === 'contain') {
+      const defense = await observeFetchRequest(request, env, 'sekret-backend');
+      emitReciprocalTelemetry(defense, ctx);
+      if (reciprocalContainmentEnabled(env)) {
+        const synthetic = syntheticFetchResponse(defense);
+        if (synthetic) return synthetic;
+      }
+    }
+
 
     const path = new URL(request.url).pathname;
     if (request.method === 'GET' && path === '/health') {

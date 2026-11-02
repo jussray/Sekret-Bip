@@ -37,6 +37,9 @@ function ParentTabs() {
         <Tabs.Screen name="dashboard" options={{ href: null }} />
         <Tabs.Screen name="circle/[id]" options={{ href: null }} />
         <Tabs.Screen name="circle/weather" options={{ href: null }} />
+        <Tabs.Screen name="circle/feed" options={{ href: null }} />
+        <Tabs.Screen name="bip-jr" options={{ href: null }} />
+        <Tabs.Screen name="teen-verification" options={{ href: null }} />
         <Tabs.Screen name="calm" options={{ href: null }} />
         <Tabs.Screen name="voicebip" options={{ href: null }} />
         <Tabs.Screen name="settings" options={{ href: null }} />
@@ -49,6 +52,7 @@ function ParentTabs() {
         <Tabs.Screen name="growth" options={{ href: null }} />
         <Tabs.Screen name="resources" options={{ href: null }} />
         <Tabs.Screen name="approvals" options={{ href: null }} />
+        <Tabs.Screen name="bip-jr-study" options={{ href: null }} />
       </Tabs>
       <SideSafeBackButton side="parent" />
     </View>
