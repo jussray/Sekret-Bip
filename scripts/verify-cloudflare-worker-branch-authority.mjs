@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { normalizeCloudflareTokenTransport } from './run-with-normalized-cloudflare-token.mjs';
 
 const API = 'https://api.cloudflare.com/client/v4';
 const clean = (value) => String(value ?? '').trim();
@@ -209,7 +210,12 @@ async function verifyApiToken(inspected) {
 }
 
 async function probeWorkersRead(rawValue, source) {
-  const inspected = inspectToken(rawValue, source);
+  // Recover transport-only wrappers; the provider still validates user-token
+  // identity and scoped read permission before any authority claim.
+  const normalized = normalizeCloudflareTokenTransport(rawValue);
+  const inspected = normalized.nonAsciiRemaining
+    ? { ok: false, source, shape: 'invalid', code: 'token-non-ascii-transport' }
+    : inspectToken(normalized.token, source);
   if (!inspected.ok) {
     receipt.credential.attempts.push({ source, shape: inspected.shape, probe: 'workers-scripts', result: 'rejected-preflight', failureCode: inspected.code });
     return { ok: false, code: inspected.code, message: `${source} failed Workers Builds token preflight.`, shape: inspected.shape };
@@ -355,7 +361,15 @@ const separateActiveNonMainBuilds = (Array.isArray(separateBuildRows) ? separate
 });
 const separateBuildConnectionDisabled = separateActiveTriggers.length === 0;
 const separateBuildConnectionMainOnly = separateActiveTriggers.length === 1 && JSON.stringify(separateIncludes) === JSON.stringify(['main']) && separateExcludes.length === 0;
-const separateVerifiedSafeBuildAuthority = (separateBuildConnectionDisabled || separateBuildConnectionMainOnly) && separateActiveNonMainBuilds.length === 0;
+// The repository's default wrangler.toml targets sekret-backend. A generic
+// "wrangler deploy" trigger for bip can therefore deploy the wrong Worker.
+// Treat a dedicated, named bip deployment command as necessary (not sufficient)
+// for release authority; its script/config and runtime still need separate proof.
+const separateDeployCommandTargetsBip = separateBuildConnectionDisabled
+  || (separateBuildConnectionMainOnly && separateDeployCommand === 'npm run deploy:bip');
+const separateVerifiedSafeBuildAuthority = (separateBuildConnectionDisabled
+  || (separateBuildConnectionMainOnly && separateDeployCommandTargetsBip))
+  && separateActiveNonMainBuilds.length === 0;
 
 const triggerRows = await get(`/accounts/${accountId}/builds/workers/${productionTag}/triggers`);
 const buildRows = await get(`/accounts/${accountId}/builds/workers/${productionTag}/builds?per_page=50`);
@@ -385,6 +399,7 @@ receipt.separateWorker.deployCommand = separateDeployCommand;
 receipt.separateWorker.buildCommand = separateBuildCommand;
 receipt.separateWorker.activeNonMainBuildCount = separateActiveNonMainBuilds.length;
 receipt.separateWorker.buildConnectionState = separateBuildConnectionDisabled ? 'disabled' : separateBuildConnectionMainOnly ? 'main-only' : 'unsafe-or-ambiguous';
+receipt.separateWorker.deployCommandTargetsBip = separateDeployCommandTargetsBip;
 receipt.separateWorker.verifiedSafeBuildAuthority = separateVerifiedSafeBuildAuthority;
 receipt.productionWorker.activeTriggerCount = activeTriggers.length;
 receipt.productionWorker.branchIncludes = includes;
