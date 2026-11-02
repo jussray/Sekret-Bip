@@ -8,7 +8,7 @@ const loopback = Object.values(networkInterfaces())
   .find((address) => address?.internal === true && address.family === 'IPv4')
   ?.address;
 if (!loopback) throw new Error('hallway_preview_internal_network_unavailable');
-const previewOrigin = `http://${loopback}:8799`;
+const previewOrigin = `https://${loopback}:8799`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -23,11 +23,14 @@ export default defineConfig({
   outputDir: 'artifacts/hallway-worker-preview/test-results',
   use: {
     baseURL: previewOrigin,
+    // Wrangler uses a self-signed cert only for this isolated local test.
+    ignoreHTTPSErrors: true,
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: `npx wrangler dev --local --config wrangler.toml --ip ${loopback} --port 8799 --var RECIPROCAL_DEFENSE_MODE:contain --var RECIPROCAL_DEFENSE_SECRET:hallway-preview-only`,
+    command: `npx wrangler dev --local --local-protocol=https --config wrangler.toml --ip ${loopback} --port 8799 --var RECIPROCAL_DEFENSE_MODE:contain --var RECIPROCAL_DEFENSE_SECRET:hallway-preview-only`,
     url: `${previewOrigin}/health`,
+    ignoreHTTPSErrors: true,
     timeout: 120_000,
     reuseExistingServer: false,
   },
