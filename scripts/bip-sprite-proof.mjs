@@ -66,6 +66,17 @@ export function runProof({ mission, sha }, { root = repositoryRoot, spawn = spaw
   });
   if (git.status !== 0 || String(git.stdout).trim() !== sha) throw new Error('BIP_SPRITE_EXACT_HEAD_MISMATCH');
 
+  // A clean exact-head checkout is required before attributing test results to its SHA.
+  const cleanliness = spawn('git', ['status', '--porcelain=v1', '--untracked-files=all', '--ignore-submodules=none'], {
+    cwd: root, env: safeEnvironment(env), encoding: 'utf8', timeout: 10_000, maxBuffer: 4096, shell: false,
+  });
+  if (cleanliness.status !== 0 || cleanliness.error || cleanliness.signal) {
+    throw new Error('BIP_SPRITE_DIRTY_CHECK_FAILED');
+  }
+  if (String(cleanliness.stdout ?? '').trim()) {
+    throw new Error('BIP_SPRITE_DIRTY_CHECKOUT');
+  }
+
   const selected = MISSIONS[mission];
   const start = now();
   const result = spawn(selected.command, selected.args, {
