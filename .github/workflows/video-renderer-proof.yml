@@ -32,7 +32,7 @@ env:
 jobs:
   render-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - name: Check out exact proof subject
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -51,7 +51,11 @@ jobs:
       - run: npm ci
       - name: Install media tooling
         run: |
-          sudo apt-get update
+          sudo apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            update
           sudo apt-get install -y ffmpeg
           ffmpeg -version | head -1
           ffprobe -version | head -1
