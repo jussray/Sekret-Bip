@@ -123,12 +123,17 @@ jobs:
           response="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?status=failure&per_page=100")"
           run_id="$(jq -r '[.workflow_runs[] | select(.name != "GitHub Failure Routing Exact-Head Gate")][0].id // empty' <<<"$response")"
           head_sha="$(jq -r '[.workflow_runs[] | select(.name != "GitHub Failure Routing Exact-Head Gate")][0].head_sha // empty' <<<"$response")"
-          test -n "$run_id"
-          test -n "$head_sha"
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          if [[ -n "$run_id" && -n "$head_sha" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No eligible completed failed run exists; failure-rehearsal proof is unavailable and carries no authority." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Rehearse exact failed-run capture
+        if: steps.failed-run.outputs.available == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           CONTROL_ROOM_GITHUB_RUN_ID: ${{ steps.failed-run.outputs.run_id }}
@@ -136,6 +141,7 @@ jobs:
         run: node scripts/control-room-ingest-github-failures.mjs
 
       - name: Verify exact failed-run report
+        if: steps.failed-run.outputs.available == 'true'
         env:
           EXPECTED_RUN_ID: ${{ steps.failed-run.outputs.run_id }}
           EXPECTED_FAILED_HEAD_SHA: ${{ steps.failed-run.outputs.head_sha }}
@@ -165,12 +171,17 @@ jobs:
           response="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?status=completed&per_page=100")"
           run_id="$(jq -r '[.workflow_runs[] | select(.name != "GitHub Failure Routing Exact-Head Gate" and .conclusion == "skipped")][0].id // empty' <<<"$response")"
           head_sha="$(jq -r '[.workflow_runs[] | select(.name != "GitHub Failure Routing Exact-Head Gate" and .conclusion == "skipped")][0].head_sha // empty' <<<"$response")"
-          test -n "$run_id"
-          test -n "$head_sha"
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          if [[ -n "$run_id" && -n "$head_sha" ]]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+            echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No eligible completed skipped run exists; skip-rehearsal proof is unavailable and carries no authority." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Rehearse exact skipped-run capture
+        if: steps.skipped-run.outputs.available == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           CONTROL_ROOM_GITHUB_RUN_ID: ${{ steps.skipped-run.outputs.run_id }}
@@ -178,6 +189,7 @@ jobs:
         run: node scripts/control-room-ingest-github-test-skips.mjs
 
       - name: Verify exact skipped-run report
+        if: steps.skipped-run.outputs.available == 'true'
         env:
           EXPECTED_RUN_ID: ${{ steps.skipped-run.outputs.run_id }}
           EXPECTED_SKIPPED_HEAD_SHA: ${{ steps.skipped-run.outputs.head_sha }}

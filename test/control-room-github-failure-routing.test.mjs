@@ -75,6 +75,10 @@ test('CI and major workflow failures invoke the scanner automatically without re
   assert.match(watcher, /github\.event\.workflow_run\.id/);
 
   const watchedWorkflowBlock = watcher.match(/workflows:\s*([\s\S]*?)\n\s*types:/)?.[1] || '';
+  assert.match(watchedWorkflowBlock, /^\s*- Founder Shield\s*$/m,
+    'Founder Shield security failures and skipped witnesses must enter the existing router');
+  assert.match(docs, /^- Founder Shield;$/m,
+    'documented watched workflows must include the security audit path');
   assert.doesNotMatch(watchedWorkflowBlock, /Founder Control Room GitHub Failure Router/);
   assert.doesNotMatch(watchedWorkflowBlock, /GitHub Failure Routing Exact-Head Gate/);
   assert.match(exactGate, /select\(\.name != "GitHub Failure Routing Exact-Head Gate"\)/);
@@ -103,4 +107,15 @@ test('scan and ingest commands are explicitly exposed', () => {
     packageJson.scripts['test:github-failure-routing'],
     'node --test test/control-room-github-failure-routing.test.mjs',
   );
+});
+
+
+test('historical failure and skip rehearsals fail closed without making healthy PRs red', () => {
+  assert.match(exactGate, /echo "available=false" >> "\$GITHUB_OUTPUT"/);
+  assert.match(exactGate, /failure-rehearsal proof is unavailable and carries no authority/);
+  assert.match(exactGate, /skip-rehearsal proof is unavailable and carries no authority/);
+  assert.match(exactGate, /if: steps\.failed-run\.outputs\.available == 'true'/);
+  assert.match(exactGate, /if: steps\.skipped-run\.outputs\.available == 'true'/);
+  assert.doesNotMatch(exactGate, /test -n "\$run_id"/);
+  assert.doesNotMatch(exactGate, /test -n "\$head_sha"/);
 });
