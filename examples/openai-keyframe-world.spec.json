@@ -1,0 +1,11 @@
+{
+  "schema": "sekret-bip-openai-keyframe@v1",
+  "shot": 1,
+  "mode": "world-only",
+  "prompt": "Cinematic environment study of a calm violet night sky and a luminous pathway. No characters, no faces, no logos, no text.",
+  "size": "1024x1536",
+  "quality": "high",
+  "cast": [],
+  "references": [],
+  "approvedForGeneration": false
+}
