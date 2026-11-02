@@ -258,6 +258,8 @@ const styles = StyleSheet.create({
   root: {
     flex: 1, backgroundColor: BG,
     alignItems: 'center', justifyContent: 'center',
+    // Keep the decorative glow inside the viewport without horizontal scrolling.
+    overflow: 'hidden',
   },
   bgDot1: {
     position: 'absolute', width: 340, height: 340,

@@ -1,6 +1,8 @@
 # Demo Readiness Runbook
 
 This document describes the `scripts/demo-check.sh` script and what each check means.
+
+`wrangler.toml` explicitly disables `workers.dev`. A 404 from that hostname is expected and is **not** a production failure. Only the canonical `https://api.sekretbip.net/health` endpoint is checked for Worker reachability.
 Run this before every investor demo, App Store submission, or press event.
 
 ---
@@ -19,7 +21,6 @@ Expected output when all systems are green:
 ✓ SEKRET_CLIENT_TOKEN is set in production
 
 ▶ Step 3 — Live Deployment Health
-✓ Worker health (.workers.dev) → HTTP 200
 ✓ Worker health (api.sekretbip.net) → HTTP 200
 ✓ Pages release marker → HTTP 200
 ✓ Deployed commit matches local HEAD
@@ -45,7 +46,6 @@ Results: 9 passed · 0 warnings · 0 failed
 |------|-------|------------------------|
 | 2 | `OPENAI_API_KEY` in production secrets | Without this the AI companion returns a 401 silently |
 | 2 | `SEKRET_CLIENT_TOKEN` in production | Auth gate for all Worker endpoints |
-| 3 | Worker health `.workers.dev` | Baseline Cloudflare deploy is live |
 | 3 | Worker health `api.sekretbip.net` | Custom domain TLS is provisioned |
 | 3 | Pages release marker | Web demo shell is deployed |
 | 3 | Commit SHA match | No stale deploy — what you demoed in dev is what's live |
