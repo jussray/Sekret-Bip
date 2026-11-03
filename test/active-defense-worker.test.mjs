@@ -65,3 +65,19 @@ test('canonical Worker entry invokes active defense before auth', () => {
   assert.ok(activeIndex > 0, 'active-defense call missing from voice-entry');
   assert.ok(authIndex > activeIndex, 'active defense must observe ingress before auth');
 });
+
+test('inactive hallway mode defaults off and generates no telemetry side effects', () => {
+  assert.match(activeDefense, /function normalizedMode\(value: unknown\): ActiveDefenseMode \{\s*return value === 'contain' \|\| value === 'observe' \? value : 'off';/);
+  assert.match(activeDefense, /if \(normalizedMode\(env\.ACTIVE_DEFENSE_MODE\) !== 'off'\) observeDecision\(/);
+  assert.match(activeDefense, /mode === 'contain'\s*&& rootSecret\s*&& !verifiedBot/);
+});
+
+test('retained hallway logs omit raw IP and claimed User-Agent', () => {
+  const start = activeDefense.indexOf("  console.info(JSON.stringify({");
+  assert.ok(start >= 0, 'bounded logger must exist');
+  const logged = activeDefense.slice(start, activeDefense.indexOf("\n  }));", start) + 7);
+  assert.doesNotMatch(logged, /source_ip:|decision\.sourceIp/);
+  assert.doesNotMatch(logged, /claimed_user_agent:|decision\.claimedUserAgent/);
+  assert.match(logged, /incident_fingerprint:/);
+  assert.match(logged, /actor_fingerprint:/);
+});
