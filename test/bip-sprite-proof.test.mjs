@@ -85,3 +85,34 @@ test('source cleanliness probe failures block proof rather than passing', () => 
   assert.throws(() => runProof({ mission: 'agent-contract', sha }, { spawn }), /BIP_SPRITE_DIRTY_CHECK_FAILED/);
   assert.equal(calls.length, 2);
 });
+
+test('invocation-specific requests bind a non-guessable receipt identity', () => {
+  const invocationId = '1'.repeat(32);
+  const parsed = parseRequest(['--mission', 'repo-truth', '--sha', sha, '--invocation', invocationId]);
+  assert.deepEqual(parsed, { mission: 'repo-truth', sha, invocationId });
+  for (const invalid of ['short', 'z'.repeat(32), '../escape', 'A'.repeat(32)]) {
+    assert.throws(() => parseRequest(['--mission', 'repo-truth', '--sha', sha, '--invocation', invalid]));
+  }
+  assert.throws(() => parseRequest(['--mission', 'repo-truth', '--sha', sha, '--invocation', invocationId, 'extra']));
+  const result = receiptFor({
+    ...parsed, result: { status: 0, stdout: '', stderr: '' },
+    startedAt: '2026-11-02T00:00:00.000Z', finishedAt: '2026-11-02T00:00:01.000Z',
+  });
+  assert.equal(result.invocationId, invocationId);
+  assert.equal(result.authority.deploy, false);
+});
+
+test('unique invocation flows through clean exact-head proof', () => {
+  const invocationId = 'b'.repeat(32);
+  let calls = 0;
+  const spawn = () => {
+    calls++;
+    if (calls === 1) return { status: 0, stdout: sha + '\n', stderr: '' };
+    if (calls === 2) return { status: 0, stdout: '', stderr: '' };
+    return { status: 0, stdout: 'pass', stderr: '' };
+  };
+  const receipt = runProof({ mission: 'agent-contract', sha, invocationId }, { spawn, now: () => '2026-11-02T00:00:00Z' });
+  assert.equal(receipt.invocationId, invocationId);
+  assert.equal(receipt.status, 'pass');
+  assert.equal(calls, 3);
+});

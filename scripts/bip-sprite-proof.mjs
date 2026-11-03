@@ -14,18 +14,21 @@ export const MISSIONS = Object.freeze({
   'companion-contract': Object.freeze({ command: 'node', args: ['--test', 'test/companion-runtime-contracts.test.mjs'] }),
 });
 const SHA_RE = /^[0-9a-f]{40}$/;
+const INVOCATION_RE = /^[0-9a-f]{32}$/;
 const script = fileURLToPath(import.meta.url);
 const repositoryRoot = path.resolve(path.dirname(script), '..');
 const receiptRoot = '/home/sprite/.sprite-proof/receipts';
 
 export function parseRequest(argv) {
-  if (argv.length !== 4 || argv[0] !== '--mission' || argv[2] !== '--sha') {
+  const withInvocation = argv.length === 6 && argv[4] === '--invocation';
+  if (!(argv.length === 4 || withInvocation) || argv[0] !== '--mission' || argv[2] !== '--sha') {
     throw new Error('BIP_SPRITE_FIXED_MISSION_AND_SHA_REQUIRED');
   }
-  const mission = argv[1], sha = argv[3];
+  const mission = argv[1], sha = argv[3], invocationId = withInvocation ? argv[5] : null;
   if (!Object.hasOwn(MISSIONS, mission)) throw new Error('BIP_SPRITE_MISSION_DENIED');
   if (!SHA_RE.test(sha)) throw new Error('BIP_SPRITE_SHA_INVALID');
-  return { mission, sha };
+  if (invocationId !== null && !INVOCATION_RE.test(invocationId)) throw new Error('BIP_SPRITE_INVOCATION_INVALID');
+  return invocationId ? { mission, sha, invocationId } : { mission, sha };
 }
 
 export function safeEnvironment(env = process.env) {
@@ -40,12 +43,13 @@ export function safeEnvironment(env = process.env) {
   };
 }
 
-export function receiptFor({ sha, mission, result, startedAt, finishedAt }) {
+export function receiptFor({ sha, mission, invocationId = null, result, startedAt, finishedAt }) {
   const content = String(result.stdout ?? '') + '\n' + String(result.stderr ?? '');
   return {
     schema: CONTRACT,
     source: { repository: 'jussray/Sekret-Bip', sha },
     mission,
+    ...(invocationId ? { invocationId } : {}),
     status: result.status === 0 && !result.error && !result.signal ? 'pass' : 'fail',
     exitCode: Number.isInteger(result.status) ? result.status : null,
     outputFingerprint: 'sha256:' + createHash('sha256').update(content).digest('hex'),
@@ -56,8 +60,9 @@ export function receiptFor({ sha, mission, result, startedAt, finishedAt }) {
   };
 }
 
-export function runProof({ mission, sha }, { root = repositoryRoot, spawn = spawnSync, now = () => new Date().toISOString(), env = process.env } = {}) {
-  if (!Object.hasOwn(MISSIONS, mission) || !SHA_RE.test(sha)) throw new Error('BIP_SPRITE_REQUEST_INVALID');
+export function runProof({ mission, sha, invocationId = null }, { root = repositoryRoot, spawn = spawnSync, now = () => new Date().toISOString(), env = process.env } = {}) {
+  if (!Object.hasOwn(MISSIONS, mission) || !SHA_RE.test(sha) ||
+      (invocationId !== null && !INVOCATION_RE.test(invocationId))) throw new Error('BIP_SPRITE_REQUEST_INVALID');
   if (env.FOUNDER_OPERATION_KILL_SWITCH && env.FOUNDER_OPERATION_KILL_SWITCH !== 'off') {
     throw new Error('FOUNDER_OPERATION_PAUSED');
   }
@@ -82,7 +87,7 @@ export function runProof({ mission, sha }, { root = repositoryRoot, spawn = spaw
   const result = spawn(selected.command, selected.args, {
     cwd: root, env: safeEnvironment(env), encoding: 'utf8', timeout: 60_000, maxBuffer: 1024 * 1024, shell: false,
   });
-  return receiptFor({ mission, sha, result, startedAt: start, finishedAt: now() });
+  return receiptFor({ mission, sha, invocationId, result, startedAt: start, finishedAt: now() });
 }
 
 function main() {
@@ -92,9 +97,9 @@ function main() {
     fs.mkdirSync('/home/sprite/.bip-sprite-home', { recursive: true, mode: 0o700 });
     const receipt = runProof(req);
     fs.mkdirSync(receiptRoot, { recursive: true, mode: 0o700 });
-    const destination = path.join(receiptRoot, req.sha + '-' + req.mission + '.json');
-    // Repeated runs update the same bounded proof slot, never a repo file.
-    fs.writeFileSync(destination, JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600 });
+    const destination = path.join(receiptRoot, req.sha + '-' + req.mission + (req.invocationId ? '-' + req.invocationId : '') + '.json');
+    // Invocation-specific receipts are write-once. Legacy operator receipts retain their old slot.
+    fs.writeFileSync(destination, JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600, flag: req.invocationId ? 'wx' : 'w' });
     console.log('BIP_SPRITE_PROOF_RECEIPT_WRITTEN');
     if (receipt.status !== 'pass') process.exitCode = 1;
   } catch (error) {
