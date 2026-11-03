@@ -75,6 +75,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     : `${STORE_ASSET_DIR}/teen-play-store-icon.png`;
   const plugins = (base.plugins ?? []).filter((plugin) => !isSplashPlugin(plugin));
 
+  // Provider-returned Firebase native config stays outside git. EAS file
+  // environment variables resolve to temporary build-runner paths.
+  const googleServicesJson = process.env.GOOGLE_SERVICES_JSON?.trim() || undefined;
+  const googleServiceInfoPlist = process.env.GOOGLE_SERVICE_INFO_PLIST?.trim() || undefined;
+
   return ({
     ...config,
     ...base,
@@ -97,6 +102,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       ...base.ios,
       bundleIdentifier: isParent ? 'com.sekretbip.parent' : 'com.sekretbip.app',
+      googleServicesFile: googleServiceInfoPlist,
       infoPlist: {
         ...((base.ios as { infoPlist?: Record<string, unknown> })?.infoPlist),
         ITSAppUsesNonExemptEncryption: false,
@@ -105,6 +111,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       ...base.android,
       package: isParent ? 'com.sekretbip.parent' : 'com.sekretbip.app',
+      googleServicesFile: googleServicesJson,
       adaptiveIcon: {
         backgroundColor: '#160028',
         foregroundImage: adaptiveForeground,

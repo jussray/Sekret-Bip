@@ -85,6 +85,26 @@
         "EXPO_PUBLIC_RELEASE_AUDIENCE": "public",
         "EXPO_PUBLIC_BACKEND_URL": "https://api.sekretbip.net"
       }
+    },
+    "firebase-preview": {
+      "extends": "preview",
+      "env": {
+        "APP_VARIANT": "teen",
+        "EXPO_PUBLIC_APP_VARIANT": "teen",
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "beta",
+        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend-alpha.mcgill-raylene.workers.dev",
+        "EXPO_PUBLIC_FIREBASE_APPCHECK_ENABLED": "true"
+      }
+    },
+    "parent-firebase-preview": {
+      "extends": "parent-preview",
+      "env": {
+        "APP_VARIANT": "parent",
+        "EXPO_PUBLIC_APP_VARIANT": "parent",
+        "EXPO_PUBLIC_RELEASE_AUDIENCE": "beta",
+        "EXPO_PUBLIC_BACKEND_URL": "https://sekret-backend-alpha.mcgill-raylene.workers.dev",
+        "EXPO_PUBLIC_FIREBASE_APPCHECK_ENABLED": "true"
+      }
     }
   }
 }

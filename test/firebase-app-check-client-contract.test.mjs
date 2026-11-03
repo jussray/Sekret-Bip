@@ -106,3 +106,25 @@ test('server enforcement stays off and Firebase cannot become a second backend a
     assert.ok(!source.includes(prohibited), `prohibited Firebase authority surface detected: ${prohibited}`);
   }
 });
+
+test('Firebase native provider files enter only through EAS file variables and proof-only profiles', () => {
+  const appConfig = read('app.config.ts');
+  const eas = JSON.parse(read('eas.json'));
+  const gitignore = read('.gitignore');
+
+  assert.match(appConfig, /process\.env\.GOOGLE_SERVICES_JSON/);
+  assert.match(appConfig, /process\.env\.GOOGLE_SERVICE_INFO_PLIST/);
+  assert.match(appConfig, /googleServicesFile: googleServicesJson/);
+  assert.match(appConfig, /googleServicesFile: googleServiceInfoPlist/);
+
+  assert.equal(eas.build['firebase-preview'].extends, 'preview');
+  assert.equal(eas.build['firebase-preview'].env.EXPO_PUBLIC_FIREBASE_APPCHECK_ENABLED, 'true');
+  assert.equal(eas.build['firebase-preview'].env.APP_VARIANT, 'teen');
+  assert.equal(eas.build['parent-firebase-preview'].extends, 'parent-preview');
+  assert.equal(eas.build['parent-firebase-preview'].env.EXPO_PUBLIC_FIREBASE_APPCHECK_ENABLED, 'true');
+  assert.equal(eas.build['parent-firebase-preview'].env.APP_VARIANT, 'parent');
+
+  assert.match(gitignore, /^google-services\.json$/m);
+  assert.match(gitignore, /^GoogleService-Info\.plist$/m);
+  assert.doesNotMatch(appConfig, /1:\d+:(?:ios|android):[a-f0-9]+/i);
+});

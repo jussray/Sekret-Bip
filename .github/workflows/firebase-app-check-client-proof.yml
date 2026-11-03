@@ -9,6 +9,9 @@ on:
       - package-lock.json
       - app.json
       - app/_layout.tsx
+      - app.config.ts
+      - eas.json
+      - .gitignore
       - .env.example
       - src/services/appCheckToken.ts
       - src/services/firebase/appCheck.ts

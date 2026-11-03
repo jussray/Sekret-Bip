@@ -17,6 +17,8 @@ npm-debug.*
 *.p12
 *.key
 *.mobileprovision
+google-services.json
+GoogleService-Info.plist
 *.orig.*
 web-build/
 
