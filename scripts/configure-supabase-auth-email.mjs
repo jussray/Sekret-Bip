@@ -192,8 +192,12 @@ async function main() {
   console.log('AUTH_EMAIL_PROVIDER_APPLIED');
 }
 
+// Only the leading error code is surfaced. Messages can carry arbitrary text after it.
+const KNOWN_FAILURE_CODE = /^(AUTH_EMAIL_|RESEND_DOMAIN_|SUPABASE_AUTH_CONFIG_HTTP_|SUPABASE_TARGET_)[A-Z0-9_]+$/;
+
 main().catch(async (err) => {
-  const bounded = /^AUTH_EMAIL_[A-Z_]+$/.test(err?.message) ? err.message : 'AUTH_EMAIL_PROVIDER_FAILED';
+  const code = String(err?.message ?? '').match(/^[A-Z][A-Z0-9_]+/)?.[0] ?? '';
+  const bounded = KNOWN_FAILURE_CODE.test(code) ? code : 'AUTH_EMAIL_PROVIDER_FAILED';
   console.error(bounded);
   try {
     await writeReceipt({

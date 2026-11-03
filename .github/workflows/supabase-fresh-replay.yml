@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# Serialize container-heavy fresh replays across PRs so public GHCR pulls do not
+# stampede the same Supabase images from multiple hosted runners at once.
+concurrency:
+  group: supabase-fresh-replay-${{ github.repository }}
+  cancel-in-progress: false
+
 env:
   EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
 
@@ -78,7 +84,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          supabase start -x gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          excluded_services="gotrue,realtime,storage-api,imgproxy,kong,mailpit,postgrest,postgres-meta,studio,edge-runtime,logflare,vector,supavisor"
+          for attempt in 1 2 3 4 5; do
+            log_file="$(mktemp)"
+            set +e
+            supabase start -x "$excluded_services" 2>&1 | tee "$log_file"
+            status=${PIPESTATUS[0]}
+            set -e
+
+            if [[ "$status" -eq 0 ]]; then
+              rm -f "$log_file"
+              exit 0
+            fi
+
+            if ! grep -Eiq 'toomanyrequests|too many requests|rate.?limit|failed to pull docker image|error pulling image configuration' "$log_file"; then
+              rm -f "$log_file"
+              exit "$status"
+            fi
+
+            if [[ "$attempt" -eq 5 ]]; then
+              rm -f "$log_file"
+              exit "$status"
+            fi
+
+            echo "Transient container-registry pull failure on attempt $attempt; retrying after bounded backoff." >&2
+            rm -f "$log_file"
+            supabase stop --no-backup || true
+            sleep "$((attempt * 30))"
+          done
 
       - name: Prove L3 memory owner and anonymous denial
         shell: bash

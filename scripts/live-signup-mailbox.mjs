@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
+import { githubEnvLine } from './github-env-line.mjs';
 
 const API_BASE = 'https://api.mail.tm';
 const PROVIDER_URL = 'https://mail.tm';
@@ -23,7 +24,7 @@ function mailboxMode() {
 
 function appendGithubEnv(name, value) {
   const envFile = required('GITHUB_ENV');
-  fs.appendFileSync(envFile, `${name}=${value}\n`, 'utf8');
+  fs.appendFileSync(envFile, githubEnvLine(name, value), 'utf8');
 }
 
 function mask(value) {

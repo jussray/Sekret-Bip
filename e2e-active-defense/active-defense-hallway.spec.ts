@@ -17,7 +17,7 @@ test('unknown reconnaissance stays in a synthetic successor hallway', async ({ r
     cursor: string;
   };
   expect(firstBody.continuation).toHaveLength(8);
-  expect(firstBody.continuation.every((value) => value.startsWith('http://127.0.0.1:8799/'))).toBe(true);
+  expect(firstBody.continuation.every((value) => new URL(value).origin === new URL(first.url()).origin)).toBe(true);
 
   const setCookie = first.headers()['set-cookie'];
   expect(setCookie).toContain('__Host-juss_hallway=');
@@ -41,5 +41,5 @@ test('unknown reconnaissance stays in a synthetic successor hallway', async ({ r
   };
   expect(secondBody.request_id).not.toBe(firstBody.request_id);
   expect(secondBody.continuation).toHaveLength(8);
-  expect(secondBody.continuation.every((value) => value.startsWith('http://127.0.0.1:8799/'))).toBe(true);
+  expect(secondBody.continuation.every((value) => new URL(value).origin === new URL(first.url()).origin)).toBe(true);
 });

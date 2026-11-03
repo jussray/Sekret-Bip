@@ -1,3 +1,10 @@
+import { enforceActiveDefense } from './active-defense';
+import {
+  emitReciprocalTelemetry,
+  observeFetchRequest,
+  reciprocalContainmentEnabled,
+  syntheticFetchResponse,
+} from '../security/reciprocal-ingress.mjs';
 import observedWorker from './observed-index';
 import emailRouter from './email-router';
 import { WORKER_RELEASE_SHA } from './release-identity.generated';
@@ -10,14 +17,15 @@ import {
 } from './firebase-app-check';
 import { emitWorkerTelemetry, type WorkerTelemetryEvent } from './telemetry';
 import { persistAuditEvent, type AuditPersistEnv } from './audit/persist-event';
-import { enforceActiveDefense, type ActiveDefenseEnv } from './active-defense';
 import { normalizeReplyActor, resolveRuntimeStyle } from './runtime-style';
 import { selectVoiceRoute, type CharacterId } from './voice-routing';
 import { synthesizeRoutedVoice, type VoiceProviderEnv } from './voice-providers';
+import { handleBipProviderRequest } from './provider-route';
 import {
   evaluateFounderOperationKillSwitch,
   stableHttpOperationId,
 } from '../shared/founder-operation-kill-switch.js';
+import { shouldPassThroughToFrontend } from '../shared/frontend-host-passthrough.js';
 
 interface MinimalExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -33,13 +41,17 @@ interface WorkerVersionMetadata {
   timestamp: string;
 }
 
-interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv, ActiveDefenseEnv {
+interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv {
   ALLOWED_ORIGINS?: string;
   VOICE_PROVIDER_MODE?: 'legacy' | 'cloudflare-only' | 'hybrid';
   SEKRET_RATE_LIMITER?: RateLimit;
   CF_VERSION_METADATA?: WorkerVersionMetadata;
   FOUNDER_OPERATION_KILL_SWITCH?: string;
   FOUNDER_OPERATION_KILL_SWITCH_REASON?: string;
+  RECIPROCAL_DEFENSE_MODE?: 'off' | 'observe' | 'contain';
+  RECIPROCAL_DEFENSE_SECRET?: string;
+  ACTIVE_DEFENSE_MODE?: 'off' | 'observe' | 'contain';
+  ACTIVE_DEFENSE_HMAC_KEY?: string;
 }
 
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -202,6 +214,8 @@ function observeAppCheck(
     decision: mode === 'observe' || result.status === 'valid' ? 'allow' : 'block',
     violation_codes: result.reason ? [`app_check_${result.reason}`] : undefined,
   };
+  // Never log the bearer App Check token or decoded token body. Cloudflare
+  // receives only the privacy-safe verification classification and reason.
   emitWorkerTelemetry(event);
 }
 
@@ -245,10 +259,12 @@ async function enforceRateLimit(
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
   const key = principal.kind === 'user' ? `user:${principal.userId}` : `ip:${ip}`;
   try {
-    const { success } = await env.SEKRET_RATE_LIMITER.limit({ key });
+    const outcome = await env.SEKRET_RATE_LIMITER.limit({ key });
+    if (!outcome || typeof outcome.success !== 'boolean') return protectionUnavailable(cors);
+    const { success } = outcome;
     return success ? null : json({ error: 'rate limit exceeded', retryable: true }, 429, cors);
-  } catch (error) {
-    console.error('[voice-entry:rate-limit]', error);
+  } catch {
+    console.error('SEKRET_RATE_LIMIT_UNAVAILABLE');
     return protectionUnavailable(cors);
   }
 }
@@ -376,15 +392,34 @@ async function handleVoice(
 
 export default {
   async fetch(request: Request, env: Env, ctx: MinimalExecutionContext): Promise<Response> {
+    // A Worker route on a public frontend host must never replace the Pages
+    // welcome UI with a backend JSON response; hand page loads to the origin.
+    if (shouldPassThroughToFrontend(request.method, request.url)) return fetch(request);
+
     const started = Date.now();
     const cors = corsHeaders(request, env);
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-
-    const activeDefense = enforceActiveDefense(request, env, ctx, started);
-    if (activeDefense.response) return withSecurityHeaders(activeDefense.response, cors);
-
     const blocked = originRejected(request, env, cors);
     if (blocked) return blocked;
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+    // Only explicit test/provider configuration can activate original V1.
+    // The already-merged reciprocal gate retains its existing precedence.
+    if (env.ACTIVE_DEFENSE_MODE === 'observe' || env.ACTIVE_DEFENSE_MODE === 'contain') {
+      const active = enforceActiveDefense(request, env, ctx, started);
+      if (active.response) return active.response;
+    }
+
+
+    // Default-off, synthetic-only containment. Preserve canonical Worker routing.
+    if (env.RECIPROCAL_DEFENSE_MODE === 'observe' || env.RECIPROCAL_DEFENSE_MODE === 'contain') {
+      const defense = await observeFetchRequest(request, env, 'sekret-backend');
+      emitReciprocalTelemetry(defense, ctx);
+      if (reciprocalContainmentEnabled(env)) {
+        const synthetic = syntheticFetchResponse(defense);
+        if (synthetic) return synthetic;
+      }
+    }
+
 
     const path = new URL(request.url).pathname;
     if (request.method === 'GET' && path === '/health') {
@@ -414,6 +449,9 @@ export default {
 
     const founderPaused = enforceFounderOperationKillSwitch(request, env, cors);
     if (founderPaused) return founderPaused;
+
+    const providerResponse = await handleBipProviderRequest(request, env, cors);
+    if (providerResponse) return providerResponse;
 
     const isProtectedApiPost = request.method === 'POST' && path.includes('/api/');
     let downstreamEnv = env;
