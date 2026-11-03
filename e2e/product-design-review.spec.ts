@@ -376,7 +376,7 @@ test('Founder Visual Truth: Teen first-five-minute packet', async ({ page }, tes
 test('S2Tell synthetic draft stays private before deliberate sharing', async ({ page }, testInfo) => {
   const sharedWrites: string[] = [];
   page.on('request', request => {
-    if (request.method() === 'POST' && /\\/rest\\/v1\\/bridge_shares(?:\\?|$)/.test(request.url())) {
+    if (request.method() === 'POST' && request.url().includes('/rest/v1/bridge_shares')) {
       sharedWrites.push(request.url());
     }
   });
