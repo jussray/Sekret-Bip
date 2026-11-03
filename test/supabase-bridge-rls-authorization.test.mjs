@@ -9,7 +9,7 @@ const migrationsDir = path.join(root, 'supabase', 'migrations');
 const summaryContractPath = path.join(migrationsDir, '20260705010000_bridge_summary_contract.sql');
 const permanentBoundaryPath = path.join(
   migrationsDir,
-  '20260920203000_harden_bridge_permanent_account_boundary.sql',
+  '20261103024500_harden_bridge_permanent_account_boundary.sql',
 );
 
 const summaryContract = fs.readFileSync(summaryContractPath, 'utf8');
