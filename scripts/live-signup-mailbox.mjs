@@ -123,7 +123,7 @@ async function createMailbox() {
       mailboxMode: mode,
       confirmation: 'external-owned-mailbox',
     });
-    console.log('Owned Bip signup proof mailbox selected; identifiers recorded in live-signup-proof-account.json.');
+    console.log('OWNED_BIP_SIGNUP_PROOF_MAILBOX_SELECTED');
     return;
   }
 
@@ -173,7 +173,7 @@ async function createMailbox() {
   });
 
   console.log(`Disposable mailbox provider: Mail.tm (${PROVIDER_URL})`);
-  console.log('Disposable live signup mailbox created; identifiers recorded in live-signup-proof-account.json.');
+  console.log('DISPOSABLE_LIVE_SIGNUP_MAILBOX_CREATED');
 }
 
 async function confirmMailbox() {
@@ -181,7 +181,7 @@ async function confirmMailbox() {
   const address = required('LIVE_ONBOARDING_EMAIL');
 
   if (mode === 'bip_routed') {
-    console.log('Owned Bip confirmation is waiting in the owned mailbox; successful returning sign-in is the authoritative confirmation proof.');
+    console.log('OWNED_BIP_CONFIRMATION_WAITING');
     return;
   }
 
@@ -247,7 +247,7 @@ async function confirmMailbox() {
   });
 
   console.log(`Signup confirmation accepted with HTTP ${confirmation.status}.`);
-  console.log('Confirmation and redirect hosts recorded in live-signup-confirmation.json.');
+  console.log('SIGNUP_CONFIRMATION_HOSTS_RECORDED');
 }
 
 async function recordOwnedConfirmation() {
@@ -259,7 +259,7 @@ async function recordOwnedConfirmation() {
     confirmationStatus: 'proved_by_returning_signin',
     confirmedAt: new Date().toISOString(),
   });
-  console.log('Owned Bip mailbox confirmation proved by successful returning sign-in.');
+  console.log('OWNED_BIP_CONFIRMATION_PROVED');
 }
 
 async function cleanupMailbox() {
