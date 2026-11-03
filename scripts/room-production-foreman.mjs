@@ -135,7 +135,22 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+const SAFE_SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;
+const SAFE_RELATIVE_PATH = /^[A-Za-z0-9_./-]{1,200}$/;
+
+function safeSegment(value, label) {
+  assert(typeof value === 'string' && SAFE_SEGMENT.test(value), `${label} is not a safe identifier.`);
+  return value;
+}
+
+function safeRelativePath(value, label) {
+  assert(typeof value === 'string' && SAFE_RELATIVE_PATH.test(value) && !value.includes('..') && !value.startsWith('/'),
+    `${label} must be a safe relative path.`);
+  return value;
+}
+
 function registryBlock(source, collectionName, key) {
+  key = safeSegment(key, 'registry key');
   const collectionIndex = source.indexOf(`export const ${collectionName}`);
   assert(collectionIndex >= 0, `Registry is missing ${collectionName}.`);
   const tail = source.slice(collectionIndex);
@@ -153,7 +168,7 @@ function requirePathFor(registryPath, assetPath) {
 
 function validateRegistryConsumer(rootDir, manifest) {
   for (const consumer of manifest.runtime.registryConsumers) {
-    const source = fs.readFileSync(path.join(rootDir, consumer), 'utf8');
+    const source = fs.readFileSync(path.join(rootDir, safeRelativePath(consumer, 'registry consumer')), 'utf8');
     assert(source.includes('NIGHT_ROOM_POSE_ASSETS'), `${consumer} does not consume NIGHT_ROOM_POSE_ASSETS.`);
   }
 }
@@ -242,7 +257,8 @@ function resolveWorkspaceUrl(tool, manifest) {
   return '';
 }
 
-async function runInteractiveTool(tool, manifest, runDir, args) {
+async function runInteractiveTool(toolName, manifest, runDir, args) {
+  const tool = safeSegment(toolName, 'tool');
   const url = resolveWorkspaceUrl(tool, manifest);
   if (!url) return { status: 'blocked', label: tool, detail: 'Workspace URL environment variable is not configured.' };
   const { chromium } = await import('@playwright/test');
@@ -278,7 +294,7 @@ async function main() {
   const manifest = readJson(manifestPath);
   const promptPack = readJson(path.join(rootDir, manifest.creativeTools.leonardo.promptPack));
   validateManifest(manifest, promptPack);
-  const runId = new Date().toISOString().replace(/[:.]/g, '-');
+  const runId = safeSegment(new Date().toISOString().replace(/[:.]/g, '-'), 'run id');
   const runDir = path.resolve('.room-foreman', 'runs', runId);
   const startedAt = new Date().toISOString();
   const results = [];
