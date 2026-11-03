@@ -28,7 +28,9 @@ export function receiptPath({ mission, sha, invocationId = null }) {
   // Defense in depth: normalize user-controlled CLI data before using any filesystem path.
   const safeStem = rawStem.replace(/[^a-z0-9-]/g, '');
   if (safeStem !== rawStem) throw new Error('BIP_SPRITE_RECEIPT_NAME_INVALID');
-  const destination = path.resolve(receiptRoot, safeStem + '.json');
+  // Derive the file name from a cryptographic digest, not raw CLI segments.
+  const digest = createHash('sha256').update(safeStem).digest('hex');
+  const destination = path.resolve(receiptRoot, digest + '.json');
   if (path.dirname(destination) !== path.resolve(receiptRoot)) {
     throw new Error('BIP_SPRITE_RECEIPT_PATH_OUTSIDE_ROOT');
   }

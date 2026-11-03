@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { MISSIONS, parseRequest, safeEnvironment, receiptFor, receiptPath, runProof } from '../scripts/bip-sprite-proof.mjs';
 
@@ -120,7 +121,7 @@ test('unique invocation flows through clean exact-head proof', () => {
 test('sanitized receipt names remain inside private receipt directory', () => {
   const invocationId = 'a'.repeat(32);
   const path = receiptPath({ mission: 'repo-truth', sha, invocationId });
-  assert.equal(path, '/home/sprite/.sprite-proof/receipts/' + sha + '-repo-truth-' + invocationId + '.json');
+  assert.equal(path, '/home/sprite/.sprite-proof/receipts/' + createHash('sha256').update(sha + '-repo-truth-' + invocationId).digest('hex') + '.json');
   assert.throws(() => receiptPath({ mission: '../outside', sha, invocationId }));
   assert.throws(() => receiptPath({ mission: 'repo-truth', sha, invocationId: 'a/../b' }));
   assert.throws(() => receiptPath({ mission: 'repo-truth', sha: '../../etc', invocationId }));
