@@ -72,6 +72,9 @@ test('CI and major workflow failures invoke the scanner automatically without re
   assert.match(watcher, /Type Check/);
   assert.match(watcher, /Implementation Evidence/);
   assert.match(watcher, /Playwright Smoke and Guardrails/);
+  assert.match(watcher, /Verify Cloudflare Native Deployment/);
+  assert.match(watcher, /Audit Cloudflare Zone Access Coverage/);
+  assert.match(watcher, /Reconcile app\.sekretbip\.net Frontend Ownership/);
   assert.match(watcher, /github\.event\.workflow_run\.id/);
 
   const watchedWorkflowBlock = watcher.match(/workflows:\s*([\s\S]*?)\n\s*types:/)?.[1] || '';
