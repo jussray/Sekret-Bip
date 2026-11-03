@@ -48,6 +48,12 @@ test('production Auth email provider keeps confirmation enabled and secrets out 
   assert.match(script, /\(pass\|secret\|token\|key\)/i);
 });
 
+test('production Auth email provider surfaces the leading failure code without message text', () => {
+  assert.match(script, /KNOWN_FAILURE_CODE = \/\^\(AUTH_EMAIL_\|RESEND_DOMAIN_\|SUPABASE_AUTH_CONFIG_HTTP_\|SUPABASE_TARGET_\)/);
+  assert.match(script, /match\(\/\^\[A-Z\]\[A-Z0-9_\]\+\/\)/);
+  assert.match(script, /: 'AUTH_EMAIL_PROVIDER_FAILED'/);
+});
+
 test('production Auth email provider stays on the canonical Resend domain', () => {
   const workflowAdminEmailLines = workflow
     .split('\n')

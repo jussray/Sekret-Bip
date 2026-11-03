@@ -13,6 +13,7 @@ const receipts = [
   ['20260827062000', '20260905234019', 'harden_legacy_circle_permanent_account_boundaries'],
   ['20260827063000', '20260905234039', 'reconcile_reward_approval_live_and_replay'],
   ['20260831233000', '20260905234048', 'private_self_task_visibility'],
+  ['20261006025600', '20261006031559', 'remove_noncanonical_compliance_foundation'],
 ];
 
 test('current production apply receipts remain explicit exact runtime aliases', () => {

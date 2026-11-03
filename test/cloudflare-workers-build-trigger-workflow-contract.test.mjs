@@ -56,12 +56,18 @@ test('Cloudflare token transport canonicalizes common secret wrappers and flags 
     ['‘abc123’', 'abc123', true],
     ["CLOUDFLARE_API_TOKEN='Bearer\u00a0abc\u200b123'", 'abc123', true],
     ['CLOUDFLARE_API_TOKEN=“Bearer\u00a0abc\u200b123”', 'abc123', true],
+    ['abс123', 'abc123', true],
+    ['сlоudflаre‐token', 'cloudflare-token', true],
   ]) {
     const result = normalizeCloudflareTokenTransport(input);
     assert.equal(result.token, expected, input);
     assert.equal(result.changed, changed, input);
     assert.equal(result.nonAsciiRemaining, false, input);
   }
+
+  const unrelatedCyrillic = normalizeCloudflareTokenTransport('abж123');
+  assert.equal(unrelatedCyrillic.token, 'abж123');
+  assert.equal(unrelatedCyrillic.nonAsciiRemaining, true);
 
   const invalid = normalizeCloudflareTokenTransport('abc💥');
   assert.equal(invalid.token, 'abc💥');

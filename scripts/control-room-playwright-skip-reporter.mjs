@@ -31,10 +31,10 @@ export default class ControlRoomPlaywrightSkipReporter {
   }
 
   onEnd() {
-    const { reportPath } = writeSkipReport(this.observations, {
+    writeSkipReport(this.observations, {
       filename: 'playwright-test-skips-latest.json',
       source: 'playwright',
     });
-    console.log(`CONTROL_ROOM_PLAYWRIGHT_SKIP_SUMMARY count=${this.observations.length} report=${path.relative(process.cwd(), reportPath)}`);
+    console.log('CONTROL_ROOM_PLAYWRIGHT_SKIP_REPORT_WRITTEN');
   }
 }
