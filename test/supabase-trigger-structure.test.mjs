@@ -7,9 +7,11 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const migrationsRoot = path.join(root, 'supabase', 'migrations');
 const baselinePath = path.join(root, 'security', 'supabase-trigger-baseline.json');
+const candidateReviewPath = path.join(root, 'security', 'supabase-trigger-candidate-reviews.json');
 const sprintPath = path.join(root, 'SPRINT.md');
 
 const baseline = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+const candidateReview = JSON.parse(fs.readFileSync(candidateReviewPath, 'utf8'));
 const sprint = fs.readFileSync(sprintPath, 'utf8');
 const migrations = fs
   .readdirSync(migrationsRoot)
@@ -350,12 +352,12 @@ function buildEffectiveState(inputMigrations) {
 
 const state = buildEffectiveState(migrations);
 const repositoryFunctions = new Map(
-  baseline.functions
+  [...baseline.functions, ...candidateReview.functions]
     .filter((item) => item.repositoryExpected !== false)
     .map((item) => [item.signature.toLowerCase(), item]),
 );
 const repositoryAttachments = new Map(
-  baseline.attachments
+  [...baseline.attachments, ...candidateReview.attachments]
     .filter((item) => item.repositoryExpected !== false)
     .filter((item) => !tc01RetiredSafetyTriggerKeys.has(
       triggerKey(item.table.toLowerCase(), item.trigger.toLowerCase()),
@@ -411,9 +413,16 @@ test('baseline separates repository truth, live catalog observation, and behavio
   assert.equal(baseline.verification.liveBehaviorVerified, false);
   assert.equal(baseline.verification.externalEffectsSafelyStubbed, false);
   assert.equal(baseline.functions.length, 14);
-  assert.equal(repositoryFunctions.size, 13);
   assert.equal(baseline.attachments.length, 18);
-  assert.equal(repositoryAttachments.size, 14);
+  assert.equal(candidateReview.schemaVersion, 1);
+  assert.equal(candidateReview.status, 'candidate_not_live');
+  assert.equal(candidateReview.sourceMigration, '20260919190000_auth_signup_onboarding_baseline.sql');
+  assert.equal(candidateReview.functions.length, 1);
+  assert.equal(candidateReview.attachments.length, 2);
+  assert.equal(repositoryFunctions.size, 14);
+  assert.equal(repositoryAttachments.size, 16);
+  assert.equal(candidateReview.functions[0].deployedLive, false);
+  assert.equal(candidateReview.functions[0].clientExecuteRevokedLive, false);
 });
 
 test('TC-01 retired private and mixed safety triggers stay historical-only', () => {

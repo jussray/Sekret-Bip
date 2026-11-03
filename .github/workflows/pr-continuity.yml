@@ -1,7 +1,5 @@
 name: PR Continuity
 on:
-  push:
-    branches: [main]
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   pull_request_target:
@@ -85,7 +83,7 @@ jobs:
         run: node scripts/pr-continuity.mjs metadata
   rollover:
     name: Roll Current Main Through Open PR Graph
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     permissions:

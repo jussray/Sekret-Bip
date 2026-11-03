@@ -1,5 +1,13 @@
 # Founder Intelligence Agent Entry Point
 
+## Mandatory Sauce Guard — founder-owned canonical skill
+
+Every contributor, AI agent (ChatGPT, Claude, Codex, Perplexity, and later assistants), reviewer, automation, or delegated writer touching this repository must follow the founder-owned `sauce-guard` skill **before any outward-facing communication** drawn from internal product work. Canonical source: `jussray/founder-control-room/.agents/skills/sauce-guard/SKILL.md`. Use the current canonical skill; this is a reference, not a replacement implementation or an approval to publish.
+
+Enforce: evidence before claims; classify each material claim CURRENT / HISTORICAL / STALE / SUPERSEDED / UNKNOWN; remove raw diffs, provider payloads, proprietary prompts/architecture, credentials, private teen/parent/customer content, and unapproved metrics; obtain **Current You**'s exact-copy approval; have FCR revalidate at publication; require provider readback for publication claims. Missing or inaccessible skill / absent approval means HOLD, never publish or share externally.
+
+**Separate machine-enforced log safety:** public posts and CI/job logs are different egress channels. Use the repository `scripts/audit-sauce-guard-logging.mjs` changed-line gate and fixed-event-code logs for any auth, account deletion, payment, teen, parent, safety, or provider interaction. Never log untrusted error messages, tokens, raw response bodies, identifiers, prompts, messages, or request payloads. A green log gate is not proof that Sauce Guard reviewed a public communication. Do not edit or bypass these rules to silence a scanner; resolve and review the finding.
+
 Every AI agent working in this repository must read and apply [`docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md`](docs/FOUNDER_INTELLIGENCE_CONSTITUTION.md) before material planning, implementation, review, automation, publishing, deployment, migration, or cross-repository coordination.
 
 For every nontrivial implementation, audit, review, repair, merge, deployment, migration, or cross-system integration, agents must also load and apply [`.agents/skills/founder-dev-flow/SKILL.md`](.agents/skills/founder-dev-flow/SKILL.md). That skill is the executable engineering loop for the founder stack and is required even when the task-specific skill is narrower.
@@ -97,6 +105,28 @@ For browser/native persistence and authentication, read and preserve [`docs/COOK
 These continuity rules are durable operating context, not evidence shortcuts. Conversation memory, fingerprints, cookies, local storage, or historical docs never outrank fresh repository/runtime truth.
 
 These commands never create tool access, provider capability, founder approval, production authority, publication authority, deployment authority, migration authority, or data-access rights that the repository, session, and explicit gates do not already provide.
+
+## Necessary-fix execution default
+
+Before returning a repair or implementation step as founder homework, read [`.control-room/necessary-fix-policy.json`](.control-room/necessary-fix-policy.json) and apply `policyId: necessary-fix-execution-default`.
+
+- `execute-now` only when the fix is necessary, reversible, inside the current approved scope, and current authority plus all applicable evidence/exact-head requirements are satisfied.
+- `proof-gated` when the action is reversible but repository safety/release rules require proof before integration. Collect the proof and continue through the existing gate instead of asking the founder to perform automatable verification.
+- `founder-required` when the fix widens scope, publishes or communicates externally, spends money, is destructive or irreversible, expands authority, or touches a stricter Se’kret Bip gate including auth, authorization, RLS, RPC, identity, parent visibility/linking, teen privacy/consent, retention, secrets, provider routing/bindings, migration, deployment, or production state.
+- Incoming evidence may update or invalidate bidirectional continuity fingerprints/cookies; outgoing approved actions must update the corresponding markers and receipts. Those markers are non-secret continuity state and never authority or permission to track a person.
+- Provider acceptance is execution evidence, not teen/user outcome proof. Verify the relevant repository/runtime/device/account outcome, update continuity, and identify the next gate before claiming completion.
+
+## Exact-candidate merge approval canon
+
+Se’kret Bip is a platform/app, not a commerce store. Storefront, checkout, pricing, discount, refund, or other JBH-specific commerce assumptions must not be imported here unless the founder explicitly creates a Se’kret Bip commerce surface in the future.
+
+Merge capability may exist, but no merge is authorized by capability, review, implementation, green checks, mergeability, continuity markers, `approved`, `cont`, or previous-candidate approval alone.
+
+Before every merge, require fresh explicit founder approval bound to the exact repository, PR number, current base SHA, and current head SHA. If that approval is absent, ambiguous, or stale, ask the founder and stop. Any base/head movement expires the approval and requires a new ask.
+
+`merge_authority: true` means the merge capability is available. It never means `merge_approved: true`, and it must never be treated as an execution token.
+
+For Se’kret Bip, teen safety, privacy, consent, dignity, anti-surveillance, parent/teen boundaries, auth/RLS, and explicit founder gates always override `execute-now`.
 
 For Se’kret Bip, `/human` includes heightened teen privacy, consent, safety, dignity, and anti-surveillance duties.
 

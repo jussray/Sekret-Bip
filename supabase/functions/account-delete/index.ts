@@ -7,16 +7,17 @@
 // Required secrets:
 //   ACCOUNT_DELETION_PROCESS_SECRET
 //   SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY
+//   SUPABASE_SECRET_KEYS (hosted Edge Functions; legacy service_role remains a migration fallback)
 //
 // Deploy with JWT verification disabled because this processor authenticates
 // with x-account-deletion-secret instead of a user session.
 
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { getSupabaseSecretKey } from '../_shared/supabase-api-keys.ts';
 
 const PROCESS_SECRET = Deno.env.get('ACCOUNT_DELETION_PROCESS_SECRET') ?? '';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
-const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+const SUPABASE_SECRET_KEY = getSupabaseSecretKey() ?? '';
 
 interface DeleteRequestBody {
   requestId?: string;
@@ -224,7 +225,7 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'unauthorized' }, 401);
   }
 
-  if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
     return json({ error: 'server_config' }, 500);
   }
 
@@ -238,7 +239,7 @@ Deno.serve(async (req: Request) => {
   const requestId = body.requestId?.trim() ?? '';
   if (!isUuid(requestId)) return json({ error: 'invalid_request_id' }, 400);
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+  const admin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 

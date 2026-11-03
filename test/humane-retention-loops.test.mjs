@@ -13,7 +13,6 @@ test('legacy Bip Energy fade remains bounded history but is not a teen return tr
   const energyService = read('src/features/activity/bipEnergy.ts');
   const overlay = read('components/retention/BipReturnOverlay.tsx');
 
-  // Preserve migration lineage and the bounded legacy contract for audit/rollback.
   assert.match(finalMigration, /v_days_away <= 1/);
   assert.match(finalMigration, /least\(v_balance, least\(5, greatest\(1, v_days_away - 1\)\)\)/);
   assert.match(finalMigration, /on conflict do nothing/);
@@ -30,7 +29,6 @@ test('legacy Bip Energy fade remains bounded history but is not a teen return tr
   assert.match(energyService, /if \(inFlightCheck\) return inFlightCheck/);
   assert.match(energyService, /cachedUserId === user\.id/);
 
-  // Humane return UX does not invoke inactivity decay or advertise absence loss.
   assert.doesNotMatch(ledger, /applyBipEnergyFade/);
   assert.doesNotMatch(overlay, /applyBipEnergyFade|loadUnseenBipEnergyAdjustment|markBipEnergyAdjustmentSeen/);
   assert.doesNotMatch(overlay, /Bip Energy faded|days away|streak resets/);
@@ -80,20 +78,28 @@ test('public Circle keeps support actions and makes totals owner-only', () => {
   assert.match(migration, /revoke select on table public\.public_circle_posts from anon, authenticated/);
 });
 
-test('Bridge carries a teen-selected response request without private content', () => {
+test('Bridge carries teen-selected metadata, fails loud on delivery errors, and surfaces the latest signal to the linked parent', () => {
   const migration = read('supabase/migrations/20260714043000_humane_retention_loops.sql');
   const teenDock = read('components/bridge/BridgeResponsePreferenceDock.tsx');
   const parentCard = read('components/bridge/ParentBridgeResponseRequestCard.tsx');
   const bridgeCompat = read('src/utils/parentBridgeCompat.ts');
+  const teenBridge = read('screens/BridgeScreen.tsx');
   const preferenceContract = read('src/features/bridge/responsePreference.ts');
 
   assert.match(migration, /add column if not exists response_preference text/);
   assert.match(migration, /'listen', 'comfort', 'help_plan', 'check_later', 'give_space'/);
   assert.match(teenDock, /What would help after you send this\?/);
   assert.match(teenDock, /They still do not get the rest of your private space/);
-  assert.match(parentCard, /Honor the request without asking to see journals, chats, mood history/);
+  assert.match(parentCard, /setLatest\(signals\[0\] \?\? null\)/);
+  assert.match(parentCard, /LATEST TEEN-CHOSEN BRIDGE SIGNAL/);
+  assert.match(parentCard, /Linking does not unlock journals, chats, mood history/);
+  assert.match(bridgeCompat, /const \{ error \} = await sb\.from\('bridge_signals'\)\.insert/);
+  assert.match(bridgeCompat, /if \(error\) throw error/);
   assert.match(bridgeCompat, /response_preference: responsePreference/);
   assert.match(bridgeCompat, /select\('id, share_type, conv_mode, response_preference/);
+  assert.match(teenBridge, /Bridge could not confirm delivery\. Nothing was marked sent/);
+  assert.match(teenBridge, /await sendBridgeSignal[\s\S]*setSent\(true\)/);
+  assert.doesNotMatch(teenBridge, /catch \{[\s\S]{0,120}local experience unaffected/);
   assert.match(preferenceContract, /just listen/);
   assert.match(preferenceContract, /give me space/);
 });

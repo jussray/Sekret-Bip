@@ -14,6 +14,10 @@ Look to Founder Control Room first for release-truth interpretation. Capture rep
 
 GitHub Actions failures must be classified as `runner_startup_failure`, `workflow_no_jobs`, or `workflow_step_failure` before any provider blames code. Zero-step/no-log jobs are infrastructure evidence, not code-regression proof. Infrastructure outages can still gate merge and release truth under this repo’s rules.
 
+A workflow run that completes as `action_required` with **zero jobs** is `workflow_no_jobs` unless later evidence proves another cause. It is a release blocker, but it is not proof of a failed build, failed assertion, Playwright regression, CodeQL finding, Supabase-preview failure, or application defect. Do not change product/provider source merely to make a zero-job gate look green. First get the workflow authorized/runnable, then rerun the same proof subject and inspect actual jobs, steps, and logs.
+
+If GitHub refuses to rerun a zero-job `action_required` run because the run has no retryable failed jobs, preserve the candidate and classify the gate as `BLOCKED` by workflow execution/approval state. Do not manufacture a replacement commit solely to retrigger CI unless a repository rule explicitly requires a new proof subject. Any new head invalidates predecessor exact-head proof and must be treated as a fresh subject.
+
 Cloudflare build/deploy evidence is separate from GitHub Actions evidence. Cloudflare success does not prove Playwright, auth, data, privacy, Supabase, Worker, or app runtime gates. GitHub runner outage does not prove application failure.
 
 ## Claude / Claude Code
@@ -92,6 +96,75 @@ Supabase is the canonical durable application base for Se’kret Bip. Auth ident
 Firebase App Check, FCM, Firebase Hosting, Cloudflare, and Expo may protect, transport, execute, host, notify, cache, or observe within their approved boundaries, but they may not independently redefine user identity, RLS, consent, relationship truth, or durable user state. Any future provider must integrate around this Supabase authority unless a founder-approved migration explicitly replaces it with rollback and verified data/auth continuity.
 
 Do not introduce the deprecated Management API `logs.all` analytics endpoint into observability or proof tooling. New Management API log queries must use the supported `logs` endpoint and its ClickHouse SQL contract. A provider-log query is observability evidence only; it cannot grant data access, weaken RLS, or prove an application outcome.
+
+## Firebase
+
+Firebase is a bounded supporting provider for Se’kret Bip, not a second application authority.
+
+### Project identity
+
+- Firebase project: `sekretbip-7e2b1`
+- canonical teen Apple/iOS bundle identifier: `com.sekretbip.app`
+- parent Apple/iOS bundle identifier: `com.sekretbip.parent`
+- the teen and parent app identities are distinct; do not collapse or silently reuse one Firebase App ID for both
+
+The Firebase Apple App ID, web App ID, numeric project number, and `GoogleService-Info.plist` are provider-returned identities. Never guess, fabricate, or derive them from the bundle identifier. Record them only after authenticated Firebase tooling returns them.
+
+### Approved capability boundary
+
+Firebase may provide:
+
+- App Check attestation for requests reaching the canonical Cloudflare Worker;
+- Firebase Hosting as an alternate static host for the existing Expo web export;
+- FCM only when the existing Expo notification architecture explicitly requires or adopts it.
+
+Firebase must not become Se’kret Bip Auth, Firestore, Realtime Database, durable Storage authority, Functions authority, relationship truth, consent truth, parent/teen authority, or another durable application backend while Supabase remains canonical.
+
+The current notification path uses Expo notification tokens. Do not add a direct FCM client path merely because Firebase is present. A notification-provider change requires a separate need, migration boundary, rollback, and device proof.
+
+### App Check contract
+
+Supabase authentication is evaluated independently from Firebase App Check. A valid Firebase App Check token proves app attestation only; it cannot create a principal, replace an Authorization bearer token, weaken RLS, or grant user/parent/teen authority.
+
+The Worker accepts App Check only through `X-Firebase-AppCheck`. Supported Firebase App IDs must be explicitly allowlisted. Web and Apple clients may have different Firebase App IDs, so a single web-only expected app ID is not sufficient for multi-client rollout.
+
+Rollout order is mandatory:
+
+```text
+off
+→ bind authenticated provider identities
+→ acquire real client token
+→ observe
+→ verify telemetry + exemptions + failure behavior
+→ exact-runtime proof
+→ separately approve enforce
+```
+
+`FIREBASE_APPCHECK_MODE = "off"` is the checked-in safe default and one-variable rollback. `observe` must preserve legitimate traffic while producing non-token evidence. `enforce` is forbidden until the intended client cohort can consistently acquire and attach valid real tokens and the failure path is proven.
+
+Client App Check tokens must not be persisted in AsyncStorage, SecureStore, cookies, durable database state, or source-controlled fixtures. The canonical backend-header carrier may request a fresh token from a registered provider and attach it per request.
+
+### Firebase Hosting contract
+
+Firebase Hosting serves the existing Expo static web output from `dist` with SPA fallback. It is an additional provider surface only.
+
+Do not bind, transfer, replace, or infer ownership of `app.sekretbip.net`, `api.sekretbip.net`, or the canonical Cloudflare frontend/API path from the presence of `firebase.json`, `.firebaserc`, a successful Firebase deploy, or a `*.web.app`/`*.firebaseapp.com` URL.
+
+A Firebase Hosting deployment proves only that the Firebase-hosted artifact was deployed. It does not prove canonical-domain traffic, Cloudflare Worker health, Supabase health, auth, RLS, app runtime, Playwright user journeys, or production equivalence.
+
+### Firebase proof ladder
+
+For any Firebase continuation, classify each layer separately:
+
+1. **Repository**: exact branch/head contains intended config and contracts.
+2. **Provider identity**: authenticated Firebase tooling confirms project/app identities.
+3. **Client configuration**: Apple/web SDK configuration is bound to the provider-returned identities.
+4. **Build**: applicable web/native builds and focused tests pass on exact head.
+5. **Runtime attestation**: a real intended client sends a valid App Check token and observe-mode telemetry proves acceptance without granting identity.
+6. **Hosting**: Firebase deploy returns the actual Hosting URL and deployment receipt.
+7. **Canonical production**: separately prove whether any canonical Se’kret domain intentionally points to that artifact. Never infer this from step 6.
+
+Missing evidence at one layer stays `UNKNOWN` or `BLOCKED`; success at another layer cannot donate proof upward.
 
 ## Cloudflare Workers / Pages
 

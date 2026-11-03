@@ -8,13 +8,18 @@ on:
       - package.json
       - package-lock.json
       - app.json
+      - app/_layout.tsx
       - .env.example
+      - src/services/appCheckToken.ts
       - src/services/firebase/appCheck.ts
       - src/utils/backendAuth.ts
+      - scripts/verify-firebase-app-check-rollout.mjs
       - test/firebase-app-check-client-contract.test.mjs
+      - test/firebase-client-app-check-contract.test.mjs
       - test/firebase-app-check-contract.test.mjs
-      - .github/workflows/firebase-client-lockfile.yml
+      - e2e/smoke.spec.ts
       - .github/workflows/firebase-app-check-client-proof.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -22,10 +27,12 @@ permissions:
 jobs:
   firebase-client-proof:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Check out exact branch head
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
@@ -36,8 +43,11 @@ jobs:
       - name: Install exact dependencies
         run: npm ci --no-audit --no-fund
 
+      - name: Verify App Check rollout state
+        run: node scripts/verify-firebase-app-check-rollout.mjs
+
       - name: Run App Check contracts
-        run: node --test test/firebase-app-check-client-contract.test.mjs test/firebase-app-check-contract.test.mjs
+        run: node --test test/firebase-app-check-client-contract.test.mjs test/firebase-client-app-check-contract.test.mjs test/firebase-app-check-contract.test.mjs
 
       - name: Typecheck
         run: npm run type-check
@@ -50,3 +60,9 @@ jobs:
 
       - name: Export web bundle
         run: npm run build:web
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run real web smoke path
+        run: npm run test:e2e -- e2e/smoke.spec.ts

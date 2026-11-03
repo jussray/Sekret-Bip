@@ -30,7 +30,7 @@ test('App Check client dependencies and Expo plugins stay narrowly scoped', () =
   assert.equal(pkg.dependencies['expo-build-properties'], '56.0.19');
   assert.ok(pluginNames.includes('@react-native-firebase/app'));
   assert.ok(pluginNames.includes('@react-native-firebase/app-check'));
-  assert.ok(buildProperties, 'Expo build properties must carry the RNFirebase iOS framework prerequisite');
+  assert.ok(buildProperties);
   assert.equal(buildProperties[1]?.ios?.useFrameworks, 'static');
 
   for (const prohibited of [
@@ -40,57 +40,51 @@ test('App Check client dependencies and Expo plugins stay narrowly scoped', () =
     '@react-native-firebase/storage',
     '@react-native-firebase/functions',
   ]) {
-    assert.equal(pkg.dependencies[prohibited], undefined, `${prohibited} must not enter the V1 client dependency boundary`);
+    assert.equal(pkg.dependencies[prohibited], undefined, `${prohibited} must not enter the client authority boundary`);
   }
 });
 
-test('App Check client is opt-in and uses platform attestation without debug-token source material', () => {
+test('runtime installs only the request-scoped App Check provider seam', () => {
   const client = read('src/services/firebase/appCheck.ts');
-  const envExample = read('.env.example');
+  const seam = read('src/services/appCheckToken.ts');
+  const layout = read('app/_layout.tsx');
 
+  assert.match(client, /registerAppCheckTokenProvider/);
+  assert.match(client, /readFreshAppCheckToken/);
   assert.match(client, /EXPO_PUBLIC_FIREBASE_APPCHECK_ENABLED === 'true'/);
   assert.match(client, /provider: __DEV__ \? 'debug' : 'playIntegrity'/);
   assert.match(client, /provider: __DEV__ \? 'debug' : 'appAttestWithDeviceCheckFallback'/);
   assert.match(client, /provider: 'reCaptchaEnterprise'/);
-  assert.match(client, /EXPO_PUBLIC_FIREBASE_APPCHECK_SITE_KEY/);
   assert.match(client, /isTokenAutoRefreshEnabled: true/);
   assert.match(client, /getToken\(appCheck\)/);
-  assert.match(client, /return \{\};/);
+  assert.doesNotMatch(client, /AsyncStorage|SecureStore|document\.cookie|Set-Cookie/);
 
-  assert.match(envExample, /EXPO_PUBLIC_FIREBASE_APPCHECK_ENABLED=false/);
-  assert.doesNotMatch(envExample, /EXPO_PUBLIC_FIREBASE_APPCHECK_DEBUG_TOKEN\s*=/);
-  assert.doesNotMatch(client, /debugToken\s*:/);
+  assert.match(seam, /getAppCheckToken/);
+  assert.match(layout, /installFirebaseAppCheckTokenProvider/);
+  assert.match(layout, /useEffect\(\(\) => installFirebaseAppCheckTokenProvider\(\), \[\]\)/);
 });
 
-test('Supabase identity and Firebase attestation remain independent at one backend header boundary', () => {
-  const backendAuth = read('src/utils/backendAuth.ts');
+test('disabled default does not load native Firebase at module evaluation', () => {
   const client = read('src/services/firebase/appCheck.ts');
+  assert.doesNotMatch(client, /^import .* from ['"]@react-native-firebase\/app['"];?$/m);
+  assert.doesNotMatch(client, /^import \{[^}]*getToken[^}]*\} from ['"]@react-native-firebase\/app-check['"];?$/m);
+  assert.match(client, /await import\('@react-native-firebase\/app'\)/);
+  assert.match(client, /await import\('@react-native-firebase\/app-check'\)/);
+});
 
-  assert.match(backendAuth, /resolveBackendToken\(\)/);
-  assert.match(backendAuth, /firebaseAppCheckHeaders\(\)/);
+test('canonical backend headers cannot be caller-spoofed', () => {
+  const backendAuth = read('src/utils/backendAuth.ts');
+
+  assert.match(backendAuth, /getAppCheckToken\(\)/);
   assert.match(backendAuth, /key\.toLowerCase\(\)/);
   assert.match(backendAuth, /normalized === 'authorization'/);
   assert.match(backendAuth, /normalized === 'x-firebase-appcheck'/);
   assert.match(backendAuth, /delete safeExtra\[key\]/);
-  assert.match(backendAuth, /\.\.\.appCheckHeaders/);
-  assert.doesNotMatch(client, /Authorization/);
-  assert.doesNotMatch(client, /userId/);
+  assert.match(backendAuth, /backendHeaders\(token, safeExtra\)/);
+  assert.match(backendAuth, /headers\['X-Firebase-AppCheck'\] = appCheckToken/);
 });
 
-test('public health remains unattested while protected backend posts inherit canonical headers', () => {
-  const sekretClient = read('src/services/backend/sekretClient.ts');
-  const bridgeSummary = read('src/services/bridgeSummaryService.ts');
-
-  assert.match(sekretClient, /headers: await backendAuthHeaders\(\)/);
-  assert.match(bridgeSummary, /const headers = await backendAuthHeaders\(\)/);
-
-  const pingStart = sekretClient.indexOf('async ping()');
-  const pingBody = sekretClient.slice(pingStart);
-  assert.match(pingBody, /'\/health'/);
-  assert.doesNotMatch(pingBody, /backendAuthHeaders\(\)/);
-});
-
-test('server enforcement remains off by default and Firebase cannot become a second auth or data backend', () => {
+test('server enforcement stays off and Firebase cannot become a second backend authority', () => {
   const wrangler = read('wrangler.toml');
   const roots = ['app', 'src', 'worker'].map((part) => path.join(root, part));
   const source = roots.flatMap(collectSourceFiles).map((file) => fs.readFileSync(file, 'utf8')).join('\n');

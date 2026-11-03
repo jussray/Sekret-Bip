@@ -14,11 +14,14 @@ test('parent setup completes profile and continues to optional code entry', asyn
   assert.doesNotMatch(source, /\['parent_profile_done', 'true'\]/);
 });
 
-test('parent link screen validates consent before resolving backend entry state', async () => {
+test('parent link screen establishes relationship without minting Teen verification', async () => {
   const source = await read('app/(onboarding)/parent-link.tsx');
   assert.match(source, /redeemInviteCodeResult\(normalized\)/);
   assert.match(source, /result\.value\.teenUserId/);
-  assert.match(source, /completeVerifiedParentLink/);
+  assert.match(source, /completeParentLink/);
+  assert.match(source, /completeParentLink\(result\.value\.teenUserId\)/);
+  assert.doesNotMatch(source, /completeVerifiedParentLink/);
+  assert.match(source, /Teen age assurance is a separate explicit action/);
   assert.match(source, /resolveParentEntryState\(\)/);
   assert.match(source, /routeForParentEntryState\(parentEntry\)/);
   assert.match(source, /linked_teen_id/);

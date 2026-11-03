@@ -115,6 +115,7 @@ export type WorkerErrorCode =
   | 'RATE_LIMITED'
   | 'BACKEND_UNAVAILABLE'
   | 'VOICE_UNAVAILABLE'
+  | 'FOUNDER_PAUSED'
   | 'TIMEOUT'
   | 'NETWORK_ERROR'
   | 'UNKNOWN';

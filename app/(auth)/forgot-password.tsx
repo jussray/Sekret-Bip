@@ -11,20 +11,32 @@ import {
   View,
 } from 'react-native';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import {
   PASSWORD_RECOVERY_PATH,
   buildRecoveryRedirectUrl,
   normalizeRecoveryEmail,
   validateRecoveryEmail,
+  type RecoveryAccountSide,
 } from '@/features/auth/passwordRecovery';
 import { getSupabase } from '@/utils/supabase';
 
-function recoveryRedirectUrl(): string {
+function normalizeSide(value: string | undefined): RecoveryAccountSide | undefined {
+  return value === 'parent' || value === 'teen' ? value : undefined;
+}
+
+function authRoute(path: '/(auth)/login' | '/(auth)/forgot-password', side?: RecoveryAccountSide): string {
+  return side ? `${path}?side=${side}` : path;
+}
+
+function recoveryRedirectUrl(side?: RecoveryAccountSide): string {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
-    return buildRecoveryRedirectUrl({ webOrigin: window.location.origin });
+    return buildRecoveryRedirectUrl({ webOrigin: window.location.origin, side });
   }
-  return buildRecoveryRedirectUrl({ nativeUrl: Linking.createURL(PASSWORD_RECOVERY_PATH) });
+  return buildRecoveryRedirectUrl({
+    nativeUrl: Linking.createURL(PASSWORD_RECOVERY_PATH),
+    side,
+  });
 }
 
 function authErrorMessage(error: unknown): string {
@@ -70,6 +82,8 @@ function readableAuthError(error: unknown): string {
 }
 
 export default function ForgotPasswordScreen() {
+  const params = useLocalSearchParams<{ side?: string }>();
+  const preferredSide = normalizeSide(params.side);
   const [email, setEmail]     = useState('');
   const [error, setError]     = useState('');
   const [sent, setSent]       = useState(false);
@@ -91,7 +105,7 @@ export default function ForgotPasswordScreen() {
       router.back();
       return;
     }
-    router.replace('/(auth)/login');
+    router.replace(authRoute('/(auth)/login', preferredSide) as never);
   }
 
   async function handleResetRequest() {
@@ -114,7 +128,7 @@ export default function ForgotPasswordScreen() {
     try {
       const { error: resetError } = await sb.auth.resetPasswordForEmail(
         normalizeRecoveryEmail(email),
-        { redirectTo: recoveryRedirectUrl() },
+        { redirectTo: recoveryRedirectUrl(preferredSide) },
       );
       if (resetError) {
         setError(readableAuthError(resetError));
@@ -130,7 +144,6 @@ export default function ForgotPasswordScreen() {
     }
   }
 
-  // ─ Sent state ─────────────────────────────────────────────────────────────
   if (sent) {
     return (
       <View style={styles.root}>
@@ -164,7 +177,6 @@ export default function ForgotPasswordScreen() {
     );
   }
 
-  // ─ Form ───────────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.root}
@@ -174,7 +186,6 @@ export default function ForgotPasswordScreen() {
       <View style={styles.bgDot2} pointerEvents="none" />
 
       <Animated.View style={[styles.inner, { transform: [{ translateX: shakeAnim }] }]}>
-        {/* Logo */}
         <View style={styles.logoWrap}>
           <Text style={styles.logoMark}>Bip</Text>
           <Text style={styles.logoHeart}>💜</Text>

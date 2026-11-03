@@ -57,6 +57,10 @@ export function routeForSide(side: 'teen' | 'parent' | null | undefined, key: st
       memories: PARENT_ROUTES.profile,
       cloud: PARENT_ROUTES.calm,
       comfort: PARENT_ROUTES.calm,
+      bipJr: PARENT_ROUTES.bipJr,
+      'bip-jr': PARENT_ROUTES.bipJr,
+      teenVerification: PARENT_ROUTES.teenVerification,
+      'teen-verification': PARENT_ROUTES.teenVerification,
     };
     return parentMap[key] ?? missingRoute('parent', key);
   }

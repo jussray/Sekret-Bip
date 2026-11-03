@@ -43,11 +43,13 @@ test('Product Design proof remains exact-head and failure-preserving', () => {
     'path: artifacts/product-design-playwright',
     'if-no-files-found: error',
     'retention-days: 30',
+    'e2e/privacy-wording-accuracy.spec.ts',
     'e2e/room-canonical-display.spec.ts',
     'e2e/canonical-companion-identity.spec.ts',
     'e2e/guardrails.spec.ts',
     'test/founder-visual-authority-contract.test.mjs',
     'test/pages-companion-asset-contract.test.mjs',
+    'test/companion-display-name-canon.test.mjs',
   ]) {
     assert.ok(workflow.includes(required), `missing Product Design workflow contract: ${required}`);
   }

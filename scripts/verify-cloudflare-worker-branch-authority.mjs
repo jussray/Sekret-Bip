@@ -5,6 +5,7 @@ const API = 'https://api.cloudflare.com/client/v4';
 const clean = (value) => String(value ?? '').trim();
 const accountId = clean(process.env.CLOUDFLARE_ACCOUNT_ID);
 const dedicatedTokenRaw = String(process.env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN ?? '');
+const fallbackTokenRaw = String(process.env.CLOUDFLARE_API_TOKEN ?? '');
 let token = '';
 let prefetchedScripts = null;
 const evidencePath = clean(process.env.EVIDENCE_PATH) || 'artifacts/cloudflare-worker-branch-authority.json';
@@ -17,7 +18,7 @@ const terminal = new Set(['success', 'fail', 'skipped', 'cancelled', 'terminated
 const active = (rows) => (Array.isArray(rows) ? rows : []).filter((row) => !row?.deleted_on);
 
 const receipt = {
-  schemaVersion: 11,
+  schemaVersion: 13,
   generatedAt: new Date().toISOString(),
   trustedGitRef: process.env.GITHUB_REF || null,
   trustedGitSha: process.env.GITHUB_SHA || null,
@@ -26,16 +27,19 @@ const receipt = {
   status: 'started',
   failure: null,
   credential: {
-    configuredSources: [dedicatedTokenRaw ? 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN' : null].filter(Boolean),
+    configuredSources: [
+      dedicatedTokenRaw ? 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN' : null,
+      fallbackTokenRaw ? 'CLOUDFLARE_API_TOKEN' : null,
+    ].filter(Boolean),
     selectedSource: null,
     selectedShape: null,
     attempts: [],
   },
   providerTopology: {
     workers: [
-      { name: separateWorker, previousName: previousSeparateWorker, role: 'separate-protected', mutationAuthorized: false },
-      { name: productionWorker, role: 'production' },
-      { name: alphaWorker, role: 'founder-gated-alpha', mutationAuthorized: false },
+      { name: separateWorker, previousName: previousSeparateWorker, role: 'separate-protected', requiredPresence: true, mutationAuthorized: false },
+      { name: productionWorker, role: 'production', requiredPresence: true },
+      { name: alphaWorker, role: 'founder-gated-alpha', requiredPresence: false, mutationAuthorized: false },
     ],
     pages: [{ name: pagesProject, role: 'frontend', mutationAuthorized: false }],
   },
@@ -68,6 +72,9 @@ const receipt = {
   alphaWorker: {
     name: alphaWorker,
     scriptTag: null,
+    observed: false,
+    expectedPresence: 'optional-until-founder-approved',
+    deploymentState: 'not-deployed-until-founder-approved',
     activeTriggerCount: null,
     founderGatedObservationOnly: true,
   },
@@ -112,34 +119,35 @@ function inspectToken(rawValue, source) {
   if (/^Bearer\s+/i.test(rawValue)) return { ok: false, source, shape: 'invalid', code: 'token-bearer-prefix-stored' };
   if (/^["']|["']$/.test(rawValue)) return { ok: false, source, shape: 'invalid', code: 'token-quoted-secret' };
   if (/^[A-Z_][A-Z0-9_]*=/.test(rawValue)) return { ok: false, source, shape: 'invalid', code: 'token-variable-assignment-stored' };
-  if (rawValue.startsWith('cfat_')) return { ok: false, source, shape: 'account-scoped', code: 'workers-builds-account-token-unsupported' };
 
   return {
     ok: true,
     source,
-    shape: rawValue.startsWith('cfut_') ? 'user-prefixed' : 'legacy-opaque',
+    shape: rawValue.startsWith('cfat_') ? 'account-prefixed' : rawValue.startsWith('cfut_') ? 'user-prefixed' : 'legacy-opaque',
     token: rawValue,
   };
 }
 
-async function verifyApiToken(inspected) {
+async function verifyUserApiToken(inspected) {
+  const providerPath = '/user/tokens/verify';
+  const probe = 'token-verify-user';
   let response;
   try {
-    response = await fetch(`${API}/user/tokens/verify`, {
+    response = await fetch(`${API}${providerPath}`, {
       headers: { Authorization: `Bearer ${inspected.token}`, 'Content-Type': 'application/json' },
     });
   } catch {
     receipt.credential.attempts.push({
       source: inspected.source,
       shape: inspected.shape,
-      probe: 'token-verify-user',
+      probe,
       result: 'request-failed',
       failureCode: 'provider-request-failed',
     });
     return {
       ok: false,
       code: 'token-verify-request-failed',
-      message: `${inspected.source} could not be verified before provider response.`,
+      message: `${inspected.source} could not be verified as a Cloudflare user API token before provider response.`,
       shape: inspected.shape,
       providerStatus: null,
       providerCode: null,
@@ -155,7 +163,7 @@ async function verifyApiToken(inspected) {
   receipt.credential.attempts.push({
     source: inspected.source,
     shape: inspected.shape,
-    probe: 'token-verify-user',
+    probe,
     result: verified ? 'accepted' : 'rejected',
     providerStatus: response.status,
     providerCode,
@@ -174,7 +182,30 @@ async function verifyApiToken(inspected) {
     };
   }
 
-  return { ok: true };
+  return { ok: true, owner: 'user' };
+}
+
+async function verifyApiToken(inspected) {
+  if (inspected.shape === 'account-prefixed') {
+    receipt.credential.attempts.push({
+      source: inspected.source,
+      shape: inspected.shape,
+      probe: 'workers-builds-token-scope',
+      result: 'rejected-preflight',
+      failureCode: 'workers-builds-account-token-unsupported',
+    });
+    return {
+      ok: false,
+      code: 'workers-builds-account-token-unsupported',
+      message: `${inspected.source} must be a user-scoped Cloudflare API token because the Workers Builds API does not support account-owned API tokens.`,
+      shape: inspected.shape,
+      providerStatus: null,
+      providerCode: null,
+      tokenStatus: null,
+    };
+  }
+
+  return verifyUserApiToken(inspected);
 }
 
 async function probeWorkersRead(rawValue, source) {
@@ -218,30 +249,45 @@ async function probeWorkersRead(rawValue, source) {
 }
 
 async function selectCredential() {
-  if (!dedicatedTokenRaw) {
-    fail('configuration-missing', 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN is required.', {
-      field: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN',
+  const candidates = [
+    { source: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', raw: dedicatedTokenRaw },
+    { source: 'CLOUDFLARE_API_TOKEN', raw: fallbackTokenRaw },
+  ].filter((candidate) => candidate.raw);
+
+  if (candidates.length === 0) {
+    fail('configuration-missing', 'A Cloudflare user API token is required for read-only Workers Builds authority verification.', {
+      fields: ['CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', 'CLOUDFLARE_API_TOKEN'],
     });
   }
 
-  const result = await probeWorkersRead(dedicatedTokenRaw, 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN');
-  if (!result.ok) {
-    fail(result.code || 'token-selection-failed', result.message || 'The dedicated Workers Builds API token cannot read the Workers scripts collection.', {
-      credentialSource: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN',
-      tokenShape: result.shape || null,
-      providerStatus: result.providerStatus ?? null,
-      providerCode: result.providerCode ?? null,
-      tokenStatus: result.tokenStatus ?? null,
-    });
+  let lastResult = null;
+  for (const candidate of candidates) {
+    const result = await probeWorkersRead(candidate.raw, candidate.source);
+    lastResult = result;
+    if (!result.ok) continue;
+
+    token = result.token;
+    prefetchedScripts = result.scripts;
+    receipt.credential.selectedSource = result.source;
+    receipt.credential.selectedShape = result.shape;
+    receipt.failure = null;
+    receipt.status = 'started';
+    writeReceipt();
+    return;
   }
 
-  token = result.token;
-  prefetchedScripts = result.scripts;
-  receipt.credential.selectedSource = result.source;
-  receipt.credential.selectedShape = result.shape;
-  receipt.failure = null;
-  receipt.status = 'started';
-  writeReceipt();
+  fail(
+    lastResult?.code || 'token-selection-failed',
+    lastResult?.message || 'No configured Cloudflare token can read the Workers scripts collection.',
+    {
+      credentialSources: candidates.map((candidate) => candidate.source),
+      credentialSource: candidates.at(-1)?.source || null,
+      tokenShape: lastResult?.shape || null,
+      providerStatus: lastResult?.providerStatus ?? null,
+      providerCode: lastResult?.providerCode ?? null,
+      tokenStatus: lastResult?.tokenStatus ?? null,
+    },
+  );
 }
 
 async function get(providerPath) {
@@ -278,17 +324,20 @@ const productionMatches = findWorker(productionWorker);
 const alphaMatches = findWorker(alphaWorker);
 if (separateMatches.length !== 1) fail('worker-identity-mismatch', `${separateWorker}: expected exactly one Worker, found ${separateMatches.length}.`, { worker: separateWorker, previousName: previousSeparateWorker, observedCount: separateMatches.length });
 if (productionMatches.length !== 1) fail('worker-identity-mismatch', `${productionWorker}: expected exactly one Worker, found ${productionMatches.length}.`, { worker: productionWorker, observedCount: productionMatches.length });
-if (alphaMatches.length !== 1) fail('worker-identity-mismatch', `${alphaWorker}: expected exactly one Worker, found ${alphaMatches.length}.`, { worker: alphaWorker, observedCount: alphaMatches.length });
+if (alphaMatches.length > 1) fail('worker-identity-mismatch', `${alphaWorker}: expected at most one founder-gated Worker, found ${alphaMatches.length}.`, { worker: alphaWorker, observedCount: alphaMatches.length, expectedPresence: 'optional-until-founder-approved' });
 
 const separateTag = clean(separateMatches[0]?.tag);
 const productionTag = clean(productionMatches[0]?.tag);
-const alphaTag = clean(alphaMatches[0]?.tag);
-if (!separateTag || !productionTag || !alphaTag) fail('worker-tag-missing', 'All protected Worker identities must expose immutable script tags.');
+const alphaTag = alphaMatches.length === 1 ? clean(alphaMatches[0]?.tag) : '';
+if (!separateTag || !productionTag) fail('worker-tag-missing', 'Required active Worker identities must expose immutable script tags.');
+if (alphaMatches.length === 1 && !alphaTag) fail('worker-tag-missing', `${alphaWorker}: observed founder-gated Worker must expose an immutable script tag.`, { worker: alphaWorker });
 
 receipt.separateWorker.scriptTag = separateTag;
 receipt.separateWorkerObserved = true;
 receipt.productionWorker.scriptTag = productionTag;
-receipt.alphaWorker.scriptTag = alphaTag;
+receipt.alphaWorker.observed = alphaMatches.length === 1;
+receipt.alphaWorker.scriptTag = alphaTag || null;
+receipt.alphaWorker.deploymentState = alphaTag ? 'deployed-founder-gated-observation-only' : 'not-deployed-until-founder-approved';
 writeReceipt();
 
 const separateTriggerRows = await get(`/accounts/${accountId}/builds/workers/${separateTag}/triggers`);
@@ -327,7 +376,7 @@ const verifiedMainOnly = activeTriggers.length === 1 &&
   deployCommand === 'npm run deploy:api:production' &&
   buildCommand === '' &&
   activeNonMainBuilds.length === 0;
-const alphaTriggers = await get(`/accounts/${accountId}/builds/workers/${alphaTag}/triggers`);
+const alphaTriggers = alphaTag ? await get(`/accounts/${accountId}/builds/workers/${alphaTag}/triggers`) : [];
 
 receipt.separateWorker.activeTriggerCount = separateActiveTriggers.length;
 receipt.separateWorker.branchIncludes = separateIncludes;

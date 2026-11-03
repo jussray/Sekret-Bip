@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Stack, router, useSegments } from 'expo-router';
 import { Analytics } from '@/components/shared/Analytics';
 import { NotificationBootstrap } from '@/components/shared/NotificationBootstrap';
+import { installFirebaseAppCheckTokenProvider } from '@/services/firebase/appCheck';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import { VerificationProvider, useVerificationContext } from '@/context/VerificationContext';
 import { OnboardingProvider } from '@/context/OnboardingContext';
@@ -104,6 +105,8 @@ function RouteBoundary() {
 }
 
 export default function RootLayout() {
+  useEffect(() => installFirebaseAppCheckTokenProvider(), []);
+
   useEffect(() => {
     installSekretBipGuardrailRuntime();
   }, []);

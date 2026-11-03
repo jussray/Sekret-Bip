@@ -1,7 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
+import {
+  buildStaticSupabaseIdentityMarker,
+  resolveSupabaseTarget,
+  verifySupabaseManagementIdentity,
+} from './supabase-target-identity.mjs';
+
 const API_BASE = 'https://api.supabase.com/v1';
+const RESEND_API_BASE = 'https://api.resend.com';
 
 function env(name, fallback = '') {
   const value = process.env[name];
@@ -36,10 +43,50 @@ async function request(projectRef, accessToken, options = {}) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok) {
-    const message = payload?.message || payload?.error || response.statusText;
-    throw new Error(`Supabase Auth config ${options.method ?? 'GET'} failed (${response.status}): ${message}`);
+    throw new Error(`SUPABASE_AUTH_CONFIG_HTTP_${response.status}`);
   }
   return payload;
+}
+
+function senderDomain(email) {
+  const normalized = String(email || '').trim().toLowerCase();
+  const at = normalized.lastIndexOf('@');
+  if (at <= 0 || at === normalized.length - 1) {
+    throw new Error('AUTH_SMTP_ADMIN_EMAIL_INVALID');
+  }
+  return normalized.slice(at + 1);
+}
+
+async function assertResendDomainVerified(apiKey, email) {
+  const domainName = senderDomain(email);
+  const response = await fetch(`${RESEND_API_BASE}/domains?limit=100`, {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      accept: 'application/json',
+    },
+  });
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    throw new Error(`RESEND_DOMAIN_PREFLIGHT_HTTP_${response.status}`);
+  }
+
+  const domains = Array.isArray(payload?.data) ? payload.data : [];
+  const domain = domains.find((entry) => String(entry?.name || '').toLowerCase() === domainName);
+  if (!domain) {
+    throw new Error('RESEND_DOMAIN_NOT_FOUND');
+  }
+  if (domain.status !== 'verified') {
+    throw new Error('RESEND_DOMAIN_NOT_VERIFIED');
+  }
+  if (domain.capabilities?.sending === 'disabled') {
+    throw new Error('RESEND_DOMAIN_SENDING_DISABLED');
+  }
+
+  return {
+    name: domainName,
+    status: domain.status,
+    sending: domain.capabilities?.sending ?? 'unknown',
+  };
 }
 
 function desiredConfig({ smtpPass }) {
@@ -47,7 +94,7 @@ function desiredConfig({ smtpPass }) {
     external_email_enabled: true,
     mailer_secure_email_change_enabled: true,
     mailer_autoconfirm: false,
-    smtp_admin_email: env('AUTH_SMTP_ADMIN_EMAIL', 'invite@mail.sekretbip.com'),
+    smtp_admin_email: env('AUTH_SMTP_ADMIN_EMAIL', 'invite@sekretbip.net'),
     smtp_host: env('AUTH_SMTP_HOST', 'smtp.resend.com'),
     smtp_port: Number(env('AUTH_SMTP_PORT', '465')),
     smtp_user: env('AUTH_SMTP_USER', 'resend'),
@@ -74,7 +121,7 @@ function assertApplied(actual, desired) {
   const d = comparable(desired);
   for (const key of Object.keys(d)) {
     if (a[key] !== d[key]) {
-      throw new Error(`AUTH_EMAIL_CONFIG_MISMATCH ${key}: expected=${JSON.stringify(d[key])} actual=${JSON.stringify(a[key])}`);
+      throw new Error(`AUTH_EMAIL_CONFIG_MISMATCH_${key}`);
     }
   }
 }
@@ -91,30 +138,34 @@ async function writeReceipt(receipt) {
 
 async function main() {
   const apply = process.argv.includes('--apply');
-  const projectRef = env('SUPABASE_PROJECT_REF', 'tbsevonvegdnlyjgplmm');
+  const target = await resolveSupabaseTarget();
+  const projectRef = target.projectRef;
   const desiredPublic = desiredConfig({ smtpPass: '[redacted]' });
 
   if (!apply) {
     const receipt = {
       mode: 'plan',
       projectRef,
+      supabaseIdentity: buildStaticSupabaseIdentityMarker(target),
       provider: 'resend-smtp',
       desired: redact(desiredPublic),
       confirmationRequired: true,
       productionMutation: false,
     };
     await writeReceipt(receipt);
-    console.log(JSON.stringify(receipt, null, 2));
+    console.log('AUTH_EMAIL_PROVIDER_PLAN');
     return;
   }
 
   if (env('GITHUB_REF_NAME') && env('GITHUB_REF_NAME') !== 'main') {
-    throw new Error(`Production Auth email apply is main-only; got ${env('GITHUB_REF_NAME')}.`);
+    throw new Error('AUTH_EMAIL_APPLY_NON_MAIN');
   }
 
   const accessToken = required('SUPABASE_ACCESS_TOKEN');
   const smtpPass = required('RESEND_API_KEY');
   const desired = desiredConfig({ smtpPass });
+  const supabaseIdentity = await verifySupabaseManagementIdentity({ target, accessToken });
+  const resendDomain = await assertResendDomainVerified(smtpPass, desired.smtp_admin_email);
 
   const before = await request(projectRef, accessToken);
   await request(projectRef, accessToken, { method: 'PATCH', body: desired });
@@ -124,9 +175,11 @@ async function main() {
   const receipt = {
     mode: 'apply',
     projectRef,
+    supabaseIdentity,
     provider: 'resend-smtp',
     confirmationRequired: true,
     productionMutation: true,
+    resendDomain,
     before: redact(before),
     after: redact(after),
     rollback: {
@@ -137,14 +190,22 @@ async function main() {
 
   await writeReceipt(receipt);
   console.log('AUTH_EMAIL_PROVIDER_APPLIED');
-  console.log(JSON.stringify(receipt, null, 2));
 }
 
-main().catch(async (error) => {
-  const message = error instanceof Error ? error.message : String(error);
-  console.error(message);
+// Only the leading error code is surfaced. Messages can carry arbitrary text after it.
+const KNOWN_FAILURE_CODE = /^(AUTH_EMAIL_|RESEND_DOMAIN_|SUPABASE_AUTH_CONFIG_HTTP_|SUPABASE_TARGET_)[A-Z0-9_]+$/;
+
+main().catch(async (err) => {
+  const code = String(err?.message ?? '').match(/^[A-Z][A-Z0-9_]+/)?.[0] ?? '';
+  const bounded = KNOWN_FAILURE_CODE.test(code) ? code : 'AUTH_EMAIL_PROVIDER_FAILED';
+  console.error(bounded);
   try {
-    await writeReceipt({ mode: process.argv.includes('--apply') ? 'apply' : 'plan', ok: false, error: message });
+    await writeReceipt({
+      mode: process.argv.includes('--apply') ? 'apply' : 'plan',
+      ok: false,
+      errorCode: bounded,
+      mutationPhase: process.argv.includes('--apply') ? 'apply' : 'plan',
+    });
   } catch {}
   process.exit(1);
 });

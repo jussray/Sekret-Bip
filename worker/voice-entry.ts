@@ -1,3 +1,9 @@
+import {
+  emitReciprocalTelemetry,
+  observeFetchRequest,
+  reciprocalContainmentEnabled,
+  syntheticFetchResponse,
+} from '../security/reciprocal-ingress.mjs';
 import observedWorker from './observed-index';
 import emailRouter from './email-router';
 import { WORKER_RELEASE_SHA } from './release-identity.generated';
@@ -13,6 +19,12 @@ import { persistAuditEvent, type AuditPersistEnv } from './audit/persist-event';
 import { normalizeReplyActor, resolveRuntimeStyle } from './runtime-style';
 import { selectVoiceRoute, type CharacterId } from './voice-routing';
 import { synthesizeRoutedVoice, type VoiceProviderEnv } from './voice-providers';
+import { handleBipProviderRequest } from './provider-route';
+import {
+  evaluateFounderOperationKillSwitch,
+  stableHttpOperationId,
+} from '../shared/founder-operation-kill-switch.js';
+import { shouldPassThroughToFrontend } from '../shared/frontend-host-passthrough.js';
 
 interface MinimalExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
@@ -33,6 +45,10 @@ interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv {
   VOICE_PROVIDER_MODE?: 'legacy' | 'cloudflare-only' | 'hybrid';
   SEKRET_RATE_LIMITER?: RateLimit;
   CF_VERSION_METADATA?: WorkerVersionMetadata;
+  FOUNDER_OPERATION_KILL_SWITCH?: string;
+  FOUNDER_OPERATION_KILL_SWITCH_REASON?: string;
+  RECIPROCAL_DEFENSE_MODE?: 'off' | 'observe' | 'contain';
+  RECIPROCAL_DEFENSE_SECRET?: string;
 }
 
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -105,6 +121,49 @@ function originRejected(request: Request, env: Env, cors: Record<string, string>
 function hasJsonContentType(request: Request): boolean {
   const contentType = request.headers.get('Content-Type')?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
   return contentType === 'application/json' || contentType.endsWith('+json');
+}
+
+function founderGuardedOperation(request: Request): { scope: string; operation: string } | null {
+  if (request.method === 'OPTIONS') return null;
+  const pathname = new URL(request.url).pathname;
+  if (request.method === 'GET' && pathname === '/health') return null;
+
+  if (pathname.endsWith('/api/sekret/reply')) return { scope: 'companion', operation: 'sekret:reply' };
+  if (pathname.endsWith('/api/sekret/voice')) return { scope: 'companion', operation: 'sekret:voice' };
+  if (pathname.endsWith('/api/sekret/transcribe')) return { scope: 'companion', operation: 'sekret:transcribe' };
+  if (pathname.endsWith('/api/bridge/summary/generate')) return { scope: 'bridge', operation: 'bridge:summary-generate' };
+  if (pathname.includes('/api/')) return { scope: 'api', operation: stableHttpOperationId(request.method, pathname) };
+  return { scope: 'worker', operation: stableHttpOperationId(request.method, pathname) };
+}
+
+function founderPauseResponse(cors: Record<string, string>): Response {
+  return json(
+    {
+      error: "Se'kret Bip is temporarily paused by the founder.",
+      code: 'FOUNDER_OPERATION_PAUSED',
+      retryable: false,
+    },
+    503,
+    { ...cors, 'Cache-Control': 'no-store', 'Retry-After': '60' },
+  );
+}
+
+function enforceFounderOperationKillSwitch(
+  request: Request,
+  env: Env,
+  cors: Record<string, string>,
+): Response | null {
+  const guarded = founderGuardedOperation(request);
+  if (!guarded) return null;
+
+  const decision = evaluateFounderOperationKillSwitch({
+    rawValue: env.FOUNDER_OPERATION_KILL_SWITCH,
+    rawReason: env.FOUNDER_OPERATION_KILL_SWITCH_REASON,
+    ...guarded,
+  });
+  if (!decision.blocked) return null;
+
+  return founderPauseResponse(cors);
 }
 
 function requiresPreciseLipSync(body: Record<string, unknown>): boolean {
@@ -197,10 +256,12 @@ async function enforceRateLimit(
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
   const key = principal.kind === 'user' ? `user:${principal.userId}` : `ip:${ip}`;
   try {
-    const { success } = await env.SEKRET_RATE_LIMITER.limit({ key });
+    const outcome = await env.SEKRET_RATE_LIMITER.limit({ key });
+    if (!outcome || typeof outcome.success !== 'boolean') return protectionUnavailable(cors);
+    const { success } = outcome;
     return success ? null : json({ error: 'rate limit exceeded', retryable: true }, 429, cors);
-  } catch (error) {
-    console.error('[voice-entry:rate-limit]', error);
+  } catch {
+    console.error('SEKRET_RATE_LIMIT_UNAVAILABLE');
     return protectionUnavailable(cors);
   }
 }
@@ -328,11 +389,26 @@ async function handleVoice(
 
 export default {
   async fetch(request: Request, env: Env, ctx: MinimalExecutionContext): Promise<Response> {
+    // A Worker route on a public frontend host must never replace the Pages
+    // welcome UI with a backend JSON response; hand page loads to the origin.
+    if (shouldPassThroughToFrontend(request.method, request.url)) return fetch(request);
+
     const started = Date.now();
     const cors = corsHeaders(request, env);
     const blocked = originRejected(request, env, cors);
     if (blocked) return blocked;
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+    // Default-off, synthetic-only containment. Preserve canonical Worker routing.
+    if (env.RECIPROCAL_DEFENSE_MODE === 'observe' || env.RECIPROCAL_DEFENSE_MODE === 'contain') {
+      const defense = await observeFetchRequest(request, env, 'sekret-backend');
+      emitReciprocalTelemetry(defense, ctx);
+      if (reciprocalContainmentEnabled(env)) {
+        const synthetic = syntheticFetchResponse(defense);
+        if (synthetic) return synthetic;
+      }
+    }
+
 
     const path = new URL(request.url).pathname;
     if (request.method === 'GET' && path === '/health') {
@@ -359,6 +435,12 @@ export default {
         }, 502, cors);
       }
     }
+
+    const founderPaused = enforceFounderOperationKillSwitch(request, env, cors);
+    if (founderPaused) return founderPaused;
+
+    const providerResponse = await handleBipProviderRequest(request, env, cors);
+    if (providerResponse) return providerResponse;
 
     const isProtectedApiPost = request.method === 'POST' && path.includes('/api/');
     let downstreamEnv = env;
@@ -398,7 +480,21 @@ export default {
     return withSecurityHeaders(response, cors);
   },
 
-  async email(message: Parameters<typeof emailRouter.email>[0]): Promise<void> {
+  async email(message: Parameters<typeof emailRouter.email>[0], env: Env): Promise<void> {
+    const decision = evaluateFounderOperationKillSwitch({
+      rawValue: env.FOUNDER_OPERATION_KILL_SWITCH,
+      rawReason: env.FOUNDER_OPERATION_KILL_SWITCH_REASON,
+      scope: 'email',
+      operation: 'email:inbound',
+    });
+    if (decision.blocked) {
+      const rejectable = message as Parameters<typeof emailRouter.email>[0] & { setReject?: (reason: string) => void };
+      if (typeof rejectable.setReject === 'function') {
+        rejectable.setReject("Se'kret Bip email processing is temporarily paused.");
+        return;
+      }
+      throw new Error('FOUNDER_OPERATION_PAUSED');
+    }
     await emailRouter.email(message);
   },
 };

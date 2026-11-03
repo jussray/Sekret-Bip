@@ -96,16 +96,16 @@ parent_link_sent → (teen) app tabs                                │
     └─[parent]─────────────────────────────────────────────────────┘
          │
          ▼
-    parent-welcome.tsx → parent-link.tsx
-         │  (links teen OR skips)
+    parent-welcome.tsx → parent-setup.tsx
+         │  (completes Parent profile and submits guardian review)
+         ▼
+    parent_setup_complete → parent-link.tsx
+         │  (links teen now OR continues without a code)
          ├──► parent_linked (linked now)
          └──► parent_link_skipped (link later)
          │
          ▼
-    parent-setup.tsx
-         │  (completes parent profile)
-         ▼
-    parent_setup_complete → (parent) app tabs
+    parent entry routing / guardian verification
          │
          first core action
          (bridge message / check-in)
@@ -130,10 +130,10 @@ parent_link_sent → (teen) app tabs                                │
 | `app/(onboarding)/identity.tsx` | Role selection (teen / parent) |
 | `app/(onboarding)/name.tsx` | Display name — teen path |
 | `app/(onboarding)/reflection.tsx` | Emotional reflection — teen path |
-| `app/(onboarding)/parent-link.tsx` | Parent invite code — shared entry point |
+| `app/(onboarding)/parent-link.tsx` | Parent invite code — shared entry point after Parent Setup |
 | `app/(onboarding)/parent-splash.tsx` | Parent entry splash |
 | `app/(onboarding)/parent-welcome.tsx` | Parent welcome |
-| `app/(onboarding)/parent-setup.tsx` | Parent profile setup |
+| `app/(onboarding)/parent-setup.tsx` | Parent profile setup before Parent Link |
 | `app/(onboarding)/teen-splash.tsx` | Teen entry splash |
 | `services/onboarding.ts` | State machine — DB reads/writes, `getSupabase()` |
 | `context/OnboardingContext.tsx` | React context — optional, wraps service for context-aware screens |

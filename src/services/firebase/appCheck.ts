@@ -1,14 +1,8 @@
 import { Platform } from 'react-native';
 import type { AppCheck } from '@react-native-firebase/app-check';
+import { registerAppCheckTokenProvider } from '../appCheckToken';
 
-const APP_CHECK_HEADER = 'X-Firebase-AppCheck';
-
-// App Check client attachment is intentionally opt-in. Cloudflare remains the
-// enforcement authority through FIREBASE_APPCHECK_MODE=off|observe|enforce.
 const APP_CHECK_ENABLED = process.env.EXPO_PUBLIC_FIREBASE_APPCHECK_ENABLED === 'true';
-
-// Browser-safe Firebase client configuration. These values identify a Firebase
-// app but are not authorization credentials. Supabase remains user identity.
 const FIREBASE_API_KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY?.trim() ?? '';
 const FIREBASE_APP_ID = process.env.EXPO_PUBLIC_FIREBASE_APP_ID?.trim() ?? '';
 const FIREBASE_PROJECT_ID = process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID?.trim() ?? '';
@@ -31,9 +25,8 @@ async function resolveFirebaseApp() {
 
   if (getApps().length > 0) return getApp();
 
-  // Native apps are configured by GoogleService-Info.plist / google-services.json.
-  // Until those provider-side files exist, native App Check stays absent rather
-  // than inventing a second Firebase app or silently weakening the boundary.
+  // Native Firebase apps must come from provider-returned platform config.
+  // Web may initialize from browser-safe public identifiers.
   if (Platform.OS !== 'web' || !hasWebFirebaseConfig()) return null;
 
   return initializeApp({
@@ -84,25 +77,33 @@ async function getClientAppCheck(): Promise<AppCheck | null> {
   return appCheckPromise;
 }
 
-/**
- * Returns the App Check request header when attestation is available.
- *
- * Client failure deliberately produces no header. The Cloudflare verifier owns
- * observe/enforce behavior and can therefore distinguish missing attestation
- * from invalid attestation without the client impersonating authorization.
- */
-export async function firebaseAppCheckHeaders(): Promise<Record<string, string>> {
+async function readFreshAppCheckToken(): Promise<string | null> {
   const appCheck = await getClientAppCheck();
-  if (!appCheck) return {};
+  if (!appCheck) return null;
 
   try {
     const { getToken } = await import('@react-native-firebase/app-check');
     const { token } = await getToken(appCheck);
     const normalized = token.trim();
-    return normalized ? { [APP_CHECK_HEADER]: normalized } : {};
+    return normalized || null;
   } catch {
-    return {};
+    return null;
   }
+}
+
+/**
+ * Installs Firebase as the request-scoped App Check token provider only.
+ * It never becomes auth, RLS, consent, relationship, or durable-data authority.
+ * The disabled default registers no provider and does not load native Firebase.
+ */
+export function installFirebaseAppCheckTokenProvider(): () => void {
+  if (!APP_CHECK_ENABLED) {
+    registerAppCheckTokenProvider(null);
+    return () => registerAppCheckTokenProvider(null);
+  }
+
+  registerAppCheckTokenProvider(readFreshAppCheckToken);
+  return () => registerAppCheckTokenProvider(null);
 }
 
 export function firebaseAppCheckClientEnabled(): boolean {

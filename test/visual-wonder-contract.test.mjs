@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const vibe = readFileSync(new URL('../tools/figma-vibe-builder/README.md', import.meta.url), 'utf8');
 const arrival = readFileSync(new URL('../src/components/FrontDoorSceneArrival.tsx', import.meta.url), 'utf8');
 const motion = readFileSync(new URL('../src/motion/frontDoorMotion.ts', import.meta.url), 'utf8');
+const theme = readFileSync(new URL('../constants/frontDoorTheme.ts', import.meta.url), 'utf8');
 
 describe('Se’kret Bip Visual Wonder contract', () => {
   it('requires nonliteral, family-first wonder instead of generic AI/dashboard visual language', () => {
@@ -28,6 +29,18 @@ describe('Se’kret Bip Visual Wonder contract', () => {
     assert.match(arrival, /arrivalState === 'entering'/);
     assert.match(arrival, /arrivalState !== 'entering'/);
     assert.match(motion, /arrivalDurationMs/);
+  });
+
+  it('locks QUALITY to cinematic finish layers instead of flat or generic decoration', () => {
+    assert.match(theme, /QUALITY bar:/);
+    assert.match(theme, /cinematicBackdrop/);
+    assert.match(theme, /cinematicWash/);
+    assert.match(theme, /cinematicVignette/);
+    assert.match(theme, /qualityRim/);
+    assert.ok(arrival.includes('testID="web-welcome-quality-backdrop"'));
+    assert.ok(arrival.includes('testID="web-welcome-quality-wash"'));
+    assert.ok(arrival.includes('testID="web-welcome-quality-vignette"'));
+    assert.ok(arrival.includes('testID="web-welcome-quality-rim"'));
   });
 
   it('keeps product truth and human dignity inside the beauty gate', () => {

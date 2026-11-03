@@ -102,6 +102,42 @@ test('authoritative prompt instruction carries role, versions, and question budg
   assert.match(instruction, /not a selectable companion/i);
 });
 
+test('companion empathy understands perspective without validating harmful conduct', () => {
+  const instruction = runtime.buildRuntimeStyleInstruction(suhana);
+
+  assert.match(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
+  assert.match(instruction, /without treating that perspective as verified truth/i);
+  assert.match(instruction, /without automatically endorsing an action, belief, accusation, explanation, or choice/i);
+  assert.match(instruction, /Understanding is not agreement/i);
+  assert.match(instruction, /Explanation is context, not excuse/i);
+  assert.match(instruction, /does not erase impact/i);
+  assert.match(instruction, /preserve the boundary plainly and without shaming/i);
+  assert.match(instruction, /support proportionate accountability/i);
+  assert.match(instruction, /keep the judgment uncertain/i);
+  assert.match(instruction, /do not invent blame or certainty/i);
+  assert.match(instruction, /affected by the behavior, not only the speaker/i);
+  assert.match(instruction, /Never use empathy to pressure reconciliation, forgiveness, disclosure, parent sharing, or surrender of privacy/i);
+  assert.match(instruction, /Safety, consent, privacy, existing escalation rules, and factual truth outrank conversational warmth/i);
+});
+
+test('empathy invariants stay explicit and do not silently weaken truth or accountability', () => {
+  assert.deepEqual(runtime.EMPATHY_ACCOUNTABILITY_INVARIANTS, {
+    perspectiveIsNotTruth: true,
+    understandingIsNotAgreement: true,
+    explanationIsNotExcuse: true,
+    compassionDoesNotEraseImpact: true,
+    intentDoesNotOverrideOutcome: true,
+    accountabilityCanCoexistWithEmpathy: true,
+    dignitySurvivesCorrection: true,
+    uncertaintyMustStayUncertain: true,
+  });
+});
+
+test('parent coach remains outside the teen companion empathy contract', () => {
+  const instruction = runtime.buildRuntimeStyleInstruction(parentCoach);
+  assert.doesNotMatch(instruction, /EMPATHY \+ ACCOUNTABILITY CONTRACT/);
+});
+
 test('Se’kret output is deterministically repaired to hide Oracle and ask zero questions', () => {
   const result = runtime.enforceRuntimeStyleResponse({
     reply: 'Oracle noticed a pattern. What feels true? Is there more?',
@@ -143,6 +179,7 @@ test('production Worker wrapper injects, enforces, voices, and returns style evi
   assert.match(indexSource, /instructions: style\.speechInstructions/);
   assert.match(indexSource, /styleDecision/);
   assert.match(runtimeSource, /parentCoach actor requires the parentCoach surface/);
+  assert.match(runtimeSource, /EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION/);
 });
 
 test('observed Worker forwards style versions and repair evidence to telemetry', () => {

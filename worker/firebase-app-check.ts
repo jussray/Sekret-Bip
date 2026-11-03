@@ -7,7 +7,9 @@ export interface FirebaseAppCheckEnv {
   FIREBASE_APPCHECK_MODE?: string;
   /** Numeric Firebase project number, not the human-readable project ID. */
   FIREBASE_PROJECT_NUMBER?: string;
-  /** Expected Firebase web app ID, for example 1:123456789012:web:abc123. */
+  /** Comma-separated allowlist of expected Firebase App IDs across supported clients. */
+  FIREBASE_APP_IDS?: string;
+  /** Legacy single-web-app fallback retained for a reversible rollout. */
   FIREBASE_WEB_APP_ID?: string;
 }
 
@@ -66,9 +68,14 @@ function configuredProjectNumber(env: FirebaseAppCheckEnv): string | null {
   return /^\d+$/.test(value) ? value : null;
 }
 
-function configuredAppId(env: FirebaseAppCheckEnv): string | null {
-  const value = env.FIREBASE_WEB_APP_ID?.trim() ?? '';
-  return value || null;
+function configuredAppIds(env: FirebaseAppCheckEnv): ReadonlySet<string> {
+  const configured = (env.FIREBASE_APP_IDS ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const legacyWebAppId = env.FIREBASE_WEB_APP_ID?.trim() ?? '';
+  if (legacyWebAppId) configured.push(legacyWebAppId);
+  return new Set(configured);
 }
 
 function errorCode(error: unknown): string {
@@ -121,8 +128,8 @@ export async function verifyFirebaseAppCheck(
   if (mode === 'invalid') return { status: 'verification_error', reason: 'misconfigured' };
 
   const projectNumber = configuredProjectNumber(env);
-  const expectedAppId = configuredAppId(env);
-  if (!projectNumber || !expectedAppId) {
+  const expectedAppIds = configuredAppIds(env);
+  if (!projectNumber || expectedAppIds.size === 0) {
     return { status: 'verification_error', reason: 'misconfigured' };
   }
 
@@ -147,11 +154,12 @@ export async function verifyFirebaseAppCheck(
       return { status: 'invalid', reason: 'invalid_claims' };
     }
 
-    if (payload.sub !== expectedAppId) {
+    const appId = typeof payload.sub === 'string' ? payload.sub : '';
+    if (!appId || !expectedAppIds.has(appId)) {
       return { status: 'invalid', reason: 'unexpected_app' };
     }
 
-    return validVerification(expectedAppId);
+    return validVerification(appId);
   } catch (error) {
     const classified = classifyVerificationError(error);
     if (classified.status !== 'invalid' && classified.status !== 'verification_error') {

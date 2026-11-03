@@ -2,6 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {PRODUCTION_PROJECT_REF} from './verify-supabase-history-reconciliation-plan.mjs';
+
 export const CONTROL_ROOM_TEST_LEDGER_SCHEMA_VERSION = 1;
 
 const FAILURE_CONCLUSIONS = new Set([
@@ -31,9 +33,69 @@ function timestamp(value) {
   return Number.isFinite(time) ? time : 0;
 }
 
+function checkRunId(value) {
+  const id = Number(value);
+  return Number.isSafeInteger(id) ? id : -1;
+}
+
 function checkKey(run) {
   const app = clean(run?.app?.slug) || clean(run?.app?.name) || 'unknown-app';
   return `${app}\u0000${clean(run?.name)}`;
+}
+
+function supabaseProjectRef(detailsUrl) {
+  const value = clean(detailsUrl);
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    if (url.hostname !== 'supabase.com') return null;
+    const match = url.pathname.match(/^\/dashboard\/project\/([a-z0-9]+)(?:\/|$)/i);
+    return match?.[1]?.toLowerCase() ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export function classifyProviderAuthority(run) {
+  const app = clean(run?.app?.slug) || clean(run?.app?.name) || 'unknown-app';
+  if (app !== 'supabase') {
+    return {
+      providerAuthority: 'not-applicable',
+      providerTarget: null,
+      expectedProviderTarget: null,
+      authorityDisposition: null,
+      blockReason: null,
+    };
+  }
+
+  const observedProjectRef = supabaseProjectRef(run?.details_url);
+  if (!observedProjectRef) {
+    return {
+      providerAuthority: 'unknown-target',
+      providerTarget: null,
+      expectedProviderTarget: PRODUCTION_PROJECT_REF,
+      authorityDisposition: 'blocked',
+      blockReason: 'supabase_project_unresolved',
+    };
+  }
+
+  if (observedProjectRef !== PRODUCTION_PROJECT_REF) {
+    return {
+      providerAuthority: 'foreign-target',
+      providerTarget: observedProjectRef,
+      expectedProviderTarget: PRODUCTION_PROJECT_REF,
+      authorityDisposition: 'blocked',
+      blockReason: 'supabase_project_mismatch',
+    };
+  }
+
+  return {
+    providerAuthority: 'canonical-target',
+    providerTarget: observedProjectRef,
+    expectedProviderTarget: PRODUCTION_PROJECT_REF,
+    authorityDisposition: null,
+    blockReason: null,
+  };
 }
 
 export function mapCheckState(run) {
@@ -61,7 +123,15 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
     const current = selected.get(key);
     const currentTime = timestamp(current?.completed_at ?? current?.started_at);
     const candidateTime = timestamp(run.completed_at ?? run.started_at);
-    if (!current || candidateTime >= currentTime) selected.set(key, run);
+    const currentId = checkRunId(current?.id);
+    const candidateId = checkRunId(run.id);
+    if (
+      !current
+      || candidateTime > currentTime
+      || (candidateTime === currentTime && candidateId > currentId)
+    ) {
+      selected.set(key, run);
+    }
   }
 
   return [...selected.values()]
@@ -77,6 +147,7 @@ export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '
       completedAt: clean(run.completed_at) || null,
       detailsUrl: clean(run.details_url) || clean(run.html_url) || null,
       externalId: clean(run.external_id) || null,
+      ...classifyProviderAuthority(run),
     }))
     .sort((left, right) => left.name.localeCompare(right.name) || left.app.localeCompare(right.app));
 }
@@ -112,7 +183,7 @@ export function classifyObservation({checks, oldEnough, fingerprint, previousFin
   return 'observing';
 }
 
-export function buildTestLedger({
+export function buildTestLedger({runtimeState = null,
   repository,
   sha,
   branch,
@@ -128,6 +199,7 @@ export function buildTestLedger({
     commitSha: normalizeSha(sha),
     branch: clean(branch) || null,
     generatedAt: observedAt.toISOString(),
+    ...(runtimeState ? { runtimeState } : {}),
     source: {
       provider: 'github-check-runs',
       exactRef: 'commit-sha',
@@ -150,6 +222,15 @@ export function assertLedgerMergeReady(ledger, outputPath = 'artifacts/control-r
   const counts = ledger?.aggregate?.counts;
   if (!counts || counts.total === 0) {
     throw new Error(`No exact-head checks were discovered. Evidence: ${outputPath}`);
+  }
+
+  const foreignSupabase = Array.isArray(ledger?.checks)
+    ? ledger.checks.find((check) => check.providerAuthority === 'foreign-target' && check.app === 'supabase')
+    : null;
+  if (foreignSupabase) {
+    throw new Error(
+      `Exact-head Supabase check is bound to a foreign project. Expected ${foreignSupabase.expectedProviderTarget}, observed ${foreignSupabase.providerTarget}. BLOCKED: external integration misbound. Evidence: ${outputPath}`,
+    );
   }
 
   if (counts.failed > 0) {
@@ -299,6 +380,15 @@ export async function observeExactHeadChecks(env = process.env) {
   const runId = clean(env.GITHUB_RUN_ID);
   const observerCheckName = clean(env.CONTROL_ROOM_LEDGER_SELF_CHECK || 'Publish exact-head test ledger');
   const outputPath = clean(env.CONTROL_ROOM_TEST_LEDGER_PATH) || 'artifacts/control-room-test-ledger.json';
+  const runtimeStatePath = clean(env.CONTROL_ROOM_RUNTIME_STATE_PATH);
+  const runtimeState = runtimeStatePath
+    ? JSON.parse(fs.readFileSync(runtimeStatePath, 'utf8'))
+    : null;
+  if (runtimeState) {
+    if (clean(runtimeState.repository) !== repository) throw new Error('Runtime-state receipt repository does not match the ledger repository.');
+    if (normalizeSha(runtimeState.sourceSha) !== sha) throw new Error('Runtime-state receipt sourceSha does not match the exact ledger head.');
+    if (!/^sha256:[0-9a-f]{64}$/u.test(clean(runtimeState?.trackedConfig?.sha256))) throw new Error('Runtime-state receipt is missing a valid tracked-config fingerprint.');
+  }
   const timeoutMs = Number(env.CONTROL_ROOM_LEDGER_TIMEOUT_MS || 20 * 60 * 1000);
   const pollMs = Number(env.CONTROL_ROOM_LEDGER_POLL_MS || 10_000);
   const minimumObservationMs = Number(env.CONTROL_ROOM_LEDGER_MINIMUM_MS || 30_000);
@@ -315,9 +405,15 @@ export async function observeExactHeadChecks(env = process.env) {
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
     checks = selectLatestChecks(runs, sha, observerCheckName);
-    writeLedger(outputPath, buildTestLedger({repository, sha, branch, runId, checks}));
+    writeLedger(outputPath, buildTestLedger({runtimeState, repository, sha, branch, runId, checks}));
 
-    const fingerprint = JSON.stringify(checks.map((check) => [check.app, check.name, check.state]));
+    const fingerprint = JSON.stringify(checks.map((check) => [
+      check.app,
+      check.name,
+      check.state,
+      check.providerAuthority,
+      check.providerTarget,
+    ]));
     const oldEnough = Date.now() - startedAt >= minimumObservationMs;
     observerState = classifyObservation({checks, oldEnough, fingerprint, previousFingerprint});
     previousFingerprint = fingerprint;
@@ -326,7 +422,7 @@ export async function observeExactHeadChecks(env = process.env) {
     await sleep(pollMs);
   }
 
-  const ledger = buildTestLedger({
+  const ledger = buildTestLedger({runtimeState, 
     repository,
     sha,
     branch,

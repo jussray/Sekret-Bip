@@ -9,15 +9,14 @@
  *   2. The shared client token (EXPO_PUBLIC_BACKEND_TOKEN) for guests /
  *      unauthenticated flows, or when no session exists.
  *
- * Firebase App Check is a separate app-attestation signal. It never becomes
- * identity or authorization and is attached only from the canonical provider.
+ * Firebase App Check is an independent app-attestation header. It never
+ * replaces the bearer credential, creates identity, or grants authorization.
  *
- * This is the single place the backend request-credential policy lives; every
- * protected client call uses backendAuthHeaders(). Kept separate from env.ts to
- * avoid a circular import (this module depends on the Supabase client, which
- * depends on env.ts).
+ * This is the single place the token policy lives; every call site uses
+ * backendAuthHeaders(). Kept separate from env.ts to avoid a circular import
+ * (this module depends on the Supabase client, which depends on env.ts).
  */
-import { firebaseAppCheckHeaders } from '@/services/firebase/appCheck';
+import { getAppCheckToken } from '@/services/appCheckToken';
 import { getSupabase } from './supabase';
 import { BACKEND_TOKEN, backendHeaders } from './env';
 
@@ -49,21 +48,14 @@ function withoutCallerControlledAuthorityHeaders(
   return safeExtra;
 }
 
-/**
- * Backend request headers with independent identity and app-attestation signals.
- * Caller-provided headers cannot select or spoof Authorization or App Check,
- * including alternate HTTP-header casing.
- */
+/** Backend request headers with auth plus optional, independent App Check attestation. */
 export async function backendAuthHeaders(extra?: Record<string, string>): Promise<Record<string, string>> {
   const safeExtra = withoutCallerControlledAuthorityHeaders(extra);
-
-  const [token, appCheckHeaders] = await Promise.all([
+  const [token, appCheckToken] = await Promise.all([
     resolveBackendToken(),
-    firebaseAppCheckHeaders(),
+    getAppCheckToken(),
   ]);
-
-  return backendHeaders(token, {
-    ...safeExtra,
-    ...appCheckHeaders,
-  });
+  const headers = backendHeaders(token, safeExtra);
+  if (appCheckToken) headers['X-Firebase-AppCheck'] = appCheckToken;
+  return headers;
 }

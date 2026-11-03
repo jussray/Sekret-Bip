@@ -115,14 +115,36 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
       // Session restoration lives here so entry screens can consume one
       // resolved auth truth instead of each mounting their own getSession().
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) throw sessionError;
-      await loadVerificationForSession(sessionData.session);
+      if (sessionError) {
+        setSession(null);
+        setAuthenticated(false);
+        setAuthResolved(true);
+        setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
+        setError(sessionError.message);
+        return;
+      }
+
+      const session = sessionData.session;
+      try {
+        await loadVerificationForSession(session);
+      } catch (error) {
+        // Verification truth may fail closed, but it must never rewrite a
+        // successfully restored permanent Supabase session into signed-out.
+        const permanentSession = Boolean(session && !session.user.is_anonymous);
+        setSession(session);
+        setAuthenticated(permanentSession);
+        setAuthResolved(true);
+        setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
+        setError(error instanceof Error ? error.message : 'Unable to load verification.');
+      }
     } catch (error) {
+      // A genuine session-read failure is auth uncertainty, so clear auth
+      // truth rather than preserving a potentially stale local session.
       setSession(null);
       setAuthenticated(false);
       setAuthResolved(true);
       setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
-      setError(error instanceof Error ? error.message : 'Unable to load verification.');
+      setError(error instanceof Error ? error.message : 'Unable to restore account session.');
     } finally {
       setLoading(false);
     }
@@ -194,8 +216,11 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
       void loadVerificationForSession(session)
         .catch((error) => {
           if (!active) return;
-          setSession(null);
-          setAuthenticated(false);
+          // The auth event already established a permanent session. Keep that
+          // auth truth while verification falls back to its locked state.
+          setSession(session);
+          setAuthenticated(permanentSession);
+          setAuthResolved(true);
           setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
           setError(error instanceof Error ? error.message : 'Unable to load verification.');
         })

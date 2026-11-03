@@ -29,7 +29,7 @@ type Props = {
   from: 'companion' | 'user';
   text: string;
   time: string;
-  /** Character accent hex — e.g. '#FF4FA3' for Raylene. Optional; falls back to neutral. */
+  /** Character accent hex — e.g. '#FF4FA3' for Suhana. Optional; falls back to neutral. */
   accentColor?: string;
   /** Tone string returned by backend reply. Optional. */
   tone?: string;

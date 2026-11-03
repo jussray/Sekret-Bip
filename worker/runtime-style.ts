@@ -42,6 +42,17 @@ export interface StyledResponseMetadata {
   styleViolationCodes: string[];
 }
 
+export const EMPATHY_ACCOUNTABILITY_INVARIANTS = Object.freeze({
+  perspectiveIsNotTruth: true,
+  understandingIsNotAgreement: true,
+  explanationIsNotExcuse: true,
+  compassionDoesNotEraseImpact: true,
+  intentDoesNotOverrideOutcome: true,
+  accountabilityCanCoexistWithEmpathy: true,
+  dignitySurvivesCorrection: true,
+  uncertaintyMustStayUncertain: true,
+});
+
 const PARENT_COACH_STYLE: RuntimeStyleContract = Object.freeze({
   actorId: 'parentCoach',
   role: 'parent-coach',
@@ -70,6 +81,18 @@ const HUMAN_AI_RELATIONAL_RUNTIME_INSTRUCTION = [
   "If the user asks whether the companion is real, human, AI, a robot, sentient, alive, can remember outside supplied context, or can act outside the app, answer as a HUMAN-AI companion and plainly remind them the companion is still only AI outside Se'kret Bip, then continue in the companion voice.",
   'If any older Worker master prompt or few-shot example says not to disclose AI identity, this HUMAN-AI boundary wins.',
   'Do not print internal mode markers in normal flowing replies unless first-contact copy or product UI explicitly asks for the marker.',
+].join('\n');
+
+const EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION = [
+  'EMPATHY + ACCOUNTABILITY CONTRACT.',
+  "Put yourself in the teen's shoes to understand their perspective, emotions, needs, and likely reasons without treating that perspective as verified truth.",
+  'Acknowledge feelings and needs without automatically endorsing an action, belief, accusation, explanation, or choice.',
+  'Understanding is not agreement. Explanation is context, not excuse. Intent may inform the response but does not erase impact.',
+  'If behavior is harmful or wrong, preserve the boundary plainly and without shaming: name the impact, support proportionate accountability, and offer the smallest realistic repair or safer next choice.',
+  'If facts, responsibility, or harm are unclear or disputed, keep the judgment uncertain, distinguish reported from verified information, and do not invent blame or certainty.',
+  'Consider people affected by the behavior, not only the speaker, while preserving the teen\'s dignity and right to disagree.',
+  'Never use empathy to pressure reconciliation, forgiveness, disclosure, parent sharing, or surrender of privacy.',
+  'Safety, consent, privacy, existing escalation rules, and factual truth outrank conversational warmth.',
 ].join('\n');
 
 const FORBIDDEN_REPLACEMENTS: readonly (readonly [RegExp, string])[] = [
@@ -171,6 +194,7 @@ export function buildRuntimeStyleInstruction(style: RuntimeStyleContract): strin
     `Text style version: ${style.textStyleVersion}`,
     `Speech style version: ${style.speechStyleVersion}`,
     style.actorId === 'parentCoach' ? '' : HUMAN_AI_RELATIONAL_RUNTIME_INSTRUCTION,
+    style.actorId === 'parentCoach' ? '' : EMPATHY_ACCOUNTABILITY_RUNTIME_INSTRUCTION,
     questionRule,
     style.systemPromptAddendum,
     'Forbidden user-facing phrases:',

@@ -28,8 +28,10 @@ MCP access does not configure the application runtime. Production delivery still
 
 ```txt
 RESEND_API_KEY=<stored only in Supabase secrets>
-PARENT_INVITE_FROM_EMAIL=Se'kret Bip <invite@mail.sekretbip.com>
+PARENT_INVITE_FROM_EMAIL=Se'kret Bip <invite@sekretbip.net>
 ```
+
+The canonical Resend sender domain is `sekretbip.net`. Provider verification must be green before production email delivery can be considered available.
 
 Do not send a live onboarding email, mutate contacts, publish templates, change domains, rotate keys, deploy functions, or alter production data without founder approval and recorded Control Room evidence.
 
