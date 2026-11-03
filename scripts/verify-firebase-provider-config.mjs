@@ -113,4 +113,4 @@ const receipt = {
   androidAppIdSha256: sha256(androidAppId),
 };
 
-process.stdout.write(JSON.stringify(receipt, null, 2) + '\\n');
+process.stdout.write(JSON.stringify(receipt, null, 2) + '\n');
