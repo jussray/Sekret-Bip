@@ -78,8 +78,8 @@ const iosProjectNumber = plistString(iosRaw, 'GCM_SENDER_ID');
 
 if (iosProjectId !== FIREBASE_PROJECT_ID) fail('iOS project ID does not match canonical Firebase project');
 if (iosBundleId !== expectedIdentity) fail('iOS bundle identifier does not match requested app variant');
-if (!/^1:\\d+:ios:[A-Za-z0-9]+$/.test(iosAppId ?? '')) fail('iOS Firebase App ID is missing or malformed');
-if (!/^\\d+$/.test(iosProjectNumber ?? '')) fail('iOS project number is missing or malformed');
+if (!/^1:\d+:ios:[A-Za-z0-9]+$/.test(iosAppId ?? '')) fail('iOS Firebase App ID is missing or malformed');
+if (!/^\d+$/.test(iosProjectNumber ?? '')) fail('iOS project number is missing or malformed');
 
 if (android?.project_info?.project_id !== FIREBASE_PROJECT_ID) {
   fail('Android project ID does not match canonical Firebase project');
@@ -93,10 +93,10 @@ if (!androidClient) fail('Android provider file does not contain the requested a
 
 const androidAppId = androidClient?.client_info?.mobilesdk_app_id;
 const androidProjectNumber = String(android?.project_info?.project_number ?? '');
-if (!/^1:\\d+:android:[A-Za-z0-9]+$/.test(androidAppId ?? '')) {
+if (!/^1:\d+:android:[A-Za-z0-9]+$/.test(androidAppId ?? '')) {
   fail('Android Firebase App ID is missing or malformed');
 }
-if (!/^\\d+$/.test(androidProjectNumber)) fail('Android project number is missing or malformed');
+if (!/^\d+$/.test(androidProjectNumber)) fail('Android project number is missing or malformed');
 if (androidProjectNumber !== iosProjectNumber) fail('iOS and Android configs disagree on Firebase project number');
 
 const receipt = {
