@@ -57,10 +57,25 @@ export interface MinimalExecutionContext {
   waitUntil(promise: Promise<unknown>): void;
 }
 
+export type ArtOfWarManeuver =
+  | 'HOLD_GROUND'
+  | 'REACQUIRE_GROUND'
+  | 'PROBE_CHEAPEST_UNKNOWN'
+  | 'EXPLOIT_VERIFIED_ASYMMETRY'
+  | 'ADVANCE_REVERSIBLY'
+  | 'AVOID_SIEGE';
+export const ART_OF_WAR_STAGE_CONTRACT = 'juss/art-of-war-hallway-strategy@v1';
+
 interface AttackFlowResult {
   flow: AttackFlowName;
   score: number;
   finding: string;
+  artOfWar?: {
+    contract: typeof ART_OF_WAR_STAGE_CONTRACT;
+    maneuver: ArtOfWarManeuver;
+    authorizing: false;
+    basis: 'evidence-only' | 'bounded-synthetic-containment';
+  };
 }
 
 export interface ActiveDefenseDecision {
@@ -221,6 +236,32 @@ function runAttackUnit(input: {
   ];
 }
 
+// Derived from the FCR Art of War maneuver vocabulary. This layer provides
+// per-stage recommendations only; it never changes access, session or merge authority.
+function artOfWarStage(
+  item: AttackFlowResult,
+  verdict: ActiveDefenseVerdict,
+  suspiciousPath: boolean,
+): NonNullable<AttackFlowResult['artOfWar']> {
+  const contained = verdict === 'HALLWAY';
+  const verifiedSyntheticOpportunity = contained && suspiciousPath;
+  let maneuver: ArtOfWarManeuver = 'HOLD_GROUND';
+
+  if (item.flow === 'rollback' || item.flow === 'lindymode') maneuver = 'AVOID_SIEGE';
+  else if (item.flow === 'proofMode' || item.flow === 'continuity') maneuver = 'REACQUIRE_GROUND';
+  else if (item.flow === 'truthmode' || item.flow === 'confess' || item.flow === 'devil') maneuver = 'PROBE_CHEAPEST_UNKNOWN';
+  else if (contained && (item.flow === 'goalfix' || item.flow === 'ooda')) maneuver = 'ADVANCE_REVERSIBLY';
+  else if (verifiedSyntheticOpportunity && (item.flow === 'attack48000' || item.flow === 'redteamI')) maneuver = 'EXPLOIT_VERIFIED_ASYMMETRY';
+  else if (item.score >= 60 && verdict !== 'VERIFIED_BOT') maneuver = 'PROBE_CHEAPEST_UNKNOWN';
+
+  return {
+    contract: ART_OF_WAR_STAGE_CONTRACT,
+    maneuver,
+    authorizing: false,
+    basis: contained ? 'bounded-synthetic-containment' : 'evidence-only',
+  };
+}
+
 function riskFromAttackUnit(results: AttackFlowResult[]): number {
   const top = [...results].sort((a, b) => b.score - a.score).slice(0, 5);
   return Math.round(top.reduce((sum, item) => sum + item.score, 0) / top.length);
@@ -305,7 +346,10 @@ export function evaluateActiveDefenseRequest(request: Request, env: ActiveDefens
     fixedExpansion,
     randomExpansion: randomExpansionValue,
     logicalExpansion: fixedExpansion + randomExpansionValue,
-    attackUnit,
+    attackUnit: attackUnit.map((item) => ({
+      ...item,
+      artOfWar: artOfWarStage(item, verdict, suspiciousPath),
+    })),
     evidence: {
       method: request.method,
       pathname: url.pathname,
