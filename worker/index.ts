@@ -405,7 +405,7 @@ export default {
       if (!env.OPENAI_API_KEY) {
         // Degraded path: crisis text must never receive a canned greeting.
         if (CRISIS_RE.test(userText)) {
-          return json(crisisReply(prepared.style.actorId, false), 200, cors);
+          return json(crisisReply(prepared.style.actorId === 'suhana' ? 'raylene' : prepared.style.actorId === 'sy' ? 'rylane' : prepared.style.actorId, false), 200, cors);
         }
         const options = CHARACTER_FALLBACKS[prepared.style.actorId];
         const start = stableHash(`${prepared.style.actorId}:${userText.toLowerCase()}`) % options.length;
