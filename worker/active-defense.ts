@@ -129,7 +129,7 @@ function deriveKey(rootSecret: string, purpose: string): string {
 }
 
 function normalizedMode(value: unknown): ActiveDefenseMode {
-  return value === 'contain' || value === 'observe' || value === 'off' ? value : 'observe';
+  return value === 'contain' || value === 'observe' ? value : 'off';
 }
 
 function parseCookies(request: Request): Map<string, string> {
@@ -401,10 +401,8 @@ function observeDecision(
     actor_fingerprint: decision.actorFingerprint,
     incident_fingerprint: decision.incidentFingerprint,
     continuity_parent: decision.continuityParent,
-    source_ip: decision.sourceIp,
-    asn: decision.asn,
-    as_organization: decision.asOrganization,
-    claimed_user_agent: decision.claimedUserAgent,
+    // Avoid raw network identifiers in retained console logs; incident and
+    // actor fingerprints provide non-identifying technical correlation.
     verified_bot: decision.verifiedBot,
     verified_bot_category: decision.verifiedBotCategory,
     bot_score: decision.botScore,
@@ -424,7 +422,8 @@ export function enforceActiveDefense(
   started = Date.now(),
 ): ActiveDefenseResult {
   const decision = evaluateActiveDefenseRequest(request, env);
-  observeDecision(request, env, ctx, decision, started);
+  // An omitted or invalid mode must perform no telemetry side effects.
+  if (normalizedMode(env.ACTIVE_DEFENSE_MODE) !== 'off') observeDecision(request, env, ctx, decision, started);
   const rootSecret = env.ACTIVE_DEFENSE_HMAC_KEY?.trim() || '';
   return {
     decision,
