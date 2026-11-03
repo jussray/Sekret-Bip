@@ -91,10 +91,10 @@ test('all 20 hallway checks carry evidence-only Art of War maneuvers', () => {
     'ADVANCE_REVERSIBLY',
     'AVOID_SIEGE',
   ];
-  assert.match(activeDefense, /ART_OF_WAR_STAGE_CONTRACT = 'juss\\/art-of-war-hallway-strategy@v1'/);
+  assert.ok(activeDefense.includes("ART_OF_WAR_STAGE_CONTRACT = 'juss/art-of-war-hallway-strategy@v1'"));
   for (const name of names) assert.ok(activeDefense.includes(name), 'missing Art of War maneuver: ' + name);
-  assert.match(activeDefense, /attackUnit: attackUnit\\.map\\(\\(item\\) => \\(\\{/);
-  assert.match(activeDefense, /artOfWar: artOfWarStage\\(item, verdict, suspiciousPath\\)/);
+  assert.ok(activeDefense.includes('attackUnit: attackUnit.map((item) => ({'));
+  assert.ok(activeDefense.includes('artOfWar: artOfWarStage(item, verdict, suspiciousPath)'));
   assert.match(activeDefense, /authorizing: false/);
   assert.match(activeDefense, /verifiedSyntheticOpportunity = contained && suspiciousPath/);
   assert.doesNotMatch(activeDefense, /externalActionAllowed: true/);
