@@ -76,7 +76,8 @@
     "control-room:github-failures:scan": "node scripts/control-room-ingest-github-failures.mjs",
     "control-room:github-failures:ingest": "CONTROL_ROOM_GITHUB_INGEST=1 node scripts/control-room-ingest-github-failures.mjs",
     "test:github-failure-routing": "node --test test/control-room-github-failure-routing.test.mjs",
-    "configure:mcp:codex-cloudflare": "node scripts/configure-codex-cloudflare-mcp.mjs"
+    "configure:mcp:codex-cloudflare": "node scripts/configure-codex-cloudflare-mcp.mjs",
+    "verify:firebase-provider-config": "node scripts/verify-firebase-provider-config.mjs"
   },
   "dependencies": {
     "@expo/log-box": "^56.0.13",
@@ -133,4 +134,4 @@
     "node-addon-api": "^8.8.0",
     "sharp": "^0.35.2"
   }
-}
+}\n

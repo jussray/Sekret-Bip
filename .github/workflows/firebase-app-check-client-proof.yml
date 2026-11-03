@@ -59,7 +59,7 @@ jobs:
         run: node scripts/verify-firebase-app-check-rollout.mjs
 
       - name: Run App Check contracts
-        run: node --test test/firebase-app-check-client-contract.test.mjs test/firebase-client-app-check-contract.test.mjs test/firebase-app-check-contract.test.mjs
+        run: node --test test/firebase-app-check-client-contract.test.mjs test/firebase-client-app-check-contract.test.mjs test/firebase-app-check-contract.test.mjs test/firebase-provider-config-contract.test.mjs
 
       - name: Typecheck
         run: npm run type-check
