@@ -17,7 +17,9 @@ on:
       - src/services/firebase/appCheck.ts
       - src/utils/backendAuth.ts
       - scripts/verify-firebase-app-check-rollout.mjs
+      - scripts/verify-firebase-provider-config.mjs
       - test/firebase-app-check-client-contract.test.mjs
+      - test/firebase-provider-config-contract.test.mjs
       - test/firebase-client-app-check-contract.test.mjs
       - test/firebase-app-check-contract.test.mjs
       - e2e/smoke.spec.ts
