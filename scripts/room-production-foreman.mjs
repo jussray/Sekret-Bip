@@ -76,7 +76,7 @@ function validateManifest(manifest, promptPack) {
   assert(promptPack.roomMaster === manifest.rooms.night.baseAsset, 'Night room master mismatch.');
 }
 
-function buildQueue(manifest, promptPack) {
+function buildQueue(promptPack) {
   return [
     ...promptPack.poses.map(pose => ({ kind: 'character-pose', characterId: 'night', pose: pose.id, file: pose.file, fallback: promptPack.canonicalMaster })),
     ...promptPack.roomPhases.map(phase => ({ kind: 'room-phase', roomId: 'night', phase: phase.id, file: phase.file, fallback: promptPack.roomMaster })),
@@ -131,10 +131,9 @@ function validateImage(filePath, requirements = {}) {
   return metadata;
 }
 
-function escapeRegex(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
+const ROOT_DIR = process.cwd();
+const RUN_DIR = path.resolve('.room-foreman', 'runs', 'latest');
+const EVIDENCE_DIR = path.join(RUN_DIR, 'evidence');
 const REGISTRY_CONSUMER_FILES = ['src/components/room/character/SekretSprite.tsx'];
 const TOOL_PROFILE_DIRS = {
   canva: '.room-foreman/profiles/canva',
@@ -163,12 +162,12 @@ function requirePathFor(registryPath, assetPath) {
   return relative;
 }
 
-function validateRegistryConsumer(rootDir, manifest) {
+function validateRegistryConsumer(manifest) {
   for (const consumer of manifest.runtime.registryConsumers) {
     assert(REGISTRY_CONSUMER_FILES.includes(consumer), 'Unknown registry consumer.');
   }
   for (const file of REGISTRY_CONSUMER_FILES) {
-    const source = fs.readFileSync(path.join(rootDir, file), 'utf8');
+    const source = fs.readFileSync(path.join(ROOT_DIR, file), 'utf8');
     assert(source.includes('NIGHT_ROOM_POSE_ASSETS'), `${file} does not consume NIGHT_ROOM_POSE_ASSETS.`);
   }
 }
@@ -178,7 +177,7 @@ function verifyAssets({ rootDir, manifest, promptPack }) {
   const registryRelative = manifest.runtime.assetRegistry;
   const registryPath = path.join(rootDir, registryRelative);
   const registrySource = fs.readFileSync(registryPath, 'utf8');
-  validateRegistryConsumer(rootDir, manifest);
+  validateRegistryConsumer(manifest);
   const minimum = parseSize(promptPack.output.minimumSize);
   const aspectRatio = parseAspectRatio(promptPack.output.aspectRatio);
   const canonicalPath = path.join(rootDir, promptPack.canonicalMaster);
@@ -242,11 +241,11 @@ function verifyAssets({ rootDir, manifest, promptPack }) {
   return results;
 }
 
-function writeReports(runDir, report) {
-  fs.mkdirSync(runDir, { recursive: true });
-  fs.writeFileSync(path.join(runDir, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`);
+function writeReports(report) {
+  fs.mkdirSync(RUN_DIR, { recursive: true });
+  fs.writeFileSync(path.join(RUN_DIR, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`);
   const markdown = ['# Room Foreman Run', '', `- Run: ${report.runId}`, `- Mode: ${report.mode}`, `- Status: ${report.status}`, `- Started: ${report.startedAt}`, `- Finished: ${report.finishedAt}`, '', '## Results', ...report.results.map(result => `- ${result.status.toUpperCase()} — ${result.label}${result.detail ? `: ${result.detail}` : ''}`), ''].join('\n');
-  fs.writeFileSync(path.join(runDir, 'run-report.md'), markdown);
+  fs.writeFileSync(path.join(RUN_DIR, 'run-report.md'), markdown);
 }
 
 function resolveWorkspaceUrl(tool, manifest) {
@@ -257,13 +256,13 @@ function resolveWorkspaceUrl(tool, manifest) {
   return '';
 }
 
-async function runInteractiveTool(tool, manifest, runDir, args) {
+async function runInteractiveTool(tool, manifest, args) {
   assert(TOOL_PROFILE_DIRS[tool] && TOOL_EVIDENCE_FILES[tool], 'Unsupported interactive tool.');
   const url = resolveWorkspaceUrl(tool, manifest);
   if (!url) return { status: 'blocked', label: tool, detail: 'Workspace URL environment variable is not configured.' };
   const { chromium } = await import('@playwright/test');
   const profileDir = path.resolve(TOOL_PROFILE_DIRS[tool]);
-  const evidenceDir = path.join(runDir, 'evidence');
+  const evidenceDir = EVIDENCE_DIR;
   fs.mkdirSync(profileDir, { recursive: true });
   fs.mkdirSync(evidenceDir, { recursive: true });
   const context = await chromium.launchPersistentContext(profileDir, { headless: args.headless, viewport: { width: 1440, height: 1000 } });
@@ -295,11 +294,10 @@ async function main() {
   const promptPack = readJson(path.join(rootDir, manifest.creativeTools.leonardo.promptPack));
   validateManifest(manifest, promptPack);
   const runId = new Date().toISOString().replace(/[:.]/g, '-');
-  const runDir = path.resolve('.room-foreman', 'runs', 'latest');
   const startedAt = new Date().toISOString();
   const results = [];
   if (args.mode === 'plan') {
-    const queue = buildQueue(manifest, promptPack);
+    const queue = buildQueue(promptPack);
     results.push({ status: 'pass', label: 'manifest', detail: `${queue.length} vertical-slice jobs validated.` });
     queue.forEach(() => console.log('ROOM_FOREMAN_QUEUE_ITEM'));
   } else if (args.mode === 'verify') {
@@ -309,14 +307,14 @@ async function main() {
     const tools = args.tool === 'all' ? allowed : [args.tool];
     for (const tool of tools) {
       assert(allowed.includes(tool), `Unsupported interactive tool: ${tool}`);
-      results.push(await runInteractiveTool(tool, manifest, runDir, args));
+      results.push(await runInteractiveTool(tool, manifest, args));
     }
   } else {
     throw new Error(`Unsupported mode: ${args.mode}`);
   }
   const blocking = hasBlockingResults(results);
   const report = { runId, mode: args.mode, tool: args.tool, manifest: path.relative(rootDir, manifestPath), startedAt, finishedAt: new Date().toISOString(), status: blocking ? 'attention-required' : 'pass', results };
-  writeReports(runDir, report);
+  writeReports(report);
   console.log('ROOM_FOREMAN_FINISHED');
   console.log('ROOM_FOREMAN_REPORT_WRITTEN');
   if (blocking) process.exitCode = 1;
