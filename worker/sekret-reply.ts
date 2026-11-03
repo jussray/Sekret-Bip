@@ -1659,7 +1659,7 @@ async function handleReply(request: Request, env: Env, principal: GuardianAwareP
     return json({
       reply: finalReply.replace(/\bOracle\b/gi, "Se'kret"),
       tone: String(parsed.tone || characterId),
-      safetyFlag: Boolean(parsed.safetyFlag),
+      safetyFlag: parsed.safetyFlag === true,
       parentShareSummary: typeof parsed.parentShareSummary === 'string' ? parsed.parentShareSummary : null,
       suggestedComfortTool: typeof parsed.suggestedComfortTool === 'string' ? parsed.suggestedComfortTool : null,
       replySource,

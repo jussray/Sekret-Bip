@@ -52,6 +52,40 @@ test('qualifying messages reach the supportive safety response', async () => {
   assert.match(body.reply, /988/);
 });
 
+test('model string safety flags do not escalate or share a guardian summary', async () => {
+  const priorFetch = globalThis.fetch;
+  let modelCalls = 0;
+  globalThis.fetch = async () => {
+    modelCalls += 1;
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({
+        reply: 'How was your science class today?',
+        tone: 'casual',
+        safetyFlag: 'false',
+        parentShareSummary: null,
+        suggestedComfortTool: null,
+      }) } }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    const request = new Request('https://worker.test/api/sekret/reply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userText: 'Tell me about a science project', characterId: 'sekret', surface: 'journal' }),
+    });
+    const response = await worker.fetch(request, { OPENAI_API_KEY: 'synthetic-test-key' }, {
+      kind: 'user', userId: USER, guardianSharingEnabled: true,
+    });
+    const body = await response.json();
+    assert.equal(response.status, 200);
+    assert.equal(body.safetyFlag, false);
+    assert.equal(body.parentShareSummary, null);
+    assert.ok(modelCalls >= 1);
+  } finally {
+    globalThis.fetch = priorFetch;
+  }
+});
+
 test('ordinary location language does not escalate', async () => {
   const { body } = await reply('I want to live in Lagos', true, false);
   assert.equal(body.safetyFlag, false);

@@ -132,6 +132,11 @@ export function evaluateReply(input: EvaluateReplyInput): EvaluationResult {
     violations.push('invalid_schema');
   }
 
+  // A model string such as "false" must never be truthy escalation authority.
+  if (parsed.safetyFlag !== undefined && typeof parsed.safetyFlag !== 'boolean') {
+    violations.push('invalid_schema');
+  }
+
   if (replyText) {
     if (replyText.length > MAX_REPLY_LENGTH) violations.push('reply_too_long');
     if (countQuestionMarks(replyText) > 1) violations.push('too_many_questions');

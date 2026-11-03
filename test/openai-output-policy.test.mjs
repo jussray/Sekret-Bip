@@ -44,6 +44,27 @@ test('a normal, in-voice reply is allowed with no violations', () => {
   assert.equal(result.schemaValid, true);
 });
 
+test('malformed model safety flags cannot pass the response contract', () => {
+  for (const malformed of ['false', 'true', 1, null, {}]) {
+    const result = evaluateReply({
+      parsed: { reply: 'How did the class project go?', safetyFlag: malformed },
+      parentSharingEnabled: true,
+    });
+    assert.equal(result.decision, 'retry', String(malformed));
+    assert.ok(result.violations.includes('invalid_schema'));
+  }
+});
+
+test('boolean safety flags remain schema-valid', () => {
+  for (const flag of [true, false]) {
+    const result = evaluateReply({
+      parsed: { reply: 'How did the class project go?', safetyFlag: flag },
+      parentSharingEnabled: true,
+    });
+    assert.equal(result.decision, 'allow');
+  }
+});
+
 // ─── block: prompt leakage always wins, even alongside other violations ───
 test('prompt leakage is blocked even when the reply is otherwise fine', () => {
   const result = evaluateReply({ parsed: { reply: 'As an AI language model, I care about you.' }, parentSharingEnabled: false });

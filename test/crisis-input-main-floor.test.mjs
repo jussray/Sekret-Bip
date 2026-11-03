@@ -46,6 +46,31 @@ for (const phrase of [...CONTRACTION_AND_BARE_CASES, ...MAIN_KEYWORD_CASES]) {
   });
 }
 
+test('keyword floor keeps isolated distress terms without escalating unrelated discussion', () => {
+  for (const phrase of [
+    'this website is unsafe',
+    'that code is not safe',
+    'we learned about abuse in class',
+    'the game says run away from the monster',
+    'I am no longer in danger',
+    'this chapter describes an emergency response',
+  ]) {
+    assert.equal(isCrisisText(phrase), false, phrase);
+  }
+});
+
+test('contextual danger statements remain covered', () => {
+  for (const phrase of [
+    "we're in danger",
+    'my brother is in danger',
+    "there's an emergency",
+    'I feel unsafe',
+    'it is not safe here',
+  ]) {
+    assert.equal(isCrisisText(phrase), true, phrase);
+  }
+});
+
 test('crisis input floor does not flag ordinary text', () => {
   assert.equal(isCrisisText('what should I cook for dinner tonight'), false);
   assert.equal(isCrisisText(undefined), false);
