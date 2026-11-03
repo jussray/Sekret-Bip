@@ -21,6 +21,10 @@ on:
       - .github/workflows/firebase-app-check-client-proof.yml
   workflow_dispatch:
 
+concurrency:
+  group: firebase-app-check-client-proof-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -33,6 +37,11 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+
+      - name: Assert exact branch head
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
 
       - name: Set up Node 24
         uses: actions/setup-node@v4
