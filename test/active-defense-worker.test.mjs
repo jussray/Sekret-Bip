@@ -81,3 +81,21 @@ test('retained hallway logs omit raw IP and claimed User-Agent', () => {
   assert.match(logged, /incident_fingerprint:/);
   assert.match(logged, /actor_fingerprint:/);
 });
+
+test('all 20 hallway checks carry evidence-only Art of War maneuvers', () => {
+  const names = [
+    'HOLD_GROUND',
+    'REACQUIRE_GROUND',
+    'PROBE_CHEAPEST_UNKNOWN',
+    'EXPLOIT_VERIFIED_ASYMMETRY',
+    'ADVANCE_REVERSIBLY',
+    'AVOID_SIEGE',
+  ];
+  assert.match(activeDefense, /ART_OF_WAR_STAGE_CONTRACT = 'juss\\/art-of-war-hallway-strategy@v1'/);
+  for (const name of names) assert.ok(activeDefense.includes(name), 'missing Art of War maneuver: ' + name);
+  assert.match(activeDefense, /attackUnit: attackUnit\\.map\\(\\(item\\) => \\(\\{/);
+  assert.match(activeDefense, /artOfWar: artOfWarStage\\(item, verdict, suspiciousPath\\)/);
+  assert.match(activeDefense, /authorizing: false/);
+  assert.match(activeDefense, /verifiedSyntheticOpportunity = contained && suspiciousPath/);
+  assert.doesNotMatch(activeDefense, /externalActionAllowed: true/);
+});
