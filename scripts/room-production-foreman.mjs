@@ -285,7 +285,7 @@ async function main() {
   if (args.mode === 'plan') {
     const queue = buildQueue(manifest, promptPack);
     results.push({ status: 'pass', label: 'manifest', detail: `${queue.length} vertical-slice jobs validated.` });
-    for (const item of queue) console.log('ROOM_FOREMAN_QUEUE_ITEM');
+    queue.forEach(() => console.log('ROOM_FOREMAN_QUEUE_ITEM'));
   } else if (args.mode === 'verify') {
     results.push(...verifyAssets({ rootDir, manifest, promptPack }));
   } else if (args.mode === 'interactive') {
@@ -307,7 +307,7 @@ async function main() {
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isMain) main().catch(error => {
+if (isMain) main().catch(() => {
   console.error('ROOM_FOREMAN_FAILED');
   process.exitCode = 1;
 });

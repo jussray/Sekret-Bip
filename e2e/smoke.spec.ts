@@ -196,12 +196,10 @@ test('parent signup deep link exposes accessible account creation controls', asy
 
 test('protected teen routes remain behind the account and verification boundary', async ({ page }) => {
   await page.goto('/circle?bipDevSide=teen');
-  await expect(page).toHaveURL(/\/guardian-verification(?:\?|$)/, { timeout: 30_000 });
-  await expect(page.getByText('GUARDIAN ACCESS')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('Guardian verification required.')).toBeVisible();
-  await expect(page.getByText(/Linking to a teen is a separate consent step/)).toBeVisible();
-  await expect(page.getByText(/No journal, voice note, or private source is shared automatically/)).toBeVisible();
-  await expect(page.getByText('Submit for guardian review')).toBeVisible();
+  await expect(page).toHaveURL(/\/parent-link-verify(?:\?|$)/, { timeout: 30_000 });
+  await expect(page.getByText('TRUSTED CONNECTION', { exact: true })).toBeVisible();
+  await expect(page.getByText('Keep using Limited Mode')).toBeVisible();
+  await expect(page.getByText('🌐 Circle')).not.toBeVisible();
 });
 
 test('authorization evidence and secrets stay out of the public surface', async ({ page }) => {
