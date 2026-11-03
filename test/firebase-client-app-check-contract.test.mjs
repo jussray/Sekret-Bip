@@ -21,7 +21,11 @@ test('client App Check seam is optional, nonpersistent, and independent from Sup
   assert.match(backendAuth, /resolveBackendToken\(\)/);
   assert.match(backendAuth, /getAppCheckToken\(\)/);
   assert.match(backendAuth, /headers\['X-Firebase-AppCheck'\] = appCheckToken/);
-  assert.match(backendAuth, /backendHeaders\(token, extra\)/);
+  assert.match(backendAuth, /withoutCallerControlledAuthorityHeaders/);
+  assert.match(backendAuth, /key\.toLowerCase\(\)/);
+  assert.match(backendAuth, /normalized === 'authorization'/);
+  assert.match(backendAuth, /normalized === 'x-firebase-appcheck'/);
+  assert.match(backendAuth, /backendHeaders\(token, safeExtra\)/);
   assert.doesNotMatch(backendAuth, /Authorization\s*=\s*appCheckToken/);
 });
 
