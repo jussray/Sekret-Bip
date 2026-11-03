@@ -135,29 +135,26 @@ function escapeRegex(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-const SAFE_SEGMENT = /^[A-Za-z0-9_-]{1,64}$/;
-const SAFE_RELATIVE_PATH = /^[A-Za-z0-9_./-]{1,200}$/;
-
-function safeSegment(value, label) {
-  assert(typeof value === 'string' && SAFE_SEGMENT.test(value), `${label} is not a safe identifier.`);
-  return value;
-}
-
-function safeRelativePath(value, label) {
-  assert(typeof value === 'string' && SAFE_RELATIVE_PATH.test(value) && !value.includes('..') && !value.startsWith('/'),
-    `${label} must be a safe relative path.`);
-  return value;
-}
+const REGISTRY_CONSUMER_FILES = ['src/components/room/character/SekretSprite.tsx'];
+const TOOL_PROFILE_DIRS = {
+  canva: '.room-foreman/profiles/canva',
+  figma: '.room-foreman/profiles/figma',
+  leonardo: '.room-foreman/profiles/leonardo',
+  app: '.room-foreman/profiles/app',
+};
+const TOOL_EVIDENCE_FILES = {
+  canva: { workspace: 'canva-workspace.png', checkpoint: 'canva-checkpoint.png' },
+  figma: { workspace: 'figma-workspace.png', checkpoint: 'figma-checkpoint.png' },
+  leonardo: { workspace: 'leonardo-workspace.png', checkpoint: 'leonardo-checkpoint.png' },
+  app: { workspace: 'app-workspace.png', checkpoint: 'app-checkpoint.png' },
+};
 
 function registryBlock(source, collectionName, key) {
-  key = safeSegment(key, 'registry key');
   const collectionIndex = source.indexOf(`export const ${collectionName}`);
   assert(collectionIndex >= 0, `Registry is missing ${collectionName}.`);
-  const tail = source.slice(collectionIndex);
-  const pattern = new RegExp(`(?:^|\\n)\\s*${escapeRegex(key)}:\\s*\\{([^\\n]*)\\},?`);
-  const match = pattern.exec(tail);
-  assert(match, `Registry is missing ${collectionName}.${key}.`);
-  return match[1];
+  const line = source.slice(collectionIndex).split('\n').find(entry => entry.trimStart().startsWith(`${key}: {`));
+  assert(line, `Registry is missing ${collectionName}.${key}.`);
+  return line.slice(line.indexOf('{') + 1, line.lastIndexOf('}'));
 }
 
 function requirePathFor(registryPath, assetPath) {
@@ -168,8 +165,11 @@ function requirePathFor(registryPath, assetPath) {
 
 function validateRegistryConsumer(rootDir, manifest) {
   for (const consumer of manifest.runtime.registryConsumers) {
-    const source = fs.readFileSync(path.join(rootDir, safeRelativePath(consumer, 'registry consumer')), 'utf8');
-    assert(source.includes('NIGHT_ROOM_POSE_ASSETS'), `${consumer} does not consume NIGHT_ROOM_POSE_ASSETS.`);
+    assert(REGISTRY_CONSUMER_FILES.includes(consumer), 'Unknown registry consumer.');
+  }
+  for (const file of REGISTRY_CONSUMER_FILES) {
+    const source = fs.readFileSync(path.join(rootDir, file), 'utf8');
+    assert(source.includes('NIGHT_ROOM_POSE_ASSETS'), `${file} does not consume NIGHT_ROOM_POSE_ASSETS.`);
   }
 }
 
@@ -257,12 +257,12 @@ function resolveWorkspaceUrl(tool, manifest) {
   return '';
 }
 
-async function runInteractiveTool(toolName, manifest, runDir, args) {
-  const tool = safeSegment(toolName, 'tool');
+async function runInteractiveTool(tool, manifest, runDir, args) {
+  assert(TOOL_PROFILE_DIRS[tool] && TOOL_EVIDENCE_FILES[tool], 'Unsupported interactive tool.');
   const url = resolveWorkspaceUrl(tool, manifest);
   if (!url) return { status: 'blocked', label: tool, detail: 'Workspace URL environment variable is not configured.' };
   const { chromium } = await import('@playwright/test');
-  const profileDir = path.resolve('.room-foreman', 'profiles', tool);
+  const profileDir = path.resolve(TOOL_PROFILE_DIRS[tool]);
   const evidenceDir = path.join(runDir, 'evidence');
   fs.mkdirSync(profileDir, { recursive: true });
   fs.mkdirSync(evidenceDir, { recursive: true });
@@ -270,11 +270,11 @@ async function runInteractiveTool(toolName, manifest, runDir, args) {
   try {
     const page = context.pages()[0] ?? await context.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 });
-    await page.screenshot({ path: path.join(evidenceDir, `${tool}-workspace.png`), fullPage: true });
+    await page.screenshot({ path: path.join(evidenceDir, TOOL_EVIDENCE_FILES[tool].workspace), fullPage: true });
     if (!args.headless && args.holdMs > 0) {
       console.log('ROOM_FOREMAN_MANUAL_LOGIN_WAIT');
       await page.waitForTimeout(args.holdMs);
-      await page.screenshot({ path: path.join(evidenceDir, `${tool}-checkpoint.png`), fullPage: true });
+      await page.screenshot({ path: path.join(evidenceDir, TOOL_EVIDENCE_FILES[tool].checkpoint), fullPage: true });
     }
     return { status: 'captured', label: tool, detail: `Evidence saved under ${evidenceDir}.` };
   } finally {
@@ -294,8 +294,8 @@ async function main() {
   const manifest = readJson(manifestPath);
   const promptPack = readJson(path.join(rootDir, manifest.creativeTools.leonardo.promptPack));
   validateManifest(manifest, promptPack);
-  const runId = safeSegment(new Date().toISOString().replace(/[:.]/g, '-'), 'run id');
-  const runDir = path.resolve('.room-foreman', 'runs', runId);
+  const runId = new Date().toISOString().replace(/[:.]/g, '-');
+  const runDir = path.resolve('.room-foreman', 'runs', 'latest');
   const startedAt = new Date().toISOString();
   const results = [];
   if (args.mode === 'plan') {

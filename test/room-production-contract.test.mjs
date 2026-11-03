@@ -100,7 +100,7 @@ test('verification passes declared fallbacks and blocks present but unwired pose
   write(root, canonical, png(2, 3, 6));
   write(root, day, jpeg(20, 10));
   write(root, night, jpeg(20, 10));
-  write(root, 'src/consumer.ts', "import { NIGHT_ROOM_POSE_ASSETS } from './registry';\nexport const active = NIGHT_ROOM_POSE_ASSETS.neutral.source;\n");
+  write(root, 'src/components/room/character/SekretSprite.tsx', "import { NIGHT_ROOM_POSE_ASSETS } from './registry';\nexport const active = NIGHT_ROOM_POSE_ASSETS.neutral.source;\n");
   write(root, 'src/registry.ts', `
 export const NIGHT_ROOM_POSE_ASSETS = {
   neutral: { source: require('../assets/night/neutral.png'), generatedFile: '${canonical}', activeFile: '${canonical}', status: 'generated' },
@@ -111,7 +111,7 @@ export const NIGHT_ROOM_PHASE_ASSETS = {
   night: { source: require('../assets/room/night.jpg'), file: '${night}' },
 };
 `);
-  const manifest = { runtime: { assetRegistry: 'src/registry.ts', registryConsumers: ['src/consumer.ts'] } };
+  const manifest = { runtime: { assetRegistry: 'src/registry.ts', registryConsumers: ['src/components/room/character/SekretSprite.tsx'] } };
   const promptPack = {
     canonicalMaster: canonical,
     roomMaster: day,
