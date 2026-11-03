@@ -19,6 +19,23 @@ const script = fileURLToPath(import.meta.url);
 const repositoryRoot = path.resolve(path.dirname(script), '..');
 const receiptRoot = '/home/sprite/.sprite-proof/receipts';
 
+export function receiptPath({ mission, sha, invocationId = null }) {
+  if (!Object.hasOwn(MISSIONS, mission) || !SHA_RE.test(sha) ||
+      (invocationId !== null && !INVOCATION_RE.test(invocationId))) {
+    throw new Error('BIP_SPRITE_RECEIPT_NAME_INVALID');
+  }
+  const rawStem = sha + '-' + mission + (invocationId ? '-' + invocationId : '');
+  // Defense in depth: normalize user-controlled CLI data before using any filesystem path.
+  const safeStem = rawStem.replace(/[^a-z0-9-]/g, '');
+  if (safeStem !== rawStem) throw new Error('BIP_SPRITE_RECEIPT_NAME_INVALID');
+  const destination = path.resolve(receiptRoot, safeStem + '.json');
+  if (path.dirname(destination) !== path.resolve(receiptRoot)) {
+    throw new Error('BIP_SPRITE_RECEIPT_PATH_OUTSIDE_ROOT');
+  }
+  return destination;
+}
+
+
 export function parseRequest(argv) {
   const withInvocation = argv.length === 6 && argv[4] === '--invocation';
   if (!(argv.length === 4 || withInvocation) || argv[0] !== '--mission' || argv[2] !== '--sha') {
@@ -97,7 +114,7 @@ function main() {
     fs.mkdirSync('/home/sprite/.bip-sprite-home', { recursive: true, mode: 0o700 });
     const receipt = runProof(req);
     fs.mkdirSync(receiptRoot, { recursive: true, mode: 0o700 });
-    const destination = path.join(receiptRoot, req.sha + '-' + req.mission + (req.invocationId ? '-' + req.invocationId : '') + '.json');
+    const destination = receiptPath(req);
     // Invocation-specific receipts are write-once. Legacy operator receipts retain their old slot.
     fs.writeFileSync(destination, JSON.stringify(receipt, null, 2) + '\n', { mode: 0o600, flag: req.invocationId ? 'wx' : 'w' });
     console.log('BIP_SPRITE_PROOF_RECEIPT_WRITTEN');

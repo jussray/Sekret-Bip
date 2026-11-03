@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { MISSIONS, parseRequest, safeEnvironment, receiptFor, runProof } from '../scripts/bip-sprite-proof.mjs';
+import { MISSIONS, parseRequest, safeEnvironment, receiptFor, receiptPath, runProof } from '../scripts/bip-sprite-proof.mjs';
 
 const sha = 'a'.repeat(40);
 test('only fixed missions and one exact SHA are accepted', () => {
@@ -115,4 +115,13 @@ test('unique invocation flows through clean exact-head proof', () => {
   assert.equal(receipt.invocationId, invocationId);
   assert.equal(receipt.status, 'pass');
   assert.equal(calls, 3);
+});
+
+test('sanitized receipt names remain inside private receipt directory', () => {
+  const invocationId = 'a'.repeat(32);
+  const path = receiptPath({ mission: 'repo-truth', sha, invocationId });
+  assert.equal(path, '/home/sprite/.sprite-proof/receipts/' + sha + '-repo-truth-' + invocationId + '.json');
+  assert.throws(() => receiptPath({ mission: '../outside', sha, invocationId }));
+  assert.throws(() => receiptPath({ mission: 'repo-truth', sha, invocationId: 'a/../b' }));
+  assert.throws(() => receiptPath({ mission: 'repo-truth', sha: '../../etc', invocationId }));
 });
