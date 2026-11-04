@@ -89,8 +89,10 @@ test('mission timeout terminates the process tree before the active slot is rele
   assert.match(localServer, /spawnSync\('taskkill', args/);
   assert.match(localServer, /terminateProcessTree\(child, 'SIGTERM'\)/);
   assert.match(localServer, /terminateProcessTree\(child, 'SIGKILL'\)/);
-  assert.match(localServer, /terminationEscalated = true/);
-  assert.match(localServer, /if \(timedOutPayload\) finish\('timed_out', timedOutPayload\)/);
+  assert.match(localServer, /const finishWhenTreeStops = \(\) => \{/);
+  assert.match(localServer, /if \(!processTreeAlive\(processGroupId\)\) \{/);
+  assert.match(localServer, /treePollTimer = setTimeout\(finishWhenTreeStops, 40\)/);
+  assert.match(localServer, /if \(settled \|\| !processTreeAlive\(processGroupId\)\) return/);
 
   const timeoutStart = localServer.indexOf('timeoutTimer = setTimeout');
   const forceTimerStart = localServer.indexOf('forceKillTimer = setTimeout', timeoutStart);
@@ -99,8 +101,8 @@ test('mission timeout terminates the process tree before the active slot is rele
   assert.notEqual(forceTimerStart, -1);
   assert.notEqual(errorHandlerStart, -1);
   assert.doesNotMatch(localServer.slice(timeoutStart, forceTimerStart), /finish\(/);
-  assert.match(localServer, /child\.on\('close',[\s\S]*timedOutPayload = \{[\s\S]*error: 'mission_timeout'/);
-  assert.match(localServer, /if \(terminationEscalated\) finish\('timed_out', timedOutPayload\)/);
+  assert.match(localServer, /child\.on\('close',[\s\S]*else finishWhenTreeStops\(\)/);
+  assert.match(localServer, /finish\('timed_out', \{ \.\.\.closePayload, error: 'mission_timeout', termination: 'process_tree' \}\)/);
   assert.match(localServer, /termination: 'process_tree'/);
   assert.match(localServer, /if \(activeChild\) terminateProcessTree\(activeChild, 'SIGKILL'\)/);
 });
@@ -116,6 +118,7 @@ test('Playwright evidence output remains compatible with the room-specific suite
   assert.match(playwright, /playwright\.room\.config\.ts/);
   const frontendVerifier = fs.readFileSync('scripts/control-room-verify-frontend.mjs', 'utf8');
   assert.match(frontendVerifier, /PLAYWRIGHT_ARTIFACT_DIR/);
-  assert.match(frontendVerifier, /path\.join\(rootDir, 'reports', 'control-room', 'playwright', runId\)/);
+  assert.match(frontendVerifier, /const stamp = generatedAt\.toISOString\(\)\.replace/);
+  assert.match(frontendVerifier, /path\.join\(rootDir, 'reports', 'control-room', 'playwright', stamp\)/);
   assert.doesNotMatch(frontendVerifier, /--reporter=json/);
 });
