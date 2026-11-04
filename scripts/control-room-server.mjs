@@ -462,10 +462,31 @@ server.listen(port, host, () => {
   console.log('Loopback-only. Only fixed missions and fixed-path Founder Operator evidence persistence are available.');
 });
 
+let shuttingDown = false;
 function shutdown() {
-  if (activeChild) terminateProcessTree(activeChild, 'SIGTERM');
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 1_000).unref();
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const missionChild = activeChild;
+  const started = Date.now();
+  let serverClosed = false;
+  if (missionChild) terminateProcessTree(missionChild, 'SIGTERM');
+  server.close(() => { serverClosed = true; });
+
+  const finishShutdown = () => {
+    const treeAlive = missionChild && processTreeAlive(missionChild.pid);
+    if (treeAlive && Date.now() - started >= terminationGraceMs) {
+      // Retain the original child pid so descendants are still terminated if
+      // the child closes before its process group does.
+      if (activeChild) terminateProcessTree(activeChild, 'SIGKILL');
+      else terminateProcessTree(missionChild, 'SIGKILL');
+    }
+    if (serverClosed && !treeAlive) return process.exit(0);
+    if (Date.now() - started >= terminationGraceMs + 2_000) {
+      return process.exit(1);
+    }
+    setTimeout(finishShutdown, 40).unref();
+  };
+  finishShutdown();
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
