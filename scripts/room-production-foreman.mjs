@@ -32,7 +32,7 @@ function parseArgs(argv) {
 }
 
 function usage() {
-  console.log(`\nSe’kret Bip room production foreman\n\nUsage:\n  npm run room:foreman -- --mode plan\n  npm run room:foreman -- --mode verify\n  npm run room:foreman -- --mode interactive --tool canva\n\nModes:\n  plan         Validate the manifest and print the production queue.\n  verify       Validate approved runtime assets already present in the repo.\n  interactive  Open creative-tool workspaces with isolated persistent profiles,\n               capture evidence, and leave all login/generation approval manual.\n\nTools:\n  all | canva | figma | leonardo | app\n\nSecurity:\n  This script never types passwords, bypasses MFA, solves CAPTCHAs, or commits\n  creative-tool changes. Browser profiles and evidence stay in ignored local folders.\n`);
+  console.log('ROOM_FOREMAN_HELP_SEE_ROOM_PRODUCTION_ENGINE_DOC');
 }
 
 function readJson(filePath) {
@@ -154,7 +154,7 @@ async function runInteractiveTool(tool, manifest, runDir, args) {
     await page.screenshot({ path: path.join(evidenceDir, `${tool}-workspace.png`), fullPage: true });
 
     if (!args.headless && args.holdMs > 0) {
-      console.log(`[${tool}] Workspace opened. Complete any login or approval manually. Waiting ${args.holdMs}ms before evidence close.`);
+      console.log('ROOM_FOREMAN_INTERACTIVE_WORKSPACE_OPEN');
       await page.waitForTimeout(args.holdMs);
       await page.screenshot({ path: path.join(evidenceDir, `${tool}-checkpoint.png`), fullPage: true });
     }
@@ -185,7 +185,7 @@ async function main() {
   if (args.mode === 'plan') {
     results.push({ status: 'pass', label: 'manifest', detail: `${queue.length} production jobs validated.` });
     for (const item of queue) {
-      console.log(`${item.kind.padEnd(15)} ${item.characterId ?? item.roomId} / ${item.pose ?? item.phase} -> ${runtimeOutputFor(item)}`);
+      results.push({ status: 'planned', label: runtimeOutputFor(item), detail: item.kind });
     }
   } else if (args.mode === 'verify') {
     for (const item of queue) {
@@ -217,13 +217,14 @@ async function main() {
   };
 
   writeReports(runDir, report);
-  console.log(`\nRoom foreman status: ${report.status}`);
-  console.log(`Report: ${path.join(runDir, 'run-report.md')}`);
+  if (blocking) console.error('ROOM_FOREMAN_ATTENTION_REQUIRED');
+  else console.log('ROOM_FOREMAN_REPORT_WRITTEN');
 
   if (args.mode === 'verify' && blocking) process.exitCode = 1;
 }
 
 main().catch(error => {
-  console.error(`Room foreman failed: ${error instanceof Error ? error.message : String(error)}`);
+  // Do not surface provider, path, or credential-shaped content through CI logs.
+  console.error('ROOM_FOREMAN_EXECUTION_FAILED');
   process.exitCode = 1;
 });
