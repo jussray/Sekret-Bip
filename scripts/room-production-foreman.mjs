@@ -9,7 +9,7 @@ import { chromium } from '@playwright/test';
 const EXPECTED_NAV = ['Room', 'Pages', 'Calm', 'Circle', 'More'];
 const DEFAULT_MANIFEST = 'config/room-production.manifest.json';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const RUN_ID = /^\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}-\\d{3}Z$/;
+const RUN_ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/;
 const SAFE_NAME = /^[a-z][a-zA-Z0-9-]{0,63}$/;
 const TOOLS = ['canva', 'figma', 'leonardo', 'app'];
 const WORKSPACE_IMAGES = Object.freeze({
@@ -48,7 +48,7 @@ export function resolveManifestPath(requested) {
   assert(typeof requested === 'string' && requested.length > 0, 'Manifest path required.');
   const resolved = path.resolve(ROOT, requested);
   const relative = path.relative(ROOT, resolved).split(path.sep).join('/');
-  assert(/^config\\/room-production(?:\\.[a-z0-9-]+)?\\.json$/.test(relative),
+  assert(/^config\/room-production(?:\.[a-z0-9-]+)?\.json$/.test(relative),
     'Only repository-owned room-production manifests are allowed.');
   return safeProjectPath(relative);
 }
