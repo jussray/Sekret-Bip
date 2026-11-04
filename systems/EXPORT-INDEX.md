@@ -65,3 +65,30 @@ This directory is the exported copy of the portfolio's operating systems and ski
 
 - **`local-juss`** — held for review. It carries Ray's personal operating context; a redaction check runs before any hub copy is exported, and the full version stays with the personal set if it names family detail.
 - **Personal-context set (never exported to public repos):** `ray-fingerprint` and `tales-mode` stay in the workspace only, pending a private target on Ray's call. They are not in this batch and were not copied anywhere.
+
+## Security repair on review branch — canonical synchronization pending
+
+The original exported runtime receipt checker (Git blob
+ddc6968139be635f5c1e230fb6749c9ff5739fe3) accepted malformed
+VERIFIED claims without adequate evidence. A reproducible regression
+suite supplied eight failing/erroring cases before the repair; ten
+focused tests passed after the repair.
+
+For this review candidate, systems/skills/local-runtime-kernel/scripts/check_receipt.py
+has new expected Git blob 3c7d8e59452aac2592fd9e9d2ebccf58f57a4365,
+SHA-256 c6f5bd6b4899ec0c16ff20f85e7ef8d83e3d90d1a334dcd71e6aee65040b2938.
+The new regression test file has expected Git blob
+66d3cfc4fdfd74929eb8fab00d5a879d89473833,
+SHA-256 c4223d1b4f092b0fa999d3c61c476eef1dcd15a0bdca9591e40dda70f3259545.
+The required deployability job executes these tests and emits a bounded
+source-fingerprint/proof-cookie artifact. The proof cookie is a JSON audit
+record, never an HTTP Set-Cookie, and grants no merge or production
+authority. The project's zero-first-party-cookie policy is unchanged.
+
+**Source-of-truth limitation:** these are target-PR review fixes only; the
+canonical workspace source is not accessible to the current connected
+GitHub integration and has **not** been patched or independently verified.
+Reconcile the proposed code with that canonical version before accepting
+this exported artifact as current. No teen identity, device fingerprint,
+journal, voice, or sensitive user content is part of the proof artifact.
+
