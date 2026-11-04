@@ -223,7 +223,7 @@ async function main() {
   if (args.mode === 'verify' && blocking) process.exitCode = 1;
 }
 
-main().catch(error => {
+main().catch(() => {
   // Do not surface provider, path, or credential-shaped content through CI logs.
   console.error('ROOM_FOREMAN_EXECUTION_FAILED');
   process.exitCode = 1;
