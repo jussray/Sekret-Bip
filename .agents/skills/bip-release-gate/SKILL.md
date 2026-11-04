@@ -1,6 +1,10 @@
 # bip-release-gate
 
-Last reviewed: 2026-07-13
+## 5W1H operating contract
+
+Before planning, editing, or claiming completion, establish requester/owner, exact outcome/non-goals, repository/branch/environment/runtime/provider target, lifecycle/order/rollback, verified reason, and smallest safe implementation/proof.
+
+Last reviewed: 2026-08-20
 
 ## Trigger
 
@@ -8,39 +12,68 @@ Before any merge to `main`. Run this last, after task-specific review skills.
 
 ## Rule
 
-Discover the current release machinery from the repository. Do not rely on a remembered workflow list, deployment target, or dashboard value.
+Discover current release machinery from the repository and live provider evidence. Do not rely on a remembered workflow list, Worker name, route, binding, or dashboard value.
 
-Classify each possible gate as:
+Classify every possible gate as:
 
-- **REQUIRED** — must run and pass on the current head;
-- **NOT APPLICABLE** — explain why the changed paths and target do not require it;
-- **MANUAL GATE** — requires external verification that CI cannot prove.
+- **REQUIRED** — must run/pass on current head;
+- **NOT APPLICABLE** — explain why;
+- **MANUAL GATE** — requires external verification CI cannot prove.
 
-An untriggered workflow is not automatically passed. A green check from an older SHA is decorative nostalgia.
+An untriggered workflow is not automatically passed. A green check from an older SHA is not current evidence.
+
+## Attack 2000 falsification layer
+
+Attack 2000 is mandatory for merge, beta, controlled production mutation, and public-release decisions. It is an adversarial depth contract, not a literal claim that 2,000 tests executed.
+
+For every consequential release claim, record:
+
+- **CLAIM** — the exact thing being asserted;
+- **SUBJECT** — exact repository head, release target, runtime/provider identity, or other immutable proof subject;
+- **AUTHORITY** — who/what can authorize the transition and what that authority does not permit;
+- **EVIDENCE** — the current observations that support the claim;
+- **FALSIFIER** — the smallest observation that would force the claim to be withdrawn;
+- **RESULT** — PASS, HOLD, or FAIL;
+- **ROLLBACK** — the smallest safe reversal or forward-fix path.
+
+Attack the selected claim across the applicable truth planes rather than counting arbitrary test cases. At minimum, try to falsify with:
+
+- exact head or trusted base movement;
+- missing, pending, skipped, cancelled, or failed required checks;
+- same-name checks emitted by an untrusted app;
+- user-visible Playwright that did not actually execute when applicable;
+- production source/runtime identity mismatch;
+- Supabase migration-history, schema, RLS, or runtime contradiction;
+- Cloudflare Pages/Worker/provider readback contradiction;
+- stale evidence, stale continuity, or predecessor success being reused as current proof;
+- authority scope drift, replay, or a non-authorizing receipt being treated as permission;
+- rollback that cannot be attributed safely;
+- newer live evidence contradicting repository or historical evidence.
+
+Attack 2000 may only preserve or reduce confidence. It never manufactures merge, deploy, publication, spending, deletion, auth, or provider authority. A failed verification can be a successful Attack 2000 outcome when it correctly prevents a false success claim.
+
+The GitHub merge membrane implements the source-side Attack 2000 slice for exact-head machine evidence. Full beta/public-release Attack 2000 additionally requires the applicable provider, runtime, Supabase, browser, privacy, and rollback planes below.
 
 ## Step 0 — Discover, do not assume
 
-```bash
-find .github/workflows -maxdepth 1 -type f -print | sort
-git diff --name-only origin/main...HEAD
-git rev-parse HEAD
-```
-
-Read current workflow triggers, path filters, jobs, required secrets, concurrency, and branch conditions. When available, inspect branch protection and required checks.
+Inspect current workflows, diff, exact HEAD, branch protection, current `wrangler.toml`, active Worker/client contracts, and live provider evidence when deployment truth matters.
 
 Read:
 
 - `implementation-ledger.json`
 - `DEPLOYMENT.md`
+- `docs/CURRENT_STATUS.md`
 - `docs/CLOUDFLARE_OWNERSHIP.md`
+- `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md`
 - `docs/DEMO_READINESS_ENFORCEMENT.md`
 
-Canonical production targets:
+Durable production topology:
 
-- backend Worker: `sekret-backend`;
-- frontend Pages project: `sekret-bip`;
-- deployment authority: Cloudflare native Git integration from `main`;
-- release verification: GitHub Actions exact-release verifier, not a second upload path.
+- frontend Pages: `sekret-bip`;
+- stable public API origin: `api.sekretbip.net`, currently repository-configured to `sekret-backend`;
+- companion Worker lineage: `sekret`, founder-confirmed active, exact provider binding read back live;
+- preferred purpose split: `/api/sekret/*` delegated from `sekret-backend` to `sekret` through a Cloudflare Service Binding after explicit cutover proof;
+- deployment authority: Cloudflare native integration, with GitHub exact-release verification rather than a second normal upload path.
 
 ## Release gate checklist
 
@@ -49,8 +82,10 @@ Canonical production targets:
 Classify as one or more of:
 
 - app/UI;
-- backend Worker/API (`sekret-backend`);
-- web frontend/Cloudflare Pages (`sekret-bip`);
+- companion Worker/API (`sekret` purpose or `/api/sekret/*` contract);
+- public/platform Worker/API (`sekret-backend`);
+- Worker route/domain/Service Binding/build-trigger configuration;
+- web frontend/Pages (`sekret-bip`);
 - Supabase migration/RLS/database function;
 - Supabase Edge Function;
 - native dependency/config;
@@ -58,125 +93,120 @@ Classify as one or more of:
 - CI/tooling;
 - documentation/agent instructions.
 
-State the target: PR merge only, preview/beta, controlled production deployment, or public release.
+State target: PR merge only, preview/beta, controlled production mutation, or public release.
 
 ### 2. Applicable CI
 
-- [ ] Discover workflows from `.github/workflows/`.
-- [ ] Identify event and path filters that apply.
-- [ ] Confirm every required check ran on the current HEAD SHA and passed.
-- [ ] Confirm no required check is pending, stale, unexpectedly skipped, or attached to an older SHA.
-- [ ] Explain each NOT APPLICABLE workflow.
-- [ ] Confirm Implementation Evidence passes when architecture, roadmap, status, or agent-skill files changed.
-- [ ] Run Playwright when user-visible routes, privacy guardrails, deployment evidence, or public-surface isolation changed.
+- discover workflows and path/event filters;
+- confirm every required check ran on current exact head and passed;
+- explain every NOT APPLICABLE workflow;
+- run implementation/documentation truth gates when architecture/docs/skills change;
+- run Playwright for user-visible/runtime/privacy/release-evidence changes.
 
-### 3. Supabase migration and authorization safety
+A docs-only branch can still trigger provider builds if Cloudflare integration is misconfigured. Provider activity must be classified separately from code/doc applicability.
 
-When `supabase/`, security baselines, RLS, grants, or database functions changed:
+### 3. Supabase safety
 
-- [ ] compare repository migration history with the target project;
-- [ ] account for schema drift;
-- [ ] review ordering, dependencies, locks, backfills, indexes, and idempotency;
-- [ ] review `SECURITY DEFINER` search paths and execution grants;
-- [ ] run positive owner/role tests and negative anonymous/cross-user tests;
-- [ ] preserve a rollback or forward-fix strategy;
-- [ ] reconcile live migration versions and evidence back into the repository.
+When Supabase/security/RLS/grants/functions change, compare migration history with target project, review authorization/locking/idempotency, run positive/negative tests, preserve rollback/forward-fix, and record live evidence.
 
-If the target environment is unavailable, classify the proof as BLOCKED or MANUAL GATE. Do not pronounce it passed through interpretive dance.
+If target environment is unavailable, classify proof BLOCKED/MANUAL GATE.
 
 ### 4. Worker readiness
 
-When `worker/`, `wrangler.toml`, bindings, AI, TTS, or authenticated API behavior changed:
+When Worker source/config/bindings/AI/voice/auth behavior changes:
 
-- [ ] confirm Worker entry points compile;
-- [ ] confirm `wrangler.toml` names `sekret-backend`;
-- [ ] compare bindings with changed secret/config references;
-- [ ] confirm elevated credentials are not bundled or logged;
-- [ ] run `bip-worker-guardian`;
-- [ ] test authentication before protected data access;
-- [ ] test identity/style, Bridge, or safety boundaries affected by the change;
-- [ ] confirm rollout, telemetry, and rollback.
+- confirm relevant entry points compile;
+- confirm current public `wrangler.toml` identity unless intentionally changing it;
+- read back live `sekret-backend` and `sekret` provider state when relevant;
+- compare bindings with code/secret references;
+- keep elevated credentials out of clients and logs;
+- run `bip-worker-guardian`;
+- test auth before protected access;
+- test affected identity/style/Bridge/safety boundaries;
+- confirm rollout, telemetry, rollback.
 
-Use a real staging environment when one exists. Do not invent one when it does not.
+#### Special gate: companion Service Binding
 
-### 5. Pages and web readiness
+If adding/changing `sekret-backend -> sekret`:
 
-When Expo web, public routes, assets, or Pages deployment changed:
+- [ ] `sekret` exact provider identity/routes/version/build trigger known;
+- [ ] compatibility proven before activation;
+- [ ] `SUPABASE_SERVICE_ROLE_KEY` remains platform-owned;
+- [ ] companion telemetry least-privilege seam proven;
+- [ ] public client remains on `api.sekretbip.net` unless separately approved;
+- [ ] only `/api/sekret/*` delegates;
+- [ ] Bridge/email/platform routes stay local to backend;
+- [ ] provider binding read back after mutation;
+- [ ] exact companion release/version included in release packet;
+- [ ] old backend-local companion execution retained as rollback during first cutover;
+- [ ] production reply, voice, transcription, auth-denial, rate-limit, and trace journeys pass.
 
-- [ ] run the Expo web export;
-- [ ] run Playwright smoke and guardrail tests;
-- [ ] confirm Cloudflare native Git integration remains the production authority;
-- [ ] confirm the target Pages project is `sekret-bip`;
-- [ ] confirm the custom domain is attached to the canonical project;
-- [ ] confirm `EXPO_PUBLIC_BACKEND_URL` points to `sekret-backend`;
-- [ ] confirm no backend secret appears in the client bundle;
-- [ ] confirm the build writes a valid public `release.json` marker.
+### 5. Pages/web readiness
 
-Do not treat Worker deployment as proof that Pages deployed, or vice versa.
+When web/public routes/assets/Pages change:
+
+- run Expo web export and Playwright;
+- verify Pages project `sekret-bip` and custom domain;
+- verify `EXPO_PUBLIC_BACKEND_URL` remains the stable approved public origin (`https://api.sekretbip.net` under the current contract);
+- confirm no backend/companion secret appears in client bundle;
+- confirm build writes the canonical well-known release marker.
+
+Do not point the client directly at `sekret` simply because companion execution moves there internally.
 
 ### 6. Exact production evidence
 
-For deployment or release claims, verify the exact expected commit through:
+Before a Worker split, follow the exact-release contract in `DEPLOYMENT.md`: repository target, Pages marker, `sekret-backend` health/release identity, Supabase runtime, production Playwright, and applicable account/device proof.
 
-1. successful `Workers Builds: sekret-backend` check;
-2. deployed `release.json` matching the expected `main` SHA;
-3. successful Worker health endpoint;
-4. read-only production Playwright;
-5. retained GitHub Actions evidence artifact.
+After the companion binding activates, additionally verify:
 
-The retired Supabase `release-health` function is a JWT-protected HTTP 410 endpoint and must not be used as release evidence.
+1. exact `sekret-backend` public release;
+2. exact `sekret` companion release/version;
+3. live Cloudflare Service Binding readback;
+4. production companion paths executing on that version;
+5. Bridge/email/platform non-regression;
+6. retained rollback.
 
-### 7. Environment variables
+The retired Supabase `release-health` function is not release evidence.
 
-When configuration changed:
+### 7. Environment variables and secrets
 
-- [ ] compare code references with example/config files;
-- [ ] document and provision every new variable in the correct environment;
-- [ ] keep secrets out of source, logs, and public bundles;
-- [ ] confirm Expo public variables contain only intentionally public values;
-- [ ] confirm server-only authentication headers remain server-side.
+- compare code references with example/config files;
+- document/provision new variables/bindings in correct environment;
+- keep secrets out of source/logs/public bundles;
+- do not duplicate service-role credentials across Worker boundaries for convenience;
+- treat AI/voice secret relocation as a separately approved credential migration.
 
 ### 8. Expo/EAS readiness
 
-When native config, app identifiers, native modules, or release metadata changed:
-
-- [ ] confirm EAS profile and platform;
-- [ ] confirm version/build-number policy;
-- [ ] require a native build for native changes rather than OTA-only delivery;
-- [ ] test affected auth, route, storage, and privacy journeys.
-
-Documentation-only or server-only PRs do not require EAS unless repository policy says otherwise.
+For native changes, confirm EAS profile/platform/version policy and require native build when appropriate. Documentation-only/server-only PRs do not require EAS unless repository policy says otherwise.
 
 ### 9. Conditional product gates
 
-- [ ] Supabase/data boundary: privacy red-team and denial tests passed.
-- [ ] Worker endpoint: `bip-worker-guardian` passed.
-- [ ] AI/prompt/summary: AI review and Companion Lab passed.
-- [ ] User-facing copy: voice guard passed.
-- [ ] Parent/Bridge: controlled relationship and revocation proof is current.
-- [ ] Beta/release candidate: affected user journeys and legal checklist are complete.
-- [ ] L4: remains blocked unless authorization, deletion, provenance, retention, runtime use, rollout, and rollback are evidenced.
+- Supabase/data: privacy red-team and denial tests;
+- Worker endpoint/binding: `bip-worker-guardian`;
+- AI/prompt/summary: AI review + Companion Lab;
+- user copy: voice guard;
+- Parent/Bridge: controlled relationship/revocation proof;
+- beta/release: affected journeys/legal checklist;
+- L4: blocked until authorization/deletion/provenance/retention/runtime/rollout/rollback are evidenced.
 
 ### 10. Documentation reality
 
-When Markdown or agent skills changed:
+When Markdown/agent skills change:
 
-- [ ] current status matches `implementation-ledger.json`;
-- [ ] historical audits are labeled as snapshots;
-- [ ] old repository names and deployment targets are removed from active instructions;
-- [ ] integrated features are not described as verified or released;
-- [ ] resolved findings are not still labeled release-blocking;
-- [ ] remaining blockers are concrete and owned.
+- active docs agree on current routing vs target purpose;
+- historical audits remain labeled snapshots;
+- `sekret` is not mislabeled legacy/deletion target;
+- current repository routing is not falsely described as already service-bound;
+- integrated features are not called released without live proof;
+- remaining provider/binding unknowns stay UNKNOWN;
+- `node scripts/audit-documentation-truth.mjs` passes.
 
 ## Pass criteria
 
-Return `READY TO MERGE` only when:
+Return `READY TO MERGE` only when all applicable current-head checks/evidence pass and no known safety/privacy/migration/evidence/release blocker applies to the requested merge.
 
-- all applicable checks passed on the current head;
-- every non-applicable check has a defensible reason;
-- no known safety, privacy, migration, evidence, or release blocker applies to the requested merge.
-
-Return `READY TO DEPLOY` only after deployment-specific manual and exact-release gates are satisfied.
+Return `READY TO DEPLOY` only after deployment/provider manual gates and exact-release requirements are satisfied.
 
 ## Output
 
@@ -186,13 +216,10 @@ Return one of:
 - `READY TO DEPLOY`
 - `BLOCKED`
 
-Include:
+Include current head SHA, change classification/target, applicable checks, NOT APPLICABLE reasons, manual gates, and exact blocker.
 
-- current head SHA;
-- change classification and target;
-- applicable checks with status;
-- NOT APPLICABLE checks with reasons;
-- manual gates;
-- exact blocker file, workflow, or environment when blocked.
+Never recommend merging with a known failure. Never describe untriggered/skipped/stale/older-SHA checks as passed.
 
-Never recommend merging with a known failure. Never describe an untriggered, skipped, stale, or older-SHA check as passed.
+## Control Room evidence gate
+
+Local Control Room success is local evidence only. It does not merge, deploy, prove provider bindings, or satisfy exact-production verification. If GitHub jobs never execute steps, classify hosted evidence as BLOCKED and preserve local evidence without calling the head merge-ready.

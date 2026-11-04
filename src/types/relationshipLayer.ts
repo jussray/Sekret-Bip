@@ -1,5 +1,6 @@
 export type RelationshipFeature =
   | 'bridgeSummaries'
+  | 'bridgeLearning'
   | 'crewAccountability'
   | 'emotionalScrapbook'
   | 'companionMemory';

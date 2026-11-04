@@ -23,9 +23,15 @@ import {
   type CircleReactionKey,
   type PublicCircleFeedItem,
 } from '@/features/circle/circleRepository';
+import {
+  audienceLabel,
+  CIRCLE_AUDIENCES,
+} from '@/features/circle/audiencePolicy';
 import type { CirclePost } from '@/types';
 
 const HIDE_HEAVY_KEY = 'circle_hide_heavy_posts_v2';
+const OPEN_BIP_AUDIENCE = CIRCLE_AUDIENCES.open_bip;
+const OPEN_BIP_LABEL = audienceLabel('open_bip');
 const REACTIONS: Array<{ key: CircleReactionKey; emoji: string; label: string }> = [
   { key: 'felt', emoji: '💜', label: 'felt this' },
   { key: 'comfort', emoji: '☁️', label: 'comfort' },
@@ -167,16 +173,23 @@ export default function PublicCircleFeedV2() {
       </View>
 
       <View style={styles.composeCard}>
+        <View style={styles.audienceRow}>
+          <View style={styles.audiencePill} accessibilityLabel={`Audience: ${OPEN_BIP_LABEL}`}>
+            <Text style={styles.audiencePillText}>{OPEN_BIP_LABEL}</Text>
+          </View>
+          <Text style={styles.audienceHint}>inside Circle · faces stay hidden here</Text>
+        </View>
         <Text style={styles.composeLabel}>put something into the circle</Text>
         <TextInput
           value={draft}
           onChangeText={setDraft}
-          placeholder="say it here. no private names."
+          placeholder="say it here. keep private names out."
           placeholderTextColor="#695579"
           multiline
           maxLength={280}
           style={styles.input}
         />
+        <Text style={styles.audienceRule}>{OPEN_BIP_AUDIENCE.description}</Text>
         <View style={styles.composeFooter}>
           <Text style={styles.count}>{draft.length}/280</Text>
           <TouchableOpacity
@@ -301,6 +314,11 @@ const styles = StyleSheet.create({
   switchWrap: { alignItems: 'center', justifyContent: 'center' },
   switchLabel: { color: '#8f7aa6', fontSize: 9, marginBottom: 2 },
   composeCard: { borderRadius: 20, borderWidth: 1, borderColor: '#3d1a5e', backgroundColor: '#180a28', padding: 16, marginBottom: 12 },
+  audienceRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 10 },
+  audiencePill: { borderRadius: 999, borderWidth: 1, borderColor: '#6d28d966', backgroundColor: '#26103f', paddingHorizontal: 10, paddingVertical: 6 },
+  audiencePillText: { color: '#ddd6fe', fontSize: 11, fontWeight: '900' },
+  audienceHint: { color: '#806b98', fontSize: 10, fontWeight: '700' },
+  audienceRule: { color: '#806b98', fontSize: 10, lineHeight: 15, marginTop: 8 },
   composeLabel: { color: '#8f7aa6', fontSize: 11, fontWeight: '800', marginBottom: 10 },
   input: { minHeight: 76, borderRadius: 14, backgroundColor: '#100520', color: '#f0e6ff', padding: 12, fontSize: 15, lineHeight: 22, textAlignVertical: 'top' },
   composeFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 },

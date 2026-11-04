@@ -1,0 +1,2 @@
+-- Production receipt marker for canonical migration 20260827063000.
+-- Already applied to the linked Supabase project; no schema changes.

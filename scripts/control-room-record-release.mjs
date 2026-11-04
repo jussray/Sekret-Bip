@@ -1,6 +1,6 @@
 const reportOnly = process.env.CONTROL_ROOM_REPORT_ONLY === 'true';
 const url = process.env.SUPABASE_URL;
-const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 const sha = process.env.GITHUB_SHA || process.env.RELEASE_COMMIT_SHA;
 if (!sha) throw new Error('Release commit SHA is required.');
 

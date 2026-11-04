@@ -20,7 +20,7 @@ import type { CompanionId } from '@/features/sekret/companionEngine';
 const POLL_DELAY_MS = 2000;
 
 export function useSafetyCheck(
-  companionId: CompanionId = 'raylene',
+  companionId: CompanionId = 'suhana',
   isReady: boolean = true,
 ) {
   const [experience, setExperience] = useState<SafetyExperience | null>(null);

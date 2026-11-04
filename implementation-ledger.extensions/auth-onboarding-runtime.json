@@ -4,7 +4,8 @@
   "status": "contract",
   "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/451",
   "acceptanceCriteria": [
-    "Signed-out users can reach Splash and the age/account-side choice before permanent account creation or sign-in.",
+    "Signed-out users can reach Splash and the one-page age/account-side choice before permanent account creation or sign-in.",
+    "The one-page entry records age assurance metadata only and never stores raw ID images, selfies, videos, face scans, or full birth dates.",
     "Login, signup, email confirmation, and account restore wait for canonical profile, required consent, and verification facts before routing.",
     "Required Privacy Policy and Terms consent is explicit, persisted, auditable, and never inferred from continuing onboarding.",
     "One global own-row Realtime subscription refreshes account verification without duplicate screen subscriptions.",
@@ -13,22 +14,27 @@
   ],
   "contractPaths": [
     ".agents/skills/bip-auth-onboarding/SKILL.md",
+    "ONBOARDING.md",
     "config/mcp-skill-routing.json",
+    "src/features/onboarding/ageAssurance.ts",
     "src/services/auth/postAuthBootstrap.ts"
   ],
   "runtimePaths": [
     "app/(auth)/login.tsx",
     "app/(auth)/signup.tsx",
+    "app/(onboarding)/age.tsx",
     "app/(onboarding)/consent.tsx",
+    "app/(onboarding)/welcome.tsx",
     "src/context/VerificationContext.tsx"
   ],
   "testPaths": [
+    "test/age-assurance-model.test.mjs",
     "test/auth-onboarding-runtime.test.mjs",
     "test/parent-link-realtime.test.mjs",
     "scripts/verify-mcp-config.mjs"
   ],
   "verification": {
     "state": "not-run",
-    "evidence": "https://github.com/jussray/Sekret-Bip/pull/455"
+    "evidence": "https://github.com/jussray/Sekret-Bip/pull/544"
   }
 }

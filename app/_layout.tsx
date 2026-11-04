@@ -4,7 +4,9 @@ import { Analytics } from '@/components/shared/Analytics';
 import { NotificationBootstrap } from '@/components/shared/NotificationBootstrap';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import { VerificationProvider, useVerificationContext } from '@/context/VerificationContext';
+import { OnboardingProvider } from '@/context/OnboardingContext';
 import { installSekretBipGuardrailRuntime } from '@/config/visionGuardrails';
+import { isFounderPreviewEnabled } from '@/constants/founderPreview';
 import { decideRouteAccess } from '@/services/routeAccess';
 import { validateEnv } from '@/utils/env';
 import { getSupabase, isSupabaseConfigured } from '@/utils/supabase';
@@ -18,6 +20,7 @@ const SOCIAL_SEGMENTS = new Set(['circle', 'crew', 'bip-crew', 'discover']);
 const PUBLIC_ONBOARDING_SEGMENTS = new Set([
   'welcome',
   'age',
+  'parental-consent',
   'parent-splash',
   'parent-welcome',
 ]);
@@ -38,19 +41,16 @@ function RouteBoundary() {
     if (!sb) return;
 
     const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
-      if (session) return;
-      if (event === 'SIGNED_OUT') {
-        void (async () => {
-          try {
-            await clearPrivateAccountCache();
-            await clearProfileIdentityCache();
-          } finally {
-            router.replace('/(auth)/login');
-          }
-        })();
-        return;
-      }
-      router.replace('/(auth)/login');
+      if (session || event !== 'SIGNED_OUT') return;
+
+      void (async () => {
+        try {
+          await clearPrivateAccountCache();
+          await clearProfileIdentityCache();
+        } finally {
+          router.replace('/(auth)/login');
+        }
+      })();
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -70,6 +70,12 @@ function RouteBoundary() {
       }
       return;
     }
+
+    // Founder Preview is a development-only route-inspection mode. It may
+    // bypass onboarding/verification routing after the normal auth boundary,
+    // but it never grants a Supabase session, relationship, RLS permission,
+    // or screen-level data capability.
+    if (isFounderPreviewEnabled()) return;
 
     const effectiveUserSide = getDevSplitViewSideOverride() ?? userSide;
     if (!effectiveUserSide) return;
@@ -105,10 +111,15 @@ export default function RootLayout() {
   return (
     <VerificationProvider>
       <AppProvider>
-        <RouteBoundary />
-        <NotificationBootstrap />
-        <Analytics />
-        <Stack screenOptions={{ headerShown: false }} />
+        {/* OnboardingProvider sits inside AppProvider so it has access to
+            useAuth/useAppContext, but wraps everything below so all screens
+            can call useOnboarding() without prop-drilling. */}
+        <OnboardingProvider>
+          <RouteBoundary />
+          <NotificationBootstrap />
+          <Analytics />
+          <Stack screenOptions={{ headerShown: false }} />
+        </OnboardingProvider>
       </AppProvider>
     </VerificationProvider>
   );

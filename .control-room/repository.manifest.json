@@ -150,7 +150,7 @@
       "status": "active",
       "evidencePaths": [
         "src/utils/api.ts",
-        "src/services/worker/invokeWorker.ts",
+        "src/services/backend/sekretClient.ts",
         "worker/config/policy.ts",
         "app/(teen)/pages/[id].tsx",
         "test/supabase-worker-ai-reply-contract.test.mjs"
@@ -164,10 +164,38 @@
           "description": "The teen Pages conversation flow calls the companion API contract."
         },
         {
-          "id": "api-invokes-worker-adapter",
+          "id": "api-uses-typed-sekret-client",
           "path": "src/utils/api.ts",
-          "marker": "invokeWorker",
-          "description": "The API layer routes companion requests through the worker adapter."
+          "marker": "sekretClient.sendReply(request)",
+          "description": "The API layer routes companion requests through the current typed Worker client and Result contract."
+        }
+      ]
+    },
+    {
+      "id": "repository-truth-enforcement",
+      "description": "Inventories failure handling and branch state so false success and duplicate work cannot hide behind green-looking output.",
+      "status": "active",
+      "evidencePaths": [
+        "scripts/audit-failure-truth.mjs",
+        "scripts/audit-branch-hygiene.mjs",
+        "config/failure-truth-allowlist.json",
+        ".github/workflows/repository-truth-gate.yml",
+        "test/repository-truth-gates.test.mjs",
+        "implementation-ledger.extensions/repository-truth-enforcement.json"
+      ],
+      "requiredSignals": ["unit-tests", "runtime-truth"],
+      "usageAssertions": [
+        {
+          "id": "failure-truth-blocks-success-in-catch",
+          "path": "scripts/audit-failure-truth.mjs",
+          "marker": "suspicious-success",
+          "description": "The gate distinguishes suspicious success from truthful failure, fallback, recovery, and telemetry-only handling."
+        },
+        {
+          "id": "branch-gate-never-auto-deletes",
+          "path": "scripts/audit-branch-hygiene.mjs",
+          "marker": "deletionAuthorized: false",
+          "description": "The branch inventory records cleanup debt without silently deleting founder history."
         }
       ]
     }

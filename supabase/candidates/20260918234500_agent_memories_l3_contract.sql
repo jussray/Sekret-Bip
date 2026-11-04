@@ -1,0 +1,11 @@
+-- Non-authoritative pointer only.
+--
+-- The immutable reviewed L3 migration is:
+--   supabase/migrations/20260918234500_agent_memories_l3_contract.sql
+--
+-- This file contains no executable schema SQL and exists only to record the
+-- post-merge authority review that confirmed migration history must remain
+-- append-only. Production application remains gated by the canonical manual,
+-- exact-main Supabase workflow and current provider authority.
+--
+-- No schema changes.

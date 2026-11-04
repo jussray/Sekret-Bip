@@ -8,14 +8,17 @@ const scanner = read('scripts/control-room-ingest-github-failures.mjs');
 const docs = read('docs/CONTROL_ROOM_GITHUB_FAILURES.md');
 const ci = read('.github/workflows/ci.yml');
 const watcher = read('.github/workflows/control-room-github-failures.yml');
+const exactGate = read('.github/workflows/github-failure-routing-exact-head.yml');
 const packageJson = JSON.parse(read('package.json'));
 
-test('GitHub failures route through Founder Control Room first', () => {
+test('GitHub failures and skipped proof witnesses route through Founder Control Room first', () => {
   assert.match(scanner, /Founder Control Room is the first escalation surface whenever GitHub fails/);
   assert.match(scanner, /github_actions_/);
   assert.match(scanner, /upsert_control_room_issue/);
   assert.match(scanner, /audit_events/);
-  assert.match(docs, /Every GitHub failure must be checked against Founder Control Room first/);
+  assert.match(docs, /Every GitHub failure/);
+  assert.match(docs, /every skipped proof witness/i);
+  assert.match(docs, /must be checked against Founder Control Room first/);
 });
 
 test('runner-startup failures are not mislabeled as code regressions', () => {
@@ -58,7 +61,7 @@ test('scanner supports exact current runs and completed main push failures', () 
   assert.match(scanner, /run\.event === 'push'/);
 });
 
-test('CI and major workflow failures invoke the scanner automatically', () => {
+test('CI and major workflow failures invoke the scanner automatically without recursion', () => {
   assert.match(ci, /route-failure:/);
   assert.match(ci, /needs: \[lint, type-check, test, build, audit\]/);
   assert.match(ci, /CONTROL_ROOM_GITHUB_RUN_ID: \$\{\{ github\.run_id \}\}/);
@@ -70,6 +73,15 @@ test('CI and major workflow failures invoke the scanner automatically', () => {
   assert.match(watcher, /Implementation Evidence/);
   assert.match(watcher, /Playwright Smoke and Guardrails/);
   assert.match(watcher, /github\.event\.workflow_run\.id/);
+
+  const watchedWorkflowBlock = watcher.match(/workflows:\s*([\s\S]*?)\n\s*types:/)?.[1] || '';
+  assert.match(watchedWorkflowBlock, /^\s*- Founder Shield\s*$/m,
+    'Founder Shield security failures and skipped witnesses must enter the existing router');
+  assert.match(docs, /^- Founder Shield;$/m,
+    'documented watched workflows must include the security audit path');
+  assert.doesNotMatch(watchedWorkflowBlock, /Founder Control Room GitHub Failure Router/);
+  assert.doesNotMatch(watchedWorkflowBlock, /GitHub Failure Routing Exact-Head Gate/);
+  assert.match(exactGate, /select\(\.name != "GitHub Failure Routing Exact-Head Gate"\)/);
 });
 
 test('credentials stay server-side and out of issue metadata', () => {
@@ -91,4 +103,19 @@ test('scan and ingest commands are explicitly exposed', () => {
     packageJson.scripts['control-room:github-failures:ingest'],
     'CONTROL_ROOM_GITHUB_INGEST=1 node scripts/control-room-ingest-github-failures.mjs',
   );
+  assert.equal(
+    packageJson.scripts['test:github-failure-routing'],
+    'node --test test/control-room-github-failure-routing.test.mjs',
+  );
+});
+
+
+test('historical failure and skip rehearsals fail closed without making healthy PRs red', () => {
+  assert.match(exactGate, /echo "available=false" >> "\$GITHUB_OUTPUT"/);
+  assert.match(exactGate, /failure-rehearsal proof is unavailable and carries no authority/);
+  assert.match(exactGate, /skip-rehearsal proof is unavailable and carries no authority/);
+  assert.match(exactGate, /if: steps\.failed-run\.outputs\.available == 'true'/);
+  assert.match(exactGate, /if: steps\.skipped-run\.outputs\.available == 'true'/);
+  assert.doesNotMatch(exactGate, /test -n "\$run_id"/);
+  assert.doesNotMatch(exactGate, /test -n "\$head_sha"/);
 });

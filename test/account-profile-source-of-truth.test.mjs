@@ -19,7 +19,7 @@ const controlRoomScreen = read('src/screens/DevControlRoomScreen.tsx');
 const cleanup = read('src/features/identity/clearProfileIdentityCache.ts');
 const migration = read('supabase/migrations/20260711190000_account_profile_source_of_truth.sql');
 const reviewMigration = read('supabase/migrations/20260711194500_guardian_review_queue.sql');
-const guardianCommunityMigration = read('supabase/migrations/20260701020000_circle_v2_parent_community.sql');
+const guardianCommunityMigration = read('supabase/migrations/20260701174943_circle_v2_parent_community_guardian_access.sql');
 
 function between(source, start, end) {
   const startAt = source.indexOf(start);

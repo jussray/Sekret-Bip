@@ -1,4 +1,5 @@
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -10,6 +11,8 @@ from pydantic import BaseModel, Field
 app = FastAPI(title="Se'kret Bip Piper TTS")
 VOICE_DIR = Path(os.environ.get("PIPER_VOICE_DIR", "/voices"))
 API_TOKEN = os.environ.get("PIPER_API_TOKEN", "").strip()
+ALLOW_INSECURE_LOCAL = os.environ.get("PIPER_ALLOW_INSECURE_LOCAL", "").strip().lower() in {"1", "true", "yes"}
+VOICE_STEM = re.compile(r"[A-Za-z0-9_-]{1,80}\Z", re.ASCII)
 
 class SynthesisRequest(BaseModel):
     text: str = Field(min_length=1, max_length=4000)
@@ -17,16 +20,33 @@ class SynthesisRequest(BaseModel):
     format: str = "wav"
 
 def require_token(authorization: str | None) -> None:
-    if API_TOKEN and authorization != f"Bearer {API_TOKEN}":
+    if not API_TOKEN:
+        if ALLOW_INSECURE_LOCAL:
+            return
+        raise HTTPException(status_code=503, detail="Piper service authentication is not configured")
+    if authorization != f"Bearer {API_TOKEN}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 def resolve_model(voice: str) -> Path:
-    safe_voice = "".join(ch for ch in voice if ch.isalnum() or ch in {"-", "_"})
-    model = VOICE_DIR / f"{safe_voice}.onnx"
-    config = VOICE_DIR / f"{safe_voice}.onnx.json"
-    if not model.is_file() or not config.is_file():
-        raise HTTPException(status_code=404, detail=f"Voice '{safe_voice}' is not installed")
-    return model
+    # Do not normalize untrusted model identifiers into another installed voice.
+    if not VOICE_STEM.fullmatch(voice):
+        raise HTTPException(status_code=400, detail="Invalid voice identifier")
+
+    voice_root = VOICE_DIR.resolve()
+    # Select from installed files, rather than joining untrusted input to a path.
+    # Refuse symlinks that resolve outside the configured voice directory.
+    for model in VOICE_DIR.glob("*.onnx"):
+        if model.stem != voice:
+            continue
+        config = model.with_name(model.name + ".json")
+        if (
+            model.is_file()
+            and config.is_file()
+            and model.resolve().is_relative_to(voice_root)
+            and config.resolve().is_relative_to(voice_root)
+        ):
+            return model
+    raise HTTPException(status_code=404, detail="Voice is not installed")
 
 @app.get("/health")
 def health() -> dict[str, object]:

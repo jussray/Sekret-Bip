@@ -65,12 +65,16 @@ export default function ParentWelcome() {
           style={styles.btn}
           activeOpacity={0.85}
           onPress={() => router.push('/(auth)/signup?side=parent' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="Create my Parent account"
         >
           <Text style={styles.btnText}>Create my Parent account →</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.signIn}
           onPress={() => router.push('/(auth)/login?side=parent' as never)}
+          accessibilityRole="button"
+          accessibilityLabel="I already have an account"
         >
           <Text style={styles.signInText}>I already have an account</Text>
         </TouchableOpacity>

@@ -5,6 +5,7 @@ These files contain evidence-ranked opportunity research. They do **not** change
 ## Current research
 
 - [`../industry-signals/mobile-dev-under-the-radar-2026.md`](../industry-signals/mobile-dev-under-the-radar-2026.md) — canonical ten-trend mobile-development brief, product opportunities, evidence strength, and OODA priorities
+- [`VOICE_RLS_VISUAL_INTAKE_2026-07-17.md`](VOICE_RLS_VISUAL_INTAKE_2026-07-17.md) — repository-truth reconciliation of the uploaded voice architecture, SQL/RLS templates, engineering audit, and visual concept boards, with explicit adopt / reframe / reject decisions
 
 ## Promotion path
 

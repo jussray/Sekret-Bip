@@ -1,0 +1,100 @@
+name: CodeQL PR Alert Proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'worker/**'
+      - 'security/**'
+      - 'public/_headers'
+      - 'wrangler.toml'
+      - '.dev.vars.example'
+      - 'scripts/verify-firewall-v10.mjs'
+      - 'scripts/codeql-pr-alert-proof.mjs'
+      - 'scripts/control-room-test-ledger.mjs'
+      - 'test/worker-auth.test.mjs'
+      - 'test/codeql-pr-alert-proof.test.mjs'
+      - 'test/control-room-test-ledger.test.mjs'
+      - 'test/cloudflare-worker-consolidation.test.mjs'
+      - '.github/workflows/founder-shield.yml'
+      - '.github/workflows/product-design-playwright-proof.yml'
+      - '.github/workflows/codeql-pr-alert-proof.yml'
+      - '.github/workflows/pr-continuity.yml'
+
+permissions:
+  contents: read
+  actions: read
+  security-events: read
+
+concurrency:
+  group: codeql-pr-alert-proof-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  CODEQL_WAIVER_PATH: security/codeql-local-waivers.json
+
+jobs:
+  local-codeql:
+    name: Local CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - actions
+          - javascript-typescript
+          - python
+
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\nlanguage=%s\n' "$EXPECTED_HEAD_SHA" "$actual" "${{ matrix.language }}"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node for proof contracts
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+
+      - name: Verify local CodeQL proof contract
+        run: node --test test/codeql-pr-alert-proof.test.mjs
+
+      - name: Initialize local CodeQL security queries
+        uses: github/codeql-action/init@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended
+
+      - name: Analyze locally without Code Scanning upload
+        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd
+        with:
+          upload: never
+          upload-database: false
+          output: artifacts/codeql-local/${{ matrix.language }}/sarif
+
+      - name: Enforce local CodeQL SARIF proof
+        env:
+          CODEQL_LANGUAGE: ${{ matrix.language }}
+          CODEQL_SARIF_DIR: artifacts/codeql-local/${{ matrix.language }}/sarif
+          EVIDENCE_DIR: artifacts/codeql-local/${{ matrix.language }}/evidence
+        run: node scripts/codeql-pr-alert-proof.mjs
+
+      - name: Upload local CodeQL evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: codeql-local-${{ matrix.language }}-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/codeql-local/${{ matrix.language }}
+          if-no-files-found: error
+          retention-days: 30

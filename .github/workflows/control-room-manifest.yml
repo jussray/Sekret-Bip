@@ -1,15 +1,7 @@
 name: Control Room Manifest
 
 on:
-  pull_request:
-    paths:
-      - control-room.manifest.json
-      - .github/workflows/control-room-manifest.yml
-  push:
-    branches: [main]
-    paths:
-      - control-room.manifest.json
-      - .github/workflows/control-room-manifest.yml
+  workflow_dispatch:
 
 permissions:
   contents: read

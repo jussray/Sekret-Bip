@@ -11,7 +11,7 @@ test('parent invite redemption uses the protected RPC', async () => {
 });
 
 test('approval migration atomically activates the link and verifies the teen', async () => {
-  const source = await read('supabase/migrations/20260630001000_account_verification_parent_approval.sql');
+  const source = await read('supabase/migrations/20260630022018_limited_mode_parent_invite_transition.sql');
   assert.match(source, /status = 'active'/);
   assert.match(source, /'VERIFIED_TEEN'/);
   assert.match(source, /parent_link_state = 'active'/);

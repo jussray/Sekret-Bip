@@ -1,26 +1,23 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
+import { resolvePlaywrightExecutablePath } from './scripts/playwright-executable.mjs';
 
 const PORT = 4173;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
-const sandboxChromium = '/opt/pw-browsers/chromium';
-const executablePath =
-  process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ||
-  (fs.existsSync(sandboxChromium) ? sandboxChromium : undefined);
+const executablePath = resolvePlaywrightExecutablePath();
 const artifactDir = process.env.PLAYWRIGHT_ARTIFACT_DIR
   ? path.resolve(process.env.PLAYWRIGHT_ARTIFACT_DIR)
   : null;
+const controlRoomSkipReporter = path.resolve('./scripts/control-room-playwright-skip-reporter.mjs');
 
 export default defineConfig({
   testDir: './e2e',
-  // Production smoke requires real Supabase config and runs only through
-  // playwright.production.config.ts. Room production specs require the
-  // founder-preview environment defined by playwright.room.config.ts.
-  // Neither suite belongs in the default blank-Supabase development run.
+  // Room production specs run in playwright.room.config.ts, not the default suite.
   testIgnore: [
-    '**/production-smoke.spec.ts',
     '**/rooms/**',
+    '**/production-smoke.spec.ts',
+    '**/production-password-recovery.spec.ts',
+    '**/production-auth-reachability.spec.ts',
   ],
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
@@ -31,10 +28,11 @@ export default defineConfig({
         ['line'],
         ['json', { outputFile: path.join(artifactDir, 'results.json') }],
         ['html', { open: 'never', outputFolder: path.join(artifactDir, 'html') }],
+        [controlRoomSkipReporter],
       ]
     : process.env.CI
-      ? [['line'], ['html', { open: 'never' }]]
-      : 'html',
+      ? [['line'], ['html', { open: 'never' }], [controlRoomSkipReporter]]
+      : [['html'], [controlRoomSkipReporter]],
   outputDir: artifactDir ? path.join(artifactDir, 'test-results') : undefined,
   use: {
     baseURL: BASE_URL,

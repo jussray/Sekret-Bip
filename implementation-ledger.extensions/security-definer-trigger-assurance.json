@@ -1,0 +1,23 @@
+{
+  "id": "security-definer-trigger-assurance",
+  "name": "SECURITY DEFINER trigger assurance",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/399",
+  "acceptanceCriteria": [
+    "Repository migrations produce a reviewed inventory of every application-owned SECURITY DEFINER trigger function and effective trigger attachment, including ordered CREATE, ALTER, DROP, GRANT, and REVOKE semantics.",
+    "The live Supabase catalog is compared read-only with repository truth and any live-only or repository-only function, trigger, ACL, search_path, or wiring difference is recorded as unresolved drift.",
+    "High-risk trigger behavior is not marked verified until external effects are safely stubbed or isolated and rollback-contained owner, cross-user, anonymous, idempotency, and cleanup probes pass with zero retained synthetic rows."
+  ],
+  "contractPaths": [
+    "SPRINT.md",
+    "security/supabase-trigger-baseline.json",
+    "supabase/probes/security_definer_trigger_catalog_phase1.sql"
+  ],
+  "testPaths": [
+    "test/supabase-trigger-structure.test.mjs"
+  ],
+  "verification": {
+    "state": "partial",
+    "evidence": "Read-only production pg_catalog observation recorded 11 application-owned SECURITY DEFINER trigger functions and 14 attachments. Repository structural enforcement is under exact-head CI. Behavioral probes remain intentionally unverified because pg_net and other external effects are not yet isolated."
+  }
+}

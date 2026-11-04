@@ -16,11 +16,15 @@ import {
 import {
   getConversationPhase,
   isArrivalMessage,
-  keepSekretReply,
+  guardSekretReply,
   getSekretFallback,
   buildConversationPhaseInstruction,
   type ConversationPhase,
 } from '../../../services/sekretVoice';
+import {
+  getLocalSafetyFallback,
+  shouldBypassReplyGuard,
+} from '../../../services/sekretSafety';
 
 export interface ChatMessage {
   id: string;
@@ -86,14 +90,20 @@ function localFallback(
   const reset = /\b(failed|fell off|gave up|stopped|missed|behind|procrastinat)\w*\b/.test(lower);
   const mirror = mayMirrorProfanity(relationship);
 
+  if (personalityId === 'parentCoach') {
+    if (angry) return "Let's slow this down before anyone reacts. What happened right before things escalated?";
+    if (sad) return "That sounds hard for both of you. What happened, and what have you already tried?";
+    return 'Start with what happened at home and what you want to handle differently.';
+  }
+
   if (isShortContinuation) {
-    if (personalityId === 'rylane') return "Aight, I'm here. Talk.";
+    if (personalityId === 'rylane' || (personalityId as string) === 'sy') return "Aight, I'm here. Talk.";
     if (personalityId === 'cloud') return "Hey. No pressure — whatever you want to say, or nothing at all.";
     if (personalityId === 'night') return 'Still here. No rush.';
     return 'Hey! Random or did something actually happen?';
   }
 
-  if (personalityId === 'rylane') {
+  if (personalityId === 'rylane' || (personalityId as string) === 'sy') {
     if (angry) return mirror
       ? 'Yeah, that shit would set anybody off. Before you move on it, what line got crossed?'
       : 'Yeah, that would set anybody off. Before you move on it, what line got crossed?';
@@ -178,15 +188,14 @@ export async function sendMessage(
               : context === 'selfDiscovery' ? 'selfDiscovery'
                 : context === 'parentCoach' ? 'parentCoach'
                   : 'journal');
+  const localSafetyFallback = getLocalSafetyFallback(text);
 
   if (!WORKER_BASE_URL) {
-    const fallbackText = personalityId === 'parentCoach'
-      ? "Hey. Glad you're here. What's going on at home?"
-      : localFallback(personalityId, text, learnedRelationship);
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
     if (__DEV__) {
       console.warn(
         '[sendMessage] No EXPO_PUBLIC_BACKEND_URL set — using local fallback.',
-        { companion: personalityId, surface: normalizedSurface, userText: text },
+        { companion: personalityId, surface: normalizedSurface, userTextLength: text.length },
       );
     }
     return {
@@ -204,7 +213,7 @@ export async function sendMessage(
 
   const payload: CompanionReplyRequest = {
     userText: text,
-    characterId: personalityId === 'oracle' ? 'sekret' : personalityId,
+    characterId: personalityId === 'oracle' ? 'sekret' : personalityId === 'raylene' ? 'suhana' : personalityId === 'rylane' ? 'sy' : personalityId,
     surface: normalizedSurface ?? 'journal',
     mood,
     history: workerHistory,
@@ -239,7 +248,7 @@ export async function sendMessage(
   if (!result.ok) {
     const reason = `${result.error.code}${result.error.status ? ` (${result.error.status})` : ''}`;
     console.error('[sendMessage] Worker request failed:', reason, result.error.traceId ?? 'no-trace');
-    const fallbackText = localFallback(personalityId, text, learnedRelationship);
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
     return {
       reply: fallbackText,
       replySource: 'local-fallback',
@@ -251,7 +260,7 @@ export async function sendMessage(
   const data = result.data;
   const rawReply = data.reply ?? '';
   if (!rawReply) {
-    const fallbackText = localFallback(personalityId, text, learnedRelationship);
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
     return {
       reply: fallbackText,
       replySource: 'local-fallback',
@@ -260,15 +269,44 @@ export async function sendMessage(
     };
   }
 
-  const sekretFallback = getSekretFallback(personalityId, text);
-  const guardedReply = keepSekretReply(rawReply, sekretFallback);
-  const guardBlocked = guardedReply !== rawReply.trim();
+  const isParentCoach = personalityId === 'parentCoach';
+  const sekretFallback = localSafetyFallback ?? (isParentCoach
+    ? localFallback(personalityId, text, learnedRelationship)
+    : getSekretFallback(personalityId, text));
 
-  if (__DEV__ && guardBlocked) {
+  // Teen-companion voices reject em/en dashes as an AI tell. Parent Coach may
+  // use those marks naturally, so remove dash separators only for evaluation.
+  // Collapsing them to whitespace keeps blocked word sequences contiguous;
+  // inserting a hyphen here could let a phrase such as “I'm here to support
+  // you” evade the shared guard.
+  const guardInput = isParentCoach
+    ? rawReply.replace(/\s*(?:—|–|--)\s*/g, ' ').replace(/\s+/g, ' ').trim()
+    : rawReply;
+  const guardBypass = shouldBypassReplyGuard(rawReply, data.safetyFlag);
+  const { reply: guardedCandidate, blocked: guardBlocked } = guardBypass.bypass
+    ? { reply: rawReply.trim(), blocked: false }
+    : guardSekretReply(guardInput, sekretFallback);
+  const guardedReply = guardBypass.bypass
+    ? rawReply.trim()
+    : isParentCoach && !guardBlocked
+      ? rawReply.trim()
+      : guardedCandidate;
+  const guardSubstituted = guardBlocked && !guardBypass.bypass;
+  const safetyBackstopTriggered = guardBypass.reason === 'crisis-resource-backstop';
+
+  if (__DEV__ && guardSubstituted) {
     console.warn('[sendMessage] keepSekretReply blocked Worker reply — substituted character fallback.', {
       companion: personalityId,
-      blocked: rawReply.slice(0, 80),
-      substituted: guardedReply.slice(0, 80),
+      blockedReplyLength: rawReply.length,
+      substitutedReplyLength: guardedReply.length,
+      traceId: data.traceId ?? result.meta.traceId,
+    });
+  }
+
+  if (__DEV__ && safetyBackstopTriggered) {
+    console.warn('[sendMessage] crisis-resource backstop bypassed reply guard because safetyFlag was missing.', {
+      companion: personalityId,
+      surface: normalizedSurface,
       traceId: data.traceId ?? result.meta.traceId,
     });
   }
@@ -282,7 +320,9 @@ export async function sendMessage(
       surface: normalizedSurface,
       reply_source: data.replySource ?? 'worker',
       history_length: historyLength,
-      fallback_used: result.meta.fallbackUsed,
+      fallback_used: result.meta.fallbackUsed || guardSubstituted,
+      reply_guard_substituted: guardSubstituted,
+      safety_resource_backstop: safetyBackstopTriggered,
       trace_id: data.traceId ?? result.meta.traceId ?? null,
       avatar_state: data.avatarState ?? null,
     },
@@ -290,9 +330,11 @@ export async function sendMessage(
 
   return {
     reply: guardedReply,
-    replySource: data.safetyFlag ? 'safety' : 'worker',
-    fallbackUsed: result.meta.fallbackUsed,
-    fallbackReason: result.meta.fallbackUsed ? 'Worker served fallback response' : null,
+    replySource: guardBypass.bypass ? 'safety' : guardSubstituted ? 'local-fallback' : 'worker',
+    fallbackUsed: result.meta.fallbackUsed || guardSubstituted,
+    fallbackReason: guardSubstituted
+      ? 'Reply guard replaced Worker reply with character fallback'
+      : result.meta.fallbackUsed ? 'Worker served fallback response' : null,
   };
 }
 

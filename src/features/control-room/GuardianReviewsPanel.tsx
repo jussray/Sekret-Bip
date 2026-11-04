@@ -9,8 +9,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { getSupabase } from '@/utils/supabase';
 import { getCurrentFounderProfile, isFounderProfile } from '@/services/founderAudit';
+import { getSupabase } from '@/utils/supabase';
 
 type GuardianReviewRow = {
   target_user_id: string;
@@ -20,6 +20,11 @@ type GuardianReviewRow = {
   verification_reason: string | null;
   submitted_at: string;
 };
+
+type ReviewGateState =
+  | { phase: 'idle' }
+  | { phase: 'review'; row: GuardianReviewRow; approve: boolean; note: string }
+  | { phase: 'confirm'; row: GuardianReviewRow; approve: boolean; note: string };
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -31,9 +36,9 @@ export default function GuardianReviewsPanel() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [notes, setNotes] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [authorized, setAuthorized] = useState(false);
+  const [gate, setGate] = useState<ReviewGateState>({ phase: 'idle' });
 
   const load = useCallback(async () => {
     setError(null);
@@ -76,29 +81,49 @@ export default function GuardianReviewsPanel() {
     }
   }
 
-  async function decide(row: GuardianReviewRow, approve: boolean) {
+  function openGate(row: GuardianReviewRow, approve: boolean) {
+    setError(null);
+    setGate({ phase: 'review', row, approve, note: '' });
+  }
+
+  function updateGateNote(note: string) {
+    if (gate.phase === 'idle') return;
+    setGate({ ...gate, note });
+  }
+
+  function advanceToConfirmation() {
+    if (gate.phase !== 'review') return;
+    if (!gate.approve && !gate.note.trim()) {
+      setError('A reason is required before rejecting a guardian review.');
+      return;
+    }
+    setError(null);
+    setGate({ ...gate, phase: 'confirm' });
+  }
+
+  async function applyDecision() {
+    if (gate.phase !== 'confirm' || busyId) return;
+
     const supabase = getSupabase();
-    if (!supabase || busyId) return;
+    if (!supabase) {
+      setError('Supabase is not configured.');
+      return;
+    }
+
+    const { row, approve, note } = gate;
     setBusyId(row.target_user_id);
     setError(null);
+
     try {
-      const reason = notes[row.target_user_id]?.trim() || null;
-      if (!approve && !reason) {
-        setError('Add a reason before rejecting a guardian review.');
-        return;
-      }
       const { error: reviewError } = await supabase.rpc('review_guardian_verification', {
         p_target_user_id: row.target_user_id,
         p_approve: approve,
-        p_reason: reason,
+        p_reason: note.trim() || null,
       });
       if (reviewError) throw reviewError;
-      setNotes(current => {
-        const next = { ...current };
-        delete next[row.target_user_id];
-        return next;
-      });
+
       await load();
+      setGate({ phase: 'idle' });
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to review this guardian account.');
     } finally {
@@ -118,6 +143,111 @@ export default function GuardianReviewsPanel() {
     );
   }
 
+  if (gate.phase !== 'idle') {
+    const busy = busyId === gate.row.target_user_id;
+    const isConfirming = gate.phase === 'confirm';
+
+    return (
+      <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+        <Text style={styles.kicker}>{isConfirming ? 'CONFIRM LIVE RPC' : 'REVIEW DECISION'}</Text>
+        <Text style={styles.title}>
+          {gate.approve ? 'Approve this guardian account?' : 'Reject this guardian account?'}
+        </Text>
+        <Text style={styles.body}>
+          This submits the existing live guardian-review RPC only after confirmation. It changes guardian verification state and writes a review record. It does not create a parent–teen link or grant access to teen private content.
+        </Text>
+
+        <View style={styles.blastCard}>
+          <Text style={styles.blastTitle}>Verified blast radius</Text>
+          <Text style={styles.blastItem}>• Updates this completed parent account's guardian verification state</Text>
+          <Text style={styles.blastItem}>• Writes the reviewer, decision, reason, and timestamp to the guardian review record</Text>
+          <Text style={styles.blastNot}>• Does not create parent_link data</Text>
+          <Text style={styles.blastNot}>• Does not expose journal, voice note, companion chat, or private source content</Text>
+        </View>
+
+        <View style={styles.reviewTarget}>
+          <Text style={styles.name}>{gate.row.private_display_name || 'Unnamed guardian'}</Text>
+          <Text style={styles.email}>{gate.row.email || 'No email available'}</Text>
+          <Text style={styles.meta}>Submitted {formatDate(gate.row.submitted_at)}</Text>
+          {gate.row.verification_reason ? (
+            <Text style={styles.meta}>Stated reason: {gate.row.verification_reason}</Text>
+          ) : null}
+        </View>
+
+        {!isConfirming ? (
+          <>
+            <Text style={styles.fieldLabel}>
+              {gate.approve ? 'Decision note (optional)' : 'Rejection reason (required)'}
+            </Text>
+            <TextInput
+              value={gate.note}
+              onChangeText={updateGateNote}
+              placeholder={gate.approve ? 'Optional review note' : 'State the reason for rejection'}
+              placeholderTextColor="#625b72"
+              style={styles.input}
+              multiline
+              maxLength={500}
+            />
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={[styles.button, styles.ghost]}
+                onPress={() => setGate({ phase: 'idle' })}
+              >
+                <Text style={styles.ghostText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.button,
+                  styles.planNext,
+                  !gate.approve && !gate.note.trim() && styles.buttonDisabled,
+                ]}
+                disabled={!gate.approve && !gate.note.trim()}
+                onPress={advanceToConfirmation}
+              >
+                <Text style={styles.planNextText}>Review final action</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <View style={styles.notePreview}>
+              <Text style={styles.fieldLabel}>DECISION NOTE</Text>
+              <Text style={styles.body}>{gate.note.trim() || 'No optional note provided.'}</Text>
+            </View>
+            <View style={styles.actions}>
+              <TouchableOpacity
+                disabled={busy}
+                style={[styles.button, styles.ghost, busy && styles.buttonDisabled]}
+                onPress={() => setGate({ ...gate, phase: 'review' })}
+              >
+                <Text style={styles.ghostText}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={busy}
+                style={[
+                  styles.button,
+                  gate.approve ? styles.approve : styles.reject,
+                  busy && styles.buttonDisabled,
+                ]}
+                onPress={() => void applyDecision()}
+              >
+                {busy ? (
+                  <ActivityIndicator color={gate.approve ? '#07140e' : '#fda4af'} />
+                ) : (
+                  <Text style={gate.approve ? styles.approveText : styles.rejectText}>
+                    {gate.approve ? 'Confirm approve' : 'Confirm reject'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+
+        {error ? <Text style={styles.error}>{error}</Text> : null}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView
       style={styles.root}
@@ -127,7 +257,7 @@ export default function GuardianReviewsPanel() {
       <Text style={styles.kicker}>GUARDIAN REVIEW</Text>
       <Text style={styles.title}>Verify adults without touching teen consent.</Text>
       <Text style={styles.body}>
-        Approval unlocks guardian-only Parent surfaces. It does not create a parent link or expose any teen journal, voice note, or private source.
+        Approval unlocks guardian-only Parent surfaces. It does not create a parent link or expose any teen journal, voice note, companion chat, or private source.
       </Text>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -137,7 +267,7 @@ export default function GuardianReviewsPanel() {
           <Text style={styles.emptyTitle}>Queue clear</Text>
           <Text style={styles.muted}>No completed Parent accounts are awaiting review.</Text>
         </View>
-      ) : rows.map(row => {
+      ) : rows.map((row) => {
         const busy = busyId === row.target_user_id;
         return (
           <View key={row.target_user_id} style={styles.card}>
@@ -150,21 +280,20 @@ export default function GuardianReviewsPanel() {
             </View>
             <Text style={styles.meta}>Submitted {formatDate(row.submitted_at)}</Text>
             {row.verification_reason ? <Text style={styles.meta}>Reason: {row.verification_reason}</Text> : null}
-            <TextInput
-              value={notes[row.target_user_id] ?? ''}
-              onChangeText={value => setNotes(current => ({ ...current, [row.target_user_id]: value }))}
-              placeholder="Decision note, required for rejection"
-              placeholderTextColor="#625b72"
-              style={styles.input}
-              multiline
-              maxLength={500}
-            />
             <View style={styles.actions}>
-              <TouchableOpacity disabled={busy} style={[styles.button, styles.reject]} onPress={() => void decide(row, false)}>
-                <Text style={styles.rejectText}>Reject</Text>
+              <TouchableOpacity
+                disabled={busy}
+                style={[styles.button, styles.reject, busy && styles.buttonDisabled]}
+                onPress={() => openGate(row, false)}
+              >
+                <Text style={styles.rejectText}>Review rejection</Text>
               </TouchableOpacity>
-              <TouchableOpacity disabled={busy} style={[styles.button, styles.approve]} onPress={() => void decide(row, true)}>
-                {busy ? <ActivityIndicator color="#07140e" /> : <Text style={styles.approveText}>Approve guardian</Text>}
+              <TouchableOpacity
+                disabled={busy}
+                style={[styles.button, styles.approve, busy && styles.buttonDisabled]}
+                onPress={() => openGate(row, true)}
+              >
+                <Text style={styles.approveText}>Review approval</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -180,9 +309,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: '#080611', alignItems: 'center', justifyContent: 'center', padding: 28 },
   locked: { color: '#c4b5fd', fontSize: 15, lineHeight: 22, textAlign: 'center' },
   kicker: { color: '#a78bfa', fontSize: 10, fontWeight: '900', letterSpacing: 2.3, marginBottom: 10 },
-  title: { color: '#fff', fontSize: 28, lineHeight: 35, fontWeight: '900', marginBottom: 12 },
+  title: { color: '#fff', fontSize: 27, lineHeight: 34, fontWeight: '900', marginBottom: 12 },
   body: { color: '#aaa1b8', fontSize: 13, lineHeight: 20, marginBottom: 20 },
-  error: { color: '#fca5a5', fontSize: 13, lineHeight: 19, marginBottom: 14 },
+  error: { color: '#fca5a5', fontSize: 13, lineHeight: 19, marginTop: 14 },
   empty: { borderWidth: 1, borderColor: '#2a2436', borderRadius: 20, padding: 22, backgroundColor: '#0d0a15' },
   emptyTitle: { color: '#fff', fontSize: 17, fontWeight: '900', marginBottom: 6 },
   muted: { color: '#7c7489', fontSize: 12, lineHeight: 18 },
@@ -193,11 +322,23 @@ const styles = StyleSheet.create({
   email: { color: '#aaa1b8', fontSize: 12, marginTop: 4 },
   state: { color: '#fbbf24', fontSize: 9, fontWeight: '900', letterSpacing: 1.2 },
   meta: { color: '#7c7489', fontSize: 11, lineHeight: 17, marginTop: 8 },
-  input: { minHeight: 72, borderRadius: 14, borderWidth: 1, borderColor: '#2f293c', color: '#fff', backgroundColor: '#080611', padding: 12, marginTop: 14, textAlignVertical: 'top' },
-  actions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  fieldLabel: { color: '#8f899e', fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 7 },
+  input: { minHeight: 88, borderRadius: 14, borderWidth: 1, borderColor: '#2f293c', color: '#fff', backgroundColor: '#080611', padding: 12, textAlignVertical: 'top' },
+  actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   button: { flex: 1, minHeight: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  buttonDisabled: { opacity: 0.5 },
   reject: { borderWidth: 1, borderColor: '#fb718566', backgroundColor: '#fb718514' },
   approve: { backgroundColor: '#6ee7b7' },
+  ghost: { borderWidth: 1, borderColor: '#3b3448', backgroundColor: '#0d0a15' },
+  planNext: { backgroundColor: '#6d28d9' },
   rejectText: { color: '#fda4af', fontSize: 13, fontWeight: '900' },
   approveText: { color: '#07140e', fontSize: 13, fontWeight: '900' },
+  ghostText: { color: '#c4b5fd', fontSize: 13, fontWeight: '900' },
+  planNextText: { color: '#fff', fontSize: 13, fontWeight: '900' },
+  blastCard: { borderRadius: 18, borderWidth: 1, borderColor: '#3b3448', backgroundColor: '#0d0a15', padding: 16, marginBottom: 18 },
+  blastTitle: { color: '#fff', fontSize: 14, fontWeight: '900', marginBottom: 10 },
+  blastItem: { color: '#a7f3d0', fontSize: 12, lineHeight: 19, marginBottom: 4 },
+  blastNot: { color: '#aaa1b8', fontSize: 12, lineHeight: 19, marginBottom: 4 },
+  reviewTarget: { borderRadius: 18, borderWidth: 1, borderColor: '#2a2436', backgroundColor: '#0d0a15', padding: 16, marginBottom: 18 },
+  notePreview: { borderRadius: 14, borderWidth: 1, borderColor: '#2f293c', backgroundColor: '#0d0a15', padding: 14 },
 });

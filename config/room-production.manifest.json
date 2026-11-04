@@ -13,6 +13,10 @@
     "companionRoomsArePermanentDestinations": true,
     "existingRoutesMustBePreserved": true
   },
+  "productionScope": {
+    "characters": ["night"],
+    "rooms": ["night"]
+  },
   "creativeTools": {
     "canva": {
       "role": "approval-board",
@@ -40,51 +44,27 @@
   },
   "phases": ["day", "midday", "afternoon", "evening", "rain", "night", "deepNight"],
   "characters": {
-    "raylene": {
-      "canonicalMaster": "assets/images/companions/raylene/raylene-master.png",
-      "requiredPoses": ["neutral", "happy", "thinking", "writing", "window", "listening", "protective", "resting"]
-    },
-    "rylane": {
-      "canonicalMaster": "assets/images/companions/rylane/rylane-master.png",
-      "requiredPoses": ["neutral", "happy", "thinking", "writing", "window", "listening", "focused", "resting"]
-    },
     "night": {
-      "canonicalMaster": "assets/images/companions/night/night-master.png",
+      "canonicalMaster": "assets/images/companions/teen/night/neutral.png",
       "requiredPoses": ["neutral", "thinking", "writing", "window", "listening", "headphones", "microphone", "moonChair", "resting"]
-    },
-    "cloud": {
-      "canonicalMaster": "assets/images/cloud.png",
-      "requiredPoses": ["neutral", "happy", "thinking", "listening", "sleepy", "stormy"]
     }
   },
   "rooms": {
-    "raylene": {
-      "baseAsset": "assets/images/resized-bg/bg-raylene-room-day.jpg",
-      "anchors": ["door", "desk", "journal", "window", "bed", "floor", "headphones"],
-      "defaultAnchor": "desk"
-    },
-    "rylane": {
-      "baseAsset": "assets/images/resized-bg/bg-rylane-room-day.jpg",
-      "anchors": ["door", "desk", "journal", "window", "bed", "floor", "headphones"],
-      "defaultAnchor": "window"
-    },
     "night": {
       "baseAsset": "assets/images/resized-bg/bg-night-room-day.jpg",
       "anchors": ["door", "desk", "journal", "window", "moonChair", "microphone", "recordPlayer", "floor"],
       "defaultAnchor": "window",
       "verticalSlice": true
-    },
-    "cloud": {
-      "baseAsset": "assets/images/resized-bg/bg-cloud-room-day.jpg",
-      "anchors": ["journal", "beanBag", "neonCloud", "desk", "recordPlayer", "window"],
-      "defaultAnchor": "beanBag"
     }
   },
   "runtime": {
+    "assetRegistry": "src/config/nightRoomAssetRegistry.ts",
+    "registryConsumers": ["src/components/room/character/SekretSprite.tsx"],
     "actorStates": ["idle", "walking", "thinking", "writing", "listening", "usingHeadphones", "usingMicrophone", "lookingOutWindow", "resting", "talking"],
     "memoryKeys": ["lastRoom", "lastAnchor", "lastActivity", "lastPose", "lastVisit"],
     "reducedMotionFallback": "crossfade",
-    "missingAssetFallback": "canonical-neutral"
+    "missingPoseFallback": "canonical-neutral",
+    "missingPhaseFallback": "day"
   },
   "screenReferenceMap": {
     "calm": "existing Calm route visual target",

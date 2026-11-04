@@ -9,6 +9,7 @@ export type LocalMissionRun = {
   finishedAt: string;
   durationMs: number;
   exitCode: number | null;
+  signal?: string | null;
   stdout: string;
   stderr: string;
   error?: string;
@@ -27,6 +28,8 @@ export type FounderOperatorPersistence = {
   planId: string;
   reportPath: string;
   latestPath: string;
+  evidenceLevel: 'plan-only' | 'local-evidence';
+  localMissionEvidence: Pick<LocalMissionRun, 'missionId' | 'status' | 'startedAt' | 'finishedAt' | 'durationMs' | 'exitCode'> | null;
 };
 
 const baseUrl = (process.env.EXPO_PUBLIC_CONTROL_ROOM_LOCAL_AGENT_URL || 'http://127.0.0.1:4317').replace(/\/$/, '');
@@ -70,14 +73,13 @@ export async function runLocalControlRoomMission(missionId: string): Promise<Loc
     11 * 60 * 1000,
     true,
   );
-  if (!run.missionId || !['passed', 'failed', 'timed_out'].includes(run.status)) {
-    throw new Error(run.error || 'invalid_local_agent_response');
-  }
+  if (!run.missionId || !['passed', 'failed', 'timed_out'].includes(run.status)) throw new Error(run.error || 'invalid_local_agent_response');
   return run;
 }
 
 export async function persistFounderOperatorPlan(plan: FounderOperatorPlan): Promise<FounderOperatorPersistence> {
   if (plan.schemaVersion !== 1 || !/^[a-z0-9-]+$/.test(plan.id)) throw new Error('invalid_founder_operator_plan');
+  if (!['plan-only', 'local-evidence'].includes(plan.evidenceLevel)) throw new Error('unsupported_founder_operator_evidence_level');
   return request<FounderOperatorPersistence>(
     '/founder-operator/plans',
     { method: 'POST', body: JSON.stringify(plan) },

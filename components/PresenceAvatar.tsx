@@ -28,6 +28,8 @@ import {
   PRESENCE_TINT,
   type PresenceTime,
 } from '../constants/presence/timeOfDay';
+import { useReducedMotion } from '../hooks/useReducedMotion';
+import { PRESENCE_MOTION } from '../src/motion/presenceMotion';
 
 export type PresenceAvatarProps = {
   character: PresenceCharacter;
@@ -60,6 +62,8 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
     animate = true,
   } = props;
 
+  const reduceMotion = useReducedMotion();
+  const shouldAnimate = animate && !reduceMotion;
   const visualState = effectiveState(state);
   const asset = resolveAvatarAsset(character, time, visualState);
   const motion = STATE_MOTION[visualState];
@@ -67,29 +71,48 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
   // Two stacked layers so we can cross-fade between asset swaps instead of
   // hard-cutting. `current` holds the live asset; `previous` fades out.
   const prevAsset = useRef<any>(asset);
-  const fadeIn  = useRef(new Animated.Value(1)).current;
+  const fadeIn = useRef(new Animated.Value(1)).current;
   const fadeOut = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (prevAsset.current !== asset) {
-      // New asset arrived — cross-fade.
-      fadeIn.setValue(0);
-      fadeOut.setValue(1);
-      Animated.parallel([
-        Animated.timing(fadeIn,  { toValue: 1, duration: 420, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-        Animated.timing(fadeOut, { toValue: 0, duration: 420, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-      ]).start(() => {
-        prevAsset.current = asset;
-      });
-    }
-  }, [asset, fadeIn, fadeOut]);
+    if (prevAsset.current === asset) return;
 
-  // State-specific breath / motion loop
+    fadeIn.stopAnimation();
+    fadeOut.stopAnimation();
+
+    if (!shouldAnimate) {
+      prevAsset.current = asset;
+      fadeIn.setValue(1);
+      fadeOut.setValue(0);
+      return;
+    }
+
+    fadeIn.setValue(0);
+    fadeOut.setValue(1);
+    Animated.parallel([
+      Animated.timing(fadeIn, {
+        toValue: 1,
+        duration: PRESENCE_MOTION.stateCrossfadeMs,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeOut, {
+        toValue: 0,
+        duration: PRESENCE_MOTION.stateCrossfadeMs,
+        easing: Easing.inOut(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) prevAsset.current = asset;
+    });
+  }, [asset, fadeIn, fadeOut, shouldAnimate]);
+
+  // State-specific breath / motion loop.
   const motionAnim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     motionAnim.stopAnimation();
     motionAnim.setValue(0);
-    if (!animate) return;
+    if (!shouldAnimate) return undefined;
 
     const loop = Animated.loop(
       Animated.sequence([
@@ -105,24 +128,33 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
-      ])
+      ]),
     );
     loop.start();
     return () => loop.stop();
-  }, [motion.durationMs, animate, motionAnim, visualState]);
+  }, [motion.durationMs, motionAnim, shouldAnimate, visualState]);
 
-  const transform = [
-    { scale: motionAnim.interpolate({ inputRange: [0, 1], outputRange: [motion.scaleFrom, motion.scaleTo] }) },
-  ];
-  const liveOpacity = motionAnim.interpolate({
+  const motionTransform = motionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [motion.scaleFrom, motion.scaleTo],
+  });
+  const motionOpacity = motionAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [motion.opacityFrom, motion.opacityTo],
   });
+  const transform = [{ scale: shouldAnimate ? motionTransform : 1 }];
+  const liveOpacity = shouldAnimate
+    ? Animated.multiply(fadeIn, motionOpacity)
+    : fadeIn;
 
   const tint = tintColor ?? PRESENCE_TINT[time];
 
   return (
-    <View style={[styles.root, style]} pointerEvents="none">
+    <View
+      testID="voice-presence-avatar"
+      style={[styles.root, style]}
+      pointerEvents="none"
+    >
       {/* Previous asset (fading out during state transitions) */}
       <Animated.Image
         source={prevAsset.current}
@@ -130,17 +162,18 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
         style={[
           styles.layer,
           imageStyle,
-          { opacity: fadeOut, transform },
+          { opacity: shouldAnimate ? fadeOut : 0, transform },
         ]}
       />
       {/* Current asset (fading in) */}
       <Animated.Image
+        testID="voice-presence-avatar-live"
         source={asset}
         resizeMode="contain"
         style={[
           styles.layer,
           imageStyle,
-          { opacity: Animated.multiply(fadeIn, liveOpacity), transform },
+          { opacity: liveOpacity, transform },
         ]}
       />
       {/* Time-of-day tint overlay */}
@@ -155,7 +188,15 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
 }
 
 const styles = StyleSheet.create({
-  root:  { position: 'relative', width: '100%', height: '100%' },
-  layer: { position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-  tint:  StyleSheet.absoluteFill,
+  root: { position: 'relative', width: '100%', height: '100%' },
+  layer: {
+    position: 'absolute' as const,
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+  },
+  tint: StyleSheet.absoluteFill,
 });

@@ -27,41 +27,40 @@ RUN wget -q "https://github.com/rhasspy/piper/releases/download/${PIPER_VERSION}
   && rm -rf /tmp/piper /tmp/piper.tar.gz
 
 # ── Voice models ─────────────────────────────────────────────────────────────
-# Bakes the 4 character voice models into the image at build time so the
-# container is fully self-contained. Each model needs two files:
-#   <stem>.onnx       — the neural network weights
-#   <stem>.onnx.json  — the phoneme/config metadata
+# Bakes the canonical companion voice models into the image at build time so
+# the container is self-contained. These stems are also the default values in
+# worker/piper-tts.ts and must remain synchronized.
 #
-# Model → character mapping (defined in constants/voiceBip.ts):
-#   en_US-amy-medium   → raylene + sekret  (warm, expressive female)
-#   en_US-ryan-medium  → rylane            (direct male)
-#   en_US-amy-low      → cloud             (softer female)
-#   en_US-lessac-low   → night             (quietest, unhurried)
+# Model → canonical character mapping:
+#   en_US-amy-medium   → Suhana, Sekret, Parent Coach
+#   en_US-ryan-medium  → Sy
+#   en_US-amy-low      → Cloud
+#   en_US-lessac-low   → Night
 #
 # Source: https://huggingface.co/rhasspy/piper-voices/tree/main
 ARG PIPER_VOICES_BASE=https://huggingface.co/rhasspy/piper-voices/resolve/main
 
 RUN mkdir -p /voices
 
-# en_US-amy-medium (raylene + sekret)
+# Suhana + Sekret + Parent Coach
 RUN wget -q "${PIPER_VOICES_BASE}/en/en_US/amy/medium/en_US-amy-medium.onnx" \
       -O /voices/en_US-amy-medium.onnx \
   && wget -q "${PIPER_VOICES_BASE}/en/en_US/amy/medium/en_US-amy-medium.onnx.json" \
       -O /voices/en_US-amy-medium.onnx.json
 
-# en_US-ryan-medium (rylane)
+# Sy
 RUN wget -q "${PIPER_VOICES_BASE}/en/en_US/ryan/medium/en_US-ryan-medium.onnx" \
       -O /voices/en_US-ryan-medium.onnx \
   && wget -q "${PIPER_VOICES_BASE}/en/en_US/ryan/medium/en_US-ryan-medium.onnx.json" \
       -O /voices/en_US-ryan-medium.onnx.json
 
-# en_US-amy-low (cloud)
+# Cloud
 RUN wget -q "${PIPER_VOICES_BASE}/en/en_US/amy/low/en_US-amy-low.onnx" \
       -O /voices/en_US-amy-low.onnx \
   && wget -q "${PIPER_VOICES_BASE}/en/en_US/amy/low/en_US-amy-low.onnx.json" \
       -O /voices/en_US-amy-low.onnx.json
 
-# en_US-lessac-low (night)
+# Night
 RUN wget -q "${PIPER_VOICES_BASE}/en/en_US/lessac/low/en_US-lessac-low.onnx" \
       -O /voices/en_US-lessac-low.onnx \
   && wget -q "${PIPER_VOICES_BASE}/en/en_US/lessac/low/en_US-lessac-low.onnx.json" \

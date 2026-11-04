@@ -28,8 +28,8 @@ interface Env extends PiperTtsEnv, AuthEnv {
   OPENAI_TTS_MODEL?: string;
   OPENAI_STT_MODEL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
-  RAYLENE_VOICE_ID?: string;
-  RYLANE_VOICE_ID?: string;
+  SUHANA_VOICE_ID?: string;
+  SY_VOICE_ID?: string;
   CLOUD_VOICE_ID?: string;
   NIGHT_VOICE_ID?: string;
   SEKRET_VOICE_ID?: string;
@@ -38,9 +38,17 @@ interface Env extends PiperTtsEnv, AuthEnv {
   ALLOWED_ORIGINS?: string;
 }
 
+const DEFAULT_ALLOWED_ORIGINS = [
+  'https://sekretbip.net',
+  'https://www.sekretbip.net',
+  'https://app.sekretbip.net',
+];
+
 function allowedOriginList(env: Env): string[] | null {
   const configured = env.ALLOWED_ORIGINS?.trim();
-  if (!configured || configured === '*') return null;
+  if (!configured || configured === '*') {
+    return env.SEKRET_AUTH_MODE === 'dev-open' ? null : DEFAULT_ALLOWED_ORIGINS;
+  }
   return configured.split(',').map((o) => o.trim()).filter(Boolean);
 }
 
@@ -73,14 +81,14 @@ function hasJsonContentType(request: Request): boolean {
 }
 
 const CHARACTER_FALLBACKS: Record<ReplyActorId, string[]> = {
-  raylene: [
+  suhana: [
     'Hey! Random or did something actually happen?',
-    "That's valid. We can be random, nosy, calm, or chaotic.",
+    "That's porchlight behavior. I need the real version.",
     'See, now I need to know what was funny 😭',
     'Okay what happened, break it down.',
     'Girl, okay. What really happened?',
   ],
-  rylane: [
+  sy: [
     "Aight, I'm here. Talk.",
     'Bet. Nothing days count too. You tryna chill or find something to get into?',
     'Right lol. But for real though.',
@@ -88,16 +96,16 @@ const CHARACTER_FALLBACKS: Record<ReplyActorId, string[]> = {
     "Say the real version. What's going on?",
   ],
   cloud: [
-    "Hey. No pressure — what's on your mind or nothing at all?",
+    "Hey. No pressure. What's on your mind or nothing at all?",
     "That's okay. We can just vibe.",
-    "Yeah. What's the kind of vibe today?",
+    "Tiny cloud report: I'm here, no pressure.",
     'No rush. Start wherever feels okay.',
     "We don't have to fix anything. Just talk.",
   ],
   night: [
     'Hey. You trying to talk, plan, or just sit in it?',
     'Nothing-nothing or something on your mind?',
-    "Right. But for real — what's actually going on?",
+    "Right. But for real, what's actually going on?",
     "Okay, I'm here. What you bringing?",
     "Say more. What's the actual thing?",
   ],
@@ -117,8 +125,8 @@ const CHARACTER_FALLBACKS: Record<ReplyActorId, string[]> = {
 };
 
 const BUILT_IN_VOICES: Record<ReplyActorId, string> = {
-  raylene: 'nova',
-  rylane: 'ash',
+  suhana: 'nova',
+  sy: 'ash',
   cloud: 'shimmer',
   night: 'onyx',
   sekret: 'sage',
@@ -126,8 +134,8 @@ const BUILT_IN_VOICES: Record<ReplyActorId, string> = {
 };
 
 function configuredVoice(actorId: ReplyActorId, env: Env): string | undefined {
-  if (actorId === 'raylene') return env.RAYLENE_VOICE_ID;
-  if (actorId === 'rylane') return env.RYLANE_VOICE_ID;
+  if (actorId === 'suhana') return env.SUHANA_VOICE_ID;
+  if (actorId === 'sy') return env.SY_VOICE_ID;
   if (actorId === 'cloud') return env.CLOUD_VOICE_ID;
   if (actorId === 'night') return env.NIGHT_VOICE_ID;
   if (actorId === 'parentCoach') return env.PARENT_COACH_VOICE_ID;
@@ -180,6 +188,18 @@ function styleMetadata(style: RuntimeStyleContract): Record<string, unknown> {
   return enforceRuntimeStyleResponse({}, style);
 }
 
+/**
+ * `sekret-reply.ts` sets its own wildcard CORS headers on every response it
+ * builds. Routes delegated to it verbatim (anything not reshaped by
+ * rewriteStyledJsonResponse) must still carry this Worker's origin-locked
+ * headers, or the delegated response silently reopens CORS to '*'.
+ */
+function withCors(response: Response, cors: Record<string, string>): Response {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
 async function rewriteStyledJsonResponse(
   response: Response,
   style: RuntimeStyleContract,
@@ -205,7 +225,7 @@ function prepareStyledReply(
   body: Record<string, unknown>,
 ): { request: Request; style: RuntimeStyleContract } | { error: string } {
   const actorId = normalizeReplyActor(body.characterId ?? body.personality);
-  if (!actorId) return { error: 'characterId must be raylene, rylane, cloud, night, sekret, or parentCoach' };
+  if (!actorId) return { error: 'characterId must be suhana, sy, cloud, night, sekret, or parentCoach' };
 
   const surface = normalizeReplySurface(body.surface ?? body.context);
   const mismatch = validateActorSurface(actorId, surface);
@@ -218,7 +238,9 @@ function prepareStyledReply(
     ...body,
     characterId: actorId,
     surface,
-    phaseInstruction: [priorPhaseInstruction, styleInstruction].filter(Boolean).join('\n\n'),
+    phaseInstruction: priorPhaseInstruction
+      ? `${priorPhaseInstruction}\n\n${styleInstruction}`
+      : styleInstruction,
   };
 
   return { request: requestWithJsonBody(request, styledBody), style };
@@ -263,7 +285,7 @@ async function handleStyledVoice(
   if (!text) return json({ error: 'reply is required' }, 400, cors);
 
   const actorId = normalizeReplyActor(body.characterId);
-  if (!actorId) return json({ error: 'characterId must be raylene, rylane, cloud, night, sekret, or parentCoach' }, 400, cors);
+  if (!actorId) return json({ error: 'characterId must be suhana, sy, cloud, night, sekret, or parentCoach' }, 400, cors);
   const style = resolveRuntimeStyle(actorId);
 
   if (env.PIPER_TTS_URL?.trim()) {
@@ -383,7 +405,7 @@ export default {
       if (!env.OPENAI_API_KEY) {
         const options = CHARACTER_FALLBACKS[prepared.style.actorId];
         const start = stableHash(`${prepared.style.actorId}:${userText.toLowerCase()}`) % options.length;
-        console.error('[sekret/reply] OPENAI_API_KEY is not configured — serving fallback');
+        console.error('[sekret/reply] OPENAI_API_KEY is not configured, serving fallback');
         const styled = enforceRuntimeStyleResponse({
           reply: options[start],
           tone: prepared.style.actorId === 'parentCoach' ? 'grounded' : 'casual',
@@ -409,6 +431,7 @@ export default {
       return rewriteStyledJsonResponse(delegated, prepared.style, cors);
     }
 
-    return worker.fetch(request, env as { OPENAI_API_KEY: string }, principal);
+    const fallback = await worker.fetch(request, env as { OPENAI_API_KEY: string }, principal);
+    return withCors(fallback, cors);
   },
 };

@@ -5,7 +5,7 @@ Phase issue: #239
 
 ## Purpose
 
-This document grounds the Parent–Teen Translation Layer, Emotional Accountability Crew, Emotional Scrapbook, and Persistent Companion Memory in the repository that exists today. It does not authorize parent surveillance, automatic sharing, or silent memory retention.
+This document grounds the Parent–Teen Translation Layer, Bridge Learning, Emotional Accountability Crew, Emotional Scrapbook, and Persistent Companion Memory in the repository that exists today. It does not authorize parent surveillance, automatic sharing, or silent memory retention.
 
 ## Existing foundations
 
@@ -52,11 +52,11 @@ Recent task RPCs write canonical events using `bip_events(user_id, event_type, m
 
 ### Safety
 
-`supabase/functions/safety-scan/index.ts` and the existing safety flow remain separate from ordinary Parent Window sharing. Safety escalation is not consent for Bridge summaries, Crew disclosure, scrapbook sharing, or companion memory.
+`supabase/functions/safety-scan/index.ts` and the existing safety flow remain separate from ordinary Parent Window sharing. Safety escalation is not consent for Bridge summaries, Bridge Learning, Crew disclosure, scrapbook sharing, or companion memory.
 
 ### Deployment and API boundary
 
-The production direction is Cloudflare-first. Client code must not contain model-provider secrets. AI summary and memory operations belong behind the Worker/service boundary with typed request and response validation.
+The production direction is Cloudflare-first. Client code must not contain model-provider secrets. AI summary, teaching, and memory operations belong behind the Worker/service boundary with typed request and response validation.
 
 ## Canonical feature boundaries
 
@@ -71,7 +71,19 @@ Retention: defined before schema ships; raw content is referenced, not duplicate
 
 Required states: draft, pending, processing, ready, viewed, revoked, expired, failed, deleted.
 
-### 2. Crew Accountability
+### 2. Bridge Learning
+
+Owner: the teen and linked parent pair inside one consent-controlled shared learning session.  
+Permitted readers: the active teen, the active linked parent for that session, and service code required to produce the teaching packet.  
+Source access: shared-session content, explicit session attachments, and approved reference/curriculum material only.  
+Parent access: the shared learning session only; private Study Buddy history, journals, unshared uploads, Circle content, emotional-memory records, school identifiers, and report-card material remain outside the boundary.  
+Notification access: lock-screen copy is exact-template allowlisted and must not include subject, question, grade, answer, source document, mistake, or private-study detail.  
+Revocation: parent-link or session revocation ends ordinary shared access immediately.  
+Retention: defined before schema ships; shared-session recap must be minimized.
+
+Required states: invited, working_together, teen_stumped, parent_stumped, both_stumped, sekret_teaching, trying_again, teach_back, completed, needs_outside_help, declined, revoked, expired.
+
+### 3. Crew Accountability
 
 Owner: the teen creating a check-in, reminder, or support preference.  
 Permitted readers: accepted crew members explicitly included by the owner.  
@@ -79,7 +91,7 @@ Revocation: block/remove invalidates access immediately.
 Parent access: none by default.  
 Public access: none.
 
-### 3. Emotional Scrapbook
+### 4. Emotional Scrapbook
 
 Owner: teen.  
 Default visibility: private.  
@@ -87,7 +99,7 @@ Media: private owner-scoped storage paths with short-lived signed access.
 Sharing: an explicit destination-specific action; sharing to Circle, Crew, or Parent Window does not change the private default for future memories.  
 Deletion: removes database references and stored objects according to the retention contract.
 
-### 4. Companion Memory
+### 5. Companion Memory
 
 Owner: teen.  
 Default state: disabled.  
@@ -100,7 +112,7 @@ Parent access: none unless the teen separately shares a recap through an approve
 
 Canonical TypeScript contracts live in `src/types/relationshipLayer.ts`.
 
-Feature rollout states live in `src/constants/relationshipFeatureFlags.ts`. All four features are disabled by default. Supported rollout states are:
+Feature rollout states live in `src/constants/relationshipFeatureFlags.ts`. All five features are closed by default unless a feature has an explicit non-public internal gate. Supported rollout states are:
 
 - `disabled`
 - `internal`
@@ -114,40 +126,7 @@ Feature flags are release gates, not authorization. RLS and server-side checks r
 These names are directional and must be reconciled with current utilities before implementation:
 
 - `src/services/bridgeSummaryService.ts`
+- `src/services/bridgeLearningService.ts`
 - `src/services/crewAccountabilityService.ts`
 - `src/services/scrapbookService.ts`
 - `src/services/companionMemoryService.ts`
-
-Services should return the shared `RelationshipResult<T>` shape and represent revoked, unavailable, rate-limited, fallback, and authorization failures explicitly.
-
-## Schema decision rules
-
-Before adding a table:
-
-1. Confirm the data cannot safely live in an existing canonical table.
-2. Define owner, reader, writer, revoke, delete, and retention behavior.
-3. Add the change through a versioned migration.
-4. Enable RLS explicitly.
-5. Add teen, parent, crew, stranger, blocked, revoked-link, and service-role tests where relevant.
-6. Reconcile `db/schema.sql` with migrations or document migrations as the only canonical bootstrap source.
-
-## Immediate gaps
-
-- No canonical typed relationship-layer contracts existed before Phase 0.
-- No independent feature gates existed for the four roadmap phases.
-- Existing Bridge/Parent Window migrations need reconciliation before new summary schema is designed.
-- Existing Crew schema must be audited for accepted-only reads, blocking, and mutual activity visibility.
-- Scrapbook storage ownership, signed URL lifetime, metadata stripping, and object deletion are not yet locked.
-- Companion memory consent, candidate approval, retrieval filtering, and forget semantics are not yet implemented end to end.
-- Privacy-safe event names and payload allowlists are not yet defined for these features.
-
-## Next implementation slice
-
-Complete the remaining Phase 0 deliverables:
-
-1. data-flow diagrams;
-2. threat model;
-3. cost model;
-4. release/test gates;
-5. repo-wide schema and service audit;
-6. follow-up issues split by contracts/schema, Worker services, teen UI, parent/crew UI, analytics, tests, and docs.

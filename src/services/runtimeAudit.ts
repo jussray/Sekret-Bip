@@ -14,6 +14,7 @@ export type RuntimeAuditSource =
   | 'rewards'
   | 'voice_runtime'
   | 'memory'
+  | 'companion_fallback'
   | 'manual';
 
 export interface RuntimeAuditInput {
@@ -22,6 +23,21 @@ export interface RuntimeAuditInput {
   severity?: AuditSeverity;
   message?: string | null;
   metadata?: Record<string, unknown> | null;
+}
+
+export interface CompanionFallbackTelemetryInput {
+  characterId: string;
+  surface?: string | null;
+  mood?: string | null;
+  historyTurnCount?: number;
+  reason: string;
+  fallback: {
+    safetyFlag?: boolean;
+    tone?: string;
+    suggestedComfortTool?: string | null;
+    fallbackPackVersion?: string;
+    fallbackVariantId?: string;
+  };
 }
 
 function sanitizeMetadata(input?: Record<string, unknown> | null): Record<string, unknown> {
@@ -76,6 +92,7 @@ function sourceToEventPrefix(source: RuntimeAuditSource): string {
     case 'rewards': return 'reward';
     case 'voice_runtime': return 'voice_bip';
     case 'memory': return 'memory';
+    case 'companion_fallback': return 'companion_fallback';
     default: return 'runtime';
   }
 }
@@ -125,6 +142,41 @@ export async function logRuntimeAuditEvent(
   });
 
   return event;
+}
+
+function fallbackKind(variantId?: string): 'safety' | 'identity' | 'natural' {
+  if (!variantId) return 'natural';
+  if (variantId.endsWith(':safety')) return 'safety';
+  if (variantId.endsWith(':identity')) return 'identity';
+  return 'natural';
+}
+
+export async function logCompanionFallbackUsage(input: CompanionFallbackTelemetryInput): Promise<void> {
+  const fallbackPackVersion = input.fallback.fallbackPackVersion ?? 'unknown';
+  const fallbackVariantId = input.fallback.fallbackVariantId ?? `${fallbackPackVersion}:unknown`;
+  const kind = fallbackKind(fallbackVariantId);
+
+  await logRuntimeAuditEvent('companion_fallback', {
+    event_type: 'used',
+    screen: input.surface ? `companion:${input.surface}` : 'companion',
+    severity: input.fallback.safetyFlag ? 'warning' : 'info',
+    message: null,
+    metadata: {
+      companion: input.characterId,
+      character_id: input.characterId,
+      surface: input.surface ?? 'unknown',
+      mood_present: Boolean(input.mood),
+      history_turn_count: Number.isFinite(input.historyTurnCount) ? input.historyTurnCount : 0,
+      reason: input.reason,
+      fallback_pack_version: fallbackPackVersion,
+      fallback_variant_id: fallbackVariantId,
+      fallback_kind: kind,
+      identity_disclosure: kind === 'identity',
+      safety_flag: Boolean(input.fallback.safetyFlag),
+      suggested_comfort_tool: input.fallback.suggestedComfortTool ?? null,
+      tone: input.fallback.tone ?? 'fallback',
+    },
+  });
 }
 
 export async function captureRuntimeError(

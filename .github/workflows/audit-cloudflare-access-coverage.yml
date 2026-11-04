@@ -1,0 +1,97 @@
+name: Audit Cloudflare Access Coverage
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-cloudflare-access-coverage.yml'
+      - 'scripts/audit-cloudflare-access-coverage.mjs'
+      - 'test/cloudflare-access-coverage-audit.test.mjs'
+      - 'test/cloudflare-access-workflow-contract.test.mjs'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/audit-cloudflare-access-coverage.yml'
+      - 'scripts/audit-cloudflare-access-coverage.mjs'
+      - 'test/cloudflare-access-coverage-audit.test.mjs'
+      - 'test/cloudflare-access-workflow-contract.test.mjs'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-access-coverage-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  CLOUDFLARE_ACCESS_EVIDENCE_PATH: artifacts/cloudflare-access-coverage.json
+  CLOUDFLARE_ACCESS_TARGET_HOSTS: sekretbip.net,app.sekretbip.net,api.sekretbip.net
+  CLOUDFLARE_ACCESS_TARGET_ZONE: sekretbip.net
+
+jobs:
+  audit:
+    name: Audit public Se’kret Access coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+
+      - name: Verify redacted Access audit contract
+        run: node --test test/cloudflare-access-coverage-audit.test.mjs test/cloudflare-access-workflow-contract.test.mjs
+
+      - name: Require exact current main before Cloudflare secret use
+        if: github.event_name != 'pull_request'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          current_main="$({
+            curl --fail-with-body --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$REPOSITORY/commits/main"
+          } | node -e "let body='';process.stdin.on('data',c=>body+=c);process.stdin.on('end',()=>{const parsed=JSON.parse(body);if(!parsed.sha)process.exit(2);process.stdout.write(parsed.sha);});")"
+          printf 'expected_head=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
+          test "$EXPECTED_HEAD_SHA" = "$current_main" || {
+            echo 'Refusing Cloudflare Access audit because workflow SHA is no longer current main.' >&2
+            exit 1
+          }
+
+      - name: Audit matching Cloudflare Access applications and organization state
+        if: github.event_name != 'pull_request'
+        env:
+          CLOUDFLARE_ACCESS_API_TOKEN: ${{ secrets.CLOUDFLARE_ACCESS_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/audit-cloudflare-access-coverage.mjs
+
+      - name: Upload redacted Cloudflare Access evidence
+        if: github.event_name != 'pull_request' && always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cloudflare-access-coverage-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/cloudflare-access-coverage.json
+          if-no-files-found: error
+          retention-days: 30

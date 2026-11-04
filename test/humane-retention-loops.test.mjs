@@ -6,7 +6,7 @@ import path from 'node:path';
 const root = process.cwd();
 const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
 
-test('Bip Energy fade keeps the intentional bounded contract', () => {
+test('legacy Bip Energy fade remains bounded history but is not a teen return trigger', () => {
   const restoreMigration = read('supabase/migrations/20260714045500_restore_intentional_bip_energy_fade.sql');
   const finalMigration = read('supabase/migrations/20260714051500_align_bip_energy_with_bip_events.sql');
   const ledger = read('src/features/activity/ledger.ts');
@@ -25,13 +25,14 @@ test('Bip Energy fade keeps the intentional bounded contract', () => {
   assert.match(finalMigration, /event_type not in \('app_opened', 'streak_milestone'\)/);
   assert.doesNotMatch(finalMigration, /from public\.activity_events/);
   assert.match(restoreMigration, /when 'streak_milestone' then 3/);
-  assert.match(ledger, /void applyBipEnergyFade\(\)/);
-  assert.match(ledger, /Bip Tickets and redeemed room items[\s\S]*never removed/);
   assert.match(energyService, /let inFlightCheck/);
   assert.match(energyService, /if \(inFlightCheck\) return inFlightCheck/);
   assert.match(energyService, /cachedUserId === user\.id/);
-  assert.match(overlay, /await applyBipEnergyFade\(\)/);
-  assert.doesNotMatch(ledger, /disabled_no_guilt_retention/);
+
+  assert.doesNotMatch(ledger, /applyBipEnergyFade/);
+  assert.doesNotMatch(overlay, /applyBipEnergyFade|loadUnseenBipEnergyAdjustment|markBipEnergyAdjustmentSeen/);
+  assert.doesNotMatch(overlay, /Bip Energy faded|days away|streak resets/);
+  assert.match(ledger, /Teen return UX does not subtract points for time away/);
 });
 
 test('Room and History use meaningful return value rather than streak shame', () => {
@@ -42,8 +43,9 @@ test('Room and History use meaningful return value rather than streak shame', ()
   const receipts = read('src/features/retention/meaningfulReturn.ts');
 
   assert.match(roomRoute, /BipReturnOverlay/);
-  assert.match(overlay, /Bip Energy faded a little/);
-  assert.match(overlay, /Bip Tickets, redeemed rewards, and unlocked room items stay yours/);
+  assert.match(overlay, /Your check-ins stay part of your story, even after time away/);
+  assert.match(overlay, /without asking you to show up every day/);
+  assert.doesNotMatch(overlay, /perfect streak|streak resets|Bip Energy faded/);
   assert.match(historyRoute, /MeaningfulHistoryScreen/);
   assert.doesNotMatch(historyRoute, /streakDays=/);
   assert.match(historyScreen, /days you checked in this month/);
@@ -76,20 +78,28 @@ test('public Circle keeps support actions and makes totals owner-only', () => {
   assert.match(migration, /revoke select on table public\.public_circle_posts from anon, authenticated/);
 });
 
-test('Bridge carries a teen-selected response request without private content', () => {
+test('Bridge carries teen-selected metadata, fails loud on delivery errors, and surfaces the latest signal to the linked parent', () => {
   const migration = read('supabase/migrations/20260714043000_humane_retention_loops.sql');
   const teenDock = read('components/bridge/BridgeResponsePreferenceDock.tsx');
   const parentCard = read('components/bridge/ParentBridgeResponseRequestCard.tsx');
   const bridgeCompat = read('src/utils/parentBridgeCompat.ts');
+  const teenBridge = read('screens/BridgeScreen.tsx');
   const preferenceContract = read('src/features/bridge/responsePreference.ts');
 
   assert.match(migration, /add column if not exists response_preference text/);
   assert.match(migration, /'listen', 'comfort', 'help_plan', 'check_later', 'give_space'/);
   assert.match(teenDock, /What would help after you send this\?/);
   assert.match(teenDock, /They still do not get the rest of your private space/);
-  assert.match(parentCard, /Honor the request without asking to see journals, chats, mood history/);
+  assert.match(parentCard, /setLatest\(signals\[0\] \?\? null\)/);
+  assert.match(parentCard, /LATEST TEEN-CHOSEN BRIDGE SIGNAL/);
+  assert.match(parentCard, /Linking does not unlock journals, chats, mood history/);
+  assert.match(bridgeCompat, /const \{ error \} = await sb\.from\('bridge_signals'\)\.insert/);
+  assert.match(bridgeCompat, /if \(error\) throw error/);
   assert.match(bridgeCompat, /response_preference: responsePreference/);
   assert.match(bridgeCompat, /select\('id, share_type, conv_mode, response_preference/);
+  assert.match(teenBridge, /Bridge could not confirm delivery\. Nothing was marked sent/);
+  assert.match(teenBridge, /await sendBridgeSignal[\s\S]*setSent\(true\)/);
+  assert.doesNotMatch(teenBridge, /catch \{[\s\S]{0,120}local experience unaffected/);
   assert.match(preferenceContract, /just listen/);
   assert.match(preferenceContract, /give me space/);
 });

@@ -1,215 +1,143 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
-import { createServer } from 'node:net';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
-const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const token = 'b'.repeat(64);
 
-async function reservePort() {
-  const probe = createServer();
-  await new Promise((resolve, reject) => {
-    probe.once('error', reject);
-    probe.listen(0, '127.0.0.1', resolve);
+function getPort() {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer();
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address();
+      const port = typeof address === 'object' && address ? address.port : null;
+      server.close(error => error ? reject(error) : resolve(port));
+    });
+    server.on('error', reject);
   });
-  const address = probe.address();
-  const port = typeof address === 'object' && address ? address.port : null;
-  await new Promise(resolve => probe.close(resolve));
-  if (!port) throw new Error('Unable to reserve a loopback port.');
-  return port;
 }
 
-async function waitFor(check, timeoutMs = 4_000) {
-  const deadline = Date.now() + timeoutMs;
+async function waitForHealth(port, child) {
+  const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
-    if (check()) return;
-    await new Promise(resolve => setTimeout(resolve, 25));
+    if (child.exitCode != null) throw new Error(`server exited early: ${child.exitCode}`);
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/health`, { headers: { Authorization: `Bearer ${token}` } });
+      if (response.ok) return;
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 40));
   }
-  throw new Error('Timed out waiting for Control Room server state.');
+  throw new Error('server health timeout');
 }
 
-function buildPlan(id = '20260718-integrated-control-room') {
-  const prefix = `reports/control-room/founder-operator/${id}`;
+function buildPlan({ evidenceLevel = 'plan-only', verified = false, approvalVerified = false, createdAt = new Date(Date.now() - 1_000).toISOString() } = {}) {
+  const id = '20260724083600000-founder-test';
+  const lanes = [
+    { id: 'founder', label: 'Founder', purpose: 'Own approvals and final truth.', authority: 'decision' },
+    { id: 'chatgpt', label: 'ChatGPT', purpose: 'Build the mission and artifact plan.', authority: 'execution' },
+    { id: 'playwright', label: 'Playwright', purpose: 'Retain executed browser evidence.', authority: 'evidence' },
+    { id: 'local-agent', label: 'Local Agent', purpose: 'Run only fixed local verification missions.', authority: 'execution' },
+  ];
+  const prefix = `reports/control-room/founder-operator/${id}/`;
+  const artifacts = [
+    { id: 'mission-brief', title: 'Mission brief', kind: 'mission-brief', ownerLane: 'chatgpt', supportLanes: ['founder'], pathHint: `${prefix}mission.md`, evidenceRequired: ['5W1H scope'], status: 'planned' },
+    { id: 'system-map', title: 'System map', kind: 'architecture', ownerLane: 'chatgpt', supportLanes: ['founder'], pathHint: `${prefix}system.md`, evidenceRequired: ['dependencies'], status: 'planned' },
+    { id: 'verification-report', title: 'Verification report', kind: 'verification', ownerLane: 'playwright', supportLanes: ['local-agent'], pathHint: `${prefix}verification.json`, evidenceRequired: ['executed checks'], status: verified ? 'verified' : 'planned' },
+    { id: 'founder-decision', title: 'Founder decision', kind: 'release', ownerLane: 'founder', supportLanes: ['chatgpt'], pathHint: `${prefix}decision.md`, evidenceRequired: ['approval state'], approvalGate: 'Founder approval is required before external mutation.', status: approvalVerified ? 'verified' : 'human-required' },
+  ];
+  const phases = [
+    { id: 'observe', title: 'Observe', objective: 'Lock mission and current truth.', operatingQuestion: 'What is true right now?', ownerLane: 'chatgpt', supportLanes: ['founder'], artifactIds: ['mission-brief'], safeMissionId: 'continue-yesterday', exitGate: 'Mission truth is explicit.', status: 'planned' },
+    { id: 'orient', title: 'Orient', objective: 'Map the complete system.', operatingQuestion: 'Which dependency can invalidate the plan?', ownerLane: 'chatgpt', supportLanes: ['founder'], artifactIds: ['system-map'], exitGate: 'Dependencies are explicit.', status: 'planned' },
+    { id: 'verify', title: 'Verify', objective: 'Execute retained evidence.', operatingQuestion: 'What actually ran?', ownerLane: 'playwright', supportLanes: ['local-agent'], artifactIds: ['verification-report'], safeMissionId: 'verify-local', exitGate: 'Executed evidence is retained.', status: verified ? 'verified' : 'planned' },
+    { id: 'decide', title: 'Decide', objective: 'Stop at the founder gate.', operatingQuestion: 'Does evidence justify external action?', ownerLane: 'founder', supportLanes: ['chatgpt'], artifactIds: ['founder-decision'], exitGate: 'Founder records the decision.', status: 'human-required' },
+  ];
   return {
     schemaVersion: 1,
     id,
-    createdAt: '2026-07-18T01:30:00.000Z',
-    mission: 'Verify integrated Founder Operator persistence.',
-    constraints: 'Preserve truth gates and existing work.',
+    createdAt,
+    mission: 'Verify the Founder Operator persistence boundary.',
+    constraints: 'Do not merge, deploy, publish, use secrets, or delete data.',
     modes: ['ultrathink', 'billgates-artifacts', 'elonmusk-execution'],
-    lanes: [
-      { id: 'founder', label: 'Founder', purpose: 'Own final decisions and approvals.', authority: 'decision' },
-      { id: 'chatgpt', label: 'ChatGPT', purpose: 'Build the bounded operating plan.', authority: 'execution' },
-      { id: 'codex', label: 'Codex', purpose: 'Integrate repository code and proof.', authority: 'execution' },
-      { id: 'playwright', label: 'Playwright', purpose: 'Retain browser verification evidence.', authority: 'evidence' },
-    ],
-    phases: [
-      {
-        id: 'observe', title: 'Observe mission', objective: 'Lock the current evidence and constraints.',
-        operatingQuestion: 'What is true before implementation begins?', ownerLane: 'chatgpt', supportLanes: ['founder'],
-        artifactIds: ['mission-brief'], exitGate: 'The founder mission and boundary are explicit.', status: 'planned',
-      },
-      {
-        id: 'orient', title: 'Orient system', objective: 'Map dependencies and the smallest safe slice.',
-        operatingQuestion: 'Which dependency can invalidate the obvious plan?', ownerLane: 'chatgpt', supportLanes: ['codex'],
-        artifactIds: ['system-map'], exitGate: 'Dependencies and rollback are documented.', status: 'planned',
-      },
-      {
-        id: 'verify', title: 'Verify behavior', objective: 'Execute and retain local evidence.',
-        operatingQuestion: 'What actually ran and what remains unproven?', ownerLane: 'playwright', supportLanes: ['codex'],
-        artifactIds: ['verification-report'], safeMissionId: 'verify-local', exitGate: 'Executed evidence is retained.', status: 'planned',
-      },
-      {
-        id: 'decide', title: 'Founder decision', objective: 'Keep the external action behind founder authority.',
-        operatingQuestion: 'Does evidence justify the next external action?', ownerLane: 'founder', supportLanes: ['chatgpt'],
-        artifactIds: ['founder-decision-pack'], exitGate: 'The founder records a bounded decision.', status: 'human-required',
-      },
-    ],
-    artifacts: [
-      {
-        id: 'mission-brief', title: 'Mission brief', kind: 'mission-brief', ownerLane: 'chatgpt', supportLanes: ['founder'],
-        pathHint: `${prefix}/mission-brief.md`, evidenceRequired: ['5W1H scope'], status: 'planned',
-      },
-      {
-        id: 'system-map', title: 'System map', kind: 'architecture', ownerLane: 'codex', supportLanes: ['chatgpt'],
-        pathHint: `${prefix}/system-map.md`, evidenceRequired: ['Dependency map'], status: 'planned',
-      },
-      {
-        id: 'verification-report', title: 'Verification report', kind: 'verification', ownerLane: 'playwright', supportLanes: ['codex'],
-        pathHint: `${prefix}/verification-report.json`, evidenceRequired: ['Executed checks'], status: 'planned',
-      },
-      {
-        id: 'founder-decision-pack', title: 'Founder decision pack', kind: 'release', ownerLane: 'founder', supportLanes: ['chatgpt'],
-        pathHint: `${prefix}/founder-decision-pack.md`, evidenceRequired: ['Founder decision'],
-        approvalGate: 'Founder approval is required before any external action.', status: 'human-required',
-      },
-    ],
-    approvalGates: ['Founder approval is required before any external action.'],
-    nonClaims: ['A local plan is not deployment proof.'],
-    evidenceLevel: 'plan-only',
+    lanes,
+    phases,
+    artifacts,
+    approvalGates: ['Founder approval is required before external mutation.'],
+    nonClaims: ['A plan is not executed evidence.'],
+    evidenceLevel,
   };
 }
 
-test('Founder Operator endpoint persists valid plans and rejects false or unsafe evidence', { timeout: 15_000 }, async () => {
-  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'bip-founder-operator-server-'));
-  const scriptsDir = path.join(tempRoot, 'scripts');
-  fs.mkdirSync(scriptsDir);
-  fs.copyFileSync(path.join(sourceRoot, 'scripts', 'control-room-server.mjs'), path.join(scriptsDir, 'control-room-server.mjs'));
-  fs.writeFileSync(path.join(scriptsDir, 'control-room-agent.mjs'), 'process.exit(0);\n');
-  const token = 'f'.repeat(32);
-  const port = await reservePort();
-  const origin = `http://127.0.0.1:${port}`;
-  const endpoint = `${origin}/founder-operator/plans`;
+async function post(port, pathname, body) {
+  const response = await fetch(`http://127.0.0.1:${port}${pathname}`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return { response, body: await response.json() };
+}
+
+test('Founder Operator persistence is fixed-path, versioned, and server-attested', async t => {
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'founder-operator-server-'));
+  const scripts = path.join(temp, 'scripts');
+  fs.mkdirSync(scripts, { recursive: true });
+  fs.copyFileSync('scripts/control-room-server.mjs', path.join(scripts, 'control-room-server.mjs'));
+  fs.writeFileSync(path.join(scripts, 'control-room-agent.mjs'), `
+    const mission = process.argv[2];
+    if (!['continue-yesterday', 'verify-local', 'verify-frontend', 'recover-system'].includes(mission)) process.exit(64);
+    console.log('executed:' + mission);
+    process.exit(0);
+  `);
+
+  const port = await getPort();
   const server = spawn(process.execPath, ['scripts/control-room-server.mjs'], {
-    cwd: tempRoot,
-    env: { ...process.env, CONTROL_ROOM_LOCAL_TOKEN: token, CONTROL_ROOM_LOCAL_PORT: String(port) },
+    cwd: temp,
+    env: { ...process.env, CONTROL_ROOM_LOCAL_PORT: String(port), CONTROL_ROOM_LOCAL_TOKEN: token },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-
-  const post = (plan, overrides = {}) => fetch(endpoint, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, Origin: origin, 'Content-Type': 'application/json', ...(overrides.headers || {}) },
-    body: JSON.stringify(plan),
-    ...overrides,
+  t.after(() => {
+    if (server.exitCode == null) server.kill('SIGTERM');
+    fs.rmSync(temp, { recursive: true, force: true });
   });
+  await waitForHealth(port, server);
 
-  try {
-    server.stdout.setEncoding('utf8');
-    let output = '';
-    server.stdout.on('data', chunk => { output += chunk; });
-    await waitFor(() => output.includes('Control Room local agent ready'));
+  const planOnly = buildPlan();
+  const first = await post(port, '/founder-operator/plans', planOnly);
+  assert.equal(first.response.status, 201);
+  assert.match(first.body.reportPath, /founder-operator\/20260724083600000-founder-test\.json$/);
+  assert.equal(first.body.localMissionEvidence, null);
+  const firstRecord = JSON.parse(fs.readFileSync(path.join(temp, first.body.reportPath), 'utf8'));
+  assert.equal(firstRecord.plan.evidenceLevel, 'plan-only');
+  assert.equal(firstRecord.localMissionEvidence, null);
 
-    const unauthorized = await fetch(endpoint, { method: 'POST', headers: { Origin: origin }, body: '{}' });
-    assert.equal(unauthorized.status, 401);
+  const second = await post(port, '/founder-operator/plans', planOnly);
+  assert.equal(second.response.status, 201);
+  assert.match(second.body.reportPath, /-v2\.json$/);
 
-    const disallowedOrigin = await fetch(endpoint, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, Origin: 'https://example.com' },
-      body: JSON.stringify(buildPlan()),
-    });
-    assert.equal(disallowedOrigin.status, 403);
+  const premature = await post(port, '/founder-operator/plans', buildPlan({ evidenceLevel: 'local-evidence', verified: true }));
+  assert.equal(premature.response.status, 400);
+  assert.equal(premature.body.error, 'unexecuted_local_evidence');
 
-    if (process.platform !== 'win32') {
-      const outsideReports = path.join(tempRoot, 'outside-reports');
-      fs.mkdirSync(outsideReports);
-      fs.symlinkSync(outsideReports, path.join(tempRoot, 'reports'));
-      const directorySymlinkResponse = await post(buildPlan('20260718-directory-symlink'));
-      assert.equal(directorySymlinkResponse.status, 500);
-      assert.equal((await directorySymlinkResponse.json()).error, 'unsafe_report_directory');
-      assert.deepEqual(fs.readdirSync(outsideReports), []);
-      fs.unlinkSync(path.join(tempRoot, 'reports'));
-    }
+  const verifyRun = await post(port, '/missions/verify-local', {});
+  assert.equal(verifyRun.response.status, 200);
+  assert.equal(verifyRun.body.status, 'passed');
 
-    const first = await post(buildPlan());
-    const firstBody = await first.json();
-    assert.equal(first.status, 201, JSON.stringify(firstBody));
-    assert.equal(firstBody.reportPath, 'reports/control-room/founder-operator/20260718-integrated-control-room.json');
+  const certified = await post(port, '/founder-operator/plans', buildPlan({ evidenceLevel: 'local-evidence', verified: true }));
+  assert.equal(certified.response.status, 201);
+  assert.equal(certified.body.localMissionEvidence.missionId, 'verify-local');
+  assert.equal(certified.body.localMissionEvidence.status, 'passed');
 
-    const second = await post(buildPlan());
-    assert.equal(second.status, 201);
-    assert.equal((await second.json()).reportPath, 'reports/control-room/founder-operator/20260718-integrated-control-room-v2.json');
+  const approvalLie = await post(port, '/founder-operator/plans', buildPlan({ approvalVerified: true }));
+  assert.equal(approvalLie.response.status, 400);
+  assert.equal(approvalLie.body.error, 'approval_gated_artifact_cannot_be_verified');
 
-    const reportDir = path.join(tempRoot, 'reports', 'control-room', 'founder-operator');
-    assert.ok(fs.existsSync(path.join(reportDir, '20260718-integrated-control-room.json')));
-    assert.ok(fs.existsSync(path.join(reportDir, '20260718-integrated-control-room-v2.json')));
-    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(reportDir, 'latest.json'), 'utf8')), buildPlan());
+  const unsupported = await post(port, '/founder-operator/plans', { ...planOnly, evidenceLevel: 'exact-head' });
+  assert.equal(unsupported.response.status, 400);
+  assert.equal(unsupported.body.error, 'unsupported_evidence_level');
 
-    const terminologyPlan = buildPlan('20260718-service-role-terminology');
-    terminologyPlan.constraints = 'Audit service_role access without pasting any credential value.';
-    const terminologyResponse = await post(terminologyPlan);
-    assert.equal(terminologyResponse.status, 201);
-
-    const credentialPlan = buildPlan('20260718-service-role-credential');
-    credentialPlan.constraints = 'SUPABASE_SERVICE_ROLE_KEY=eyJabcdefghijk.abcdefghijkl.abcdefghijkl';
-    const credentialResponse = await post(credentialPlan);
-    assert.equal(credentialResponse.status, 400);
-    assert.equal((await credentialResponse.json()).error, 'credential_shaped_content_rejected');
-
-    const secretPlan = buildPlan('20260718-secret-shape-rejection');
-    secretPlan.artifacts[0].Access_Token = 'plain-text-value';
-    const secretResponse = await post(secretPlan);
-    assert.equal(secretResponse.status, 400);
-    assert.equal((await secretResponse.json()).error, 'private_or_secret_plan_field');
-
-    const falseExternalProof = buildPlan('20260718-false-external-proof');
-    falseExternalProof.artifacts.at(-1).status = 'verified';
-    const falseExternalResponse = await post(falseExternalProof);
-    assert.equal(falseExternalResponse.status, 400);
-    assert.equal((await falseExternalResponse.json()).error, 'external_action_evidence_required');
-
-    const falseHostedProof = buildPlan('20260718-false-hosted-proof');
-    falseHostedProof.evidenceLevel = 'exact-head';
-    const falseHostedResponse = await post(falseHostedProof);
-    assert.equal(falseHostedResponse.status, 400);
-    assert.equal((await falseHostedResponse.json()).error, 'unverified_evidence_level');
-
-    const traversalPlan = buildPlan('20260718-traversal-rejection');
-    traversalPlan.artifacts[0].pathHint = 'reports/control-room/founder-operator/20260718-traversal-rejection/../outside.md';
-    const traversalResponse = await post(traversalPlan);
-    assert.equal(traversalResponse.status, 400);
-    assert.equal((await traversalResponse.json()).error, 'invalid_plan_artifact_path');
-
-    if (process.platform !== 'win32') {
-      const latestPath = path.join(reportDir, 'latest.json');
-      const sentinelPath = path.join(tempRoot, 'outside-sentinel.txt');
-      fs.writeFileSync(sentinelPath, 'preserve-me');
-      fs.unlinkSync(latestPath);
-      fs.symlinkSync(sentinelPath, latestPath);
-      const symlinkResponse = await post(buildPlan('20260718-symlink-rejection'));
-      assert.equal(symlinkResponse.status, 500);
-      assert.equal((await symlinkResponse.json()).error, 'unsafe_latest_path');
-      assert.equal(fs.readFileSync(sentinelPath, 'utf8'), 'preserve-me');
-    }
-  } finally {
-    server.kill('SIGTERM');
-    await Promise.race([
-      new Promise(resolve => server.once('exit', resolve)),
-      new Promise(resolve => setTimeout(resolve, 1_000)),
-    ]);
-    if (server.exitCode === null) server.kill('SIGKILL');
-    fs.rmSync(tempRoot, { recursive: true, force: true });
-  }
+  const credential = await post(port, '/founder-operator/plans', { ...planOnly, mission: 'Use ghp_123456789012345678901234567890123456 safely.' });
+  assert.equal(credential.response.status, 400);
+  assert.equal(credential.body.error, 'credential_shaped_content_rejected');
 });

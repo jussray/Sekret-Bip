@@ -1,0 +1,32 @@
+# Sekret Bip — CODEOWNERS
+# Auto-assigns reviewers by path on every PR.
+# See control-room/bip-os.md Part 2 for rationale.
+
+# Companion logic — personality contracts, tone, memory behavior
+/apps/mobile/src/companions/     @jussray
+
+# Safety engine — teen-facing filters, content rules
+/apps/mobile/src/safety/         @jussray
+/packages/safety-engine/         @jussray
+
+# Parent bridge — visibility, notifications, Circle access
+/apps/mobile/src/parent/         @jussray
+
+# Memory architecture — writes, reads, consent signals
+/apps/mobile/src/memory/         @jussray
+
+# Supabase schema, RLS, migrations
+/packages/supabase/              @jussray
+
+# UI components — scrapbook design system
+/apps/mobile/src/ui/             @jussray
+
+# Cloudflare Workers — orchestration, AI relay
+/packages/workers/               @jussray
+
+# Engineering OS and governance docs
+/control-room/                   @jussray
+
+# Root config — any root-level architectural change
+/wrangler.toml                   @jussray
+/package.json                    @jussray

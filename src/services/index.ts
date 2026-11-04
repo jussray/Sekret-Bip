@@ -5,7 +5,6 @@
  * Import via: import { sendMessage, AI_PERSONALITIES } from '@/services';
  */
 export * from './ai';
-export * from './worker';
 export * from './founderAudit';
 export * from './founderIdeas';
 export * from './controlRoomIssues';

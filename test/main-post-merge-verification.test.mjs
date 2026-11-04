@@ -8,19 +8,35 @@ const playwright = read('.github/workflows/playwright.yml');
 const ci = read('.github/workflows/ci.yml');
 const regression = read('.github/workflows/regression-tests.yml');
 
-function assertPushesToMain(source, name) {
-  const onBlock = source.match(/^on:\n([\s\S]*?)\npermissions:/m)?.[1] ?? '';
-  assert.match(onBlock, /push:\n\s+branches:\s*\[main\]/, `${name} must run after merges to main`);
+function onBlock(source) {
+  return source.match(/^on:\n([\s\S]*?)\n(?:permissions:|env:|concurrency:|jobs:)/m)?.[1] ?? '';
 }
 
-test('critical quality workflows run on the merged main commit', () => {
-  assertPushesToMain(qualityGate, 'Quality Gate');
-  assertPushesToMain(playwright, 'Playwright');
-  assertPushesToMain(ci, 'CI');
-  assert.match(regression, /push:\n\s+branches:\n\s+- main/);
+function assertManualExactHeadGate(source, name) {
+  assert.match(onBlock(source), /workflow_dispatch:/, `${name} must remain manually dispatchable for exact-head proof`);
+}
+
+function assertNoAutomaticMainFanout(source, name) {
+  assert.doesNotMatch(
+    onBlock(source),
+    /push:\n\s+branches:(?:\s*\[main\]|\s*\n\s*- main)/,
+    `${name} must not reintroduce automatic main-push fan-out while Actions budget mode is active`,
+  );
+}
+
+test('critical quality workflows remain manual exact-head gates in Actions budget mode', () => {
+  for (const [name, source] of [
+    ['Quality Gate', qualityGate],
+    ['Playwright', playwright],
+    ['CI', ci],
+    ['Regression', regression],
+  ]) {
+    assertManualExactHeadGate(source, name);
+    assertNoAutomaticMainFanout(source, name);
+  }
 });
 
-test('main verification includes tests, retained failure evidence, build export, RLS evidence, and browser smoke', () => {
+test('manual verification includes tests, retained failure evidence, build export, RLS evidence, and browser smoke', () => {
   assert.match(qualityGate, /npm test/);
   assert.match(qualityGate, /unit-test-output\.log/);
   assert.match(qualityGate, /unit-test-failure-evidence/);
@@ -30,7 +46,9 @@ test('main verification includes tests, retained failure evidence, build export,
   assert.match(playwright, /npx playwright test/);
 });
 
-test('browser workflow triggers when its own main-push contract changes', () => {
-  const pushBlock = playwright.match(/push:\n([\s\S]*?)\n  pull_request:/)?.[1] ?? '';
-  assert.match(pushBlock, /'\.github\/workflows\/playwright\.yml'/);
+test('browser workflow remains an explicit manual release-proof gate', () => {
+  const triggerBlock = onBlock(playwright);
+  assert.match(triggerBlock, /workflow_dispatch:/);
+  assert.doesNotMatch(triggerBlock, /pull_request:/);
+  assert.match(playwright, /npx playwright test --config=playwright\.founder-preview\.config\.ts/);
 });

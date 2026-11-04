@@ -1,0 +1,166 @@
+name: Onboarding and Type Exact-Head Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/services/onboarding.ts
+      - src/context/OnboardingContext.tsx
+      - services/onboarding.ts
+      - context/OnboardingContext.tsx
+      - app/(auth)/**
+      - app/(onboarding)/**
+      - components/auth/AppleSignInButton.tsx
+      - components/companions/AIDisclosureModal.tsx
+      - src/features/safety/**
+      - src/hooks/useSafetyCheck.ts
+      - src/utils/sekretReply.ts
+      - constants/stickerEngine.ts
+      - constants/voiceBip.ts
+      - hooks/useSekretCompanion.ts
+      - services/sekretCheckins.ts
+      - screens/PagesScreen.tsx
+      - screens/VoiceBipScreen.tsx
+      - app/(teen)/pages/**
+      - app/account/security.tsx
+      - src/constants/relationshipFeatureFlags.ts
+      - src/features/bridgeLearning/teachingPolicy.ts
+      - src/features/control-room/WorkerPanel.tsx
+      - worker/health.ts
+      - prototypes/teen-welcome/app.js
+      - prototypes/welcome-web/app.js
+      - docs/archive/code-snapshots/**
+      - scripts/write-release-metadata.mjs
+      - test/release-metadata.test.mjs
+      - test/onboarding-stage-contract.test.mjs
+      - test/bridge-learning-teaching-contract.test.mjs
+      - test/journal-avatar-presentation.test.mjs
+      - test/account-profile-source-of-truth.test.mjs
+      - test/circle-audience-policy.test.mjs
+      - test/control-room-event-logging-contract.test.mjs
+      - test/limited-mode-flow.test.mjs
+      - test/parent-linking.test.mjs
+      - test/parent-verification-transition.test.mjs
+      - test/points-rewards-rpc-contract.test.mjs
+      - test/safety-alert-runtime-schema.test.mjs
+      - test/supabase-bridge-rls-authorization.test.mjs
+      - test/trigger-function-hardening.test.mjs
+      - e2e/smoke.spec.ts
+      - package.json
+      - package-lock.json
+      - .github/workflows/onboarding-type-gate.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: onboarding-type-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  EXPO_NO_TELEMETRY: '1'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify-onboarding-and-types:
+    name: Typecheck, lint, unit, bundle, and onboarding smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gate-evidence
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          printf 'expected_head_sha=%s\nactual_head_sha=%s\nworkflow_run_id=%s\n' \
+            "$EXPECTED_HEAD_SHA" "$ACTUAL_HEAD_SHA" "$GITHUB_RUN_ID" \
+            | tee gate-evidence/exact-head.txt
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Run TypeScript with zero-error requirement
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run type-check 2>&1 | tee gate-evidence/typecheck.log
+
+      - name: Run repository lint
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee gate-evidence/lint.log
+
+      - name: Run focused onboarding and touched-contract tests
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test \
+            test/onboarding-stage-contract.test.mjs \
+            test/bridge-learning-teaching-contract.test.mjs \
+            test/journal-avatar-presentation.test.mjs \
+            2>&1 | tee gate-evidence/focused-tests.log
+
+      - name: Run complete unit suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee gate-evidence/unit-tests.log
+
+      - name: Verify production bundle export
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run verify:bundle 2>&1 | tee gate-evidence/bundle.log
+          node --input-type=module -e "
+            import fs from 'node:fs';
+            const marker = JSON.parse(fs.readFileSync('dist/release.json', 'utf8'));
+            const expected = process.env.EXPECTED_HEAD_SHA.toLowerCase();
+            if (marker.commitSha !== expected) {
+              console.error('RELEASE_MARKER_HEAD_MISMATCH expected=' + expected + ' actual=' + marker.commitSha);
+              process.exit(1);
+            }
+            console.log('release_marker_head=' + marker.commitSha);
+          " 2>&1 | tee -a gate-evidence/bundle.log
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run focused onboarding web smoke
+        shell: bash
+        run: |
+          set -o pipefail
+          npx playwright test e2e/smoke.spec.ts \
+            --grep "teen splash leads into age-bucket onboarding|login deep link|signup deep link" \
+            --trace on 2>&1 | tee gate-evidence/playwright.log
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: onboarding-type-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            gate-evidence/
+            test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14

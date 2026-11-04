@@ -1,103 +1,123 @@
 # Cloudflare Ownership
 
-Last reviewed: 2026-07-13
+Last reviewed: 2026-08-28
 
-## Canonical split
+## Current release gate
 
-Se'kret Bip uses two distinct Cloudflare deployment targets, both deployed from `main` through Cloudflare native Git integration.
+[P0 #696](https://github.com/jussray/Sekret-Bip/issues/696) owns exact-production release truth. Repository topology below is intended authority and safety policy; it is not a substitute for live Cloudflare route/custom-domain readback for the same target.
 
-### `sekret-backend` — backend Worker
+## Canonical Cloudflare surfaces
 
-Verified by `wrangler.toml`, Worker identity tests, and Cloudflare Workers Builds:
+Se’kret Bip keeps these Cloudflare identities distinct:
 
-- Worker name: `sekret-backend`
-- Entry point: `worker/observed-index.ts`
-- Production endpoint: `https://sekret-backend.mcgill-raylene.workers.dev`
+1. `sekret-bip` — Cloudflare Pages frontend project;
+2. `sekret-backend` — canonical public API/front-door and privileged platform Worker;
+3. `bip` — current provider name for the active companion Worker lineage, formerly `sekret`;
+4. `sekret-backend-alpha` — founder-gated non-production Worker.
 
-Responsibilities:
+`bip-mail` remains retired. `bip` is not a legacy/deletion target. Exact provider route/custom-domain readback is still required before any traffic or binding mutation. The provider rename from `sekret` to `bip` does not by itself prove that every historical route, trigger, binding, or caller moved unchanged.
 
-- authenticated API routes;
-- Supabase access and authorization checks;
-- AI reply generation and canonical identity/style enforcement;
-- transcription and TTS relay;
-- Bridge summary generation;
-- safety, push, and backend business logic;
-- metadata-only telemetry.
+## Current checked-in routing versus purpose boundary
 
-Mobile and web clients call this backend through `EXPO_PUBLIC_BACKEND_URL`.
-
-### `sekret-bip` — frontend Cloudflare Pages project
-
-Canonical responsibilities:
-
-- host the Expo web export;
-- serve the custom domain;
-- deliver frontend routes and static assets;
-- bootstrap the React Native Web application;
-- expose the public non-sensitive `release.json` commit marker.
-
-Cloudflare Pages builds from `main` through the GitHub App. GitHub Actions does not run a second production upload.
-
-## Request flow
+The production client remains single-homed:
 
 ```text
-sekretbip.net
+web/native client
     |
     v
-Cloudflare Pages project: sekret-bip
+https://api.sekretbip.net
     |
     v
-Expo web frontend + release.json
-    |
-    v
-Cloudflare Worker: sekret-backend
-    |
-    +--> Supabase
-    +--> AI / voice providers
-    +--> Bridge
-    +--> Safety / push
+sekret-backend
 ```
+
+`.env.production` and EAS production profiles point `EXPO_PUBLIC_BACKEND_URL` to `https://api.sekretbip.net`. `wrangler.toml` attaches that custom domain to `sekret-backend` in repository intent.
+
+The companion contract remains `/api/sekret/reply`, `/api/sekret/voice`, `/api/sekret/transcribe`, companion style/safety enforcement, AI/voice provider execution, and companion telemetry. The route name retains the product term `sekret`; that does not require the Cloudflare Worker resource itself to keep the historical provider name `sekret`.
+
+## Preferred runtime partition
+
+```text
+client
+  |
+  v
+api.sekretbip.net
+  |
+  v
+sekret-backend  -- public ingress / platform authority
+  |
+  +-- /api/bridge/* + privileged data + email + platform operations
+  |
+  +-- /api/sekret/*
+          |
+          v
+      Service Binding
+          |
+          v
+        bip  -- companion execution authority
+```
+
+Cloudflare Service Bindings remain the preferred Worker-to-Worker boundary because the public client keeps one stable API origin. This target partition is not yet a production cutover claim.
+
+## `bip` — companion execution authority
+
+Best-fit responsibilities:
+
+- companion reply generation;
+- companion voice synthesis and transcription;
+- companion runtime style/identity enforcement;
+- companion safety-response logic coupled to reply generation;
+- AI/voice provider selection and provider-specific secrets;
+- companion telemetry that does not require broad database privilege.
+
+`bip` must not acquire `SUPABASE_SERVICE_ROLE_KEY` merely to make the split easy. If it becomes service-binding-only, public routing and `workers.dev` exposure must be reviewed separately rather than assumed.
+
+## `sekret-backend` — public ingress and privileged platform authority
+
+Current repository authority:
+
+- Worker name: `sekret-backend`;
+- entry point: `worker/voice-entry.ts`;
+- canonical API custom domain: `https://api.sekretbip.net`.
+
+It remains responsible for stable public ingress, shared auth/CORS/release controls, Bridge privacy/data authorization, server-side Supabase service-role operations, inbound email, and other privileged platform logic.
+
+## `sekret-bip` — Cloudflare Pages project
+
+Pages remains the frontend authority with intended build command `npm run build:web`, output directory `dist`, and public `/.well-known/sekret-release.json` marker. A Pages build badge alone does not prove the custom domain reaches Pages.
+
+## Provider readback required for `bip`
+
+Before any binding, route, trigger, domain, or deployment mutation, retain a provider receipt covering:
+
+- immutable current Worker/script identity and evidence linking current `bip` to previous provider name `sekret`;
+- current routes and custom domains;
+- `workers.dev` state;
+- service bindings and other platform bindings;
+- environment-variable and secret names only;
+- Git repository/branch connection and build trigger policy;
+- recent request volume/errors and known callers.
+
+Founder confirmation establishes purpose. Provider readback establishes exact traffic state.
 
 ## Ownership rules
 
-- Frontend assets, Expo routes, and browser delivery belong to `sekret-bip`.
-- API routes, secrets, database access, and business logic belong to `sekret-backend`.
-- Service-role credentials, AI provider credentials, and server-only shared secrets must never enter the frontend bundle.
-- Do not rename either target to match the custom domain or an old project name.
-- Do not create a second token-based production deployment path alongside Cloudflare native Git integration.
-- Verify repository configuration and deployed runtime evidence before changing ownership claims.
+- Product clients keep one stable production API origin unless separately approved.
+- Companion behavior belongs conceptually to `bip`; current client routing through `sekret-backend` remains valid until internal delegation is proven.
+- `api.sekretbip.net` remains on `sekret-backend` during the preferred service-binding migration.
+- Do not duplicate `SUPABASE_SERVICE_ROLE_KEY` into `bip`.
+- `bip` must not be deleted, detached, repurposed, or treated as historical merely because the provider name changed.
+- The historical name `sekret` is provenance only and must not be used as present provider identity after the rename evidence.
+- Frontend Pages authority and Worker authority remain separate.
+- `bip-mail` must not regain production authority.
+- Do not create a second token-based production deployment path alongside reviewed provider integration.
 
 ## Exact-release verification
 
-Production verification requires independent evidence for the exact expected `main` commit:
+While routing remains consolidated, production verification must prove the exact `sekret-backend` release at `api.sekretbip.net` plus applicable companion journeys. After an approved service-binding cutover, proof must additionally bind the exact `bip` version and the provider binding between `sekret-backend` and `bip`.
 
-1. `Workers Builds: sekret-backend` succeeds for that commit.
-2. `https://sekretbip.net/release.json` reports the same commit SHA and branch.
-3. `https://sekret-backend.mcgill-raylene.workers.dev/health` succeeds.
-4. read-only production Playwright verifies the release marker and protected routes.
-5. the evidence artifact is retained by GitHub Actions.
-
-```bash
-curl --fail https://sekret-backend.mcgill-raylene.workers.dev/health
-curl --fail https://sekretbip.net/release.json
-npm run test:e2e:production
-```
-
-A stale Pages check or historical deployment function is not sufficient proof of what is serving traffic.
-
-## Retired release path
-
-The Supabase `release-health` Edge Function is retired as a JWT-protected HTTP 410 endpoint. It must not be used as deployment authority, release telemetry, or proof of the current commit.
-
-Canonical evidence comes from `.github/workflows/deploy-cloudflare.yml`, `scripts/verify-cloudflare-native-deploy.mjs`, the deployed release marker, Worker health, and production Playwright.
+A stale Pages check, Worker badge, historical route statement, or Access interception is not current production proof.
 
 ## Emergency manual fallback
 
-Manual Worker or Pages upload is an administrator-only fallback documented in `DEPLOYMENT.md`. Any emergency use must record:
-
-- exact source commit;
-- command and target;
-- credentials scope;
-- validation performed;
-- rollback;
-- immediate repository reconciliation.
+Manual Worker, route, domain, service-binding, or Pages mutation is administrator-only fallback. Any emergency use must record exact source commit, provider object, hostname, before/after readback, validation, rollback, and immediate repository reconciliation.

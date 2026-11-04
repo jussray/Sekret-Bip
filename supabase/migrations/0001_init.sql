@@ -167,6 +167,25 @@ begin
   end loop;
 end $$;
 
+-- Production retained these four all-operation self policies alongside the
+-- per-command owner policies. They existed before the recorded June 29 auth
+-- hardening migrations, so fresh replay must reconstruct that precondition.
+drop policy if exists mood_history_self on public.mood_history;
+create policy mood_history_self on public.mood_history
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists journal_entries_self on public.journal_entries;
+create policy journal_entries_self on public.journal_entries
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists voice_notes_self on public.voice_notes;
+create policy voice_notes_self on public.voice_notes
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+drop policy if exists period_days_self on public.period_days;
+create policy period_days_self on public.period_days
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 create index if not exists idx_mood_user_date           on public.mood_history        (user_id, date);
 create index if not exists idx_journal_user_date        on public.journal_entries     (user_id, date);
 create index if not exists idx_circle_user_date         on public.circle_posts        (user_id, date);

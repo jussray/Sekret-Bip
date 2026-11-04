@@ -1,0 +1,57 @@
+name: Production Deploy Branch Guard
+
+on:
+  pull_request:
+    paths:
+      - package.json
+      - scripts/assert-production-deploy-branch.mjs
+      - test/production-deploy-branch-guard.test.mjs
+      - wrangler.toml
+      - wrangler.alpha.toml
+      - .github/workflows/production-deploy-branch-guard.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run branch guard contracts
+        run: node --test test/production-deploy-branch-guard.test.mjs
+
+      - name: Prove main is accepted
+        env:
+          WORKERS_CI: '1'
+          WORKERS_CI_BRANCH: main
+        run: npm run verify:production-deploy-branch
+
+      - name: Prove feature branches fail closed
+        env:
+          WORKERS_CI: '1'
+          WORKERS_CI_BRANCH: ${{ github.head_ref || 'feature-branch' }}
+        run: |
+          if npm run verify:production-deploy-branch; then
+            echo 'Guard unexpectedly accepted a non-production branch.' >&2
+            exit 1
+          fi
+          echo 'Guard correctly rejected the non-production branch.'
+
+      - name: Verify Worker bundle without deployment
+        run: npx wrangler deploy --dry-run

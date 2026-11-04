@@ -1,0 +1,124 @@
+name: Comfort Mode Exact-Head Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - screens/ComfortScreen.tsx
+      - app/(teen)/comfort.tsx
+      - src/motion/comfortMotion.ts
+      - src/utils/api.ts
+      - utils/api.ts
+      - scripts/playwright-executable.mjs
+      - test/comfort-accessibility-motion-contract.test.mjs
+      - test/canonical-comfort-cloud-routes.test.mjs
+      - test/settings-companion-canon.test.mjs
+      - e2e/comfort-boundary.spec.ts
+      - playwright.config.ts
+      - package.json
+      - package-lock.json
+      - .github/workflows/comfort-mode-gate.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: comfort-mode-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  EXPO_NO_TELEMETRY: '1'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  verify-comfort:
+    name: Canon, completion, motion, accessibility, and authorization proof
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gate-evidence
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          printf 'expected_head_sha=%s\nactual_head_sha=%s\nworkflow_run_id=%s\n' \
+            "$EXPECTED_HEAD_SHA" "$ACTUAL_HEAD_SHA" "$GITHUB_RUN_ID" \
+            | tee gate-evidence/exact-head.txt
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Run focused Comfort contracts
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test \
+            test/comfort-accessibility-motion-contract.test.mjs \
+            test/canonical-comfort-cloud-routes.test.mjs \
+            test/settings-companion-canon.test.mjs \
+            2>&1 | tee gate-evidence/comfort-contracts.log
+
+      - name: Run zero-error TypeScript
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run type-check 2>&1 | tee gate-evidence/typecheck.log
+
+      - name: Run repository lint
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run lint 2>&1 | tee gate-evidence/lint.log
+
+      - name: Run complete unit suite
+        shell: bash
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee gate-evidence/unit.log
+
+      - name: Verify production web bundle
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run build:web 2>&1 | tee gate-evidence/bundle.log
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prove unauthenticated Comfort route remains private
+        shell: bash
+        run: |
+          set -o pipefail
+          npx playwright test e2e/comfort-boundary.spec.ts \
+            --trace on 2>&1 | tee gate-evidence/playwright.log
+
+      - name: Upload exact-head Comfort evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: comfort-mode-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            gate-evidence/
+            test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14

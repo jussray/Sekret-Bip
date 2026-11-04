@@ -35,6 +35,20 @@ export interface FounderAuditCard {
   source: 'static-playbook' | 'live-audit-event';
 }
 
+export interface FounderBusinessSnapshot {
+  // A trustworthy cross-account total needs an approved founder-only aggregate RPC.
+  // Returning null prevents own-row RLS from masquerading as the global user count.
+  users: number | null;
+  openIssues: number;
+  unresolvedAudits: number;
+  releases: number;
+  latestRelease: {
+    release_key: string;
+    status: string;
+    deployed_at: string;
+  } | null;
+}
+
 const FOUNDER_ROLES = new Set<string>(['developer', 'admin', 'founder']);
 
 export const founderAuditPlaybook: FounderAuditCard[] = [
@@ -52,7 +66,7 @@ export const founderAuditPlaybook: FounderAuditCard[] = [
     category: 'structure',
     severity: 'critical',
     title: 'Create one companion runtime orchestrator',
-    summary: 'Raylene, Rylane, Cloud, Night, Voice Bip, Circle replies, Bridge, and Oracle should not each own separate AI logic.',
+    summary: 'Suhana, Sy, Cloud, Night, Voice Bip, Circle replies, Bridge, and Oracle should not each own separate AI logic.',
     fix: 'Move context building, memory retrieval, safety gating, model call, response shaping, and audit logging into one Worker route.',
     source: 'static-playbook',
   },
@@ -106,7 +120,7 @@ export const founderAuditPlaybook: FounderAuditCard[] = [
     category: 'product',
     severity: 'warning',
     title: 'Audit companion quality and persona drift',
-    summary: 'Raylene, Rylane, Cloud, Night, and Oracle need checks for tone, recall, safety, and whether replies still feel like Se’kret Bip.',
+    summary: 'Suhana, Sy, Cloud, Night, and Oracle need checks for tone, recall, safety, and whether replies still feel like Se’kret Bip.',
     fix: 'Add eval cards for persona drift, wrong companion name, stale fallback, unsafe advice, low empathy, and memory mismatch.',
     source: 'static-playbook',
   },
@@ -114,6 +128,14 @@ export const founderAuditPlaybook: FounderAuditCard[] = [
 
 export function isFounderProfile(profile: FounderProfile | null): boolean {
   return Boolean(profile?.can_view_audits && FOUNDER_ROLES.has(profile.role));
+}
+
+export function isFounderBusinessProfile(profile: FounderProfile | null): boolean {
+  return Boolean(
+    profile?.role === 'founder'
+      && profile.can_manage_app
+      && profile.can_view_audits,
+  );
 }
 
 export async function getCurrentFounderProfile(): Promise<FounderProfile | null> {
@@ -133,6 +155,77 @@ export async function getCurrentFounderProfile(): Promise<FounderProfile | null>
 
   if (error || !data) return null;
   return data as FounderProfile;
+}
+
+/**
+ * Founder lookup used during post-auth routing. Unlike the read-only dashboard
+ * helper above, this path must distinguish "not a founder" from "founder state
+ * could not be verified". A provider/read failure after successful Supabase
+ * authentication therefore fails closed instead of silently routing a founder
+ * into public teen/parent onboarding.
+ */
+export async function getCurrentFounderProfileForRouting(): Promise<FounderProfile | null> {
+  if (!isSupabaseConfigured) {
+    throw new Error('Signed in, but we could not verify your account access. Please try again.');
+  }
+  const sb = getSupabase();
+  if (!sb) {
+    throw new Error('Signed in, but we could not verify your account access. Please try again.');
+  }
+
+  const { data: authData, error: authError } = await sb.auth.getUser();
+  if (authError) {
+    throw new Error('Signed in, but we could not verify your account access. Please try again.');
+  }
+  const userId = authData.user?.id;
+  if (!userId) throw new Error('A permanent signed-in account is required.');
+
+  const { data, error } = await sb
+    .from('app_profiles')
+    .select('user_id,email,role,can_view_audits,can_manage_app,exclude_from_analytics')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error('Signed in, but we could not verify your account access. Please try again.');
+  }
+  return data ? data as FounderProfile : null;
+}
+
+export async function getFounderBusinessSnapshot(): Promise<FounderBusinessSnapshot | null> {
+  const profile = await getCurrentFounderProfile();
+  if (!isFounderBusinessProfile(profile)) return null;
+
+  const sb = getSupabase();
+  if (!sb) return null;
+
+  const [issuesResult, auditsResult, releasesResult, latestReleaseResult] = await Promise.all([
+    sb
+      .from('control_room_issues')
+      .select('id', { count: 'exact', head: true })
+      .neq('status', 'resolved')
+      .neq('status', 'ignored'),
+    sb.from('audit_events').select('id', { count: 'exact', head: true }).eq('resolved', false),
+    sb.from('control_room_releases').select('id', { count: 'exact', head: true }),
+    sb
+      .from('control_room_releases')
+      .select('release_key,status,deployed_at')
+      .order('deployed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  const firstError = [issuesResult.error, auditsResult.error, releasesResult.error, latestReleaseResult.error]
+    .find(Boolean);
+  if (firstError) throw firstError;
+
+  return {
+    users: null,
+    openIssues: issuesResult.count ?? 0,
+    unresolvedAudits: auditsResult.count ?? 0,
+    releases: releasesResult.count ?? 0,
+    latestRelease: latestReleaseResult.data ?? null,
+  };
 }
 
 export async function listFounderAuditEvents(limit = 40): Promise<AuditEvent[]> {

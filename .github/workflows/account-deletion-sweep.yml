@@ -2,11 +2,7 @@ name: Account Deletion Sweep
 
 on:
   schedule:
-    # Runs once daily. account-delete only processes requests whose
-    # seven-day grace period has already expired, so a daily cadence is
-    # enough slack for a scheduling delay without materially extending
-    # anyone's grace period.
-    - cron: '17 9 * * *'
+    - cron: '17 8 * * *'
   workflow_dispatch: {}
 
 permissions:

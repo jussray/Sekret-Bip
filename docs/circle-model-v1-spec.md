@@ -8,6 +8,8 @@
 
 The Circle system defines **who can see what** in Se'kret Bip. Every post, mood entry, and interaction is scoped to one of four circles. Circles are not friend lists — they are **trust tiers** with distinct visibility rules and identity behaviors.
 
+Circle Social Entry is documented separately in [`docs/CIRCLE_SOCIAL_ENTRY.md`](CIRCLE_SOCIAL_ENTRY.md). It may make Circle easier to reach from familiar external apps, but it must not change Circle Core behavior, feeling validation, Bip Crew/friend flows, identity rules, moderation, or privacy boundaries.
+
 ---
 
 ## The Four Circles
@@ -47,6 +49,20 @@ The Circle system defines **who can see what** in Se'kret Bip. Every post, mood 
 - Teen identity shown to parent; parent identity shown to teen
 - Teen can set "quiet hours" during which non-emergency data is held
 - Parent cannot post into teen's feed — bridge is read + alert only
+
+---
+
+## Circle Social Entry Non-Change Rule
+
+Familiar external apps may help users discover or enter Circle, but Circle itself remains Se'kret-owned.
+
+Circle Social Entry must preserve these rules:
+
+- Feeling validation happens inside Se'kret Circle, not in public platform comment threads.
+- Bip Crew members and trusted friends continue to work through Se'kret's own trust tiers.
+- External followers, comments, DMs, likes, or platform-native friend graphs must not replace Open Bip, My Circle, Crew Bip, or Parent Bridge rules.
+- Public social posts may invite a user into Circle, but they must not imply that Circle Core runs on TikTok, Instagram, or Facebook.
+- Familiar-app entry reduces friction only; it must not import follower pressure, public diary pressure, open stranger DMs, or clout loops.
 
 ---
 
@@ -167,6 +183,12 @@ Every post requires a circle selection before publish. The composer enforces:
 - [ ] Crew invite flow (max 15 enforced)
 - [ ] "People Who Bip With Me" screen
 
+### Phase 6 — Circle Social Entry
+- [ ] Add only familiar-app entry or deep-link routes that return to Se'kret-owned Circle surfaces
+- [ ] Prove Circle Core visibility, identity, validation, Bip Crew/friend, and moderation rules remain unchanged
+- [ ] Block platform-native follower/comment/DM graphs from becoming Circle membership or trust evidence
+- [ ] Add tests proving external entry cannot bypass circle selection, identity toggles, RLS, or moderation
+
 ---
 
 ## Notes
@@ -175,7 +197,8 @@ Every post requires a circle selection before publish. The composer enforces:
 - Quiet hours apply to non-emergency mood data only; safety alerts always fire
 - V2 will explore a second parent/guardian slot and crew size expansion
 - All Se'kret Bip language labels are final — do not revert to generic social terms in any user-facing string
+- Circle Social Entry is a doorway into Circle, not an external-platform replacement for Circle
 
 ---
 
-*Last updated: June 2026 — Circle Model V1*
+*Last updated: July 2026 — Circle Model V1 + Social Entry boundary*

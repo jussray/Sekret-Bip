@@ -102,7 +102,7 @@ test('runPreflight truncates history beyond MAX_HISTORY_TURNS and flags it', () 
 
 // ─── The exact gap the L99 audit flagged: index.ts must forward principal ──
 test('worker/index.ts forwards the authenticated principal to sekret-reply.ts', () => {
-  assert.match(indexTs, /return worker\.fetch\(request, env as \{ OPENAI_API_KEY: string \}, principal\);/,
+  assert.match(indexTs, /worker\.fetch\(request, env as \{ OPENAI_API_KEY: string \}, principal\)/,
     'index.ts previously dropped `principal` on this call — this is the regression guard for that exact bug');
 });
 

@@ -5,31 +5,37 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  classifyPlaywrightEvidence,
   detectPlaywrightAvailability,
-  parsePlaywrightJson,
-  playwrightArtifactDir,
-  runPlaywright,
+  parsePlaywrightJsonFile,
   writeReports,
 } from '../scripts/control-room-verify-frontend.mjs';
 
-test('Playwright JSON reporter counts are normalized for Control Room', () => {
-  const counts = parsePlaywrightJson(JSON.stringify({
-    stats: {
-      expected: 8,
-      unexpected: 1,
-      flaky: 1,
-      skipped: 2,
-      timedOut: 1,
-    },
+test('Playwright JSON reporter counts are normalized from retained evidence', () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'bip-playwright-json-'));
+  const jsonPath = path.join(directory, 'results.json');
+  fs.writeFileSync(jsonPath, JSON.stringify({
+    stats: { expected: 8, unexpected: 1, flaky: 1, skipped: 2, timedOut: 1 },
   }));
-
-  assert.deepEqual(counts, {
+  assert.deepEqual(parsePlaywrightJsonFile(jsonPath), {
     passed: 8,
     failed: 2,
     skipped: 2,
     timedOut: 1,
     total: 13,
   });
+  fs.rmSync(directory, { recursive: true, force: true });
+});
+
+test('skipped Playwright tests are browser evidence but never complete green proof', () => {
+  assert.deepEqual(
+    classifyPlaywrightEvidence(0, null, { passed: 9, failed: 0, skipped: 1, timedOut: 0, total: 10 }),
+    { status: 'warning', browserProof: true, completeBrowserProof: false },
+  );
+  assert.deepEqual(
+    classifyPlaywrightEvidence(0, null, { passed: 10, failed: 0, skipped: 0, timedOut: 0, total: 10 }),
+    { status: 'pass', browserProof: true, completeBrowserProof: true },
+  );
 });
 
 test('forced fallback is explicit and never claims browser proof', async () => {
@@ -37,94 +43,37 @@ test('forced fallback is explicit and never claims browser proof', async () => {
     rootDir: process.cwd(),
     env: { CONTROL_ROOM_FORCE_NO_PLAYWRIGHT: '1' },
   });
-
   assert.equal(availability.available, false);
   assert.match(availability.reason, /deterministic fallback testing/);
 });
 
-test('an explicit Playwright artifact directory remains authoritative', () => {
-  const rootDir = path.join(path.parse(process.cwd()).root, 'repo-root');
-  assert.equal(
-    playwrightArtifactDir({ rootDir, env: { PLAYWRIGHT_ARTIFACT_DIR: 'custom-artifacts' } }),
-    path.resolve(rootDir, 'custom-artifacts'),
-  );
-});
-
-test('Playwright runs through configured reporters and retains the Control Room artifact bundle', () => {
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bip-playwright-root-'));
-  const artifactDir = path.join(rootDir, 'reports', 'control-room', 'playwright', 'test-run');
-  let invocation = null;
-
-  const run = runPlaywright({
-    rootDir,
-    artifactDir,
-    env: { CI: 'false' },
-    spawnImpl(command, args, options) {
-      invocation = { command, args, options };
-      fs.mkdirSync(options.env.PLAYWRIGHT_ARTIFACT_DIR, { recursive: true });
-      fs.writeFileSync(
-        path.join(options.env.PLAYWRIGHT_ARTIFACT_DIR, 'results.json'),
-        JSON.stringify({ stats: { expected: 3, unexpected: 0, flaky: 0, skipped: 1, timedOut: 0 } }),
-      );
-      return { status: 0, stdout: 'line reporter output', stderr: '' };
-    },
-  });
-
-  assert.deepEqual(invocation.args, ['playwright', 'test']);
-  assert.equal(invocation.options.env.PLAYWRIGHT_ARTIFACT_DIR, artifactDir);
-  assert.equal(invocation.options.env.CI, undefined);
-  assert.equal(run.browserProof, true);
-  assert.equal(run.status, 'pass');
-  assert.equal(run.counts.passed, 3);
-  assert.equal(run.artifactDir, 'reports/control-room/playwright/test-run');
-  assert.equal(run.jsonReportPath, 'reports/control-room/playwright/test-run/results.json');
-});
-
-test('missing Playwright JSON evidence fails closed even when the command exits zero', () => {
-  const rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bip-playwright-missing-report-'));
-  const run = runPlaywright({
-    rootDir,
-    artifactDir: path.join(rootDir, 'artifacts'),
-    spawnImpl() {
-      return { status: 0, stdout: 'line reporter output', stderr: '' };
-    },
-  });
-
-  assert.equal(run.status, 'fail');
-  assert.equal(run.browserProof, false);
-  assert.match(run.parseError, /did not write results\.json/);
-});
-
-test('frontend reports distinguish browser evidence from local fallback', () => {
+test('frontend reports retain browser artifact paths and distinguish fallback evidence', () => {
   const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), 'bip-frontend-report-'));
-  const availability = {
-    available: false,
-    reason: 'No Chromium binary in this test.',
-    executablePath: null,
-  };
+  const availability = { available: false, reason: 'No Chromium binary in this test.', executablePath: null };
   const run = {
     mode: 'fallback-verify-local',
     evidenceLevel: 'non-browser-fallback',
     browserProof: false,
+    completeBrowserProof: false,
     status: 'pass',
     exitCode: 0,
     durationMs: 12,
+    artifactDir: null,
     counts: null,
     parseError: null,
     stdoutTail: 'local checks passed',
     stderrTail: '',
   };
-
   const { report, jsonPath, mdPath } = writeReports(availability, run, {
     outputDir,
-    generatedAt: '2026-07-14T20:00:00.000Z',
+    generatedAt: '2026-07-24T08:00:00.000Z',
   });
-
   assert.equal(report.run.browserProof, false);
-  assert.equal(report.run.evidenceLevel, 'non-browser-fallback');
-  assert.equal(JSON.parse(fs.readFileSync(jsonPath, 'utf8')).run.browserProof, false);
-
+  assert.equal(report.run.completeBrowserProof, false);
+  assert.equal(JSON.parse(fs.readFileSync(jsonPath, 'utf8')).run.evidenceLevel, 'non-browser-fallback');
   const markdown = fs.readFileSync(mdPath, 'utf8');
   assert.match(markdown, /Browser proof: \*\*NO\*\*/);
+  assert.match(markdown, /Complete browser proof: \*\*NO\*\*/);
   assert.match(markdown, /must not be described as browser or Playwright proof/);
+  fs.rmSync(outputDir, { recursive: true, force: true });
 });

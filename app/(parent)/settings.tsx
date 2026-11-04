@@ -1,35 +1,37 @@
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-  View,
+  Alert,
+  Clipboard,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  SafeAreaView,
-  Switch,
-  Alert,
-  Clipboard,
+  View,
 } from 'react-native';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppContext } from '@/context/AppContext';
 import { THEME_PACKS } from '@constants/theme';
 import {
+  cancelDailyReminder,
   requestNotificationPermissions,
   scheduleDailyReminder,
-  cancelDailyReminder,
 } from '@/utils/notifications';
 import { createParentLink, redeemParentLink } from '@/utils/parentBridgeCompat';
-import { revokeParentLink } from '@/utils/parentLink';
 import { useSleepGuard, type SleepWindow } from '../../hooks/useSleepGuard';
 import { AccountDeletionControls } from '@/components/settings/AccountDeletionControls';
+import { ParentLinkStatusCard } from '@/components/settings/ParentLinkStatusCard';
 
 const THEME_ORDER = Object.keys(THEME_PACKS) as (keyof typeof THEME_PACKS)[];
 
+// Compatibility keys remain unchanged so persisted selections keep working.
+// Only user-facing names use the current Se'kret Bip canon.
 const COMPANIONS = [
-  { key: 'soft', name: 'Raylene', emoji: '💜', title: 'Big Sis', tagline: 'warm · protective · emotionally real' },
-  { key: 'rylane', name: 'Rylane', emoji: '⚡', title: 'Loyal Bro', tagline: 'street smart · down to earth · no cap' },
+  { key: 'soft', name: 'Suhana', emoji: '💜', title: 'Big Sis', tagline: 'warm · protective · emotionally real' },
+  { key: 'rylane', name: 'Sy', emoji: '⚡', title: 'Loyal Bro', tagline: 'street smart · down to earth · no cap' },
 ];
 
 const SEKRET_MODES = [
@@ -55,11 +57,16 @@ function themeLabel(key: keyof typeof THEME_PACKS): string {
 
 export default function SettingsScreen() {
   const {
-    theme, setTheme,
-    userSide, setUserSide,
-    selectedSekret, setSelectedSekret,
-    sekretMode, setSekretMode,
-    notificationsEnabled, setNotificationsEnabled,
+    theme,
+    setTheme,
+    userSide,
+    setUserSide,
+    selectedSekret,
+    setSelectedSekret,
+    sekretMode,
+    setSekretMode,
+    notificationsEnabled,
+    setNotificationsEnabled,
     resetApp,
   } = useAppContext();
 
@@ -69,8 +76,8 @@ export default function SettingsScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [codeInput, setCodeInput] = useState('');
   const [isRedeeming, setIsRedeeming] = useState(false);
-  const [isUnlinking, setIsUnlinking] = useState(false);
   const [redeemStatus, setRedeemStatus] = useState<RedeemStatus>('idle');
+  const [linkStatusVersion, setLinkStatusVersion] = useState(0);
 
   async function handleNotificationToggle(enabled: boolean) {
     if (enabled) {
@@ -109,37 +116,16 @@ export default function SettingsScreen() {
     );
   }
 
-  function handleUnlinkTeen() {
-    Alert.alert(
-      'Unlink teen?',
-      'Your linked access will be removed immediately. A new invite is required to reconnect.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Unlink',
-          style: 'destructive',
-          onPress: async () => {
-            setIsUnlinking(true);
-            const revoked = await revokeParentLink();
-            setIsUnlinking(false);
-            if (revoked) {
-              setInviteCode('');
-              Alert.alert('Teen unlinked', 'Your linked access has been removed.');
-            } else {
-              Alert.alert('Could not unlink', 'No active link was found, or the connection could not be updated.');
-            }
-          },
-        },
-      ],
-    );
-  }
-
   const handleGenerateCode = useCallback(async () => {
     setIsGenerating(true);
     const code = await createParentLink();
     setIsGenerating(false);
-    if (code) setInviteCode(code);
-    else Alert.alert('Not signed in', 'Sign in to your account first, then generate a link code.');
+    if (code) {
+      setInviteCode(code);
+      setLinkStatusVersion((value) => value + 1);
+    } else {
+      Alert.alert('Not signed in', 'Sign in to your account first, then generate a link code.');
+    }
   }, []);
 
   const handleCopyCode = useCallback(() => {
@@ -153,18 +139,21 @@ export default function SettingsScreen() {
     setIsRedeeming(true);
     const raw = await redeemParentLink(codeInput);
     setIsRedeeming(false);
-    const VALID: RedeemStatus[] = ['idle', 'ok', 'not_found', 'error'];
-    setRedeemStatus(VALID.includes(raw as RedeemStatus) ? (raw as RedeemStatus) : 'error');
+    const valid: RedeemStatus[] = ['idle', 'ok', 'not_found', 'error'];
+    const result = valid.includes(raw as RedeemStatus) ? (raw as RedeemStatus) : 'error';
+    setRedeemStatus(result);
+    if (result === 'ok') setLinkStatusVersion((value) => value + 1);
   }, [codeInput]);
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Settings</Text>
+
         <Text style={styles.sectionTitle}>Side</Text>
         <View style={styles.row}>
           <Text style={styles.label}>Parent side</Text>
-          <Switch value={userSide === 'parent'} onValueChange={(v) => setUserSide(v ? 'parent' : 'teen')} />
+          <Switch value={userSide === 'parent'} onValueChange={(value) => setUserSide(value ? 'parent' : 'teen')} />
         </View>
 
         <Text style={styles.sectionTitle}>Theme</Text>
@@ -176,18 +165,25 @@ export default function SettingsScreen() {
         ))}
 
         <Text style={styles.sectionTitle}>Companion</Text>
-        {COMPANIONS.map((c) => (
-          <TouchableOpacity key={c.key} style={styles.option} onPress={() => setSelectedSekret(c.key)}>
-            <Text style={styles.optionText}>{c.emoji} {c.name} — {c.title}</Text>
-            {selectedSekret === c.key && <Text style={styles.check}>✓</Text>}
+        {COMPANIONS.map((companion) => (
+          <TouchableOpacity
+            key={companion.key}
+            style={styles.option}
+            onPress={() => setSelectedSekret(companion.key)}
+            accessibilityRole="button"
+            accessibilityLabel={`Choose ${companion.name}, ${companion.title}`}
+            accessibilityState={{ selected: selectedSekret === companion.key }}
+          >
+            <Text style={styles.optionText}>{companion.emoji} {companion.name} — {companion.title}</Text>
+            {selectedSekret === companion.key && <Text style={styles.check}>✓</Text>}
           </TouchableOpacity>
         ))}
 
-        <Text style={styles.sectionTitle}>Se'kret mode</Text>
-        {SEKRET_MODES.map((m) => (
-          <TouchableOpacity key={m.key} style={styles.option} onPress={() => setSekretMode(m.key)}>
-            <Text style={styles.optionText}>{m.emoji} {m.label}</Text>
-            {sekretMode === m.key && <Text style={styles.check}>✓</Text>}
+        <Text style={styles.sectionTitle}>Se&apos;kret mode</Text>
+        {SEKRET_MODES.map((mode) => (
+          <TouchableOpacity key={mode.key} style={styles.option} onPress={() => setSekretMode(mode.key)}>
+            <Text style={styles.optionText}>{mode.emoji} {mode.label}</Text>
+            {sekretMode === mode.key && <Text style={styles.check}>✓</Text>}
           </TouchableOpacity>
         ))}
 
@@ -198,14 +194,22 @@ export default function SettingsScreen() {
         </View>
 
         <Text style={styles.sectionTitle}>Sleep guard</Text>
-        {SLEEP_OPTIONS.map((opt) => (
-          <TouchableOpacity key={opt.label} style={styles.option} onPress={() => setSleepWindow(opt.value)}>
-            <Text style={styles.optionText}>{opt.label}</Text>
-            {JSON.stringify(sleepWindow) === JSON.stringify(opt.value) && <Text style={styles.check}>✓</Text>}
+        {SLEEP_OPTIONS.map((option) => (
+          <TouchableOpacity key={option.label} style={styles.option} onPress={() => setSleepWindow(option.value)}>
+            <Text style={styles.optionText}>{option.label}</Text>
+            {JSON.stringify(sleepWindow) === JSON.stringify(option.value) && <Text style={styles.check}>✓</Text>}
           </TouchableOpacity>
         ))}
 
         <Text style={styles.sectionTitle}>Parent link</Text>
+        <ParentLinkStatusCard
+          accountSide="parent"
+          refreshKey={linkStatusVersion}
+          onRevoked={() => {
+            setInviteCode('');
+            setLinkStatusVersion((value) => value + 1);
+          }}
+        />
         <TouchableOpacity style={styles.button} onPress={handleGenerateCode} disabled={isGenerating}>
           <Text style={styles.buttonText}>{isGenerating ? 'Generating…' : 'Generate link code'}</Text>
         </TouchableOpacity>
@@ -227,9 +231,6 @@ export default function SettingsScreen() {
           <Text style={styles.buttonText}>{isRedeeming ? 'Connecting…' : 'Redeem code'}</Text>
         </TouchableOpacity>
         {redeemStatus !== 'idle' && <Text style={styles.hint}>Status: {redeemStatus}</Text>}
-        <TouchableOpacity style={[styles.button, styles.danger]} onPress={handleUnlinkTeen} disabled={isUnlinking}>
-          <Text style={styles.buttonText}>{isUnlinking ? 'Unlinking…' : 'Unlink teen'}</Text>
-        </TouchableOpacity>
 
         <Text style={styles.sectionTitle}>Danger zone</Text>
         <AccountDeletionControls />

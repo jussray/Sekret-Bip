@@ -1,5 +1,19 @@
 # bip-sekret-identity
 
+## 5W1H operating contract
+
+Before planning, editing, or claiming completion, establish and state:
+
+- **Who** — the requester, decision owner, affected users, data subjects, and execution authority.
+- **What** — the requested outcome, concrete deliverable, non-goals, and existing work that must be preserved.
+- **Where** — the exact repository, branch, environment, runtime, route, service, table, or provider boundary involved.
+- **When** — the current lifecycle or release state, required ordering, timing constraint, and rollback window.
+- **Why** — the user problem and verified evidence that justify the work.
+- **How** — the smallest safe implementation, required permissions, verification evidence, rollout, and rollback.
+
+Inspect repository and runtime truth for unknowns. Ask the user only when a missing answer would materially change the safe solution or authority. Re-run 5W1H after red-team/OODA findings change the plan. Finish by mapping the result, evidence, remaining blocker, and next owner back to these six questions.
+
+
 ## Trigger
 
 Activate whenever work touches:
