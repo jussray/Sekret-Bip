@@ -72,7 +72,7 @@ test('room production paths are project-bound and identifiers cannot traverse di
   assert.throws(() => runtimeOutputFor({ kind: 'room-phase', roomId: 'night', phase: '..\\bad' }), /Invalid room production identifier/);
   assert.throws(() => runtimeOutputFor({ kind: 'unknown', roomId: 'night', phase: 'day' }), /Unsupported room production job/);
   assert.equal(runtimeOutputFor({ kind: 'character-pose', characterId: 'night', pose: 'moonChair' }),
-    path.join('assets', 'images', 'companions', 'night', 'night-moon-chair.png'));
+    path.join('assets', 'images', 'companions', 'teen', 'night', 'moon-chair.png'));
   assert.equal(runtimeOutputFor({ kind: 'room-phase', roomId: 'night', phase: 'deepNight' }),
     path.join('assets', 'images', 'resized-bg', 'bg-night-room-deep-night.jpg'));
 });
@@ -99,8 +99,10 @@ function inIsolatedRoomWorkspace(run) {
   try {
     for (const relative of [
       'scripts/room-production-foreman.mjs',
+      'scripts/room-asset-verification.mjs',
       'scripts/room-report-recovery.mjs',
       'config/room-production.manifest.json',
+      'config/leonardo/night-asset-prompt-pack.json',
     ]) {
       const destination = path.join(root, relative);
       fs.mkdirSync(path.dirname(destination), { recursive: true });

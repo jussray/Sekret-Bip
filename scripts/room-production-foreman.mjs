@@ -5,6 +5,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from '@playwright/test';
+import { validateManifest as validateAssetManifest, verifyAssets } from './room-asset-verification.mjs';
 
 const EXPECTED_NAV = ['Room', 'Pages', 'Calm', 'Circle', 'More'];
 const DEFAULT_MANIFEST = 'config/room-production.manifest.json';
@@ -167,7 +168,7 @@ export function runtimeOutputFor(item) {
   if (item.kind === 'character-pose') {
     const characterId = safeName(item.characterId);
     const pose = fileToken(safeName(item.pose));
-    const output = path.join('assets', 'images', 'companions', characterId, `${characterId}-${pose}.png`);
+    const output = path.join('assets', 'images', 'companions', 'teen', characterId, `${pose}.png`);
     safeProjectPath(output);
     return output;
   }
@@ -260,6 +261,8 @@ async function main() {
   const manifestPath = resolveManifestPath(args.manifest);
   const manifest = readJson(manifestPath);
   validateManifest(manifest);
+  const promptPack = readJson(safeProjectPath(manifest.creativeTools.leonardo.promptPack));
+  validateAssetManifest(manifest, promptPack);
 
   const runId = safeRunId(new Date().toISOString().replace(/[:.]/g, '-'));
   const runDir = safeProjectPath('.room-foreman', 'runs', runId);
@@ -273,11 +276,7 @@ async function main() {
       results.push({ status: 'planned', label: runtimeOutputFor(item), detail: item.kind });
     }
   } else if (args.mode === 'verify') {
-    for (const item of queue) {
-      const output = runtimeOutputFor(item);
-      const exists = fs.existsSync(safeProjectPath(output));
-      results.push({ status: exists ? 'pass' : 'missing', label: output, detail: item.kind });
-    }
+    results.push(...verifyAssets({ rootDir: ROOT, manifest, promptPack }));
   } else if (args.mode === 'interactive') {
     const tools = args.tool === 'all' ? TOOLS : [args.tool];
     for (const tool of tools) {
