@@ -371,11 +371,7 @@ async function handleVoice(
       styleDecision: 'allow',
     }, 200, cors);
   } catch {
-    console.error('[voice-entry:synthesis]', {
-      provider: route.provider,
-      fallbackProvider: route.fallbackProvider,
-      code: 'provider_failure',
-    });
+    console.error('SEKRET_VOICE_SYNTHESIS_FAILED');
     return json({
       error: 'voice synthesis unavailable',
       characterId: route.canonicalCharacterId,

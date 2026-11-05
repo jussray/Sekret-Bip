@@ -128,7 +128,7 @@ export const loadState = async (): Promise<Record<string, any>> => {
     });
     return state;
   } catch {
-    console.error('loadState failed');
+    console.error('SEKRET_STORAGE_LOAD_STATE_FAILED');
     return {};
   }
 };
@@ -141,7 +141,7 @@ export const saveState = async (stateUpdates: Record<string, any>): Promise<void
     ]);
     await AsyncStorage.multiSet(pairs);
   } catch {
-    console.error('saveState failed');
+    console.error('SEKRET_STORAGE_SAVE_STATE_FAILED');
   }
 };
 
@@ -150,6 +150,6 @@ export async function clearPrivateAccountCache(): Promise<void> {
     await AsyncStorage.multiRemove([...PRIVATE_ACCOUNT_KEYS]);
     await clearAllStudyProgress();
   } catch {
-    console.error('clearPrivateAccountCache failed');
+    console.error('SEKRET_STORAGE_CLEAR_PRIVATE_ACCOUNT_CACHE_FAILED');
   }
 }

@@ -24,9 +24,28 @@ test('Worker reply, transcription and health logs use bounded failure categories
   assert.match(reply, /SEKRET_REPLY_PROVIDER_FAILED/);
   assert.match(reply, /SEKRET_TRANSCRIPTION_FAILED/);
   assert.match(entry, /SEKRET_DELEGATED_HEALTH_INVALID/);
-  assert.match(entry, /code: 'provider_failure'/);
+  assert.match(entry, /SEKRET_VOICE_SYNTHESIS_FAILED/);
   for (const content of [index, reply]) {
     assert.doesNotMatch(content, /console\.error\('\[(?:rate-limit|sekret\/reply|sekret\/transcribe|sekret\/voice:piper)\]', error\)/);
   }
   assert.doesNotMatch(entry, /error instanceof Error \? error\.message/);
+});
+
+
+test('changed privacy diagnostic events comply with fixed-code Sauce Guard', () => {
+  const paths = [
+    'src/utils/sync.ts',
+    'src/utils/storage.ts',
+    'src/services/runtimeAudit.ts',
+    'worker/index.ts',
+    'worker/sekret-reply.ts',
+    'worker/voice-entry.ts',
+  ];
+  for (const path of paths) {
+    const source = read(path);
+    for (const match of source.matchAll(/console\\.(?:warn|error)\\(([^\\n]*)\\)/g)) {
+      if (!match[1].includes('SEKRET_')) continue;
+      assert.match(match[1], /^'SEKRET_[A-Z0-9_]+'$/, path);
+    }
+  }
 });
