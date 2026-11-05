@@ -74,3 +74,14 @@ test('Cloudflare preflight does not forward provider message bodies into CI logs
   assert.doesNotMatch(workflow, /console\.(?:log|error)\([^\n]*\$\{(?:verify|result)\.body/);
   assert.match(workflow, /provider=\$\{summarize\((?:verify|result)\.body,/);
 });
+
+test('Workers Builds slot requires live trigger and build-list readback on exact main', () => {
+  assert.match(workflow, /import \{ verifyWorkersBuildsRead \} from '\.\/scripts\/verify-cloudflare-workers-builds-read\.mjs'/);
+  assert.match(workflow, /\['CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', \['workers-scripts','workers-builds-readable'\]\]/);
+  assert.match(workflow, /workerScriptRows = result\.body\?\.result/);
+  assert.match(workflow, /const buildsRead = await verifyWorkersBuildsRead/);
+  assert.match(workflow, /if \(buildsRead\.ok\) \{[\s\S]*passedProbes\.add\('workers-builds-readable'\)/);
+  assert.match(workflow, /WORKERS_BUILDS_READ_AUTHORITY_BLOCKED code=\$\{buildsRead\.code\}/);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /test\/cloudflare-workers-builds-read-preflight\.test\.mjs/);
+});
