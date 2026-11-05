@@ -172,6 +172,7 @@ export default function ParentCirclePostDetail() {
       setReplyMode(null);
     } catch {
       Alert.alert('Could not reply', 'Parent Circle could not save that quiet reply yet.');
+      return false;
     }
   }
 

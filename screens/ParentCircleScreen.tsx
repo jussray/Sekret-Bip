@@ -183,6 +183,7 @@ export function ParentCircleScreen({
                 setReportedIds(prev => new Set(prev).add(String(postId)));
               } catch {
                 Alert.alert('Could not report', 'Parent Circle could not save that report yet.');
+                return false;
               }
             })();
           },
@@ -249,6 +250,7 @@ export function ParentCircleScreen({
       await triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
     } catch {
       Alert.alert('Could not post', 'Parent Circle could not save that post yet.');
+      return false;
     } finally {
       setIsSubmitting(false);
     }

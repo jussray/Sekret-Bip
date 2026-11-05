@@ -33,6 +33,7 @@ export default function ParentCircleRoute() {
     } catch {
       setParentCirclePosts([]);
       setCommunityNotice(friendlyCommunityNotice());
+      return false;
     }
   }, [setParentCirclePosts]);
 
