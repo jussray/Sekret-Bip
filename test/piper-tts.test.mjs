@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+const authGuard = fs.readFileSync(new URL('../services/piper-tts/auth_guard.py', import.meta.url), 'utf8');
 import { spawnSync } from 'node:child_process';
 
 const worker = fs.readFileSync(new URL('../worker/index.ts', import.meta.url), 'utf8');
@@ -22,9 +23,10 @@ test('Piper client supports protected WAV synthesis with a bounded request', () 
 });
 
 test('Piper service fails closed without auth unless local bypass is explicit', () => {
-  for (const token of ['PIPER_API_TOKEN', 'PIPER_ALLOW_INSECURE_LOCAL', 'authentication is not configured', 'Bearer']) {
+  for (const token of ['PIPER_API_TOKEN', 'PIPER_ALLOW_INSECURE_LOCAL', 'authentication is not configured']) {
     assert.equal(service.includes(token), true);
   }
+  assert.match(authGuard, /Bearer/);
 });
 
 test('canonical Piper defaults match the voice models baked into the image', () => {
