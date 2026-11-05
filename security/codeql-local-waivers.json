@@ -2,36 +2,6 @@
   "schemaVersion": 1,
   "waivers": [
     {
-      "id": "identity-spaces-test-regex-builder",
-      "language": "javascript-typescript",
-      "ruleId": "js/incomplete-sanitization",
-      "path": "test/identity-spaces.test.mjs",
-      "messageIncludes": "does not escape backslash",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "The helper builds a static source-contract assertion from repository-owned route literals; it does not sanitize untrusted runtime input."
-    },
-    {
-      "id": "parent-link-test-regexp-escape",
-      "language": "javascript-typescript",
-      "ruleId": "js/useless-regexp-character-escape",
-      "path": "test/parent-link-settings-state.test.mjs",
-      "messageIncludes": "escape sequence",
-      "maxMatches": 1,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "This is a static repository source assertion. The finding has no runtime or provider trust boundary, but remains tracked until the assertion is simplified."
-    },
-    {
-      "id": "voice-foundation-test-regexp-escapes",
-      "language": "javascript-typescript",
-      "ruleId": "js/useless-regexp-character-escape",
-      "path": "test/voice-runtime-foundation.test.mjs",
-      "messageIncludes": "escape sequence",
-      "maxMatches": 4,
-      "expiresAt": "2027-01-10T00:00:00Z",
-      "rationale": "These four results are static SQL source-contract regex construction in tests, not runtime validation of external input."
-    },
-    {
       "id": "agent-discovery-test-url-anchor",
       "language": "javascript-typescript",
       "ruleId": "js/regex/missing-regexp-anchor",
@@ -152,6 +122,42 @@
       "maxMatches": 1,
       "expiresAt": "2027-01-10T00:00:00Z",
       "rationale": "This is an exact Array.prototype.includes assertion over normalized provider-domain fixtures in a unit test. It neither parses nor authorizes runtime URLs."
+    },
+    {
+      "id": "identity-spaces-test-regex-builder",
+      "language": "javascript-typescript",
+      "ruleId": "js/incomplete-sanitization",
+      "path": "test/identity-spaces.test.mjs",
+      "messageIncludes": "does not escape backslash",
+      "maxMatches": 1,
+      "expiresAt": "2027-01-10T00:00:00Z",
+      "rationale": "The helper builds a static source-contract assertion from repository-owned route literals; it does not sanitize untrusted runtime input.",
+      "retiredAt": "2026-11-04",
+      "retirementReason": "Corrected source-contract regex escaping; exact-head CodeQL re-scan not yet observed."
+    },
+    {
+      "id": "parent-link-test-regexp-escape",
+      "language": "javascript-typescript",
+      "ruleId": "js/useless-regexp-character-escape",
+      "path": "test/parent-link-settings-state.test.mjs",
+      "messageIncludes": "escape sequence",
+      "maxMatches": 1,
+      "expiresAt": "2027-01-10T00:00:00Z",
+      "rationale": "This is a static repository source assertion. The finding has no runtime or provider trust boundary, but remains tracked until the assertion is simplified.",
+      "retiredAt": "2026-11-04",
+      "retirementReason": "Corrected source-contract regex escaping; exact-head CodeQL re-scan not yet observed."
+    },
+    {
+      "id": "voice-foundation-test-regexp-escapes",
+      "language": "javascript-typescript",
+      "ruleId": "js/useless-regexp-character-escape",
+      "path": "test/voice-runtime-foundation.test.mjs",
+      "messageIncludes": "escape sequence",
+      "maxMatches": 4,
+      "expiresAt": "2027-01-10T00:00:00Z",
+      "rationale": "These four results are static SQL source-contract regex construction in tests, not runtime validation of external input.",
+      "retiredAt": "2026-11-04",
+      "retirementReason": "Corrected source-contract regex escaping; exact-head CodeQL re-scan not yet observed."
     }
   ],
   "retirementEvidence": [
