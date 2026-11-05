@@ -394,7 +394,7 @@ export async function reconcileGithubActionsCheckRuns(checkRuns, {repository, to
         _reconciledFromActionsJob: true,
       };
     } catch {
-      console.warn('Control Room ledger reconciliation unavailable; preserving check-run state.');
+      console.warn('CONTROL_ROOM_LEDGER_RECONCILIATION_UNAVAILABLE');
       return run;
     }
   }));
