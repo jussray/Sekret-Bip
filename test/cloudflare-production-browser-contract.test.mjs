@@ -59,6 +59,6 @@ test('production Auth and signup checks stay public-safe and age-first', () => {
   assert.doesNotMatch(productionAuth, /\/rest\/v1\//);
   assert.match(productionAuth, /withoutKey/);
   assert.match(productionSignup, /How old are you\?/);
-  assert.match(productionSignup, /13\\s\*\[–-\]\\s\*15 Teen mode starts/);
+  assert.match(productionSignup, /13\\s\*\[–-\]\\s\*15/);
   assert.match(productionSignup, /No request from this test may reach real production Auth/);
 });

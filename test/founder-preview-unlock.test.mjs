@@ -76,7 +76,12 @@ test('route visibility opens in development while side and Quiet Bip safety boun
   assert.match(teenLayout, /if \(founderPreview\) \{/);
   assert.match(teenLayout, /if \(!sleepLoaded\) return <TeenLoadingSurface \/>/);
   assert.match(teenLayout, /if \(sleepActive && !quietRouteAllowed\) return <Redirect href="\/\(teen\)\/quiet" \/>/);
-  assert.match(teenLayout, /return <TeenTabs selectedSekret=\{selectedSekret \?\? 'raylene'\} quietActive=\{sleepActive\} \/>/);
+  // Both preview and verified-teen entry points must use the current guarded
+  // TeenTabs interface. Scrapbook hides decorative chrome but never Sleep Guard.
+  assert.match(teenLayout, /const immersiveScrapbook = pathname\.includes\('scrapbook-check-in'\)/);
+  assert.match(teenLayout, /const hideGlobalChrome = quietActive \|\| immersive/);
+  const guardedTabs = /<TeenTabs\s+selectedSekret=\{selectedSekret \?\? 'raylene'\}\s+quietActive=\{sleepActive\}\s+immersive=\{immersiveScrapbook\}\s*\/>/g;
+  assert.equal([...teenLayout.matchAll(guardedTabs)].length, 2, 'preview and normal routes must share guarded immersive tabs');
   assert.match(teenLayout, /SafetyExperienceSheet/);
   assert.match(teenLayout, /useSafetyCheck/);
   assert.match(parentLayout, /if \(founderPreview\) return <ParentTabs/);
