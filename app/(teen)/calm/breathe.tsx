@@ -195,8 +195,12 @@ export default function BreatheScreen() {
     try {
       // expo-notifications dynamic import to avoid crash if not configured
       const Notifications = await import('expo-notifications');
-      const { status } = await Notifications.requestPermissionsAsync();
-      if (status !== 'granted') {
+      const permissions = await Notifications.requestPermissionsAsync();
+      const allowed =
+        permissions.granted ||
+        permissions.ios?.status ===
+          Notifications.IosAuthorizationStatus.PROVISIONAL;
+      if (!allowed) {
         Alert.alert('Permission needed', 'Enable notifications in settings to get breathing reminders. 💜');
         return;
       }
@@ -207,7 +211,11 @@ export default function BreatheScreen() {
           body: "Take a moment. Open Bip for a gentle breathing session.",
           sound: true,
         },
-        trigger: { seconds: 60 * 60, repeats: true } as any,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+          seconds: 60 * 60,
+          repeats: true,
+        },
       });
       setReminderSet(true);
       Alert.alert('Reminder set 💜', 'You\'ll get a gentle nudge every hour to breathe.');
