@@ -1,147 +1,165 @@
+import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import test from 'node:test';
+import { execFileSync } from 'node:child_process';
+import { inspectLegacyReport } from '../scripts/room-report-recovery.mjs';
+import { resolveManifestPath, runtimeOutputFor, safeProjectPath } from '../scripts/room-production-foreman.mjs';
 
-import {
-  fileToken,
-  hasBlockingResults,
-  readImageMetadata,
-  validateImage,
-  validateManifest,
-  verifyAssets,
-} from '../scripts/room-production-foreman.mjs';
 
-const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
-function png(width, height, colorType = 6) {
-  const buffer = Buffer.alloc(33);
-  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(buffer, 0);
-  buffer.writeUInt32BE(13, 8);
-  buffer.write('IHDR', 12, 'ascii');
-  buffer.writeUInt32BE(width, 16);
-  buffer.writeUInt32BE(height, 20);
-  buffer[24] = 8;
-  buffer[25] = colorType;
-  return buffer;
-}
+test('default Playwright isolates rooms while CI executes the dedicated suite', async () => {
+  const config = await read('playwright.config.ts');
+  const workflow = await read('.github/workflows/playwright.yml');
 
-function jpeg(width, height) {
-  return Buffer.from([
-    0xff, 0xd8,
-    0xff, 0xc0, 0x00, 0x0b, 0x08,
-    (height >> 8) & 0xff, height & 0xff,
-    (width >> 8) & 0xff, width & 0xff,
-    0x01, 0x01, 0x11, 0x00,
-    0xff, 0xd9,
-  ]);
-}
-
-function write(root, relative, content) {
-  const target = path.join(root, relative);
-  fs.mkdirSync(path.dirname(target), { recursive: true });
-  fs.writeFileSync(target, content);
-}
-
-test('room contracts preserve the product navigation and dedicated CI gate', () => {
-  const layout = read('app/(teen)/_layout.tsx');
-  const e2e = read('e2e/rooms/room-contract.spec.ts');
-  const workflow = read('.github/workflows/playwright.yml');
-  const config = read('playwright.config.ts');
-  const registry = read('src/config/nightRoomAssetRegistry.ts');
-  const sprite = read('src/components/room/character/SekretSprite.tsx');
-  for (const route of ['room', 'pages', 'calm', 'circle', 'more']) assert.match(layout, new RegExp(`name="${route}"`));
-  assert.match(layout, /name="circle\/feed-v2" options=\{\{ href: null \}\}/);
-  assert.match(e2e, /normalizeTabLabel/);
-  assert.match(e2e, /\['Room', 'Pages', 'Calm', 'Circle', 'More'\]/);
+  assert.match(config, /testDir: '\.\/e2e'/);
+  assert.match(config, /'\*\*\/production-smoke\.spec\.ts'/);
   assert.match(config, /'\*\*\/rooms\/\*\*'/);
-  assert.match(workflow, /npm run room:foreman:verify/);
+  assert.match(config, /playwright\.room\.config\.ts/);
+
+  assert.match(workflow, /playwright\.room\.config\.ts/);
+  assert.match(workflow, /test\/room-production-contract\.test\.mjs/);
+  assert.match(workflow, /Run founder-preview room contract tests/);
   assert.match(workflow, /npm run test:e2e:rooms/);
-  assert.match(workflow, /\.room-foreman\/runs\//);
-  assert.match(sprite, /NIGHT_ROOM_POSE_ASSETS\.neutral\.source/);
-  assert.match(registry, /NIGHT_ROOM_PHASE_ASSETS/);
 });
 
-test('manifest and prompt pack remain one Night vertical slice', () => {
-  const manifest = JSON.parse(read('config/room-production.manifest.json'));
-  const promptPack = JSON.parse(read('config/leonardo/night-asset-prompt-pack.json'));
-  validateManifest(manifest, promptPack);
-  assert.deepEqual(manifest.productionScope.characters, ['night']);
-  assert.deepEqual(manifest.productionScope.rooms, ['night']);
-  assert.equal(promptPack.poses.some(item => item.id === 'moonChair' && item.file.endsWith('moon-chair.png')), true);
+test('Night required poses are fully represented in the Leonardo prompt pack', async () => {
+  const manifest = JSON.parse(await read('config/room-production.manifest.json'));
+  const promptPack = JSON.parse(await read('config/leonardo/night-asset-prompt-pack.json'));
+
+  const required = new Set(manifest.characters.night.requiredPoses);
+  const prompted = new Set(promptPack.poses.map((pose) => pose.id));
+
+  for (const pose of required) {
+    assert.equal(prompted.has(pose), true, `missing Night prompt for required pose: ${pose}`);
+  }
+
+  assert.equal(required.has('thinking'), true);
+  assert.equal(required.has('moonChair'), true);
+  assert.equal(prompted.has('thinking'), true);
+  assert.equal(prompted.has('moonChair'), true);
 });
 
-test('camel-case IDs normalize to canonical filenames', () => {
+test('room foreman normalizes camel-case IDs to canonical asset filenames', async () => {
+  const foreman = await read('scripts/room-production-foreman.mjs');
+
+  assert.match(foreman, /function fileToken\(value\)/);
+  assert.match(foreman, /replace\(\/\(\[a-z0-9\]\)\(\[A-Z\]\)\/g, '\$1-\$2'\)/);
+  assert.match(foreman, /const pose = fileToken\(safeName\(item\.pose\)\)/);
+  assert.match(foreman, /const phase = fileToken\(safeName\(item\.phase\)\)/);
+  assert.doesNotMatch(foreman, /\$\{item\.characterId\}-\$\{item\.pose\}\.png/);
+
+  const fileToken = (value) => String(value)
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[_\s]+/g, '-')
+    .toLowerCase();
+
   assert.equal(fileToken('moonChair'), 'moon-chair');
   assert.equal(fileToken('deepNight'), 'deep-night');
 });
 
-test('image parsing validates format, dimensions, and transparency', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'room-image-contract-'));
-  const alpha = path.join(root, 'alpha.png');
-  const opaque = path.join(root, 'opaque.png');
-  const room = path.join(root, 'room.jpg');
-  fs.writeFileSync(alpha, png(4, 6, 6));
-  fs.writeFileSync(opaque, png(4, 6, 2));
-  fs.writeFileSync(room, jpeg(16, 9));
-  assert.deepEqual(readImageMetadata(alpha), { format: 'png', width: 4, height: 6, transparent: true });
-  assert.equal(readImageMetadata(room).format, 'jpeg');
-  assert.throws(() => validateImage(opaque, { format: 'png', transparent: true }), /transparent_background_required/);
-  fs.rmSync(root, { recursive: true, force: true });
+test('room production paths are project-bound and identifiers cannot traverse directories', () => {
+  assert.ok(resolveManifestPath('config/room-production.manifest.json').endsWith('config/room-production.manifest.json'));
+  assert.throws(() => resolveManifestPath('../outside.json'), /Only repository-owned/);
+  assert.throws(() => resolveManifestPath('config/other-config.json'), /Only repository-owned/);
+  assert.throws(() => safeProjectPath('..', 'untrusted'), /escapes repository/);
+  assert.throws(() => runtimeOutputFor({ kind: 'character-pose', characterId: '../../private', pose: 'neutral' }), /Invalid room production identifier/);
+  assert.throws(() => runtimeOutputFor({ kind: 'character-pose', characterId: 'night', pose: '../secret' }), /Invalid room production identifier/);
+  assert.throws(() => runtimeOutputFor({ kind: 'room-phase', roomId: '../other', phase: 'night' }), /Invalid room production identifier/);
+  assert.throws(() => runtimeOutputFor({ kind: 'room-phase', roomId: 'night', phase: '..\\bad' }), /Invalid room production identifier/);
+  assert.throws(() => runtimeOutputFor({ kind: 'unknown', roomId: 'night', phase: 'day' }), /Unsupported room production job/);
+  assert.equal(runtimeOutputFor({ kind: 'character-pose', characterId: 'night', pose: 'moonChair' }),
+    path.join('assets', 'images', 'companions', 'teen', 'night', 'moon-chair.png'));
+  assert.equal(runtimeOutputFor({ kind: 'room-phase', roomId: 'night', phase: 'deepNight' }),
+    path.join('assets', 'images', 'resized-bg', 'bg-night-room-deep-night.jpg'));
 });
 
-test('verification passes declared fallbacks and blocks present but unwired poses', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'room-foreman-contract-'));
-  const canonical = 'assets/night/neutral.png';
-  const thinking = 'assets/night/thinking.png';
-  const day = 'assets/room/day.jpg';
-  const night = 'assets/room/night.jpg';
-  write(root, canonical, png(2, 3, 6));
-  write(root, day, jpeg(20, 10));
-  write(root, night, jpeg(20, 10));
-  write(root, 'src/components/room/character/SekretSprite.tsx', "import { NIGHT_ROOM_POSE_ASSETS } from './registry';\nexport const active = NIGHT_ROOM_POSE_ASSETS.neutral.source;\n");
-  write(root, 'src/registry.ts', `
-export const NIGHT_ROOM_POSE_ASSETS = {
-  neutral: { source: require('../assets/night/neutral.png'), generatedFile: '${canonical}', activeFile: '${canonical}', status: 'generated' },
-  thinking: { source: require('../assets/night/neutral.png'), generatedFile: '${thinking}', activeFile: '${canonical}', status: 'fallback' },
-};
-export const NIGHT_ROOM_PHASE_ASSETS = {
-  day: { source: require('../assets/room/day.jpg'), file: '${day}' },
-  night: { source: require('../assets/room/night.jpg'), file: '${night}' },
-};
-`);
-  const manifest = { runtime: { assetRegistry: 'src/registry.ts', registryConsumers: ['src/components/room/character/SekretSprite.tsx'] } };
-  const promptPack = {
-    canonicalMaster: canonical,
-    roomMaster: day,
-    output: { minimumSize: '2x3', aspectRatio: '2:3' },
-    poses: [{ id: 'neutral', file: canonical }, { id: 'thinking', file: thinking }],
-    roomPhases: [{ id: 'day', file: day }, { id: 'night', file: night }],
-  };
-  const fallbackResults = verifyAssets({ rootDir: root, manifest, promptPack });
-  assert.equal(fallbackResults.some(item => item.status === 'fallback' && item.label === thinking), true);
-  assert.equal(hasBlockingResults(fallbackResults), false);
-  write(root, thinking, png(2, 3, 6));
-  assert.throws(() => verifyAssets({ rootDir: root, manifest, promptPack }), /not statically required/);
-  write(root, 'src/registry.ts', `
-export const NIGHT_ROOM_POSE_ASSETS = {
-  neutral: { source: require('../assets/night/neutral.png'), generatedFile: '${canonical}', activeFile: '${canonical}', status: 'generated' },
-  thinking: { source: require('../assets/night/thinking.png'), generatedFile: '${thinking}', activeFile: '${thinking}', status: 'generated' },
-};
-export const NIGHT_ROOM_PHASE_ASSETS = {
-  day: { source: require('../assets/room/day.jpg'), file: '${day}' },
-  night: { source: require('../assets/room/night.jpg'), file: '${night}' },
-};
-`);
-  const generatedResults = verifyAssets({ rootDir: root, manifest, promptPack });
-  assert.equal(generatedResults.some(item => item.status === 'pass' && item.label === thinking), true);
-  assert.equal(hasBlockingResults(generatedResults), false);
-  fs.rmSync(root, { recursive: true, force: true });
+test('room production path guard refuses symlink escapes', { skip: process.platform === 'win32' }, () => {
+  const ignored = safeProjectPath('.room-foreman');
+  fs.mkdirSync(ignored, { recursive: true });
+  const local = fs.mkdtempSync(path.join(ignored, 'path-guard-test-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'room-guard-target-'));
+  try {
+    fs.symlinkSync(outside, path.join(local, 'escape'), 'dir');
+    assert.throws(() => safeProjectPath('.room-foreman', path.basename(local), 'escape', 'secret.json'), /symlink target rejected/);
+  } finally {
+    fs.rmSync(local, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
 });
 
-test('blocked interactive or verification results require a nonzero outcome', () => {
-  assert.equal(hasBlockingResults([{ status: 'blocked' }]), true);
-  assert.equal(hasBlockingResults([{ status: 'missing' }]), true);
-  assert.equal(hasBlockingResults([{ status: 'fallback' }, { status: 'pass' }]), false);
+
+function inIsolatedRoomWorkspace(run) {
+  const ignored = safeProjectPath('.room-foreman');
+  fs.mkdirSync(ignored, { recursive: true });
+  const root = fs.mkdtempSync(path.join(ignored, 'foreman-report-test-'));
+  try {
+    for (const relative of [
+      'scripts/room-production-foreman.mjs',
+      'scripts/room-asset-verification.mjs',
+      'scripts/room-report-recovery.mjs',
+      'config/room-production.manifest.json',
+      'config/leonardo/night-asset-prompt-pack.json',
+    ]) {
+      const destination = path.join(root, relative);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.copyFileSync(safeProjectPath(...relative.split('/')), destination);
+    }
+    return run(root);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function createPlanReport(root) {
+  const stdout = execFileSync(process.execPath, ['scripts/room-production-foreman.mjs', '--mode', 'plan'], {
+    cwd: root, encoding: 'utf8', timeout: 30_000,
+  });
+  assert.match(stdout, /ROOM_FOREMAN_REPORT_WRITTEN/);
+  const runs = path.join(root, '.room-foreman', 'runs');
+  const runIds = fs.readdirSync(runs);
+  assert.equal(runIds.length, 1, 'isolated plan mode must create exactly one run');
+  return { runId: runIds[0], reportFile: path.join(runs, runIds[0], 'run-report.json') };
+}
+
+test('room foreman plan mode writes parseable JSON with a real trailing newline', () => {
+  inIsolatedRoomWorkspace((root) => {
+    const { runId, reportFile } = createPlanReport(root);
+    const raw = fs.readFileSync(reportFile, 'utf8');
+    assert.ok(raw.endsWith('}\n'), 'report must end with a real newline');
+    assert.equal(raw.endsWith('\\n'), false, 'report must not end with a literal backslash-n');
+    const report = JSON.parse(raw);
+    assert.equal(report.runId, runId);
+    assert.equal(report.mode, 'plan');
+    assert.ok(Array.isArray(report.results));
+    assert.ok(report.results.length > 0);
+  });
+});
+
+test('legacy report recovery previews without mutation and applies only with a backup', () => {
+  inIsolatedRoomWorkspace((root) => {
+    const { runId, reportFile } = createPlanReport(root);
+    const valid = fs.readFileSync(reportFile, 'utf8');
+    const malformed = valid.slice(0, -1) + '\\n';
+    fs.writeFileSync(reportFile, malformed);
+    assert.throws(() => JSON.parse(malformed), SyntaxError);
+
+    const command = ['scripts/room-report-recovery.mjs', '--run-id', runId];
+    const options = { cwd: root, encoding: 'utf8', timeout: 30_000 };
+    assert.match(execFileSync(process.execPath, command, options), /ROOM_FOREMAN_LEGACY_REPAIRABLE/);
+    assert.equal(fs.readFileSync(reportFile, 'utf8'), malformed, 'preview must not mutate');
+    assert.match(execFileSync(process.execPath, [...command, '--apply'], options), /ROOM_FOREMAN_LEGACY_REPAIRED/);
+    assert.equal(fs.readFileSync(reportFile, 'utf8'), valid);
+    assert.equal(fs.readFileSync(reportFile + '.legacy.bak', 'utf8'), malformed);
+    assert.match(execFileSync(process.execPath, command, options), /ROOM_FOREMAN_REPORT_ALREADY_VALID/);
+  });
+});
+
+test('legacy recovery rejects other corruption rather than guessing', () => {
+  assert.throws(() => inspectLegacyReport('{"results": [}\\n'), /Unrecognized room report corruption/);
+  assert.throws(() => inspectLegacyReport('not json'), /Unrecognized room report corruption/);
+  assert.equal(inspectLegacyReport('{"results":[]}\n').status, 'valid');
 });

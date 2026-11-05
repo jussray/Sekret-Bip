@@ -260,8 +260,8 @@ async function enforceRateLimit(
   try {
     const { success } = await limiter.limit({ key });
     if (!success) return json({ error: 'rate limit exceeded' }, 429, cors);
-  } catch (error) {
-    console.error('[rate-limit]', error);
+  } catch {
+    console.error('SEKRET_RATE_LIMIT_UNAVAILABLE');
   }
   return null;
 }
@@ -303,8 +303,8 @@ async function handleStyledVoice(
           styleDecision: 'allow',
         }, 200, cors);
       }
-    } catch (error) {
-      console.error('[sekret/voice:piper]', error);
+    } catch {
+      console.error('SEKRET_PIPER_SYNTHESIS_FAILED');
       if (!env.OPENAI_API_KEY) return json({ error: 'piper tts failed' }, 502, cors);
     }
   }

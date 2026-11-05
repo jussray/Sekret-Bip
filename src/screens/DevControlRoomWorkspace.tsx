@@ -38,6 +38,13 @@ import {
   CONTROL_ROOM_SCREEN_ENTRY,
 } from '@/config/controlRoomPlacement';
 import { loadControlRoomOperatingModel } from '@/services/controlRoomMissionEngine';
+import {
+  getLocalControlRoomAgentHealth,
+  runLocalControlRoomMission,
+  type LocalAgentHealth,
+  type LocalAgentStatus,
+  type LocalMissionRun,
+} from '@/services/controlRoomLocalAgent';
 
 type Tab = 'overview' | 'missions' | 'operations' | 'issues' | 'releases' | 'dashboards' | 'ideas' | 'redteam';
 type Dashboard = 'cost' | 'companions' | 'voice' | 'signals' | 'adoption' | 'crashes';
@@ -113,6 +120,11 @@ function TriToggle({value,onChange,accent='#a78bfa'}:{value:boolean|null;onChang
 
 export default function DevControlRoomWorkspace(){
   const[loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[profile,setProfile]=useState<FounderProfile|null>(null),[issues,setIssues]=useState<(ControlRoomIssue&{snoozed_until?:string|null})[]>([]),[ideas,setIdeas]=useState<FounderIdea[]>([]),[analytics,setAnalytics]=useState(emptyAnalytics),[tab,setTab]=useState<Tab>('overview'),[dashboard,setDashboard]=useState<Dashboard>('cost'),[selected,setSelected]=useState<(ControlRoomIssue&{snoozed_until?:string|null})|null>(null),[severity,setSeverity]=useState('all'),[status,setStatus]=useState('all'),[category,setCategory]=useState('all'),[query,setQuery]=useState(''),[saved,setSaved]=useState<SavedView[]>([]),[viewName,setViewName]=useState('');
+  const[localAgentStatus,setLocalAgentStatus]=useState<LocalAgentStatus>('checking');
+  const[localAgentHealth,setLocalAgentHealth]=useState<LocalAgentHealth|null>(null);
+  const[localAgentError,setLocalAgentError]=useState('');
+  const[missionRuns,setMissionRuns]=useState<Record<string,LocalMissionRun>>({});
+  const[runningMission,setRunningMission]=useState<string|null>(null);
 
   // Redteam state
   const[decideMemo,setDecideMemo]=useState('');
@@ -120,6 +132,21 @@ export default function DevControlRoomWorkspace(){
   const[lindyAnswers,setLindyAnswers]=useState<Record<string,boolean|null>>({});
   const[placementTarget,setPlacementTarget]=useState('');
   const[l99Answers,setL99Answers]=useState<Record<string,boolean|null>>({});
+
+  const refreshLocalAgent=useCallback(async()=>{
+    setLocalAgentStatus('checking');
+    try{
+      const health=await getLocalControlRoomAgentHealth();
+      setLocalAgentHealth(health);
+      setLocalAgentStatus('online');
+      setLocalAgentError('');
+      if(health.latestRun)setMissionRuns(current=>({...current,[health.latestRun!.missionId]:health.latestRun!}));
+    }catch(error){
+      setLocalAgentHealth(null);
+      setLocalAgentStatus('offline');
+      setLocalAgentError(error instanceof Error?error.message:'local_agent_unavailable');
+    }
+  },[]);
 
   const load=useCallback(async()=>{
     const p=await getCurrentFounderProfile();setProfile(p);
@@ -129,9 +156,10 @@ export default function DevControlRoomWorkspace(){
       setAnalytics(a);setIdeas(d);
       try{setSaved(JSON.parse(await AsyncStorage.getItem(SAVED_KEY)||'[]') as SavedView[]);}catch{setSaved([]);}
       try{const memo=await AsyncStorage.getItem(OODA_KEY);if(memo)setDecideMemo(memo);}catch{}
+      void refreshLocalAgent();
     }
     setLoading(false);
-  },[]);
+  },[refreshLocalAgent]);
   useEffect(()=>{void load();},[load]);
   const refresh=useCallback(async()=>{setRefreshing(true);try{await load();}finally{setRefreshing(false);}},[load]);
   const filtered=useMemo(()=>issues.filter(i=>severity==='all'||i.severity===severity).filter(i=>status==='all'||status==='snoozed'||i.status===status).filter(i=>category==='all'||i.category===category).filter(i=>!query.trim()||`${i.title} ${i.summary} ${i.affected_surface??''}`.toLowerCase().includes(query.toLowerCase())).filter(i=>status==='snoozed'?activeSnooze(i):status==='all'?!activeSnooze(i):true),[issues,severity,status,category,query]);
@@ -139,6 +167,20 @@ export default function DevControlRoomWorkspace(){
   const saveCurrent=async()=>{if(!viewName.trim())return;const next=[...saved,{id:String(Date.now()),name:viewName.trim(),severity,status,category,query}].slice(-12);setSaved(next);setViewName('');await AsyncStorage.setItem(SAVED_KEY,JSON.stringify(next));};
   const applyView=(v:SavedView)=>{setSeverity(v.severity);setStatus(v.status);setCategory(v.category);setQuery(v.query);setTab('issues');};
   const advance=async(id:string,next:IdeaStatus)=>{if(await founderIdeasService.updateStatus(id,next))setIdeas(v=>v.map(i=>i.id===id?{...i,status:next}:i));};
+  const runMission=async(missionId:string)=>{
+    setRunningMission(missionId);setLocalAgentError('');
+    try{
+      const run=await runLocalControlRoomMission(missionId);
+      setMissionRuns(current=>({...current,[missionId]:run}));
+      setLocalAgentHealth(current=>current?{...current,activeMission:null,latestRun:run}:current);
+      setLocalAgentStatus('online');
+    }catch(error){
+      setLocalAgentError(error instanceof Error?error.message:'mission_failed');
+      await refreshLocalAgent();
+    }finally{
+      setRunningMission(null);
+    }
+  };
 
   if(loading)return <View style={s.center}><ActivityIndicator color="#a78bfa"/><Text style={s.muted}>Opening Control Room…</Text></View>;
   if(!isFounderProfile(profile))return <View style={s.center}><Text style={s.lock}>🔒</Text><Text style={s.modalTitle}>Developer tools locked</Text><TouchableOpacity style={s.primary} onPress={()=>router.replace('/')}><Text style={s.primaryText}>Back to Bip</Text></TouchableOpacity></View>;
@@ -201,10 +243,46 @@ export default function DevControlRoomWorkspace(){
         </>:null}
 
         {/* ── MISSIONS ── */}
-        {tab==='missions'?<>{operatingModel.missions.map(mission=><View key={mission.id} style={s.card}><View style={s.row}><Text style={s.severity}>{mission.category}</Text><Text style={s.health}>{mission.requiresNetwork?'network':'local-first'}</Text></View><Text style={s.cardTitle}>{mission.title}</Text><Text style={s.body}>{mission.founderPrompt}</Text><Text style={s.muted}>Action: {mission.primaryAction}</Text>{mission.recoveryPath?<Text style={s.recovery}>Recovery: {mission.recoveryPath}</Text>:null}</View>)}</>:null}
+        {tab==='missions'?<>
+          <View style={s.panel}>
+            <View style={s.row}>
+              <Text style={s.panelTitle}>Local mission agent</Text>
+              <Text style={[s.health,{color:localAgentStatus==='online'?'#4ade80':localAgentStatus==='checking'?'#facc15':'#fb7185'}]}>{localAgentStatus}</Text>
+            </View>
+            <Text style={s.body}>{localAgentStatus==='online'?`Ready on loopback · ${localAgentHealth?.allowedMissions.length??0} missions allowlisted`:'Start this workspace with npm run control-room:dev to enable Run buttons.'}</Text>
+            {localAgentError&&localAgentError!=='local_agent_not_started'?<Text style={s.recovery}>Agent: {localAgentError}</Text>:null}
+            <TouchableOpacity style={s.linkBtn} onPress={()=>void refreshLocalAgent()} disabled={localAgentStatus==='checking'}>
+              <Text style={s.linkBtnText}>{localAgentStatus==='checking'?'Checking…':'Refresh agent status'}</Text>
+            </TouchableOpacity>
+          </View>
+          {operatingModel.missions.map(mission=>{
+            const run=missionRuns[mission.id];
+            const runnable=Boolean(mission.localAgentMission);
+            const isRunning=runningMission===mission.localAgentMission;
+            const disabled=localAgentStatus!=='online'||runningMission!==null;
+            const output=run?[run.stdout,run.stderr].filter(Boolean).join('\n').trim():'';
+            return <View key={mission.id} style={s.card}>
+              <View style={s.row}><Text style={s.severity}>{mission.category}</Text><Text style={s.health}>{mission.requiresNetwork?'network':'local-first'}</Text></View>
+              <Text style={s.cardTitle}>{mission.title}</Text>
+              <Text style={s.body}>{mission.founderPrompt}</Text>
+              <Text style={s.muted}>Action: {mission.primaryAction}</Text>
+              {runnable?<TouchableOpacity style={[s.primary,disabled&&s.disabled]} disabled={disabled} onPress={()=>void runMission(mission.localAgentMission!)}>
+                <Text style={s.primaryText}>{isRunning?'Running…':`Run ${mission.title}`}</Text>
+              </TouchableOpacity>:<Text style={s.recovery}>{mission.id==='ship-release'?'Manual release gate: verify exact-head evidence before any deployment.':'Launch the combined workspace command in a terminal.'}</Text>}
+              {run?<View style={s.runResult}>
+                <Text style={[s.health,{color:run.status==='passed'?'#4ade80':'#fb7185'}]}>{run.status.replace('_',' ')}</Text>
+                <Text style={s.muted}>{Math.round(run.durationMs/1000)}s · exit {run.exitCode??'—'}</Text>
+                {run.error?<Text style={s.recovery}>{run.error}</Text>:null}
+                {output?<Text style={s.output} numberOfLines={18}>{output}</Text>:null}
+              </View>:null}
+              {mission.recoveryPath?<Text style={s.recovery}>Recovery: {mission.recoveryPath}</Text>:null}
+            </View>;
+          })}
+        </>:null}
 
         {/* ── OPERATIONS ── */}
         {tab==='operations'?<>
+          <View style={s.panel}><View style={s.row}><Text style={s.panelTitle}>Local execution</Text><Text style={[s.health,{color:localAgentStatus==='online'?'#4ade80':'#fb7185'}]}>{localAgentStatus}</Text></View><Text style={s.body}>{localAgentStatus==='online'?`Loopback agent ready. Active mission: ${localAgentHealth?.activeMission??'none'}`:'Offline until npm run control-room:dev starts the authenticated loopback agent.'}</Text></View>
           <View style={s.panel}><Text style={s.panelTitle}>Founder notifications</Text><Text style={s.body}>Mission reports, failure alerts, daily briefings, and release summaries route to {operatingModel.notificationDestination} when the Gmail connector is authenticated.</Text></View>
           <Text style={s.section}>Connectors</Text>
           {operatingModel.connectors.map(connector=><View key={connector.id} style={s.card}><View style={s.row}><Text style={s.cardTitle}>{connector.label}</Text><Text style={[s.health,{color:connector.health==='healthy'?'#4ade80':connector.health==='warning'?'#facc15':'#fb7185'}]}>{connector.health}</Text></View><Text style={s.body}>{connector.capabilities.join(' · ')}</Text><Text style={s.recovery}>Fallback: {connector.fallback}</Text></View>)}
@@ -401,4 +479,4 @@ export default function DevControlRoomWorkspace(){
   );
 }
 
-const s=StyleSheet.create({root:{flex:1,backgroundColor:'#080611'},header:{paddingTop:58,paddingHorizontal:20,paddingBottom:14},headerTop:{flexDirection:'row',alignItems:'flex-start'},linkBtn:{borderWidth:1,borderColor:'#2b2540',backgroundColor:'#12101c',paddingHorizontal:13,paddingVertical:9,borderRadius:999,marginTop:6},linkBtnText:{color:'#a7a1b7',fontWeight:'700',fontSize:12},kicker:{color:'#a78bfa',fontWeight:'800',fontSize:11,letterSpacing:2},headerTitle:{color:'#fff',fontWeight:'900',fontSize:30,marginTop:4},tabs:{maxHeight:54,paddingHorizontal:16},scroll:{flex:1},content:{padding:16,paddingBottom:80},chip:{borderWidth:1,borderColor:'#2b2540',backgroundColor:'#12101c',paddingHorizontal:13,paddingVertical:9,borderRadius:999,marginRight:8,marginBottom:8},chipOn:{backgroundColor:'#6d28d9',borderColor:'#a78bfa'},chipText:{color:'#a7a1b7',fontWeight:'700',fontSize:12},chipTextOn:{color:'#fff'},heroStats:{flexDirection:'row',gap:10,marginBottom:12},stat:{flex:1,backgroundColor:'#12101c',borderWidth:1,borderColor:'#272238',borderRadius:16,padding:14},statNum:{color:'#a78bfa',fontSize:23,fontWeight:'900'},panel:{backgroundColor:'#12101c',borderWidth:1,borderColor:'#272238',borderRadius:18,padding:16,marginBottom:12},panelTitle:{color:'#fff',fontWeight:'800',fontSize:16,marginBottom:12},bigMoney:{color:'#4ade80',fontWeight:'900',fontSize:34},muted:{color:'#8f899e',fontSize:12,lineHeight:18},section:{color:'#fff',fontWeight:'800',fontSize:15,marginTop:16,marginBottom:8},input:{backgroundColor:'#12101c',borderColor:'#332c48',borderWidth:1,borderRadius:12,padding:12,color:'#fff',marginBottom:10},notes:{minHeight:110,textAlignVertical:'top'},primary:{backgroundColor:'#6d28d9',borderRadius:12,paddingHorizontal:14,paddingVertical:11,alignItems:'center',marginBottom:10},primaryText:{color:'#fff',fontWeight:'800'},saveRow:{flexDirection:'row',gap:8,alignItems:'flex-start',marginTop:14},result:{color:'#a78bfa',fontWeight:'800',marginVertical:12},card:{backgroundColor:'#12101c',borderColor:'#272238',borderWidth:1,borderRadius:16,padding:15,marginBottom:10},row:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},cardTitle:{color:'#fff',fontWeight:'800',fontSize:16,marginVertical:7},severity:{fontWeight:'900',fontSize:11,textTransform:'uppercase',color:'#a78bfa'},health:{color:'#c4b5fd',fontWeight:'800',textTransform:'uppercase',fontSize:11},body:{color:'#c8c3d2',fontSize:13,lineHeight:19},statsRow:{flexDirection:'row',gap:12,marginTop:10},smallStat:{color:'#c4b5fd',fontSize:12,fontWeight:'700'},delta:{color:'#8f899e',fontSize:11,marginTop:8},recovery:{color:'#c4b5fd',fontSize:12,lineHeight:18,marginTop:8},metricRow:{marginBottom:12},metricTop:{flexDirection:'row',justifyContent:'space-between'},metricLabel:{color:'#d7d2df',fontSize:12},metricValue:{color:'#a78bfa',fontWeight:'800'},bar:{height:7,backgroundColor:'#29233a',borderRadius:99,overflow:'hidden',marginTop:6},barFill:{height:7,backgroundColor:'#8b5cf6',borderRadius:99},center:{flex:1,backgroundColor:'#080611',alignItems:'center',justifyContent:'center',padding:24,gap:14},lock:{fontSize:36},modal:{flex:1,backgroundColor:'#080611'},modalBody:{padding:22,paddingTop:48,paddingBottom:60},modalTitle:{color:'#fff',fontSize:25,fontWeight:'900',marginVertical:10},info:{backgroundColor:'#12101c',borderRadius:14,padding:14,marginTop:14},infoText:{color:'#bcb6c8',fontSize:12,marginBottom:6},wrap:{flexDirection:'row',flexWrap:'wrap'},history:{borderLeftWidth:2,borderLeftColor:'#6d28d9',paddingLeft:12,paddingBottom:14},historyTitle:{color:'#fff',fontWeight:'800'},historyDate:{color:'#6b7280',fontSize:10,marginTop:3},close:{backgroundColor:'#312e81',borderRadius:12,padding:14,alignItems:'center',marginTop:20},guardItem:{color:'#c8c3d2',fontSize:12,lineHeight:19,marginBottom:6},guardBad:{color:'#fb7185',fontSize:12,lineHeight:19,marginBottom:6,fontWeight:'800'}});
+const s=StyleSheet.create({root:{flex:1,backgroundColor:'#080611'},header:{paddingTop:58,paddingHorizontal:20,paddingBottom:14},headerTop:{flexDirection:'row',alignItems:'flex-start'},linkBtn:{borderWidth:1,borderColor:'#2b2540',backgroundColor:'#12101c',paddingHorizontal:13,paddingVertical:9,borderRadius:999,marginTop:6},linkBtnText:{color:'#a7a1b7',fontWeight:'700',fontSize:12},kicker:{color:'#a78bfa',fontWeight:'800',fontSize:11,letterSpacing:2},headerTitle:{color:'#fff',fontWeight:'900',fontSize:30,marginTop:4},tabs:{maxHeight:54,paddingHorizontal:16},scroll:{flex:1},content:{padding:16,paddingBottom:80},chip:{borderWidth:1,borderColor:'#2b2540',backgroundColor:'#12101c',paddingHorizontal:13,paddingVertical:9,borderRadius:999,marginRight:8,marginBottom:8},chipOn:{backgroundColor:'#6d28d9',borderColor:'#a78bfa'},chipText:{color:'#a7a1b7',fontWeight:'700',fontSize:12},chipTextOn:{color:'#fff'},heroStats:{flexDirection:'row',gap:10,marginBottom:12},stat:{flex:1,backgroundColor:'#12101c',borderWidth:1,borderColor:'#272238',borderRadius:16,padding:14},statNum:{color:'#a78bfa',fontSize:23,fontWeight:'900'},panel:{backgroundColor:'#12101c',borderWidth:1,borderColor:'#272238',borderRadius:18,padding:16,marginBottom:12},panelTitle:{color:'#fff',fontWeight:'800',fontSize:16,marginBottom:12},bigMoney:{color:'#4ade80',fontWeight:'900',fontSize:34},muted:{color:'#8f899e',fontSize:12,lineHeight:18},section:{color:'#fff',fontWeight:'800',fontSize:15,marginTop:16,marginBottom:8},input:{backgroundColor:'#12101c',borderColor:'#332c48',borderWidth:1,borderRadius:12,padding:12,color:'#fff',marginBottom:10},notes:{minHeight:110,textAlignVertical:'top'},primary:{backgroundColor:'#6d28d9',borderRadius:12,paddingHorizontal:14,paddingVertical:11,alignItems:'center',marginBottom:10},primaryText:{color:'#fff',fontWeight:'800'},saveRow:{flexDirection:'row',gap:8,alignItems:'flex-start',marginTop:14},result:{color:'#a78bfa',fontWeight:'800',marginVertical:12},card:{backgroundColor:'#12101c',borderColor:'#272238',borderWidth:1,borderRadius:16,padding:15,marginBottom:10},row:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},cardTitle:{color:'#fff',fontWeight:'800',fontSize:16,marginVertical:7},severity:{fontWeight:'900',fontSize:11,textTransform:'uppercase',color:'#a78bfa'},health:{color:'#c4b5fd',fontWeight:'800',textTransform:'uppercase',fontSize:11},body:{color:'#c8c3d2',fontSize:13,lineHeight:19},statsRow:{flexDirection:'row',gap:12,marginTop:10},smallStat:{color:'#c4b5fd',fontSize:12,fontWeight:'700'},delta:{color:'#8f899e',fontSize:11,marginTop:8},recovery:{color:'#c4b5fd',fontSize:12,lineHeight:18,marginTop:8},metricRow:{marginBottom:12},metricTop:{flexDirection:'row',justifyContent:'space-between'},metricLabel:{color:'#d7d2df',fontSize:12},metricValue:{color:'#a78bfa',fontWeight:'800'},bar:{height:7,backgroundColor:'#29233a',borderRadius:99,overflow:'hidden',marginTop:6},barFill:{height:7,backgroundColor:'#8b5cf6',borderRadius:99},center:{flex:1,backgroundColor:'#080611',alignItems:'center',justifyContent:'center',padding:24,gap:14},lock:{fontSize:36},modal:{flex:1,backgroundColor:'#080611'},modalBody:{padding:22,paddingTop:48,paddingBottom:60},modalTitle:{color:'#fff',fontSize:25,fontWeight:'900',marginVertical:10},info:{backgroundColor:'#12101c',borderRadius:14,padding:14,marginTop:14},infoText:{color:'#bcb6c8',fontSize:12,marginBottom:6},wrap:{flexDirection:'row',flexWrap:'wrap'},history:{borderLeftWidth:2,borderLeftColor:'#6d28d9',paddingLeft:12,paddingBottom:14},historyTitle:{color:'#fff',fontWeight:'800'},historyDate:{color:'#6b7280',fontSize:10,marginTop:3},close:{backgroundColor:'#312e81',borderRadius:12,padding:14,alignItems:'center',marginTop:20},guardItem:{color:'#c8c3d2',fontSize:12,lineHeight:19,marginBottom:6},guardBad:{color:'#fb7185',fontSize:12,lineHeight:19,marginBottom:6,fontWeight:'800'},disabled:{opacity:.45},runResult:{borderTopWidth:1,borderTopColor:'#272238',marginTop:10,paddingTop:10},output:{backgroundColor:'#080611',color:'#d7d2df',fontFamily:'monospace',fontSize:11,lineHeight:16,padding:10,borderRadius:10,marginTop:8}});
