@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 
-export const DEV_SPLIT_VIEW_SIDE_PARAM = 'bipDevSide';
+import { DEV_SPLIT_VIEW_SIDE_PARAM } from './devSplitViewUrl';
+export { DEV_SPLIT_VIEW_SIDE_PARAM };
 
 /**
  * Split View loads two same-origin iframes that would otherwise share the
