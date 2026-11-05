@@ -198,6 +198,42 @@ test('a PR cannot weaken its own conditional proof scope to avoid that proof', (
   );
 });
 
+test('Bearer is mandatory and its SARIF upload cannot impersonate the Actions job', () => {
+  assert.ok(ALWAYS_REQUIRED_CHECKS.includes('bearer'));
+
+  const expectedChecks = expectedChecksForChangedFiles(['docs/audit.md'], {});
+  const good = expectedChecks.map((name) => run(name));
+  assert.equal(evaluateExpectedChecks({ expectedChecks, checkRuns: good, expectedSha: SHA }).ready, true);
+
+  const missingActionsJob = good.filter((item) => item.name !== 'bearer');
+  missingActionsJob.push(run('Bearer', 'success', 'github-advanced-security'));
+  const missingVerdict = evaluateExpectedChecks({
+    expectedChecks, checkRuns: missingActionsJob, expectedSha: SHA,
+  });
+  assert.equal(missingVerdict.ready, false);
+  assert.deepEqual(missingVerdict.missing, ['bearer']);
+
+  for (const conclusion of ['failure', 'skipped', 'cancelled']) {
+    const checks = good.map((item) => item.name === 'bearer' ? run('bearer', conclusion) : item);
+    const verdict = evaluateExpectedChecks({ expectedChecks, checkRuns: checks, expectedSha: SHA });
+    assert.equal(verdict.ready, false);
+    assert.deepEqual(verdict.failed, ['bearer']);
+  }
+
+  const pending = good.map((item) => item.name === 'bearer'
+    ? run('bearer', null, 'github-actions', { status: 'queued', conclusion: null }) : item);
+  assert.deepEqual(evaluateExpectedChecks({
+    expectedChecks, checkRuns: pending, expectedSha: SHA,
+  }).pending, ['bearer']);
+
+  const stale = good.map((item) => item.name === 'bearer'
+    ? run('bearer', 'success', 'github-actions', { head_sha: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb' })
+    : item);
+  assert.deepEqual(evaluateExpectedChecks({
+    expectedChecks, checkRuns: stale, expectedSha: SHA,
+  }).missing, ['bearer']);
+});
+
 test('exact-head trusted GitHub Actions checks must all exist and pass', () => {
   const expectedChecks = [...ALWAYS_REQUIRED_CHECKS, 'product-design-proof'];
   const good = expectedChecks.map((name) => run(name));
