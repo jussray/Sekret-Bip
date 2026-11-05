@@ -119,7 +119,7 @@ export default function Welcome() {
         {decision ? (
           <View style={[styles.decisionCard, !decision.allowed && styles.blockedCard]}>
             <Text style={[styles.decisionTitle, !decision.allowed && styles.blockedTitle]}>
-              {decision.allowed ? 'You're ready for the next step' : 'A parent needs to help'}
+              {decision.allowed ? "You're ready for the next step" : 'A parent needs to help'}
             </Text>
             <Text style={styles.decisionText}>{decision.message}</Text>
           </View>

@@ -74,7 +74,7 @@ export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
       nextSide: 'parent',
       nextRoute: '/(onboarding)/parental-consent',
       actionLabel: 'Ask a parent to help',
-      message: 'A parent or guardian must help first. We won't ask for your account details yet.',
+      message: "A parent or guardian must help first. We won't ask for your account details yet.",
     };
   }
 
@@ -88,7 +88,7 @@ export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
       nextSide: 'teen',
       nextRoute: '/(auth)/signup?side=teen',
       actionLabel: 'Continue to sign up',
-      message: 'We'll save your age range and guide you through teen sign-up. A parent or guardian will need to help.',
+      message: "We'll save your age range and guide you through teen sign-up. A parent or guardian will need to help.",
     };
   }
 
@@ -101,6 +101,6 @@ export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
     nextSide: 'teen',
     nextRoute: '/(auth)/signup?side=teen',
     actionLabel: 'Continue to sign up',
-    message: 'We'll save your age range. No ID or photo is needed here.',
+    message: "We'll save your age range. No ID or photo is needed here.",
   };
 }
