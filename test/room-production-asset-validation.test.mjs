@@ -145,3 +145,25 @@ test('blocked interactive or verification results require a nonzero outcome', ()
   assert.equal(hasBlockingResults([{ status: 'missing' }]), true);
   assert.equal(hasBlockingResults([{ status: 'fallback' }, { status: 'pass' }]), false);
 });
+
+test('real Night registry helper permits missing poses but rejects a generated pose left on fallback', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'night-registry-helper-'));
+  try {
+    const manifest = JSON.parse(read('config/room-production.manifest.json'));
+    const promptPack = JSON.parse(read('config/leonardo/night-asset-prompt-pack.json'));
+    write(root, manifest.runtime.assetRegistry, read(manifest.runtime.assetRegistry));
+    write(root, manifest.runtime.registryConsumers[0],
+      'import { NIGHT_ROOM_POSE_ASSETS } from "./registry";\\nexport const current = NIGHT_ROOM_POSE_ASSETS.neutral.source;\\n');
+    write(root, promptPack.canonicalMaster, png(2, 3, 6));
+    for (const phase of promptPack.roomPhases) write(root, phase.file, jpeg(20, 10));
+    const results = verifyAssets({ rootDir: root, manifest, promptPack });
+    assert.equal(results.filter(item => item.status === 'fallback').length, promptPack.poses.length - 1);
+    assert.equal(hasBlockingResults(results), false);
+    const generatedThinking = promptPack.poses.find(item => item.id === 'thinking').file;
+    write(root, generatedThinking, png(1536, 2304, 6));
+    assert.throws(() => verifyAssets({ rootDir: root, manifest, promptPack }),
+      /not statically required by the runtime registry/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

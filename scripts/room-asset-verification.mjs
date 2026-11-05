@@ -107,9 +107,16 @@ function validateImage(filePath, requirements = {}) {
 function registryBlock(source, collectionName, key) {
   const collectionIndex = source.indexOf(`export const ${collectionName}`);
   assert(collectionIndex >= 0, `Registry is missing ${collectionName}.`);
-  const line = source.slice(collectionIndex).split('\n').find(entry => entry.trimStart().startsWith(`${key}: {`));
-  assert(line, `Registry is missing ${collectionName}.${key}.`);
-  return line.slice(line.indexOf('{') + 1, line.lastIndexOf('}'));
+  const lines = source.slice(collectionIndex).split('\n');
+  const start = lines.findIndex(line => line.trimStart().startsWith(`${key}:`));
+  assert(start >= 0, `Registry is missing ${collectionName}.${key}.`);
+  const entry = lines[start].trim();
+  if (entry.includes('fallback(')) return { kind: 'fallback-call', body: entry };
+  const candidate = lines.slice(start, start + 20).join('\n');
+  const open = candidate.indexOf('{');
+  const close = candidate.indexOf('}', open + 1);
+  assert(open >= 0 && close > open, `Registry entry ${collectionName}.${key} must be a static object or a reviewed fallback call.`);
+  return { kind: 'object', body: candidate.slice(open + 1, close) };
 }
 
 function requirePathFor(registryPath, assetPath) {
@@ -149,17 +156,39 @@ function verifyAssets({ rootDir, manifest, promptPack }) {
   }
   for (const pose of promptPack.poses) {
     const absolute = path.join(rootDir, pose.file);
-    const block = registryBlock(registrySource, 'NIGHT_ROOM_POSE_ASSETS', pose.id);
-    assert(block.includes(`generatedFile: '${pose.file}'`), `Registry generatedFile mismatch for ${pose.id}.`);
+    const entry = registryBlock(registrySource, 'NIGHT_ROOM_POSE_ASSETS', pose.id);
+    const block = entry.body;
+    const isCanonicalPose = pose.file === promptPack.canonicalMaster;
+    const usesCanonicalFile = isCanonicalPose
+      && block.includes('generatedFile: canonicalFile')
+      && registrySource.includes(`const canonicalFile = '${promptPack.canonicalMaster}'`);
+    const usesFallbackHelper = entry.kind === 'fallback-call'
+      && block.includes(`fallback('${pose.file}')`);
+    if (usesFallbackHelper) {
+      assert(registrySource.includes('function fallback('), 'Unknown runtime fallback helper.');
+      assert(registrySource.includes('source: canonicalNight')
+        && registrySource.includes('activeFile: canonicalFile')
+        && registrySource.includes("status: 'fallback'"), 'Runtime fallback helper does not use the canonical asset.');
+    } else {
+      assert(block.includes(`generatedFile: '${pose.file}'`) || usesCanonicalFile,
+        `Registry generatedFile mismatch for ${pose.id}.`);
+    }
     if (!fs.existsSync(absolute)) {
-      assert(block.includes(`activeFile: '${promptPack.canonicalMaster}'`), `Missing pose ${pose.id} must activate the canonical fallback.`);
-      assert(block.includes("status: 'fallback'"), `Missing pose ${pose.id} must be marked fallback.`);
+      assert(usesFallbackHelper || block.includes(`activeFile: '${promptPack.canonicalMaster}'`),
+        `Missing pose ${pose.id} must activate the canonical fallback.`);
+      assert(usesFallbackHelper || block.includes("status: 'fallback'"),
+        `Missing pose ${pose.id} must be marked fallback.`);
       results.push({ status: 'fallback', label: pose.file, detail: `using ${promptPack.canonicalMaster}` });
       continue;
     }
+    if (usesFallbackHelper) throw new Error(`Present pose ${pose.id} is not statically required by the runtime registry.`);
     const expectedRequire = requirePathFor(registryRelative, pose.file);
-    assert(block.includes(`require('${expectedRequire}')`) || pose.file === promptPack.canonicalMaster, `Present pose ${pose.id} is not statically required by the runtime registry.`);
-    assert(block.includes(`activeFile: '${pose.file}'`), `Present pose ${pose.id} is not active in the runtime registry.`);
+    assert(block.includes(`require('${expectedRequire}')`)
+      || (isCanonicalPose && (block.includes('source: canonicalNight') || block.includes(`require('${expectedRequire}')`))),
+      `Present pose ${pose.id} is not statically required by the runtime registry.`);
+    assert(block.includes(`activeFile: '${pose.file}'`)
+      || (isCanonicalPose && block.includes('activeFile: canonicalFile')),
+      `Present pose ${pose.id} is not active in the runtime registry.`);
     assert(block.includes("status: 'generated'"), `Present pose ${pose.id} must be marked generated.`);
     try {
       const isCanonical = pose.file === promptPack.canonicalMaster;
@@ -179,7 +208,7 @@ function verifyAssets({ rootDir, manifest, promptPack }) {
   }
   for (const phase of promptPack.roomPhases) {
     const absolute = path.join(rootDir, phase.file);
-    const block = registryBlock(registrySource, 'NIGHT_ROOM_PHASE_ASSETS', phase.id);
+    const block = registryBlock(registrySource, 'NIGHT_ROOM_PHASE_ASSETS', phase.id).body;
     assert(block.includes(`file: '${phase.file}'`), `Registry file mismatch for room phase ${phase.id}.`);
     if (!fs.existsSync(absolute)) {
       results.push({ status: 'missing', label: phase.file, detail: 'Night room phase is required.' });
