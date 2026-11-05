@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { inspectLegacyReport } from '../scripts/room-report-recovery.mjs';
 import { resolveManifestPath, runtimeOutputFor, safeProjectPath } from '../scripts/room-production-foreman.mjs';
 
 
@@ -87,4 +89,75 @@ test('room production path guard refuses symlink escapes', { skip: process.platf
     fs.rmSync(local, { recursive: true, force: true });
     fs.rmSync(outside, { recursive: true, force: true });
   }
+});
+
+
+function inIsolatedRoomWorkspace(run) {
+  const ignored = safeProjectPath('.room-foreman');
+  fs.mkdirSync(ignored, { recursive: true });
+  const root = fs.mkdtempSync(path.join(ignored, 'foreman-report-test-'));
+  try {
+    for (const relative of [
+      'scripts/room-production-foreman.mjs',
+      'scripts/room-report-recovery.mjs',
+      'config/room-production.manifest.json',
+    ]) {
+      const destination = path.join(root, relative);
+      fs.mkdirSync(path.dirname(destination), { recursive: true });
+      fs.copyFileSync(safeProjectPath(...relative.split('/')), destination);
+    }
+    return run(root);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+function createPlanReport(root) {
+  const stdout = execFileSync(process.execPath, ['scripts/room-production-foreman.mjs', '--mode', 'plan'], {
+    cwd: root, encoding: 'utf8', timeout: 30_000,
+  });
+  assert.match(stdout, /ROOM_FOREMAN_REPORT_WRITTEN/);
+  const runs = path.join(root, '.room-foreman', 'runs');
+  const runIds = fs.readdirSync(runs);
+  assert.equal(runIds.length, 1, 'isolated plan mode must create exactly one run');
+  return { runId: runIds[0], reportFile: path.join(runs, runIds[0], 'run-report.json') };
+}
+
+test('room foreman plan mode writes parseable JSON with a real trailing newline', () => {
+  inIsolatedRoomWorkspace((root) => {
+    const { runId, reportFile } = createPlanReport(root);
+    const raw = fs.readFileSync(reportFile, 'utf8');
+    assert.ok(raw.endsWith('}\n'), 'report must end with a real newline');
+    assert.equal(raw.endsWith('\\n'), false, 'report must not end with a literal backslash-n');
+    const report = JSON.parse(raw);
+    assert.equal(report.runId, runId);
+    assert.equal(report.mode, 'plan');
+    assert.ok(Array.isArray(report.results));
+    assert.ok(report.results.length > 0);
+  });
+});
+
+test('legacy report recovery previews without mutation and applies only with a backup', () => {
+  inIsolatedRoomWorkspace((root) => {
+    const { runId, reportFile } = createPlanReport(root);
+    const valid = fs.readFileSync(reportFile, 'utf8');
+    const malformed = valid.slice(0, -1) + '\\n';
+    fs.writeFileSync(reportFile, malformed);
+    assert.throws(() => JSON.parse(malformed), SyntaxError);
+
+    const command = ['scripts/room-report-recovery.mjs', '--run-id', runId];
+    const options = { cwd: root, encoding: 'utf8', timeout: 30_000 };
+    assert.match(execFileSync(process.execPath, command, options), /ROOM_FOREMAN_LEGACY_REPAIRABLE/);
+    assert.equal(fs.readFileSync(reportFile, 'utf8'), malformed, 'preview must not mutate');
+    assert.match(execFileSync(process.execPath, [...command, '--apply'], options), /ROOM_FOREMAN_LEGACY_REPAIRED/);
+    assert.equal(fs.readFileSync(reportFile, 'utf8'), valid);
+    assert.equal(fs.readFileSync(reportFile + '.legacy.bak', 'utf8'), malformed);
+    assert.match(execFileSync(process.execPath, command, options), /ROOM_FOREMAN_REPORT_ALREADY_VALID/);
+  });
+});
+
+test('legacy recovery rejects other corruption rather than guessing', () => {
+  assert.throws(() => inspectLegacyReport('{"results": [}\\n'), /Unrecognized room report corruption/);
+  assert.throws(() => inspectLegacyReport('not json'), /Unrecognized room report corruption/);
+  assert.equal(inspectLegacyReport('{"results":[]}\n').status, 'valid');
 });

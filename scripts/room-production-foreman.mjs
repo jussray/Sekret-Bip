@@ -181,7 +181,7 @@ function writeReports(runDir, report) {
   const runId = safeRunId(report.runId);
   assert(runDir === safeProjectPath('.room-foreman', 'runs', runId), 'Invalid report directory.');
   fs.mkdirSync(runDir, { recursive: true, mode: 0o700 });
-  fs.writeFileSync(reportPath(runId, 'run-report.json'), `${JSON.stringify(report, null, 2)}\\n`, { flag: 'wx', mode: 0o600 });
+  fs.writeFileSync(reportPath(runId, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
 
   const markdown = [
     '# Room Foreman Run',
