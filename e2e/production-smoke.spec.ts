@@ -115,7 +115,7 @@ test('unauthenticated visitor cannot reach a protected parent route from a blank
 
   await page.goto('/approvals');
 
-  await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
   await expect(page.getByText('To Review')).not.toBeVisible();
   await expect(page.getByText('Bridge')).toHaveCount(0);

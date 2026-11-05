@@ -43,7 +43,7 @@ test('returning Teen user can reach sign in after no-session restoration', async
   await expect(signIn).toHaveAccessibleName("Sign in to your existing Se'kret Bip account");
   await signIn.click();
   await expect(page).toHaveURL(/\/login\?side=teen(?:&|$)/);
-  await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Your space is waiting.')).toBeVisible({ timeout: 15_000 });
 });
 
 test('returning Bip Jr user preserves the parent side when opening sign in', async ({ page }) => {
@@ -52,7 +52,7 @@ test('returning Bip Jr user preserves the parent side when opening sign in', asy
   await expect(signIn).toBeVisible({ timeout: 30_000 });
   await signIn.click();
   await expect(page).toHaveURL(/\/login\?side=parent(?:&|$)/);
-  await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('Welcome back to Parent Space.')).toBeVisible({ timeout: 15_000 });
 });
 
 test('web welcome About control is keyboard accessible and reveals truthful scope', async ({ page }) => {
@@ -170,7 +170,7 @@ test('web welcome remains stable when reduced motion is requested', async ({ pag
 
 test('login deep link renders current controls and survives refresh', async ({ page }) => {
   await page.goto('/login');
-  await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Your space is waiting.')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Password', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
