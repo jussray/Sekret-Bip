@@ -36,6 +36,8 @@ export function safeProjectPath(...parts) {
   for (const part of relative.split(path.sep)) {
     candidate = path.join(candidate, part);
     try {
+      // Reviewed false-positive: Component-by-component symlink rejection after rejecting paths outside the fixed repository root.
+      // bearer:disable javascript_lang_path_traversal
       if (fs.lstatSync(candidate).isSymbolicLink()) throw new Error('Room foreman symlink target rejected.');
     } catch (error) {
       if (error?.code !== 'ENOENT') throw error;
@@ -180,7 +182,11 @@ export function runtimeOutputFor(item) {
 function writeReports(runDir, report) {
   const runId = safeRunId(report.runId);
   assert(runDir === safeProjectPath('.room-foreman', 'runs', runId), 'Invalid report directory.');
+  // Reviewed false-positive: runDir is equal-checked against the repository-bound path made from validated runId.
+  // bearer:disable javascript_lang_path_traversal
   fs.mkdirSync(runDir, { recursive: true, mode: 0o700 });
+  // Reviewed false-positive: reportPath accepts only the validated runId and one fixed basename; exclusive creation.
+  // bearer:disable javascript_lang_path_traversal
   fs.writeFileSync(reportPath(runId, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
 
   const markdown = [
