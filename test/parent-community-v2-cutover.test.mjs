@@ -40,19 +40,30 @@ test('guardian verification requires a permanent account before verified-guardia
   assert.match(fn, /cp\.account_type = 'guardian'/);
 });
 
-test('cross-parent Parent Community raw rows are not exposed through circles or posts policies', () => {
-  const circlesPolicy = cutover.slice(
-    cutover.indexOf('create policy "circles select owner or member"'),
-    cutover.indexOf('drop policy if exists "circles insert own"'),
+test('Parent Community raw tables are RPC-only behind restrictive RLS membranes', () => {
+  assert.match(cutover, /create or replace function public\.is_parent_community_circle_id\(p_circle_id uuid\)/);
+  assert.match(cutover, /create or replace function public\.is_parent_community_post_id\(p_post_id uuid\)/);
+  assert.match(cutover, /security definer[\s\S]*set row_security = off/);
+
+  for (const policy of [
+    'parent_community_circles_rpc_only',
+    'parent_community_membership_rpc_only',
+    'parent_community_posts_rpc_only',
+    'parent_community_comments_rpc_only',
+    'parent_community_reactions_rpc_only',
+    'parent_community_reports_rpc_only',
+  ]) {
+    assert.equal(cutover.includes('create policy ' + policy), true, 'missing restrictive policy ' + policy);
+  }
+
+  assert.equal(
+    cutover.includes('revoke all on function public.is_parent_community_circle_id(uuid) from public, anon;'),
+    true,
   );
-  const postsPolicy = cutover.slice(
-    cutover.indexOf('create policy "posts select by circle visibility"'),
-    cutover.indexOf('drop policy if exists "posts insert by author"'),
+  assert.equal(
+    cutover.includes('revoke all on function public.is_parent_community_post_id(uuid) from public, anon;'),
+    true,
   );
-  assert.doesNotMatch(circlesPolicy, /parent_community/);
-  assert.doesNotMatch(postsPolicy, /parent_community/);
-  assert.match(circlesPolicy, /public\.is_non_anonymous_user\(\)/);
-  assert.match(postsPolicy, /public\.is_non_anonymous_user\(\)/);
 });
 
 test('redacted feed RPC returns no author identity or reply body', () => {

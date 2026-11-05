@@ -1,8 +1,11 @@
--- Parent Circle V2 — verified-guardian, redacted RPC cutover.
+-- Parent Circle V2 — canonical shared-backend RPC cutover.
 --
--- Repository-only migration. Production application remains a separate gate.
--- Cross-parent community reads/writes are RPC-only so raw auth UUIDs and quiet
--- reply authors never become a client-visible community contract.
+-- Authority: jussray/Sekret-Bip is the canonical Bip backend/schema owner.
+-- Specialized Bip repos consume these contracts; they do not own a second DB.
+--
+-- Production application remains a separate founder gate.
+-- Parent Community raw rows are blocked from authenticated clients and exposed
+-- only through minimized SECURITY DEFINER RPCs.
 
 begin;
 
@@ -69,91 +72,119 @@ alter table public.reported_posts
   alter column post_id type text
   using post_id::text;
 
--- Parent Community circle ownership stays private. Other verified guardians use
--- the redacted feed RPC rather than selecting circles and seeing owner_user_id.
-drop policy if exists "circles select owner or member" on public.circles;
-create policy "circles select owner or member" on public.circles
-  for select
-  to authenticated
-  using (
-    public.is_non_anonymous_user()
-    and (
-      owner_user_id = (select auth.uid())
-      or id in (
-        select cm.circle_id
-        from public.circle_members cm
-        where cm.user_id = (select auth.uid())
-      )
-      or kind = 'public'::public.circle_kind
-    )
+-- RLS helper functions deliberately reveal only a boolean classification for an
+-- unguessable UUID. SECURITY DEFINER lets the restrictive policies classify a
+-- row even after raw Parent Community visibility is removed from clients.
+create or replace function public.is_parent_community_circle_id(p_circle_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+set row_security = off
+as $$
+  select exists (
+    select 1
+    from public.circles c
+    where c.id = p_circle_id
+      and c.kind = 'parent_community'::public.circle_kind
   );
+$$;
 
-drop policy if exists "circles insert own" on public.circles;
-create policy "circles insert own" on public.circles
-  for insert
-  to authenticated
-  with check (
-    public.is_non_anonymous_user()
-    and owner_user_id = (select auth.uid())
-    and (
-      kind <> 'parent_community'::public.circle_kind
-      or public.is_verified_guardian()
-    )
+create or replace function public.is_parent_community_post_id(p_post_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = pg_catalog, public, pg_temp
+set row_security = off
+as $$
+  select exists (
+    select 1
+    from public.posts p
+    join public.circles c on c.id = p.circle_id
+    where p.id = p_post_id
+      and c.kind = 'parent_community'::public.circle_kind
   );
+$$;
 
--- Parent Community posts are not raw-table readable cross-parent. Authors can
--- still read their own rows; verified guardians read redacted community rows
--- through get_parent_community_feed().
-drop policy if exists "posts select by circle visibility" on public.posts;
-create policy "posts select by circle visibility" on public.posts
-  for select
-  to authenticated
-  using (
-    public.is_non_anonymous_user()
-    and (
-      author_user_id = (select auth.uid())
-      or circle_id in (
-        select c.id from public.circles c
-        where c.kind = 'public'::public.circle_kind
-      )
-      or circle_id in (
-        select c.id
-        from public.circles c
-        where c.kind = 'friends'::public.circle_kind
-          and c.owner_user_id in (
-            select f1.friend_user_id
-            from public.friendships f1
-            join public.friendships f2
-              on f1.user_id = f2.friend_user_id
-             and f1.friend_user_id = f2.user_id
-            where f1.user_id = (select auth.uid())
-          )
-      )
-      or circle_id in (
-        select cm.circle_id
-        from public.circle_members cm
-        where cm.user_id = (select auth.uid())
-      )
-    )
-  );
+revoke all on function public.is_parent_community_circle_id(uuid) from public, anon;
+revoke all on function public.is_parent_community_post_id(uuid) from public, anon;
+grant execute on function public.is_parent_community_circle_id(uuid) to authenticated;
+grant execute on function public.is_parent_community_post_id(uuid) to authenticated;
 
-drop policy if exists "posts insert by author" on public.posts;
-create policy "posts insert by author" on public.posts
-  for insert
-  to authenticated
-  with check (
-    public.is_non_anonymous_user()
-    and author_user_id = (select auth.uid())
-    and (
-      not exists (
-        select 1
-        from public.circles c
-        where c.id = circle_id
-          and c.kind = 'parent_community'::public.circle_kind
-      )
-      or public.is_verified_guardian()
-    )
-  );
+-- Restrictive policies layer over the existing Circle policies. They affect
+-- only parent_community and leave public/friends/crew/private-family behavior
+-- unchanged. SECURITY DEFINER Parent Community RPCs bypass these table-level
+-- client membranes because migrations run as the table owner and FORCE RLS is
+-- not enabled on these tables.
+drop policy if exists parent_community_circles_rpc_only on public.circles;
+create policy parent_community_circles_rpc_only
+on public.circles
+as restrictive
+for all
+to authenticated
+using (kind <> 'parent_community'::public.circle_kind)
+with check (kind <> 'parent_community'::public.circle_kind);
+
+drop policy if exists parent_community_membership_rpc_only on public.circle_members;
+create policy parent_community_membership_rpc_only
+on public.circle_members
+as restrictive
+for all
+to authenticated
+using (not public.is_parent_community_circle_id(circle_id))
+with check (not public.is_parent_community_circle_id(circle_id));
+
+drop policy if exists parent_community_posts_rpc_only on public.posts;
+create policy parent_community_posts_rpc_only
+on public.posts
+as restrictive
+for all
+to authenticated
+using (not public.is_parent_community_post_id(id))
+with check (not public.is_parent_community_circle_id(circle_id));
+
+drop policy if exists parent_community_comments_rpc_only on public.post_comments;
+create policy parent_community_comments_rpc_only
+on public.post_comments
+as restrictive
+for all
+to authenticated
+using (not public.is_parent_community_post_id(post_id))
+with check (not public.is_parent_community_post_id(post_id));
+
+drop policy if exists parent_community_reactions_rpc_only on public.post_reactions;
+create policy parent_community_reactions_rpc_only
+on public.post_reactions
+as restrictive
+for all
+to authenticated
+using (not public.is_parent_community_post_id(post_id))
+with check (not public.is_parent_community_post_id(post_id));
+
+-- Legacy parent reports use numeric IDs. V2 Parent Community uses UUID IDs.
+-- Keep legacy reporting intact while forcing V2 UUID parent reports through
+-- report_parent_community_post(), where guardian authority and post existence
+-- are checked.
+drop policy if exists parent_community_reports_rpc_only on public.reported_posts;
+create policy parent_community_reports_rpc_only
+on public.reported_posts
+as restrictive
+for all
+to authenticated
+using (
+  not (
+    post_type = 'parent'
+    and post_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+  )
+)
+with check (
+  not (
+    post_type = 'parent'
+    and post_id ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+  )
+);
 
 create or replace function public.get_parent_community_feed(
   p_limit integer default 50
@@ -488,5 +519,12 @@ grant execute on function public.create_parent_community_post(text, text) to aut
 grant execute on function public.react_to_parent_community_post(uuid, text) to authenticated;
 grant execute on function public.reply_to_parent_community_post(uuid, text) to authenticated;
 grant execute on function public.report_parent_community_post(uuid, text) to authenticated;
+
+comment on function public.get_parent_community_feed(integer) is
+  'Canonical redacted Parent Circle feed. Main Bip owns this backend contract.';
+comment on function public.create_parent_community_post(text, text) is
+  'Canonical Parent Circle post write path for verified permanent guardians.';
+comment on policy parent_community_posts_rpc_only on public.posts is
+  'Raw Parent Community post access is denied to authenticated clients; use redacted RPCs.';
 
 commit;
