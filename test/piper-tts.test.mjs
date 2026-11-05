@@ -95,6 +95,15 @@ test('Piper authentication guard is executable and rejects remote local-mode byp
 });
 
 
+test('Piper speech text is passed as stdin, never evaluated as a shell command', () => {
+  assert.match(service, /if not VOICE_STEM\.fullmatch\(voice\)/);
+  assert.match(service, /model = resolve_model\(payload\.voice\)/);
+  assert.match(service, /\["piper", "--model", str\(model\), "--output_file", output\]/);
+  assert.match(service, /input=payload\.text/);
+  assert.match(service, /shell=False/);
+  assert.doesNotMatch(service, /shell=True/);
+});
+
 test('Piper removes private WAV files on subprocess failure, not only timeout or nonzero exit', () => {
   const result = spawnSync('python3', [
     '-m', 'unittest', 'discover', '-s', 'services/piper-tts', '-p', 'test_piper_runtime.py',

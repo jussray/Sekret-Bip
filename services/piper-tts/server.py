@@ -64,12 +64,15 @@ def synthesize(payload: SynthesisRequest, background_tasks: BackgroundTasks, req
     model = resolve_model(payload.voice)
     try:
         output_path = with_private_wav(
-            lambda output: subprocess.run(
+            # Fixed executable/argv, installed voice selected from VOICE_DIR, and private WAV path.
+            # User text goes to stdin; shell interpretation is never enabled.
+            lambda output: subprocess.run(  # bearer:disable python_lang_os_command_injection
                 ["piper", "--model", str(model), "--output_file", output],
                 input=payload.text,
                 text=True,
                 check=True,
                 timeout=45,
+                shell=False,
             )
         )
     except subprocess.TimeoutExpired as exc:
