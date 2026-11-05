@@ -67,6 +67,8 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
   const visualState = effectiveState(state);
   const asset = resolveAvatarAsset(character, time, visualState);
   const motion = STATE_MOTION[visualState];
+  const isCloud = character === 'cloud';
+  const motionDurationMs = isCloud ? PRESENCE_MOTION.cloudFloatDurationMs : motion.durationMs;
 
   // Two stacked layers so we can cross-fade between asset swaps instead of
   // hard-cutting. `current` holds the live asset; `previous` fades out.
@@ -118,13 +120,13 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
       Animated.sequence([
         Animated.timing(motionAnim, {
           toValue: 1,
-          duration: motion.durationMs,
+          duration: motionDurationMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
         Animated.timing(motionAnim, {
           toValue: 0,
-          duration: motion.durationMs,
+          duration: motionDurationMs,
           easing: Easing.inOut(Easing.sin),
           useNativeDriver: true,
         }),
@@ -132,7 +134,7 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
     );
     loop.start();
     return () => loop.stop();
-  }, [motion.durationMs, motionAnim, shouldAnimate, visualState]);
+  }, [motionDurationMs, motionAnim, shouldAnimate, visualState]);
 
   const motionTransform = motionAnim.interpolate({
     inputRange: [0, 1],
@@ -142,7 +144,21 @@ export function PresenceAvatar(props: PresenceAvatarProps) {
     inputRange: [0, 1],
     outputRange: [motion.opacityFrom, motion.opacityTo],
   });
-  const transform = [{ scale: shouldAnimate ? motionTransform : 1 }];
+  // Only the selected canonical Cloud sprite floats. Humans keep breathing scale;
+  // reduced-motion visitors see a fully still character.
+  const cloudOffsetX = motionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: PRESENCE_MOTION.cloudTranslateX,
+  });
+  const cloudOffsetY = motionAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: PRESENCE_MOTION.cloudTranslateY,
+  });
+  const transform = [
+    { translateX: isCloud && shouldAnimate ? cloudOffsetX : 0 },
+    { translateY: isCloud && shouldAnimate ? cloudOffsetY : 0 },
+    { scale: shouldAnimate ? motionTransform : 1 },
+  ];
   const liveOpacity = shouldAnimate
     ? Animated.multiply(fadeIn, motionOpacity)
     : fadeIn;
