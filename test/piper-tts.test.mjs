@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 
 const worker = fs.readFileSync(new URL('../worker/index.ts', import.meta.url), 'utf8');
 const client = fs.readFileSync(new URL('../worker/piper-tts.ts', import.meta.url), 'utf8');
@@ -78,4 +79,15 @@ test('Render Piper canary remains bounded, authenticated, and manual-deploy only
   }
 
   assert.equal(/PIPER_API_TOKEN\s*\n\s*value:/.test(renderBlueprint), false, 'Piper token must not be committed');
+});
+
+test('Piper authentication guard is executable and rejects remote local-mode bypass', () => {
+  const result = spawnSync('python3', [
+    '-m', 'unittest', 'discover', '-s', 'services/piper-tts', '-p', 'test_auth_guard.py',
+  ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(service, /request\.client\.host if request\.client else None/);
+  assert.match(service, /x-forwarded-for/);
+  assert.match(dockerfile, /COPY auth_guard\.py \.\/auth_guard\.py/);
 });

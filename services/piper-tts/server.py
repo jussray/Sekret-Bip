@@ -4,7 +4,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
+from auth_guard import piper_authorized
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -19,13 +20,12 @@ class SynthesisRequest(BaseModel):
     voice: str = Field(min_length=1, max_length=80)
     format: str = "wav"
 
-def require_token(authorization: str | None) -> None:
+def require_token(authorization: str | None, client_host: str | None, *, forwarded: bool) -> None:
+    if piper_authorized(API_TOKEN, ALLOW_INSECURE_LOCAL, authorization, client_host, forwarded=forwarded):
+        return
     if not API_TOKEN:
-        if ALLOW_INSECURE_LOCAL:
-            return
         raise HTTPException(status_code=503, detail="Piper service authentication is not configured")
-    if authorization != f"Bearer {API_TOKEN}":
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    raise HTTPException(status_code=401, detail="Unauthorized")
 
 def resolve_model(voice: str) -> Path:
     # Do not normalize untrusted model identifiers into another installed voice.
@@ -53,8 +53,12 @@ def health() -> dict[str, object]:
     return {"ok": True, "voices": sorted(path.stem for path in VOICE_DIR.glob("*.onnx"))}
 
 @app.post("/synthesize")
-def synthesize(payload: SynthesisRequest, background_tasks: BackgroundTasks, authorization: str | None = Header(default=None)):
-    require_token(authorization)
+def synthesize(payload: SynthesisRequest, background_tasks: BackgroundTasks, request: Request, authorization: str | None = Header(default=None)):
+    require_token(
+        authorization,
+        request.client.host if request.client else None,
+        forwarded=any(name in request.headers for name in ('forwarded', 'x-forwarded-for', 'x-real-ip')),
+    )
     if payload.format != "wav":
         raise HTTPException(status_code=400, detail="Piper service currently returns WAV only")
     model = resolve_model(payload.voice)
