@@ -25,8 +25,15 @@ jobs:
   bearer:
     runs-on: ubuntu-latest
     steps:
-      # Checkout project source
+      # Pin every scan to the exact PR head (or event commit outside PRs).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact scanned revision
+        env:
+          EXPECTED_SCANNED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SCANNED_SHA"
       # Scan code using Bearer CLI
       - name: Run Report
         id: report
@@ -35,19 +42,20 @@ jobs:
           api-key: ${{ secrets.BEARER_TOKEN }}
           format: sarif
           output: results.sarif
-          exit-code: 0
+          # Use Bearer's native nonzero exit status for findings.
       # Preserve the exact scanner output so merge-gate failures can be inspected
       # without weakening GitHub Advanced Security or rerunning against a different head.
       - name: Preserve Bearer SARIF evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: bearer-sarif-${{ github.sha }}
+          name: bearer-sarif-${{ github.event.pull_request.head.sha || github.sha }}
           path: results.sarif
           if-no-files-found: error
           retention-days: 14
       # Upload SARIF file generated in previous step
       - name: Upload SARIF file
+        if: always()
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: results.sarif
