@@ -34,8 +34,8 @@ test('public signup stays retryable when no Auth request reaches the server', as
 
   await page.goto('/signup?side=teen');
   await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: /13\s*[–-]\s*15 Teen mode starts/i }).click();
-  await page.getByRole('button', { name: /Continue with teen setup/i }).click();
+  await page.getByRole('button', { name: /13\s*[–-]\s*15/i }).click();
+  await page.getByRole('button', { name: /Continue to sign up/i }).click();
 
   await expect(page.getByText('create your space')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('textbox', { name: 'Email' }).fill('fresh-public-signup@example.invalid');

@@ -6,7 +6,7 @@ test('teen front door leads directly into age-bucket onboarding', async ({ page 
   await expect(enter).toBeVisible({ timeout: 30_000 });
   await enter.click();
   await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('button', { name: /13\s*[–-]\s*15 Teen mode starts/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /13\s*[–-]\s*15/i })).toBeVisible();
 });
 
 test('parent front door leads directly into parent onboarding', async ({ page }) => {
@@ -181,7 +181,7 @@ test('login deep link renders current controls and survives refresh', async ({ p
 test('teen signup deep link enforces age assurance before account fields', async ({ page }) => {
   await page.goto('/signup');
   await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: /13\s*[–-]\s*15 Teen mode starts/i })).toBeVisible();
+  await expect(page.getByRole('button', { name: /13\s*[–-]\s*15/i })).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Email' })).not.toBeVisible();
 });
 

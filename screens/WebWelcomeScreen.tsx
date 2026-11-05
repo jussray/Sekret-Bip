@@ -353,7 +353,7 @@ export function WebWelcomeScreen({
           { symbol: '✦', label: 'keep your space' },
         ],
         cueLabel: "Se'kret Bip world cues: start quiet, stay close, keep your space",
-        note: 'YOUR PEOPLE. YOUR PEACE.',
+        note: 'MAKE IT YOURS.',
         enterText: 'Enter Se’kret Bip',
         enterLabel: "Se'kret Bip teen welcome — continue to age setup",
         switchText: 'Looking for Bip Jr. + Family? →',

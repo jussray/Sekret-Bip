@@ -29,7 +29,7 @@ test('production Teen journey reaches age-gated onboarding without a write', asy
     await page.getByTestId('web-welcome-enter').click();
     await expect(page).toHaveURL(/\/welcome(?:\?|$)/);
     await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('button', { name: /13\s*[–-]\s*15 Teen mode starts/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /13\s*[–-]\s*15/i })).toBeVisible();
     await testInfo.attach('production-teen-journey.png', { body: await page.screenshot({ fullPage: true, animations: 'disabled' }), contentType: 'image/png' });
   });
 });
