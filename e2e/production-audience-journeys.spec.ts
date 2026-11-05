@@ -60,7 +60,7 @@ test('production Parent journey reaches sign-in and keeps approvals protected', 
     await expect(page).toHaveURL(/\/login(?:\?|$)/);
     await expect(page.getByRole('button', { name: /log in/i })).toBeVisible({ timeout: 30_000 });
     await page.goto('/approvals', { waitUntil: 'networkidle' });
-    await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText('To Review')).not.toBeVisible();
     await testInfo.attach('production-parent-protected-journey.png', { body: await page.screenshot({ fullPage: true, animations: 'disabled' }), contentType: 'image/png' });
   });

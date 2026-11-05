@@ -175,7 +175,7 @@ test('login deep link renders current controls and survives refresh', async ({ p
   await expect(page.getByRole('textbox', { name: 'Password', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
   await page.reload();
-  await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Your space is waiting.')).toBeVisible({ timeout: 30_000 });
 });
 
 test('teen signup deep link enforces age assurance before account fields', async ({ page }) => {
@@ -187,7 +187,7 @@ test('teen signup deep link enforces age assurance before account fields', async
 
 test('parent signup deep link exposes accessible account creation controls', async ({ page }) => {
   await page.goto('/signup?side=parent');
-  await expect(page.getByText('create your Parent Space')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Set up your Parent Space')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('textbox', { name: 'Email' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Show password', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Show password confirmation', exact: true })).toBeVisible();
