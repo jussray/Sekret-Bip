@@ -6,6 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   loadTeenRelationshipProfile,
+  DEFAULT_TEEN_RELATIONSHIP_PROFILE,
   learnTeenRelationshipStyle,
   saveTeenRelationshipProfile,
   relationshipProfileToOracleNote,
@@ -39,6 +40,8 @@ export interface ReplyRequestContext {
   extraMemory?: Record<string, unknown>;
   /** True only for the user's first introduction to this companion. */
   isFirstCompanionChat?: boolean;
+  /** Do not read, write or attach cross-session personal context. */
+  ephemeral?: boolean;
 }
 
 export interface SekretReplyRequest {
@@ -85,12 +88,14 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
   const history = ctx.history ?? [];
   const historyLength = history.length;
 
-  const [currentRelationship, oracleContext] = await Promise.all([
-    loadTeenRelationshipProfile(),
-    resolveOracleContext(ctx.oracleContext),
-  ]);
+  const [currentRelationship, oracleContext] = ctx.ephemeral
+    ? [DEFAULT_TEEN_RELATIONSHIP_PROFILE, [] as string[]] as const
+    : await Promise.all([
+      loadTeenRelationshipProfile(),
+      resolveOracleContext(ctx.oracleContext),
+    ]);
   const relationship = learnTeenRelationshipStyle(ctx.text, currentRelationship);
-  await saveTeenRelationshipProfile(relationship);
+  if (!ctx.ephemeral) await saveTeenRelationshipProfile(relationship);
 
   const conversationPhase = getConversationPhase(historyLength);
   const isFirstCompanionChat = ctx.isFirstCompanionChat ?? historyLength === 0;
@@ -102,7 +107,7 @@ export async function buildReplyRequest(ctx: ReplyRequestContext): Promise<Built
   );
   const isArrival = isArrivalMessage(ctx.text, historyLength);
 
-  const memory: Record<string, unknown> = {
+  const memory: Record<string, unknown> = ctx.ephemeral ? {} : {
     relationshipStyle: relationshipProfileToOracleNote(relationship),
     ...(oracleContext.length > 0 ? { oracleContext } : {}),
     ...(ctx.extraMemory ?? {}),
