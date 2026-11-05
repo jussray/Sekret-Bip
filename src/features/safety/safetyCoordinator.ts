@@ -162,7 +162,7 @@ function tierForSeverity(severity: string): SafetyTier {
 const PRE_FLIGHT_RULES: { re: RegExp; tier: SafetyTier }[] = [
   // immediate_danger (high)
   {
-    re:   /\b(kill myself|end my life|want to die|suicidal|cut myself|self[- ]?harm|not safe|being abused|he hits|she hits)\b/i,
+    re:   /\b(kill myself|killing myself|end my life|want to die|suicid(?:e|al)|cut myself|cutting myself|hurting myself|self[- ]?harm|not safe|being abused|he hits|she hits)\b/i,
     tier: 'immediate_danger',
   },
   // concerning_pattern (medium)

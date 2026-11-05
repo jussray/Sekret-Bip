@@ -38,6 +38,12 @@ test('CRISIS_RE matches direct self-harm phrases', () => {
   assert.ok(CRISIS_RE.test('self harm is on my mind'),     'self harm spaced');
 });
 
+test('CRISIS_RE matches gerund self-harm forms (killing/cutting/hurting myself)', () => {
+  assert.ok(CRISIS_RE.test('killing myself'),              'killing myself');
+  assert.ok(CRISIS_RE.test('cutting myself'),              'cutting myself');
+  assert.ok(CRISIS_RE.test('hurting myself'),              'hurting myself');
+});
+
 test('CRISIS_RE matches abuse and danger phrases', () => {
   assert.ok(CRISIS_RE.test('I am being abused'),     'abused');
   assert.ok(CRISIS_RE.test('there was an assault'),  'assault');
