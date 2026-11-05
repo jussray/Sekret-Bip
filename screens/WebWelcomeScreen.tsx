@@ -341,10 +341,10 @@ export function WebWelcomeScreen({
         nextAudience: 'teen' as WelcomeAudience,
       }
     : {
-        eyebrow: 'PUBLIC PREVIEW',
-        title: 'Your people.\nYour peace.',
-        lead: 'A safe little world where kids, teens, and parents can stay close—without losing their own space.',
-        subtitle: 'Come on in.',
+        eyebrow: 'YOUR PEOPLE. YOUR PEACE.',
+        title: 'Come on in.',
+        lead: 'A safe little world where teens and parents can stay close—without losing their own space.',
+        subtitle: 'stay awhile.',
         hero: TEEN_HERO,
         heroLabel: 'Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together',
         cues: [
