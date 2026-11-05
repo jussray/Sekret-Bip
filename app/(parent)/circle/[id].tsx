@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,6 +19,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAppContext } from '@/context/AppContext';
+import {
+  reactToParentCommunityPost,
+  replyToParentCommunityPost,
+  type ParentCommunityReactionKey,
+} from '@/features/circle/parentCommunityRepository';
 
 const PARENT_REACTIONS = [
   { emoji: '☕', key: 'beenThere',  label: 'been there'       },
@@ -81,9 +87,9 @@ const SEED_POSTS: ParentCirclePost[] = [
 
 export default function ParentCirclePostDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { parentCirclePosts, reactToParentPost } = useAppContext();
+  const { parentCirclePosts, setParentCirclePosts } = useAppContext();
 
-  const allPosts = parentCirclePosts.length ? parentCirclePosts : SEED_POSTS;
+  const allPosts = parentCirclePosts.length ? parentCirclePosts : (__DEV__ ? SEED_POSTS : []);
   const post = (allPosts as ParentCirclePost[]).find(p => String(p.id) === String(id));
 
   const [replyMode, setReplyMode]   = useState<ReplyModeKey | null>(null);
@@ -113,8 +119,20 @@ export default function ParentCirclePostDetail() {
   const reactions = post.reactions ?? {};
   const isSeed = String(post.id).startsWith('ps-');
 
-  function react(key: string) {
-    if (!isSeed) reactToParentPost(Number(post!.id), key);
+  async function react(key: ParentCommunityReactionKey): Promise<boolean> {
+    if (isSeed) return true;
+    try {
+      const reactionCounts = await reactToParentCommunityPost(String(post!.id), key);
+      setParentCirclePosts(current => current.map(item =>
+        String(item.id) === String(post!.id)
+          ? { ...item, reactions: reactionCounts }
+          : item
+      ));
+      return true;
+    } catch {
+      Alert.alert('Could not send support', 'Parent Circle could not save that reaction yet.');
+      return false;
+    }
   }
 
   function handleReplyMode(key: ReplyModeKey) {
@@ -123,8 +141,9 @@ export default function ParentCirclePostDetail() {
       return;
     }
     if (key === 'beenthere') {
-      setBeenThereSent(true);
-      react('solidarity');
+      void react('solidarity').then(saved => {
+        if (saved) setBeenThereSent(true);
+      });
       return;
     }
     if (key === 'pages') {
@@ -134,18 +153,35 @@ export default function ParentCirclePostDetail() {
     setReplyMode(replyMode === key ? null : key);
   }
 
-  function submitSoftReply() {
-    const t = softText.trim();
-    if (!t) return;
-    react('needed');
-    setSoftText('');
-    setReplyMode(null);
+  async function submitSoftReply() {
+    const text = softText.trim();
+    if (!text) return;
+    if (isSeed) {
+      setSoftText('');
+      setReplyMode(null);
+      return;
+    }
+    try {
+      const quietReplyCount = await replyToParentCommunityPost(String(post!.id), text);
+      setParentCirclePosts(current => current.map(item =>
+        String(item.id) === String(post!.id)
+          ? { ...item, quietRepliesCount: quietReplyCount }
+          : item
+      ));
+      setSoftText('');
+      setReplyMode(null);
+    } catch {
+      Alert.alert('Could not reply', 'Parent Circle could not save that quiet reply yet.');
+    }
   }
 
   function handleSit() {
-    setSat(true);
-    react('strength');
-    setSitModal(false);
+    void react('strength').then(saved => {
+      if (saved) {
+        setSat(true);
+        setSitModal(false);
+      }
+    });
   }
 
   const circleNoticed =
@@ -206,7 +242,7 @@ export default function ParentCirclePostDetail() {
                     <TouchableOpacity
                       key={r.key}
                       style={[s.reactionBtn, count > 0 && s.reactionBtnActive]}
-                      onPress={() => react(r.key)}
+                      onPress={() => { void react(r.key as ParentCommunityReactionKey); }}
                     >
                       <Text style={s.reactionEmoji}>{r.emoji}</Text>
                       <Text style={[s.reactionCount, count > 0 && s.reactionCountActive]}>{count}</Text>

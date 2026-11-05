@@ -14,8 +14,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
-import { SOFT_CONTENT_FLAGS, CRISIS_NUDGE, TONE } from '../constants/guardrails';
-import { reportPost } from '@/utils/circleModeration';
+import { SOFT_CONTENT_FLAGS, CRISIS_NUDGE } from '../constants/guardrails';
 
 type ParentCirclePost = {
   id: string | number;
@@ -34,19 +33,14 @@ type ParentCirclePost = {
   };
 };
 
-type FeedTab = 'foryou' | 'new' | 'following';
-const FEED_TABS: { key: FeedTab; label: string }[] = [
-  { key: 'foryou',    label: 'For You'   },
-  { key: 'new',       label: 'New'       },
-  { key: 'following', label: 'Following' },
-];
-
 type ParentCircleScreenProps = {
   parentCirclePosts: ParentCirclePost[];
   parentCirclePostText: string;
   setParentCirclePostText: (text: string) => void;
-  saveParentCirclePost: (extra?: Partial<ParentCirclePost>) => void;
-  reactToParentPost: (id: string | number, type: string) => void;
+  saveParentCirclePost: (extra?: Partial<ParentCirclePost>) => void | Promise<void>;
+  reactToParentPost: (id: string | number, type: string) => void | Promise<void>;
+  reportParentPost?: (id: string | number) => Promise<void>;
+  communityNotice?: string | null;
   setScreen: (screen: string) => void;
   BottomNav: React.ReactNode;
   onPostPress?: (id: string | number) => void;
@@ -157,6 +151,8 @@ export function ParentCircleScreen({
   setParentCirclePostText,
   saveParentCirclePost,
   reactToParentPost,
+  reportParentPost,
+  communityNotice,
   setScreen,
   BottomNav,
   onPostPress,
@@ -169,7 +165,6 @@ export function ParentCircleScreen({
   const [confirmedPost, setConfirmedPost] = useState(false);
   const [activeReplyPostId, setActiveReplyPostId] = useState<string | null>(null);
   const [selectedQuietReply, setSelectedQuietReply] = useState('');
-  const [feedTab, setFeedTab] = useState<FeedTab>('foryou');
   const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
 
   function handleReport(postId: string | number) {
@@ -182,9 +177,14 @@ export function ParentCircleScreen({
           text: 'Report',
           style: 'destructive',
           onPress: () => {
-            setReportedIds(prev => new Set(prev).add(String(postId)));
-            const numericId = Number(postId);
-            if (Number.isFinite(numericId)) void reportPost(numericId, 'parent');
+            void (async () => {
+              try {
+                if (reportParentPost) await reportParentPost(postId);
+                setReportedIds(prev => new Set(prev).add(String(postId)));
+              } catch {
+                Alert.alert('Could not report', 'Parent Circle could not save that report yet.');
+              }
+            })();
           },
         },
       ],
@@ -237,19 +237,24 @@ export function ParentCircleScreen({
       return;
     }
     setIsSubmitting(true);
-    saveParentCirclePost({
-      text:      parentCirclePostText,
-      circleTag: selectedTag || undefined,
-    });
-    setParentCirclePostText('');
-    setSelectedTag('');
-    setCrisisFlag(false);
-    setConfirmedPost(false);
-    setIsSubmitting(false);
-    await triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      await saveParentCirclePost({
+        text:      parentCirclePostText,
+        circleTag: selectedTag || undefined,
+      });
+      setParentCirclePostText('');
+      setSelectedTag('');
+      setCrisisFlag(false);
+      setConfirmedPost(false);
+      await triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
+    } catch {
+      Alert.alert('Could not post', 'Parent Circle could not save that post yet.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const visiblePosts = parentCirclePosts.length ? parentCirclePosts : SEED_POSTS;
+  const visiblePosts = parentCirclePosts.length ? parentCirclePosts : (__DEV__ ? SEED_POSTS : []);
 
   const cultureLines = [
     'no judgment. no comparisons. no competition.',
@@ -386,35 +391,25 @@ export function ParentCircleScreen({
 
         {/* ── Posts ──────────────────────────────────────────────────────── */}
         <Animated.View style={cardStyle(fade4)}>
-          {/* Feed tabs */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.feedTabRail}
-          >
-            {FEED_TABS.map(ft => {
-              const active = feedTab === ft.key;
-              return (
-                <TouchableOpacity
-                  key={ft.key}
-                  onPress={() => setFeedTab(ft.key)}
-                  style={[styles.feedTab, active && styles.feedTabActive]}
-                >
-                  <Text style={[styles.feedTabText, active && styles.feedTabTextActive]}>{ft.label}</Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          {communityNotice ? (
+            <View style={styles.communityNotice}>
+              <Text style={styles.communityNoticeText}>{communityNotice}</Text>
+            </View>
+          ) : null}
 
           <View style={styles.sectionCard}>
             <Text style={styles.sectionTitle}>what parents are carrying</Text>
 
-            {parentCirclePosts.length === 0 && (
-              <Text style={styles.emptyText}>{TONE.emptyCircle}</Text>
-            )}
+            {parentCirclePosts.length === 0 && !__DEV__ && !communityNotice ? (
+              <Text style={styles.emptyText}>The porch is quiet right now. Be the first verified parent to share.</Text>
+            ) : null}
 
             <View style={styles.circlePromise}>
-              <Text style={styles.circlePromiseText}>Every post here is from a real parent having a real day.</Text>
+              <Text style={styles.circlePromiseText}>
+                {parentCirclePosts.length === 0 && __DEV__
+                  ? 'Preview posts below are local samples only. Nothing is uploaded.'
+                  : 'Community posts are anonymous to other parents by design.'}
+              </Text>
               <Text style={styles.circlePromiseSub}>anonymous · no likes · no ranking</Text>
             </View>
 
@@ -453,7 +448,11 @@ export function ParentCircleScreen({
                       key={r.key}
                       onPress={(e) => {
                         e.stopPropagation?.();
-                        if (!String(post.id).startsWith('ps-')) reactToParentPost(post.id, r.key);
+                        if (!String(post.id).startsWith('ps-')) {
+                          void Promise.resolve(reactToParentPost(post.id, r.key)).catch(() => {
+                            Alert.alert('Could not send support', 'Parent Circle could not save that reaction yet.');
+                          });
+                        }
                       }}
                       style={styles.reactionBtn}
                     >
@@ -649,4 +648,20 @@ const styles = StyleSheet.create({
   sendBtnText:    { color: '#fff', fontWeight: '800' },
   cancelBtn:      { marginTop: 8, padding: 10, alignItems: 'center' },
   cancelBtnText:  { color: '#6b7a5e', fontSize: 13 },
+  communityNotice: {
+    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(251,191,36,0.25)',
+    backgroundColor: 'rgba(217,119,6,0.10)',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  communityNoticeText: {
+    color: '#fbbf24',
+    fontSize: 12,
+    lineHeight: 18,
+    fontWeight: '700',
+  },
+
 });
