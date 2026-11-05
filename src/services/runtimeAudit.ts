@@ -132,13 +132,13 @@ export async function logRuntimeAuditEvent(
     .single();
 
   if (error || !data) {
-    console.warn('[runtimeAudit] insert failed:', error?.message);
+    console.warn('[runtimeAudit] insert failed');
     return null;
   }
 
   const event = data as AuditEvent;
-  await ingestAuditEvent(event).catch((e) => {
-    console.warn('[runtimeAudit] normalization failed:', e instanceof Error ? e.message : e);
+  await ingestAuditEvent(event).catch(() => {
+    console.warn('[runtimeAudit] normalization failed');
   });
 
   return event;

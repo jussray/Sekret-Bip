@@ -127,8 +127,8 @@ export const loadState = async (): Promise<Record<string, any>> => {
       }
     });
     return state;
-  } catch (error) {
-    console.error('loadState error:', error);
+  } catch {
+    console.error('loadState failed');
     return {};
   }
 };
@@ -140,8 +140,8 @@ export const saveState = async (stateUpdates: Record<string, any>): Promise<void
       typeof v === 'string' ? v : JSON.stringify(v),
     ]);
     await AsyncStorage.multiSet(pairs);
-  } catch (error) {
-    console.error('saveState error:', error);
+  } catch {
+    console.error('saveState failed');
   }
 };
 
@@ -149,7 +149,7 @@ export async function clearPrivateAccountCache(): Promise<void> {
   try {
     await AsyncStorage.multiRemove([...PRIVATE_ACCOUNT_KEYS]);
     await clearAllStudyProgress();
-  } catch (error) {
-    console.error('clearPrivateAccountCache error:', error);
+  } catch {
+    console.error('clearPrivateAccountCache failed');
   }
 }
