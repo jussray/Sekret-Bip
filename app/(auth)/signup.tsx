@@ -91,6 +91,7 @@ type SignupMetadata = Readonly<{
   account_side: AccountSide;
   username: string;
   signup_source: 'sekret-bip';
+  welcome_email_version: 1;
 }>;
 
 function buildSignupMetadata(side: AccountSide, username: string): SignupMetadata {
@@ -98,6 +99,7 @@ function buildSignupMetadata(side: AccountSide, username: string): SignupMetadat
     account_side: side,
     username: username.trim(),
     signup_source: 'sekret-bip',
+    welcome_email_version: 1,
   };
 }
 

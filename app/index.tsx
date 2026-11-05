@@ -118,18 +118,14 @@ export default function Index() {
           return;
         }
 
-        const [profileModule, bootstrapModule] = await Promise.all([
-          import('@/features/identity/accountProfile'),
-          import('@/services/auth/postAuthBootstrap'),
-        ]);
-        const profile = await profileModule.hydrateAccountProfile(buildSide);
-        const result = await bootstrapModule.fetchPostAuthBootstrap(profile?.accountSide ?? buildSide, profile);
+        // The server-confirmed-email check in canonical bootstrap MUST run
+        // before any protected profile data is hydrated on session restoration.
+        const bootstrapModule = await import('@/services/auth/postAuthBootstrap');
+        const result = await bootstrapModule.fetchPostAuthBootstrap(buildSide);
         if (cancelled) return;
         setRequiredConsentsComplete(result.requiredConsentsComplete);
         setAccountProfile(result.profile);
-        if (profile?.accountSide && profile.accountSide !== userSide) {
-          setUserSide(profile.accountSide);
-        } else if (result.accountSide !== userSide) {
+        if (result.accountSide !== userSide) {
           setUserSide(result.accountSide);
         }
       } catch (error) {

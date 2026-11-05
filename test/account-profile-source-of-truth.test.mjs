@@ -57,11 +57,14 @@ test('server profile wins and is written back to the device cache', () => {
   assert.match(profileService, /if \(remote\) \{[\s\S]*await cacheAccountProfile\(remote\);[\s\S]*return remote;/s);
 });
 
-test('second-device boot hydrates account side and onboarding state from Supabase', () => {
-  assert.match(indexScreen, /hydrateAccountProfile\(buildSide\)/);
+test('second-device boot verifies email before hydrating the authoritative account profile', () => {
+  assert.match(indexScreen, /await bootstrapModule\.fetchPostAuthBootstrap\(buildSide\)/);
+  assert.match(indexScreen, /setAccountProfile\(result\.profile\)/);
+  assert.match(indexScreen, /setRequiredConsentsComplete\(result\.requiredConsentsComplete\)/);
+  assert.match(indexScreen, /setUserSide\(result\.accountSide\)/);
   assert.match(indexScreen, /accountProfile\?\.accountSide \?\? buildSide \?\? userSide/);
-  assert.match(indexScreen, /setUserSide\(profile\.accountSide\)/);
   assert.match(indexScreen, /accountProfile\?\.onboardingComplete/);
+  assert.doesNotMatch(indexScreen, /hydrateAccountProfile\(buildSide\)/);
   assert.doesNotMatch(indexScreen, /AsyncStorage/);
   assert.doesNotMatch(indexScreen, /getItem\('teen_profile_done'\)/);
   assert.doesNotMatch(indexScreen, /getItem\('parent_profile_done'\)/);
