@@ -422,7 +422,7 @@ export default function SignupScreen() {
         </View>
 
         <Text style={s.tagline}>
-          {preferredSide === 'parent' ? 'create your Parent Space' : 'create your space'}
+          {preferredSide === 'parent' ? 'Set up your Parent Space' : 'Your space, your story.'}
         </Text>
 
         {/* Step progress dots */}
@@ -568,7 +568,7 @@ export default function SignupScreen() {
           {/* ── Step 2: review + submit ── */}
           {step === 2 && (
             <View style={s.stepInner}>
-              <Text style={s.stepHint}>You're almost in 🎉</Text>
+              <Text style={s.stepHint}>One last check 💜</Text>
 
               <View style={s.reviewCard}>
                 <ReviewRow label="Email"    value={email.trim()} />
