@@ -1,11 +1,11 @@
 import os
 import re
 import subprocess
-import tempfile
 from pathlib import Path
 
 from fastapi import BackgroundTasks, FastAPI, Header, HTTPException, Request
 from auth_guard import piper_authorized
+from piper_runtime import with_private_wav
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -62,15 +62,21 @@ def synthesize(payload: SynthesisRequest, background_tasks: BackgroundTasks, req
     if payload.format != "wav":
         raise HTTPException(status_code=400, detail="Piper service currently returns WAV only")
     model = resolve_model(payload.voice)
-    output = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-    output.close()
     try:
-        subprocess.run(["piper", "--model", str(model), "--output_file", output.name], input=payload.text, text=True, check=True, timeout=45)
-        background_tasks.add_task(Path(output.name).unlink, missing_ok=True)
-        return FileResponse(output.name, media_type="audio/wav", filename=f"{payload.voice}.wav")
+        output_path = with_private_wav(
+            lambda output: subprocess.run(
+                ["piper", "--model", str(model), "--output_file", output],
+                input=payload.text,
+                text=True,
+                check=True,
+                timeout=45,
+            )
+        )
     except subprocess.TimeoutExpired as exc:
-        Path(output.name).unlink(missing_ok=True)
         raise HTTPException(status_code=504, detail="Synthesis timed out") from exc
     except subprocess.CalledProcessError as exc:
-        Path(output.name).unlink(missing_ok=True)
         raise HTTPException(status_code=500, detail="Piper synthesis failed") from exc
+    except OSError as exc:
+        raise HTTPException(status_code=503, detail="Piper synthesis unavailable") from exc
+    background_tasks.add_task(Path(output_path).unlink, missing_ok=True)
+    return FileResponse(output_path, media_type="audio/wav", filename=f"{payload.voice}.wav")

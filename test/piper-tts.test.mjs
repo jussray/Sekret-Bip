@@ -93,3 +93,15 @@ test('Piper authentication guard is executable and rejects remote local-mode byp
   assert.match(service, /x-forwarded-for/);
   assert.match(dockerfile, /COPY auth_guard\.py \.\/auth_guard\.py/);
 });
+
+
+test('Piper removes private WAV files on subprocess failure, not only timeout or nonzero exit', () => {
+  const result = spawnSync('python3', [
+    '-m', 'unittest', 'discover', '-s', 'services/piper-tts', '-p', 'test_piper_runtime.py',
+  ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(service, /with_private_wav/);
+  assert.match(service, /except OSError as exc:/);
+  assert.match(dockerfile, /COPY piper_runtime\.py \.\/piper_runtime\.py/);
+});
