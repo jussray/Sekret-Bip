@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
-const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');');
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('profile separates account identity from Circle identity', () => {
   const profile = read('app/(teen)/profile.tsx');
