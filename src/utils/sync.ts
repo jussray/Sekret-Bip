@@ -6,14 +6,16 @@
 // errors thrown. This lets us ship the UI now and add credentials later.
 //
 // Auth model: each row is scoped to auth.uid() via RLS. If there's no
-// signed-in user yet, writes are silently skipped (kept locally only).
-// ensureAnonymousSession() is called from useAppEffects on mount.
+// permanent signed-in account yet, writes are silently skipped (kept
+// locally only). No anonymous session is ever created here — account
+// authentication is permanent-account only, and anonymous participation
+// lives in Circle (public identity), never in sign-in.
 //
 // IMPORTANT: never throw. The user's local experience must never break
 // because the cloud is down. Errors are logged and swallowed.
 
 import { getSupabase, TABLES } from './supabase';
-import { ensureAnonymousSession as startAnonymousSession, getCurrentSessionUserId } from '@/services/session';
+import { getCurrentSessionUserId } from '@/services/session';
 import { loadState } from './storage';
 import { emitEvent } from '@/features/activity/events';
 import type {
@@ -109,20 +111,6 @@ async function safeDelete(table: string, id: number | string): Promise<void> {
     }
   } catch (e) {
     if (__DEV__) console.warn(`[sync] delete ${table} failed`, e);
-  }
-}
-
-// ── Anonymous sign-in ────────────────────────────────────────────
-export async function ensureAnonymousSession(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  try {
-    const uid = await startAnonymousSession();
-    if (uid) return uid;
-    return null;
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] ensureAnonymousSession threw', e);
-    return null;
   }
 }
 
