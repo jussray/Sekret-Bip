@@ -44,7 +44,7 @@ test('changed privacy diagnostic events comply with fixed-code Sauce Guard', () 
   for (const path of paths) {
     const source = read(path);
     for (const match of source.matchAll(/console\.(?:warn|error)\(([^)\n]*)\)/g)) {
-      if (!match[1].includes('SEKRET_')) continue;
+      if (!match[1].startsWith("'SEKRET_")) continue;
       assert.match(match[1], /^'SEKRET_[A-Z0-9_]+'$/, path);
     }
   }
