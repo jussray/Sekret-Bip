@@ -49,3 +49,11 @@ test('front-door theme keeps shared Bip atmosphere and safe-area contracts', () 
   assert.match(theme, /ambientPink/);
   assert.match(theme, /heroGlow/);
 });
+
+test('public teen first paint matches the preserved welcome composition copy', () => {
+  assert.match(welcome, /eyebrow: 'YOUR PEOPLE\. YOUR PEACE\.'/);
+  assert.match(welcome, /title: 'Come on in\.'/);
+  assert.match(welcome, /A safe little world where teens and parents can stay close/);
+  assert.doesNotMatch(welcome, /eyebrow: 'PUBLIC PREVIEW'/);
+  assert.match(index, /const publicWelcomeSide: AccountSide = previewSide \?\? buildSide \?\? 'teen';/);
+});
