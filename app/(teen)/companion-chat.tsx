@@ -192,7 +192,7 @@ export default function CompanionChatScreen() {
         }
       } catch (e) {
         // Non-blocking — disclosure check is best-effort.
-        console.warn('[CompanionChat] Could not check AI disclosure status:', e);
+        console.warn('AI_DISCLOSURE_STATUS_UNAVAILABLE');
       }
     })();
     return () => {
