@@ -370,6 +370,7 @@ export default function App() {
   // ── Streak tracking (daily open) ──────────────────────────────────────────
   useEffect(() => {
     if (isLoading) return;
+    if (userSide === 'parent') return;
     const today = new Date().toLocaleDateString();
     if (lastOpenDate !== today) {
       const yesterday = new Date();
@@ -378,7 +379,7 @@ export default function App() {
       setStreakDays(prev => wasYesterday ? prev + 1 : 1);
       setLastOpenDate(today);
     }
-  }, [isLoading, lastOpenDate]);
+  }, [isLoading, userSide, lastOpenDate]);
 
   // ── Rotating home message ─────────────────────────────────────────────────
   useEffect(() => {
