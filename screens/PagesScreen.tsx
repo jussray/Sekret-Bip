@@ -202,11 +202,15 @@ function PagesWorkspace({ side, entries, draft, setDraft, onSave, setScreen, Bot
   };
 
   const chooseImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (!result.canceled) setImageUri(result.assets[0]?.uri);
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.8,
+      });
+      if (!result.canceled) setImageUri(result.assets[0]?.uri);
+    } catch {
+      // permission denied or OS error — no spinner to clear
+    }
   };
 
   const save = () => {
