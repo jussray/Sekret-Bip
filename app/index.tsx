@@ -661,7 +661,7 @@ export default function App() {
       draft={parentPagesDraft}
       setDraft={setParentPagesDraft}
       onSave={saveParentPageEntry}
-      mood={parentMood || mood}
+      mood={parentMood || ''}
       setScreen={setScreen}
       BottomNav={nav}
       parentRoomStyle={parentRoomStyle}
