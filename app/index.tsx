@@ -395,9 +395,9 @@ export default function App() {
 
   // ── Activity tracker (RoomMemory + future Supabase hooks) ─────────────────
   const trackActivity = (type: 'calm' | 'comfort' | 'voice' | 'journal' | 'growth' | 'mood') => {
-    updateRoomMemory({ lastVisit: new Date().toISOString() });
-    // Parent sessions must not write into teen's comfort session history.
+    // Parent sessions must not write into teen's comfort session history or room memory.
     if (userSide === 'parent') return;
+    updateRoomMemory({ lastVisit: new Date().toISOString() });
     const now = new Date();
     const nextId = Date.now();
     const session: ComfortSession = {
