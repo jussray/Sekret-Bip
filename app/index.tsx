@@ -190,20 +190,24 @@ export default function App() {
   const vibeKey       = normalizeVibeKey(theme);
   const t             = THEME_PACKS[vibeKey];
   const currentSekret = SEKRET_PROFILES[selectedSekret] || SEKRET_PROFILES.soft;
+  const isParent = userSide === 'parent';
   const companionInput = useMemo(() => ({
     selectedSekret,
     mood,
-    journalEntries,
-    moodHistory,
-    voiceNotes,
-    comfortSessions,
-    circlePosts,
+    // Parent session must not receive teen's private collections — the companion
+    // object surfaces derived memory stats (journalCount, moodHistory, etc.)
+    // that must not cross the teen→parent boundary.
+    journalEntries:  isParent ? [] : journalEntries,
+    moodHistory:     isParent ? [] : moodHistory,
+    voiceNotes:      isParent ? [] : voiceNotes,
+    comfortSessions: isParent ? [] : comfortSessions,
+    circlePosts:     isParent ? [] : circlePosts,
     streakDays,
     lastOpenDate,
     screen,
     isLateNight: new Date().getHours() >= 22 || new Date().getHours() < 5,
     userSide,
-  }), [selectedSekret, mood, journalEntries, moodHistory, voiceNotes, comfortSessions, circlePosts, streakDays, lastOpenDate, screen, userSide]);
+  }), [selectedSekret, mood, isParent, journalEntries, moodHistory, voiceNotes, comfortSessions, circlePosts, streakDays, lastOpenDate, screen, userSide]);
   const companion = useSekretCompanion(companionInput);
 
   // ── AsyncStorage: load on mount ───────────────────────────────────────────
