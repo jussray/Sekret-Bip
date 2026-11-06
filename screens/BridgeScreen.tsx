@@ -123,7 +123,7 @@ export function BridgeScreen({
       softPrompt:     `${currentSekret?.name ?? 'Bip'} helped share this.`,
     };
 
-    console.log('[BridgeScreen] Bridge payload:', payload);
+    if (__DEV__) console.log('[BridgeScreen] Bridge payload:', payload);
 
     setSent(true);
     setMessage('');
