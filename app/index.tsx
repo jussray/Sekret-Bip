@@ -611,7 +611,7 @@ export default function App() {
   if (screen === 'cloudThoughts') return (
     <CloudThoughtsScreen
       t={t}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
       selectedSekret={selectedSekret}
       setScreen={setScreen}
       BottomNav={nav}
