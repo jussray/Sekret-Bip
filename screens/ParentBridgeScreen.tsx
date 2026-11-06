@@ -54,9 +54,10 @@ interface ParentBridgeScreenProps {
   t:         Record<string, any>;
   setScreen: (screen: string) => void;
   BottomNav: React.ReactNode;
+  userSide?: 'teen' | 'parent';
 }
 
-export function ParentBridgeScreen({ t, setScreen, BottomNav }: ParentBridgeScreenProps) {
+export function ParentBridgeScreen({ t, setScreen, BottomNav, userSide = 'parent' }: ParentBridgeScreenProps) {
   const [tab,        setTab]        = useState<'advice' | 'bridge'>('advice');
   const [topic,      setTopic]      = useState<ParentTopicId | null>(null);
   const [message,    setMessage]    = useState('');
@@ -67,15 +68,18 @@ export function ParentBridgeScreen({ t, setScreen, BottomNav }: ParentBridgeScre
 
   // Check if teen has marked something to share — parent sees gentle nudge only.
   // Content stays on the teen side; this key is just a signal.
-  // Clear it on view so the teen can re-trigger by tapping "Share when I'm ready" again.
+  // Only clear when the parent opens this screen; a teen landing here via the
+  // CircleScreen safety-scan prompt must NOT consume the signal before the parent sees it.
   useEffect(() => {
     AsyncStorage.getItem('parent_bridge_pending').then(val => {
       if (val === 'true') {
         setHasPending(true);
-        AsyncStorage.removeItem('parent_bridge_pending').catch(() => {});
+        if (userSide === 'parent') {
+          AsyncStorage.removeItem('parent_bridge_pending').catch(() => {});
+        }
       }
     }).catch(() => {});
-  }, []);
+  }, [userSide]);
 
   const fade1 = useRef(new Animated.Value(0)).current;
   const fade2 = useRef(new Animated.Value(0)).current;

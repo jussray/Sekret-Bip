@@ -750,7 +750,7 @@ export default function App() {
   }
 
   if (screen === 'parentBridge') return (
-    <ParentBridgeScreen t={t} setScreen={setScreen} BottomNav={nav} />
+    <ParentBridgeScreen t={t} setScreen={setScreen} BottomNav={nav} userSide={userSide} />
   );
 
   if (screen === 'bippin2') return (
