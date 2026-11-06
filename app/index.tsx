@@ -691,7 +691,7 @@ export default function App() {
   if (screen === 'calm') return (
     <CalmScreen
       t={t}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
       setMood={userSide === 'parent' ? () => {} : setMood}
       setScreen={setScreen}
       BottomNav={nav}
@@ -783,11 +783,11 @@ export default function App() {
   if (screen === 'growth') return (
     <GrowthScreen
       t={t}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
       selectedSekret={selectedSekret}
       setScreen={setScreen}
       onMilestone={() => trackActivity('growth')}
-      streakDays={streakDays}
+      streakDays={userSide === 'parent' ? 0 : streakDays}
       BottomNav={nav}
     />
   );
