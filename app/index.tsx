@@ -577,23 +577,36 @@ export default function App() {
     );
   }
 
-  // ── Dashboard (HomeScreen) — secondary entry, available from MoreScreen ───
-  if (screen === 'dashboard') return (
-    <HomeScreen
-      mood={mood}
-      selectMood={selectMood}
-      t={t}
-      currentSekret={currentSekret}
-      selectedSekret={selectedSekret}
-      homeMessageIndex={homeMessageIndex}
-      userSide={userSide}
-      setScreen={setScreen}
-      onMoodSelect={(m) => trackActivity('mood')}
-      BottomNav={nav}
-      streakDays={streakDays}
-      companion={companion}
-    />
-  );
+  // ── Dashboard (HomeScreen) — teen-only: selectMood writes teen moodHistory ──
+  if (screen === 'dashboard') {
+    if (userSide === 'parent') return (
+      <ParentRoomScreen
+        parentRoomStyle={parentRoomStyle}
+        parentMood={parentMood}
+        previousMood={(parentMoodDate && parentMoodDate !== new Date().toLocaleDateString()) ? parentMood : ''}
+        setParentMood={(m) => { setParentMood(m); setParentMoodDate(new Date().toLocaleDateString()); }}
+        setScreen={setScreen}
+        weatherMode={theme === 'rain' ? 'rain' : undefined}
+        BottomNav={nav}
+      />
+    );
+    return (
+      <HomeScreen
+        mood={mood}
+        selectMood={selectMood}
+        t={t}
+        currentSekret={currentSekret}
+        selectedSekret={selectedSekret}
+        homeMessageIndex={homeMessageIndex}
+        userSide={userSide}
+        setScreen={setScreen}
+        onMoodSelect={(m) => trackActivity('mood')}
+        BottomNav={nav}
+        streakDays={streakDays}
+        companion={companion}
+      />
+    );
+  }
 
   if (screen === 'cloudThoughts') return (
     <CloudThoughtsScreen
