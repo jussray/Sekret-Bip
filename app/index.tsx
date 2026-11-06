@@ -620,9 +620,22 @@ export default function App() {
     />
   );
 
-  if (screen === 'periodCalendar') return (
-    <PeriodCalendarScreen theme={t} setScreen={setScreen} BottomNav={nav} selectedSekret={selectedSekret} mood={mood} />
-  );
+  if (screen === 'periodCalendar') {
+    if (userSide === 'parent') return (
+      <MoreScreen
+        t={t}
+        userSide={userSide}
+        setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
+        setScreen={setScreen}
+        BottomNav={nav}
+        mood={mood}
+        selectedSekret={selectedSekret}
+      />
+    );
+    return (
+      <PeriodCalendarScreen theme={t} setScreen={setScreen} BottomNav={nav} selectedSekret={selectedSekret} mood={mood} />
+    );
+  }
 
   if (screen === 'voiceBip') return (
     <VoiceBipScreen
