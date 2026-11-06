@@ -145,9 +145,14 @@ export function SekretScreen({
     setIsSekretTyping(true);
     setSekretReply('');
 
-    const reply = await fetchSekretReply(text, 'chat', mood, selectedProfile, undefined, privateProfile, userSide);
-    setSekretReply(reply);
-    setIsSekretTyping(false);
+    try {
+      const reply = await fetchSekretReply(text, 'chat', mood, selectedProfile, undefined, privateProfile, userSide);
+      setSekretReply(reply);
+    } catch {
+      setSekretReply("Se'kret is here — just taking a breath. Try again? 💜");
+    } finally {
+      setIsSekretTyping(false);
+    }
   };
 
   // ── Parent side (preserved) ─────────────────────────────────────────────
