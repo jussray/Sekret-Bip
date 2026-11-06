@@ -792,27 +792,53 @@ export default function App() {
     />
   );
 
-  if (screen === 'womanhood') return (
-    <WomanhoodScreen
-      t={t}
-      mood={mood}
-      selectedSekret={selectedSekret}
-      setScreen={setScreen}
-      BottomNav={nav}
-      streakDays={streakDays}
-    />
-  );
+  if (screen === 'womanhood') {
+    if (userSide === 'parent') return (
+      <MoreScreen
+        t={t}
+        userSide={userSide}
+        setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
+        setScreen={setScreen}
+        BottomNav={nav}
+        mood={mood}
+        selectedSekret={selectedSekret}
+      />
+    );
+    return (
+      <WomanhoodScreen
+        t={t}
+        mood={mood}
+        selectedSekret={selectedSekret}
+        setScreen={setScreen}
+        BottomNav={nav}
+        streakDays={streakDays}
+      />
+    );
+  }
 
-  if (screen === 'manhood') return (
-    <ManhoodScreen
-      t={t}
-      mood={mood}
-      selectedSekret={selectedSekret}
-      setScreen={setScreen}
-      BottomNav={nav}
-      streakDays={streakDays}
-    />
-  );
+  if (screen === 'manhood') {
+    if (userSide === 'parent') return (
+      <MoreScreen
+        t={t}
+        userSide={userSide}
+        setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
+        setScreen={setScreen}
+        BottomNav={nav}
+        mood={mood}
+        selectedSekret={selectedSekret}
+      />
+    );
+    return (
+      <ManhoodScreen
+        t={t}
+        mood={mood}
+        selectedSekret={selectedSekret}
+        setScreen={setScreen}
+        BottomNav={nav}
+        streakDays={streakDays}
+      />
+    );
+  }
 
   if (screen === 'comfort') return (
     <ComfortScreen
