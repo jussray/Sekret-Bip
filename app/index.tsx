@@ -748,7 +748,7 @@ export default function App() {
     // S2Tell is teen-only: parent writing parent_bridge_pending would
     // corrupt the teen→parent signal that ParentBridgeScreen reads.
     if (userSide === 'parent') return (
-      <ParentBridgeScreen t={t} setScreen={setScreen} BottomNav={nav} />
+      <ParentBridgeScreen t={t} setScreen={setScreen} BottomNav={nav} userSide={userSide} />
     );
     return (
       <S2TellScreen
