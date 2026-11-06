@@ -645,7 +645,7 @@ export default function App() {
       voiceNotes={userSide === 'parent' ? parentVoiceNotes : voiceNotes}
       setVoiceNotes={userSide === 'parent' ? setParentVoiceNotes : setVoiceNotes}
       onSave={() => trackActivity('voice')}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
       companion={userSide === 'parent' ? undefined : companion}
       BottomNav={nav}
       privateProfile={userSide === 'parent' ? parentOracleProfile : oracleProfile}
