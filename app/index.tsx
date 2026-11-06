@@ -702,7 +702,7 @@ export default function App() {
   if (screen === 'sekret') return (
     <SekretScreen
       t={t}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
       currentSekret={currentSekret}
       selectedProfile={selectedSekret}
       setSelectedProfile={setSelectedSekret}
