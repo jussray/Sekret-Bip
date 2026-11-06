@@ -551,7 +551,7 @@ export function RoomScreen({
   useEffect(() => {
     AsyncStorage.getItem('sekretbip_first_visit_done').then(done => {
       if (done === 'true') setIsFirstVisit(false);
-    });
+    }).catch(() => {});
   }, []);
 
   // ─── Animations ─────────────────────────────────────────────────────────
