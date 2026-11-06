@@ -477,7 +477,9 @@ export function HomeScreen({
         <Animated.View style={[cardAnim(card3Anim), { marginBottom: 6 }]}>
           <Text style={[styles.sectionTitle, { color: t.soft, marginTop: 0, marginBottom: 10 }]}>Quick Actions ⚡</Text>
           <View style={styles.actionsGrid}>
-            {QUICK_ACTIONS.map(action => {
+            {QUICK_ACTIONS.filter(action =>
+              !(userSide === 'parent' && action.to === 's2tell')
+            ).map(action => {
               const route = action.to === '__bridge__'
                 ? (userSide === 'parent' ? 'parentBridge' : 'bridge')
                 : action.to;

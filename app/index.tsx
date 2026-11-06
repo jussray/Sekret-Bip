@@ -711,17 +711,24 @@ export default function App() {
     <BridgeScreen t={t} currentSekret={currentSekret} setScreen={setScreen} BottomNav={nav} selectedSekret={selectedSekret} mood={mood} />
   );
 
-  if (screen === 's2tell') return (
-    <S2TellScreen
-      t={t}
-      setScreen={setScreen}
-      BottomNav={nav}
-      selectedSekret={selectedSekret}
-      mood={mood}
-      privateProfile={userSide === 'parent' ? parentOracleProfile : oracleProfile}
-      profileSide={userSide}
-    />
-  );
+  if (screen === 's2tell') {
+    // S2Tell is teen-only: parent writing parent_bridge_pending would
+    // corrupt the teen→parent signal that ParentBridgeScreen reads.
+    if (userSide === 'parent') return (
+      <ParentBridgeScreen t={t} setScreen={setScreen} BottomNav={nav} />
+    );
+    return (
+      <S2TellScreen
+        t={t}
+        setScreen={setScreen}
+        BottomNav={nav}
+        selectedSekret={selectedSekret}
+        mood={mood}
+        privateProfile={oracleProfile}
+        profileSide="teen"
+      />
+    );
+  }
 
   if (screen === 'parentBridge') return (
     <ParentBridgeScreen t={t} setScreen={setScreen} BottomNav={nav} />
