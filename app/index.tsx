@@ -218,7 +218,7 @@ export default function App() {
   //   streakDays, lastOpenDate  (streakDays/lastOpenDate are custom — added below)
   // NOTE: storage.ts auto-parses arrays: entries, moodHistory, circlePosts, voiceNotes
   useEffect(() => {
-    (async () => {
+    void (async () => {
       try {
         const state = await loadState();
 
@@ -283,7 +283,7 @@ export default function App() {
     if (isLoading) return;
     let cancelled = false;
 
-    (async () => {
+    void (async () => {
       const uid = await ensureAnonymousSession();
       if (!uid || cancelled) return;
 
