@@ -45,7 +45,7 @@ test('retains redacted evidence when Cloudflare token verification fails before 
       },
       now: () => new Date('2026-09-07T23:35:00.000Z'),
     }),
-    /Authentication error/,
+    /CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED/,
   );
 
   assert.equal(fs.existsSync(evidencePath), true);
@@ -70,7 +70,8 @@ test('retains redacted evidence when Cloudflare token verification fails before 
   assert.equal(evidence.rollback.pathIncludes, null);
   assert.equal(evidence.rollback.pathExcludes, null);
   assert.equal(evidence.desired.nonProductionBuildsEnabled, false);
-  assert.match(evidence.error, /Cloudflare GET \/user\/tokens\/verify failed/);
+  assert.equal(evidence.error, 'CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED codes=10000 operation=token-verify');
+  assert.doesNotMatch(evidenceText, /Authentication error|Cloudflare GET/);
   assert.doesNotMatch(evidenceText, new RegExp(token));
 });
 
@@ -110,4 +111,74 @@ test('retains configuration evidence before any provider request when apply SHA 
   assert.equal(evidence.desired.watchPathsMode, 'enforced');
   assert.equal(evidence.desired.nonProductionBuildsEnabled, false);
   assert.doesNotMatch(evidenceText, /secret-token/);
+});
+
+test('failed fallback retains only bounded provider diagnostics, not token or provider messages', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sekret-workers-trigger-fallback-fail-'));
+  const evidencePath = path.join(dir, 'evidence.json');
+  const privateMarker = 'synthetic-private-token-and-message';
+  let requests = 0;
+
+  await assert.rejects(
+    () => reconcileWorkersBuildTrigger({
+      env: {
+        CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: privateMarker,
+        CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID,
+        CLOUDFLARE_BUILD_EVIDENCE_PATH: evidencePath,
+      },
+      fetchImpl: async (url) => {
+        requests += 1;
+        const verify = url.endsWith('/user/tokens/verify');
+        assert.ok(verify || url.includes('/workers/scripts?'));
+        return {
+          ok: false,
+          status: verify ? 403 : 502,
+          statusText: privateMarker,
+          async json() {
+            return { success: false, errors: [{ code: verify ? 6003 : 10000, message: privateMarker }] };
+          },
+        };
+      },
+    }),
+    /CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED/,
+  );
+  assert.equal(requests, 2);
+  const evidence = fs.readFileSync(evidencePath, 'utf8');
+  assert.equal(
+    JSON.parse(evidence).error,
+    'CLOUDFLARE_WORKERS_BUILDS_TOKEN_SELECTION_FAILED status=502 codes=10000 operation=workers-scripts-read',
+  );
+  assert.doesNotMatch(evidence, /synthetic-private-token-and-message|Cloudflare GET/);
+});
+
+test('production trigger selection failures retain only a fixed classification', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sekret-workers-trigger-selection-fail-'));
+  const evidencePath = path.join(dir, 'evidence.json');
+  const result = (value) => ({
+    ok: true,
+    status: 200,
+    async json() { return { success: true, result: value }; },
+  });
+
+  await assert.rejects(
+    () => reconcileWorkersBuildTrigger({
+      env: {
+        CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: 'synthetic-token',
+        CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID,
+        CLOUDFLARE_BUILD_EVIDENCE_PATH: evidencePath,
+      },
+      fetchImpl: async (url) => {
+        if (url.endsWith('/user/tokens/verify')) return result({ status: 'active' });
+        if (url.includes('/workers/scripts?')) {
+          return result([{ id: 'sekret-backend', tag: 'synthetic-worker-tag' }]);
+        }
+        if (url.endsWith('/builds/workers/synthetic-worker-tag/triggers')) return result([]);
+        throw new Error('unexpected synthetic request');
+      },
+    }),
+    /PRODUCTION_TRIGGER_SELECTION_FAILED/,
+  );
+  const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
+  assert.equal(evidence.error, 'PRODUCTION_TRIGGER_SELECTION_FAILED');
+  assert.equal(evidence.status, 'provider-discovery-failed');
 });

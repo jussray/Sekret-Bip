@@ -9,13 +9,19 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
-function assertFounderGate(relativePath, lockedTitle, protectedMarker) {
+function assertFounderGate(relativePath, lockedTitle, protectedMarker, { requiresManagement = false } = {}) {
   const src = read(relativePath);
 
   assert.match(src, /getCurrentFounderProfile/);
-  assert.match(src, /isFounderProfile/);
   assert.match(src, /useEffect\(\(\) => \{/);
-  assert.match(src, /setAuthorized\(isFounderProfile\(profile\)\)/);
+  if (requiresManagement) {
+    assert.match(src, /isWorkerManagementProfile/);
+    assert.match(src, /setAuthorized\(isWorkerManagementProfile\(profile\)\)/);
+    assert.doesNotMatch(src, /setAuthorized\(isFounderProfile\(profile\)\)/);
+  } else {
+    assert.match(src, /isFounderProfile/);
+    assert.match(src, /setAuthorized\(isFounderProfile\(profile\)\)/);
+  }
   assert.match(src, /authorized === null/);
   assert.match(src, /!authorized/);
   assert.match(src, new RegExp(lockedTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -44,5 +50,6 @@ test('Worker panel is gated before live Worker controls render', () => {
     'src/features/control-room/WorkerPanel.tsx',
     'Worker Panel is locked.',
     'Fire Test Shot',
+    { requiresManagement: true },
   );
 });
