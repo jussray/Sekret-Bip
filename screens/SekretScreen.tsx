@@ -173,7 +173,7 @@ export function SekretScreen({
           </Text>
           <TouchableOpacity
             style={[styles.button, { backgroundColor: glow, shadowColor: glow, marginTop: 12 }]}
-            onPress={() => setScreen('bridge')}
+            onPress={() => setScreen('parentBridge')}
           >
             <Text style={styles.buttonText}>Open Bridge 💌</Text>
           </TouchableOpacity>
