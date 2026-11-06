@@ -123,9 +123,9 @@ export function PeriodCalendarScreen({
     transform: [{ translateY: val.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
   });
 
-  const save = async (days: Record<string, string>, start: string | null) => {
-    await AsyncStorage.setItem('periodDays', JSON.stringify(days));
-    if (start) await AsyncStorage.setItem('lastPeriodStart', start);
+  const save = (days: Record<string, string>, start: string | null) => {
+    AsyncStorage.setItem('periodDays', JSON.stringify(days)).catch(() => {});
+    if (start) AsyncStorage.setItem('lastPeriodStart', start).catch(() => {});
   };
 
   const getDaysInMonth = (m: number, y: number) => new Date(y, m + 1, 0).getDate();
