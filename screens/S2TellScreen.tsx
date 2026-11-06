@@ -154,12 +154,12 @@ export function S2TellScreen({
       const history: S2TellEntry[] = raw ? JSON.parse(raw) : [];
       history.unshift(entry);
       await AsyncStorage.setItem('s2tell_history', JSON.stringify(history));
-    } catch {
-      // Storage failure — silent, state still updates for this session
-    }
 
-    setS2tellSaved(true);
-    setSavedMsg('Saved privately. It\'s yours until you\'re ready.');
+      setS2tellSaved(true);
+      setSavedMsg('Saved privately. It\'s yours until you\'re ready.');
+    } catch {
+      setSavedMsg('Kept for this session — storage unavailable.');
+    }
   };
 
   const handleShare = async () => {
