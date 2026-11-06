@@ -202,7 +202,8 @@ export default function App() {
     lastOpenDate,
     screen,
     isLateNight: new Date().getHours() >= 22 || new Date().getHours() < 5,
-  }), [selectedSekret, mood, journalEntries, moodHistory, voiceNotes, comfortSessions, circlePosts, streakDays, lastOpenDate, screen]);
+    userSide,
+  }), [selectedSekret, mood, journalEntries, moodHistory, voiceNotes, comfortSessions, circlePosts, streakDays, lastOpenDate, screen, userSide]);
   const companion = useSekretCompanion(companionInput);
 
   // ── AsyncStorage: load on mount ───────────────────────────────────────────

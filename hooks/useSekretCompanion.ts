@@ -95,7 +95,7 @@ export function useSekretCompanion(input: CompanionActivityInput) {
     (async () => {
       const [loaded, oracleRecord] = await Promise.all([
         loadSekretMemory(),
-        loadOracleRecord('teen'),
+        loadOracleRecord(input.userSide || 'teen'),
       ]);
       const oracleSignals = extractOracleSignals(oracleRecord);
       const updated = await updateSekretMemory(input, loaded);

@@ -64,6 +64,7 @@ export interface CompanionActivityInput {
   screen?: string;
   isLateNight?: boolean;
   journalText?: string;
+  userSide?: 'teen' | 'parent';
   oracleSignals?: {
     personalityNote?: string;
     growthEdge?: string;
