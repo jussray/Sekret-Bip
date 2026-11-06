@@ -224,7 +224,7 @@ export default function App() {
 
         if (state.theme)          setTheme(normalizeVibeKey(state.theme));
         if (state.mood)           setMood(state.mood);
-        if (state.userSide)       setUserSide(state.userSide);
+        if (state.userSide === 'teen' || state.userSide === 'parent') setUserSide(state.userSide);
         if (state.selectedSekret) setSelectedSekret(state.selectedSekret);
         if (state.sekretMode)     setSekretMode(state.sekretMode);
         if (state.journalText)    setJournalText(state.journalText);
