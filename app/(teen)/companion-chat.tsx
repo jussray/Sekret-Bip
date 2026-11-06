@@ -44,6 +44,8 @@ import { CompanionTypingIndicator } from '../../components/chat/CompanionTypingI
 import { ChatBubble } from '../../components/chat/ChatBubble';
 import { ChatInput } from '../../components/chat/ChatInput';
 import { SafetyExperienceSheet } from '../../components/safety/SafetyExperienceSheet';
+import AIDisclosureModal from '../../components/companions/AIDisclosureModal';
+import { getSupabase } from '../../src/utils/supabase';
 import {
   sendCompanionMessage,
   toCompanionId,
@@ -147,6 +149,7 @@ export default function CompanionChatScreen() {
   const [safetyExperience, setSafetyExperience]   = useState<SafetyExperience | null>(null);
   const [comfortNudge, setComfortNudge]           = useState<string | null>(null);
   const [teenGender, setTeenGender]               = useState<'girl' | 'boy' | 'other' | null>(null);
+  const [showAiDisclosure, setShowAiDisclosure]   = useState(false);
   /**
    * questionBudget — how many questions the companion has left this session.
    * Initialised to null (unknown) and updated from each backend reply.
@@ -167,6 +170,34 @@ export default function CompanionChatScreen() {
         }
       } catch { /* ignore */ }
     });
+  }, []);
+
+  // App Store requirement + Trust-08: disclose AI status once, ever, on first
+  // companion message. Best-effort — never blocks chat if the check fails.
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from('profiles')
+          .select('ai_disclosure_accepted_at')
+          .eq('id', user.id)
+          .single();
+        if (active && !data?.ai_disclosure_accepted_at) {
+          setShowAiDisclosure(true);
+        }
+      } catch (e) {
+        // Non-blocking — disclosure check is best-effort.
+        console.warn('[CompanionChat] Could not check AI disclosure status:', e);
+      }
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Load history on mount; show companion greeting if empty
@@ -369,6 +400,12 @@ export default function CompanionChatScreen() {
           onDismiss={() => setSafetyExperience(null)}
         />
       )}
+
+      <AIDisclosureModal
+        visible={showAiDisclosure}
+        companionName={profile.name}
+        onAccept={() => setShowAiDisclosure(false)}
+      />
     </ImageBackground>
   );
 }
