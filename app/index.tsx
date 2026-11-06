@@ -677,7 +677,7 @@ export default function App() {
     <CalmScreen
       t={t}
       mood={mood}
-      setMood={setMood}
+      setMood={userSide === 'parent' ? () => {} : setMood}
       setScreen={setScreen}
       BottomNav={nav}
       selectedSekret={selectedSekret}
