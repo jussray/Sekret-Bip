@@ -860,7 +860,7 @@ export default function App() {
       setScreen={setScreen}
       onComplete={() => trackActivity('calm')}
       BottomNav={nav}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
     />
   );
 
