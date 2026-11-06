@@ -179,12 +179,12 @@ export function S2TellScreen({
       // Lightweight signal — parent side only learns teen chose to share,
       // NOT the content. Parent reads parent_bridge_pending.
       await AsyncStorage.setItem('parent_bridge_pending', 'true');
-    } catch {
-      // Storage failure — silent, state still updates for this session
-    }
 
-    setS2tellShared(true);
-    setSharedMsg('Saved. Nothing sends unless you choose. 💜');
+      setS2tellShared(true);
+      setSharedMsg('Saved. Nothing sends unless you choose. 💜');
+    } catch {
+      setSharedMsg('Could not save — storage unavailable. Try again.');
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
