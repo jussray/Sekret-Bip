@@ -1000,7 +1000,7 @@ export default function App() {
       setParentRoomStyle={(s) => setParentRoomStyle(s as ParentRoomStyle)}
       setScreen={setScreen}
       BottomNav={nav}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
     />
   );
 
