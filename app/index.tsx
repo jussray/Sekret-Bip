@@ -742,7 +742,7 @@ export default function App() {
   }
 
   if (screen === 'bridge') return (
-    <BridgeScreen t={t} currentSekret={currentSekret} setScreen={setScreen} BottomNav={nav} selectedSekret={selectedSekret} mood={mood} />
+    <BridgeScreen t={t} currentSekret={currentSekret} setScreen={setScreen} BottomNav={nav} selectedSekret={selectedSekret} mood={userSide === 'parent' ? (parentMood || '') : mood} />
   );
 
   if (screen === 's2tell') {
@@ -980,7 +980,7 @@ export default function App() {
       setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
       setScreen={setScreen}
       BottomNav={nav}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
       selectedSekret={selectedSekret}
     />
   );
