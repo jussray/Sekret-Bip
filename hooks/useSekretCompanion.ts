@@ -92,7 +92,7 @@ export function useSekretCompanion(input: CompanionActivityInput) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const [loaded, oracleRecord] = await Promise.all([
           loadSekretMemory(),
