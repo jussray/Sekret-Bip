@@ -87,10 +87,10 @@ export function PeriodCalendarScreen({
       } catch {
         setMarkedDays({});
       }
-    });
+    }).catch(() => {});
     AsyncStorage.getItem('lastPeriodStart').then(v => {
       if (v) setLastPeriodStart(v);
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {
