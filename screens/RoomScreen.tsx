@@ -668,7 +668,7 @@ export function RoomScreen({
         // First time summoning — mark first visit done
         if (next && isFirstVisit) {
           setIsFirstVisit(false);
-          AsyncStorage.setItem('sekretbip_first_visit_done', 'true');
+          AsyncStorage.setItem('sekretbip_first_visit_done', 'true').catch(() => {});
         }
         updateRoomMemory?.({ lastSummon: new Date().toISOString(), character });
         return next;
