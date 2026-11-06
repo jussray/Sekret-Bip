@@ -92,20 +92,22 @@ export function useSekretCompanion(input: CompanionActivityInput) {
 
   useEffect(() => {
     let cancelled = false;
+    // Parent sessions never display the companion — skip all teen memory reads.
+    if (input.userSide === 'parent') {
+      setState(DEFAULT_STATE);
+      setIsReady(true);
+      return;
+    }
     void (async () => {
       try {
         const [loaded, oracleRecord] = await Promise.all([
           loadSekretMemory(),
-          loadOracleRecord(input.userSide || 'teen'),
+          loadOracleRecord('teen'),
         ]);
         const oracleSignals = extractOracleSignals(oracleRecord);
-        // Parent sessions must not write to the shared sekret_companion_memory key
-        // (it stores teen companion history). Load-only: compute state from the
-        // existing memory without persisting any parent-session activity.
-        const isParentSession = input.userSide === 'parent';
-        const updated = isParentSession ? loaded : await updateSekretMemory(input, loaded);
+        const updated = await updateSekretMemory(input, loaded);
         const nextState = snapshot(updated, input, oracleSignals);
-        if (!isParentSession && nextState.checkIn) {
+        if (nextState.checkIn) {
           updated.lastCheckIn = new Date().toISOString();
           await saveSekretMemory(updated);
           nextState.memorySummary = summarizeSekretMemory(updated);
