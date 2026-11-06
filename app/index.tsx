@@ -281,6 +281,7 @@ export default function App() {
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     if (isLoading) return;
+    if (userSide === 'parent') return;
     let cancelled = false;
 
     void (async () => {
