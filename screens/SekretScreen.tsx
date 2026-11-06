@@ -137,6 +137,7 @@ export function SekretScreen({
 
   // ── Send handler ───────────────────────────────────────────────────────────
   const handleSend = async () => {
+    if (userSide === 'parent') return;
     const text = sekretMessage.trim();
     if (!text) return;
 
