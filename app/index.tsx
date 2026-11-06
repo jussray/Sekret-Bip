@@ -847,8 +847,8 @@ export default function App() {
       onComplete={() => trackActivity('comfort')}
       BottomNav={nav}
       selectedSekret={selectedSekret}
-      mood={mood}
-      companion={companion}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
+      companion={userSide === 'parent' ? undefined : companion}
     />
   );
 
