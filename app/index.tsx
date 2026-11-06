@@ -193,7 +193,7 @@ export default function App() {
   const isParent = userSide === 'parent';
   const companionInput = useMemo(() => ({
     selectedSekret,
-    mood,
+    mood: isParent ? '' : mood,
     // Parent session must not receive teen's private collections — the companion
     // object surfaces derived memory stats (journalCount, moodHistory, etc.)
     // that must not cross the teen→parent boundary.
