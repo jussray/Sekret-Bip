@@ -804,62 +804,114 @@ export default function App() {
     />
   );
 
-  if (screen === 'points') return (
-    <PointsScreen
-      t={t}
-      mood={mood}
-      selectedSekret={selectedSekret}
-      moodHistory={moodHistory}
-      journalEntries={journalEntries}
-      voiceNotes={voiceNotes}
-      circlePosts={circlePosts}
-      comfortSessions={comfortSessions}
-      crewCheckIns={crewCheckIns}
-      streakDays={streakDays}
-      setScreen={setScreen}
-      BottomNav={nav}
-    />
-  );
+  if (screen === 'points') {
+    if (userSide === 'parent') return (
+      <MoreScreen
+        t={t}
+        userSide={userSide}
+        setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
+        setScreen={setScreen}
+        BottomNav={nav}
+        mood={mood}
+        selectedSekret={selectedSekret}
+      />
+    );
+    return (
+      <PointsScreen
+        t={t}
+        mood={mood}
+        selectedSekret={selectedSekret}
+        moodHistory={moodHistory}
+        journalEntries={journalEntries}
+        voiceNotes={voiceNotes}
+        circlePosts={circlePosts}
+        comfortSessions={comfortSessions}
+        crewCheckIns={crewCheckIns}
+        streakDays={streakDays}
+        setScreen={setScreen}
+        BottomNav={nav}
+      />
+    );
+  }
 
-  if (screen === 'crew') return (
-    <BipCrewScreen
-      t={t}
-      mood={mood}
-      selectedSekret={selectedSekret}
-      crewMembers={crewMembers}
-      setCrewMembers={setCrewMembers}
-      crewCheckIns={crewCheckIns}
-      setCrewCheckIns={setCrewCheckIns}
-      setScreen={setScreen}
-      BottomNav={nav}
-    />
-  );
+  if (screen === 'crew') {
+    if (userSide === 'parent') return (
+      <MoreScreen
+        t={t}
+        userSide={userSide}
+        setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
+        setScreen={setScreen}
+        BottomNav={nav}
+        mood={mood}
+        selectedSekret={selectedSekret}
+      />
+    );
+    return (
+      <BipCrewScreen
+        t={t}
+        mood={mood}
+        selectedSekret={selectedSekret}
+        crewMembers={crewMembers}
+        setCrewMembers={setCrewMembers}
+        crewCheckIns={crewCheckIns}
+        setCrewCheckIns={setCrewCheckIns}
+        setScreen={setScreen}
+        BottomNav={nav}
+      />
+    );
+  }
 
-  if (screen === 'comfortStreaks') return (
-    <ComfortStreaksScreen
-      t={t}
-      mood={mood}
-      selectedSekret={selectedSekret}
-      comfortSessions={comfortSessions}
-      setScreen={setScreen}
-      BottomNav={nav}
-    />
-  );
+  if (screen === 'comfortStreaks') {
+    if (userSide === 'parent') return (
+      <MoreScreen
+        t={t}
+        userSide={userSide}
+        setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
+        setScreen={setScreen}
+        BottomNav={nav}
+        mood={mood}
+        selectedSekret={selectedSekret}
+      />
+    );
+    return (
+      <ComfortStreaksScreen
+        t={t}
+        mood={mood}
+        selectedSekret={selectedSekret}
+        comfortSessions={comfortSessions}
+        setScreen={setScreen}
+        BottomNav={nav}
+      />
+    );
+  }
 
-  if (screen === 'history') return (
-    <HistoryScreen
-      t={t}
-      mood={mood}
-      selectedSekret={selectedSekret}
-      moodHistory={moodHistory}
-      journalEntries={journalEntries}
-      voiceNotes={voiceNotes}
-      circlePosts={circlePosts}
-      streakDays={streakDays}
-      setScreen={setScreen}
-      BottomNav={nav}
-    />
-  );
+  if (screen === 'history') {
+    if (userSide === 'parent') return (
+      <MoreScreen
+        t={t}
+        userSide={userSide}
+        setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
+        setScreen={setScreen}
+        BottomNav={nav}
+        mood={mood}
+        selectedSekret={selectedSekret}
+      />
+    );
+    return (
+      <HistoryScreen
+        t={t}
+        mood={mood}
+        selectedSekret={selectedSekret}
+        moodHistory={moodHistory}
+        journalEntries={journalEntries}
+        voiceNotes={voiceNotes}
+        circlePosts={circlePosts}
+        streakDays={streakDays}
+        setScreen={setScreen}
+        BottomNav={nav}
+      />
+    );
+  }
 
   if (screen === 'more') return (
     <MoreScreen

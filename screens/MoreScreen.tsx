@@ -96,18 +96,26 @@ export function MoreScreen({
         <TouchableOpacity style={btn()} onPress={() => setScreen('growth')}>
           <Text style={styles.buttonText}>🌱 Growth / Life Skills</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={btn()} onPress={() => setScreen('history')}>
-          <Text style={styles.buttonText}>📈 History · doing better</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={btn()} onPress={() => setScreen('comfortStreaks')}>
-          <Text style={styles.buttonText}>✨ Comfort Streaks</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={btn()} onPress={() => setScreen('crew')}>
-          <Text style={styles.buttonText}>🤝 Bip Crew · invite-only</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={btn()} onPress={() => setScreen('points')}>
-          <Text style={styles.buttonText}>⭐ Bip Points · soft receipts</Text>
-        </TouchableOpacity>
+        {userSide !== 'parent' && (
+          <TouchableOpacity style={btn()} onPress={() => setScreen('history')}>
+            <Text style={styles.buttonText}>📈 History · doing better</Text>
+          </TouchableOpacity>
+        )}
+        {userSide !== 'parent' && (
+          <TouchableOpacity style={btn()} onPress={() => setScreen('comfortStreaks')}>
+            <Text style={styles.buttonText}>✨ Comfort Streaks</Text>
+          </TouchableOpacity>
+        )}
+        {userSide !== 'parent' && (
+          <TouchableOpacity style={btn()} onPress={() => setScreen('crew')}>
+            <Text style={styles.buttonText}>🤝 Bip Crew · invite-only</Text>
+          </TouchableOpacity>
+        )}
+        {userSide !== 'parent' && (
+          <TouchableOpacity style={btn()} onPress={() => setScreen('points')}>
+            <Text style={styles.buttonText}>⭐ Bip Points · soft receipts</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity
           style={btn()}
           onPress={() => setScreen(userSide === 'parent' ? 'parentBridge' : 'bridge')}
