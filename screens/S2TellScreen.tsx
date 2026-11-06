@@ -14,11 +14,13 @@ import {
   Platform,
   Animated,
   Easing,
+  ImageBackground,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { fetchSekretReply } from '../utils/api';
 import { createStyles } from '../constants/styles';
+import { getRoomBg } from '../constants/theme';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,6 +58,10 @@ export function S2TellScreen({
   t, setScreen, BottomNav, selectedSekret, mood,
 }: S2TellScreenProps) {
   const styles = createStyles(t as { background: string; card: string; accent: string; soft: string; [key: string]: string });
+  const character: 'raylene' | 'rylane' = selectedSekret === 'rylane' ? 'rylane' : 'raylene';
+  const hour = new Date().getHours();
+  const timeOfDay = hour >= 5 && hour < 11 ? 'morning' : hour >= 11 && hour < 17 ? 'day' : hour >= 17 && hour < 21 ? 'evening' : 'night';
+  const roomBg = getRoomBg(character, timeOfDay as any);
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [s2tellRaw,     setS2tellRaw]     = useState('');
@@ -184,9 +190,9 @@ export function S2TellScreen({
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.root, { backgroundColor: t.background }]}>
+    <ImageBackground source={roomBg} style={[styles.root, { backgroundColor: t.background }]} resizeMode="cover">
       <LinearGradient
-        colors={[t.background, t.card + 'cc', t.background]}
+        colors={['rgba(9,3,28,0.74)', 'rgba(13,8,28,0.88)', 'rgba(9,3,28,0.96)']}
         style={StyleSheet.absoluteFill}
       />
 
@@ -359,7 +365,7 @@ export function S2TellScreen({
       </ScrollView>
 
       {BottomNav}
-    </View>
+    </ImageBackground>
   );
 }
 
