@@ -162,10 +162,15 @@ export function CloudThoughtsScreen({
     setInput('');
     setSent(true);
     setIsThinking(true);
-    // Fix C5: pass activeMode as context so the API can tune its tone
-    const r = await fetchSekretReply(text, activeMode, mood, selectedSekret, undefined, privateProfile, profileSide);
-    setReply(r);
-    setIsThinking(false);
+    try {
+      // Fix C5: pass activeMode as context so the API can tune its tone
+      const r = await fetchSekretReply(text, activeMode, mood, selectedSekret, undefined, privateProfile, profileSide);
+      setReply(r);
+    } catch {
+      setReply('Cloud is quiet right now. Try again soon.');
+    } finally {
+      setIsThinking(false);
+    }
   };
 
   // Fix C5: switching modes resets to that mode's first prompt and clears reply
