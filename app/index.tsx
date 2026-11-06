@@ -454,10 +454,10 @@ export default function App() {
     const entry: JournalEntry = {
       id: Date.now(),
       text: input.text,
-      mood: parentMood || mood,
+      mood: parentMood || '',
       source: input.source,
       activeTab: input.source,
-      moodTag: input.moodTag || parentMood || mood,
+      moodTag: input.moodTag || parentMood || '',
       entryMode: input.entryMode,
       locked: input.locked,
       imageUri: input.imageUri,
