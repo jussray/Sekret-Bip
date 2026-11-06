@@ -630,7 +630,7 @@ export default function App() {
         setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
         setScreen={setScreen}
         BottomNav={nav}
-        mood={mood}
+        mood={parentMood || ''}
         selectedSekret={selectedSekret}
       />
     );
@@ -771,11 +771,11 @@ export default function App() {
   if (screen === 'bippin2') return (
     <Bippin2Screen
       t={t}
-      mood={mood}
+      mood={userSide === 'parent' ? (parentMood || '') : mood}
       selectedSekret={selectedSekret}
       setScreen={setScreen}
       onMilestone={() => trackActivity('growth')}
-      streakDays={streakDays}
+      streakDays={userSide === 'parent' ? 0 : streakDays}
       BottomNav={nav}
     />
   );
@@ -800,7 +800,7 @@ export default function App() {
         setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
         setScreen={setScreen}
         BottomNav={nav}
-        mood={mood}
+        mood={parentMood || ''}
         selectedSekret={selectedSekret}
       />
     );
@@ -824,7 +824,7 @@ export default function App() {
         setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
         setScreen={setScreen}
         BottomNav={nav}
-        mood={mood}
+        mood={parentMood || ''}
         selectedSekret={selectedSekret}
       />
     );
@@ -872,7 +872,7 @@ export default function App() {
         setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
         setScreen={setScreen}
         BottomNav={nav}
-        mood={mood}
+        mood={parentMood || ''}
         selectedSekret={selectedSekret}
       />
     );
@@ -902,7 +902,7 @@ export default function App() {
         setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
         setScreen={setScreen}
         BottomNav={nav}
-        mood={mood}
+        mood={parentMood || ''}
         selectedSekret={selectedSekret}
       />
     );
@@ -929,7 +929,7 @@ export default function App() {
         setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
         setScreen={setScreen}
         BottomNav={nav}
-        mood={mood}
+        mood={parentMood || ''}
         selectedSekret={selectedSekret}
       />
     );
@@ -953,7 +953,7 @@ export default function App() {
         setUserSide={(side: string) => setUserSide(side as 'teen' | 'parent')}
         setScreen={setScreen}
         BottomNav={nav}
-        mood={mood}
+        mood={parentMood || ''}
         selectedSekret={selectedSekret}
       />
     );
