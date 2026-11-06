@@ -67,9 +67,13 @@ export function ParentBridgeScreen({ t, setScreen, BottomNav }: ParentBridgeScre
 
   // Check if teen has marked something to share — parent sees gentle nudge only.
   // Content stays on the teen side; this key is just a signal.
+  // Clear it on view so the teen can re-trigger by tapping "Share when I'm ready" again.
   useEffect(() => {
     AsyncStorage.getItem('parent_bridge_pending').then(val => {
-      if (val === 'true') setHasPending(true);
+      if (val === 'true') {
+        setHasPending(true);
+        AsyncStorage.removeItem('parent_bridge_pending').catch(() => {});
+      }
     }).catch(() => {});
   }, []);
 
