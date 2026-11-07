@@ -434,8 +434,8 @@ export async function syncPeriodDay(day: string, note?: string): Promise<void> {
   if (!uid) return;
   try {
     const { error } = await sb.from(TABLES.periodDays).upsert(
-      { user_id: uid, day, note: note ?? null },
-      { onConflict: 'user_id,day' },
+      { user_id: uid, date: day, note: note ?? null },
+      { onConflict: 'user_id,date' },
     );
     if (error) {
       console.warn('[sync] syncPeriodDay failed:', error.message, error.code);
@@ -452,7 +452,7 @@ export async function deletePeriodDay(day: string): Promise<void> {
   const uid = await currentUserId();
   if (!uid) return;
   try {
-    const { error } = await sb.from(TABLES.periodDays).delete().match({ user_id: uid, day });
+    const { error } = await sb.from(TABLES.periodDays).delete().match({ user_id: uid, date: day });
     if (error) {
       console.warn('[sync] deletePeriodDay failed:', error.message, error.code);
     }
@@ -470,11 +470,11 @@ export async function loadPeriodDays(): Promise<string[]> {
   try {
     const { data, error } = await sb
       .from(TABLES.periodDays)
-      .select('day')
+      .select('date')
       .eq('user_id', uid)
-      .order('day', { ascending: true });
+      .order('date', { ascending: true });
     if (error) throw error;
-    return (data ?? []).map((r: { day: string }) => r.day);
+    return (data ?? []).map((r: { date: string }) => r.date);
   } catch (e) {
     if (__DEV__) console.warn('[sync] loadPeriodDays failed', e);
     return [];
