@@ -146,3 +146,17 @@ with check (
 -- timestamp remain immutable through the client role.
 revoke update on table public.parent_notes from anon, authenticated;
 grant update (seen_by_teen) on table public.parent_notes to authenticated;
+
+-- Live privilege audit (2026-11-07 UTC) found anon EXECUTE on these
+-- SECURITY DEFINER relationship RPCs despite historical authenticated-only
+-- migration contracts. Reassert least-privilege execution on forward replay.
+-- These RPCs also check auth.uid() and permanent account status internally.
+revoke execute on function public.create_parent_link_invite() from public, anon;
+revoke execute on function public.redeem_parent_link_invite(text) from public, anon;
+revoke execute on function public.revoke_parent_link(uuid) from public, anon;
+revoke execute on function public.redeem_crew_invite(text, text) from public, anon;
+
+grant execute on function public.create_parent_link_invite() to authenticated, service_role;
+grant execute on function public.redeem_parent_link_invite(text) to authenticated, service_role;
+grant execute on function public.revoke_parent_link(uuid) to authenticated, service_role;
+grant execute on function public.redeem_crew_invite(text, text) to authenticated, service_role;
