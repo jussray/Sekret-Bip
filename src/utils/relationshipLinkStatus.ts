@@ -58,8 +58,9 @@ async function currentUserIdResult(): Promise<ParentLinkResult<string>> {
       return { ok: false, code: 'server_error', message: 'Could not verify your account. Check your connection and try again.' };
     }
 
-    const userId = data?.user?.id;
-    if (!userId) {
+    const user = data?.user;
+    const userId = user?.id;
+    if (!user || !userId || user.is_anonymous === true) {
       return { ok: false, code: 'not_authenticated', message: 'Sign in to manage a parent link.' };
     }
 
