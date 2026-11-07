@@ -1,5 +1,54 @@
 # RLS Policy Audit — journal_entries, crew_members, parent_circle_posts, planned voice_* tables
 
+## Anonymous account anchor — intended contract (2026-11-07 audit)
+
+**Target, not a deployed guarantee.** After an allowed age-gate decision and
+required safeguards, Supabase anonymous authentication supplies a private
+account identity: `auth.uid()`. Anonymous *account authentication* is separate
+from pseudonymous Circle participation. An email/password identity can be
+linked later as an optional account upgrade without changing the owner UID.
+Never create a cloud user or private record before the age gate resolves.
+
+Every private teen or parent row must carry its authenticated owner ID
+(`user_id = auth.uid()`, or an explicit equivalent owner column).
+RLS must enforce this for SELECT, INSERT WITH CHECK, UPDATE USING/WITH CHECK,
+and DELETE; a client-provided owner ID is never trusted. Shared parent views
+are narrow **exceptions to owner-only reads**, requiring a verified,
+currently approved and unrevoked teen-parent link plus explicit item-level
+sharing. Parent Circle must remain guardian-only, and parent/teen journals
+must stay separate through `owner_side`. Catalog `rewards` and public Circle
+feeds are intentionally shared, not private per-user rows.
+
+AsyncStorage must be partitioned by both authenticated UID and account side,
+must not replay legacy device-global private values into a different account,
+and must clear active private in-memory caches on account change/logout.
+Future private tables, storage objects, Edge Functions, RPCs, and sync queues
+must satisfy these boundaries before release.
+
+### Current live blockers — not yet patched/deployed
+
+- `journal_entries`, `mood_history`, `voice_notes`, `period_days`,
+  `room_memory`, and several identity/points tables currently deny
+  anonymous-authenticated users through `is_non_anonymous_user()`.
+  This is distinct from deny-by-default access for unauthenticated API calls.
+- `app_profiles`, `user_consents`, `user_onboarding_state`, and frontend
+  routing still require permanent email-based accounts. Replacing only the
+  journal RLS policy would break onboarding and age/consent sequencing.
+- Legacy private AsyncStorage keys are device-global; canonical state
+  hydration can merge data across account transitions. Do not automatically
+  adopt unowned legacy cache data or delete it during migration.
+- Linked guardian read policies for points/reward status require a separate
+  consent and removal review. Do not broaden them to raw teen records.
+- `period_days` in live Postgres uses the composite key
+  `(user_id, date)`. The isolated repair branch corrects the client's
+  stale `day` mapping; it is not production deployment evidence.
+
+Required evidence: two distinct synthetic anonymous-auth sessions; cross-UID
+read/write denials; teen-vs-parent isolation; post-age-only account creation;
+unapproved, blocked, removed-parent denials; account switching/offline cache
+tests; test/lint/type-check; live RLS readback after a reviewed migration.
+
+
 > **`db/schema.sql` has been retired.** `supabase/migrations/` is now the single
 > source of truth for schema — see finding 2. This doc is kept as the audit
 > trail for the drift that motivated that decision; the "two source files"
