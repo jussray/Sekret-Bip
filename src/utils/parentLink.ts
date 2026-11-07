@@ -144,7 +144,9 @@ async function currentUserId(): Promise<string | null> {
       });
       return null;
     }
-    return data?.user?.id ?? null;
+    const user = data?.user;
+    if (!user || user.is_anonymous === true) return null;
+    return user.id;
   } catch (error) {
     await auditParentLinkFailure('auth_user_lookup_threw', error);
     return null;
@@ -414,6 +416,7 @@ export async function fetchLinkedParentId(): Promise<string | null> {
 export async function revokeParentLink(): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return false;
+  if (!(await currentUserId())) return false;
 
   try {
     const { data, error } = await sb.rpc('revoke_parent_link');
