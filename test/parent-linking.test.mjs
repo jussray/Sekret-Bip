@@ -104,3 +104,17 @@ test('link helpers return actionable failures without Supabase or auth', () => {
   assert.match(linkSrc, /export async function generateInviteCode\(\): Promise<string \| null>/);
   assert.match(linkSrc, /export async function redeemInviteCode\(code: string\): Promise<string \| null>/);
 });
+
+test('parent link helpers reject anonymous sessions before account relationship access', () => {
+  const start = linkSrc.indexOf('async function currentUserId()');
+  const end = linkSrc.indexOf('export async function generateInviteCodeWithDeliveryResult', start);
+  assert.ok(start >= 0 && end > start);
+  const currentUser = linkSrc.slice(start, end);
+  assert.match(currentUser, /user\.is_anonymous === true/);
+  assert.match(currentUser, /return null/);
+
+  const revokeStart = linkSrc.indexOf('export async function revokeParentLink()');
+  assert.ok(revokeStart >= 0);
+  const revoke = linkSrc.slice(revokeStart);
+  assert.match(revoke, /await currentUserId\(\)/);
+});
