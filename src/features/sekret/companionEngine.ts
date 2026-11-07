@@ -142,7 +142,7 @@ export function toCompanionId(value: string): CompanionId {
 // ── Safety detection ───────────────────────────────────────────────────────────
 
 const CRISIS_PATTERN =
-  /\b(suicidal|self[- ]?harm|not safe|abuse|danger)\b/i;
+  /\b(suicidal|self[- ]?harm|not safe|abuse(?:s|d)?|abusing|assault(?:s|ed|ing)?|danger)\b/i;
 
 export function isSafetyTrigger(text: string): boolean {
   return CRISIS_PATTERN.test(text);
