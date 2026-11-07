@@ -320,15 +320,29 @@ export async function writeCirclePost(
     ? { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 }
     : { felt: 0, comfort: 0, proud: 0, stay: 0 };
   try {
-    const { error } = await sb.from(tableName).insert({
-      user_id:    uid,
+    // Parent Circle's legacy table has a composite (user_id, id) key and
+    // required date/time columns; shared feeds have a different insert shape.
+    const now = new Date();
+    const sharedPostPayload = {
+      user_id: uid,
       text,
-      post_mood:  opts.postMood  ?? null,
+      post_mood: opts.postMood ?? null,
       media_kind: opts.mediaKind ?? null,
+      reactions: defaultReactions,
+      created_at: now.toISOString(),
+    };
+    const parentPostPayload = {
+      user_id: uid,
+      id: now.getTime(),
+      text,
+      date: now.toLocaleDateString(),
+      time: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       circle_tag: opts.circleTag ?? null,
-      reactions:  defaultReactions,
-      created_at: new Date().toISOString(),
-    });
+      reactions: defaultReactions,
+      created_at: now.toISOString(),
+    };
+    const payload = tab === 'parent' ? parentPostPayload : sharedPostPayload;
+    const { error } = await sb.from(tableName).insert(payload);
     if (error) {
       console.warn('[sync] writeCirclePost failed:', error.message, error.code);
     }
