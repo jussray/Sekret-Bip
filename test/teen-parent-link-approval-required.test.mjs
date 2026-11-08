@@ -22,7 +22,7 @@ test('teen-only approval uses the exact linked teen owner and authenticated RPC'
   assert.match(approve, /for update/);
   assert.match(approve, /status = 'active'/);
   assert.match(approve, /status = 'revoked'/);
-  assert.doesNotMatch(approve, /set\\s+verification_state\\s*=/);
+  assert.doesNotMatch(approve, /set\s+verification_state\s*=/);
   assert.match(sql, /revoke all on function public.approve_parent_link_request/);
 });
 
@@ -32,8 +32,8 @@ test('onboarding cannot treat a pending request as linked access', () => {
   const status = read('src/components/settings/ParentLinkStatusCard.tsx');
   assert.match(helper, /row.status !== 'pending'/);
   assert.match(onboarding, /Request teen approval/);
-  assert.match(onboarding, /setPendingApproval\\(true\\)/);
-  assert.doesNotMatch(onboarding, /await completeParentLink\\(/);
+  assert.match(onboarding, /setPendingApproval\(true\)/);
+  assert.doesNotMatch(onboarding, /await completeParentLink\(/);
   assert.match(status, /Approve parent request/);
   assert.match(status, /Reject parent request/);
 });
