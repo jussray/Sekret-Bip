@@ -82,7 +82,7 @@ jobs:
 
   live-main-audit:
     name: Live main and exact candidate ancestry
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
       - name: Verify live main, current PR head, and ancestry (read-only)
