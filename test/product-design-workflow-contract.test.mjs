@@ -32,6 +32,22 @@ test('production browser-proof workflow changes trigger exact-head Product Desig
   );
 });
 
+test('Product Design browser proof independently runs the reply safety spec', () => {
+  const pullRequest = sectionBetween('  pull_request:', '  push:');
+  assert.match(
+    pullRequest,
+    /- 'e2e\/reply-guard-safety\.spec\.ts'/,
+    'safety spec changes must trigger fresh PR visual proof',
+  );
+  const browserStep = workflow.split('name: Capture exact-head Product Design evidence')[1]
+    ?.split('name: Upload Product Design evidence')[0] || '';
+  assert.match(
+    browserStep,
+    /run: npx playwright test [^\n]*e2e\/reply-guard-safety\.spec\.ts [^\n]*--project=chromium/,
+    'independent reply-safety spec must run, not be imported from guardrails.spec.ts',
+  );
+});
+
 test('Product Design proof remains exact-head and failure-preserving', () => {
   for (const required of [
     'EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}',
