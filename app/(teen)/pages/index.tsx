@@ -46,7 +46,6 @@ import { AmbientWeatherOverlay } from '../../../components/AmbientWeatherOverlay
 import { useAppContext } from '@/context/AppContext';
 import { IMAGES } from '@/constants/theme';
 import { TEEN_ROUTES } from '@/teen/routes';
-import { updateSekretMemory } from '../../../services/sekretMemory';
 import {
   fetchSekretVoice,
   normalizeSekretCharacter,
@@ -89,7 +88,7 @@ const COMPANIONS = [
   { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure' },
   { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady'    },
   { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages'     },
-  { id: 'oracle',  name: 'Joseema', accent: '#c7b87a', vibe: 'guided discovery'  },
+  { id: 'oracle',  name: 'Ja', accent: '#c7b87a', vibe: 'guided discovery'  },
 ] as const;
 
 type CompanionId = (typeof COMPANIONS)[number]['id'];
@@ -407,11 +406,9 @@ export default function TeenPagesRoute() {
 
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 80);
 
-    updateSekretMemory({
-      selectedSekret: isAiTab(activeTab) ? activeTab : 'raylene',
-      mood,
-      journalEntries: [{ id: String(id), text, mood, date: new Date().toISOString() }],
-    }).catch(() => null);
+    // A saved page is not consent to create a persistent companion memory.
+    // The selected AI companion receives only the submitted message below;
+    // private Me/Oracle entries must not be mirrored into companion memory.
 
     if (!aiCompanion) return;
 
@@ -815,6 +812,35 @@ export default function TeenPagesRoute() {
         {/* Companion tabs */}
         {renderAvatarStrip()}
 
+        {/* A separate, temporary conversation. Never pass a page or draft via route params. */}
+        <View style={s.talkSection}>
+          <Text style={s.talkTitle}>Talk to a companion 💜</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.talkRail}>
+            {COMPANIONS.filter(c => c.id !== 'me').map(c => {
+              const unlocked = totalPoints >= COMPANION_UNLOCK_PTS[c.id];
+              const label = c.name;
+              return (
+                <TouchableOpacity
+                  key={c.id}
+                  style={[s.talkChip, { borderColor: `${c.accent}66` }, !unlocked && s.tabLocked]}
+                  disabled={!unlocked}
+                  accessibilityRole="button"
+                  accessibilityLabel={unlocked ? `Chat privately with ${label}` : `${label} unlocks at ${COMPANION_UNLOCK_PTS[c.id]} points`}
+                  onPress={() => router.push({
+                    pathname: '/(teen)/companion-chat' as any,
+                    params: { companion: c.id, surface: 'pages' },
+                  })}
+                >
+                  <Text style={[s.talkChipText, { color: c.accent }]}>
+                    {unlocked ? `💬 ${label}` : `🔒 ${label}`}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+          <Text style={s.talkPrivacy}>Separate chat. Your page and unsent draft stay here.</Text>
+        </View>
+
         {/* Chat timeline */}
         <FlatList
           ref={flatListRef}
@@ -935,6 +961,12 @@ const s = StyleSheet.create({
   tabLocked: { opacity: 0.55 },
   tabLockBadge: { color: '#6b6175', fontSize: 8, fontWeight: '800', marginTop: 3 },
 
+  talkSection: { paddingHorizontal: 14, paddingBottom: 10 },
+  talkTitle: { color: '#f0eaf4', fontSize: 13, fontWeight: '800', marginBottom: 7 },
+  talkRail: { gap: 8, paddingBottom: 6 },
+  talkChip: { borderRadius: 999, borderWidth: 1, backgroundColor: 'rgba(255,255,255,0.035)', paddingHorizontal: 12, paddingVertical: 8 },
+  talkChipText: { fontSize: 12, fontWeight: '700' },
+  talkPrivacy: { color: '#aaa0b6', fontSize: 10, marginTop: 1 },
   thread: { paddingHorizontal: 14, paddingTop: 6, paddingBottom: 20 },
 
   exchange: { marginBottom: 18 },

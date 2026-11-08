@@ -181,6 +181,7 @@ export async function sendCompanionMessage(
     displayName:          input.displayName,
     profileName:          input.profileName,
     isFirstCompanionChat: input.isFirstCompanionChat ?? !input.history?.length,
+    ephemeral:           input.surface === 'pages',
     extraMemory:          input.teenGender ? { teenGender: input.teenGender } : undefined,
   });
 
