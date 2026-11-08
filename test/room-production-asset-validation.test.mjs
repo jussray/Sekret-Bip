@@ -8,6 +8,7 @@ import {
   fileToken,
   hasBlockingResults,
   readImageMetadata,
+  resolveAssetPath,
   validateImage,
   validateManifest,
   verifyAssets,
@@ -43,6 +44,28 @@ function write(root, relative, content) {
   fs.mkdirSync(path.dirname(target), { recursive: true });
   fs.writeFileSync(target, content);
 }
+
+test('asset verifier rejects traversal, absolute paths and symlink escapes', { skip: process.platform === 'win32' }, () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'room-asset-path-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'room-asset-outside-'));
+  try {
+    assert.equal(resolveAssetPath(root, 'assets/night/neutral.png'),
+      path.join(root, 'assets/night/neutral.png'));
+    assert.throws(() => resolveAssetPath(root, '../secret.png'), /escapes workspace/);
+    assert.throws(() => resolveAssetPath(root, 'assets/../secret.png'), /escapes workspace/);
+    assert.throws(() => resolveAssetPath(root, path.resolve(outside, 'secret.png')), /Unsafe room asset path/);
+    assert.throws(() => verifyAssets({
+      rootDir: root,
+      manifest: { runtime: { assetRegistry: '../secret.txt' } },
+      promptPack: {},
+    }), /escapes workspace/);
+    fs.symlinkSync(outside, path.join(root, 'linked'), 'dir');
+    assert.throws(() => resolveAssetPath(root, 'linked/private.png'), /symlink target rejected/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
 
 test('runtime asset contracts preserve the product navigation and dedicated CI gate', () => {
   const layout = read('app/(teen)/_layout.tsx');
