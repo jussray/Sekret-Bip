@@ -38,15 +38,29 @@ jobs:
       # The third-party action's installer did not retry release-asset HTTP failures.
       - name: Install checksum-verified Bearer v2.1.3
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           asset="bearer_2.1.3_linux_amd64.tar.gz"
           archive="$RUNNER_TEMP/$asset"
-          curl --fail --silent --show-error --location \
+          # GitHub release CDN has returned HTTP 504. The official API can
+          # stream the same pinned release asset from an alternate route.
+          if ! curl --fail --silent --show-error --location \
             --retry 6 --retry-all-errors --retry-delay 3 \
             --connect-timeout 20 --max-time 180 \
             --output "$archive" \
-            "https://github.com/Bearer/bearer/releases/download/v2.1.3/$asset"
+            "https://github.com/Bearer/bearer/releases/download/v2.1.3/$asset"; then
+            rm -f "$archive"
+            curl --fail --silent --show-error --location \
+              --retry 5 --retry-all-errors --retry-delay 4 \
+              --connect-timeout 20 --max-time 180 \
+              --header "Accept: application/octet-stream" \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --output "$archive" \
+              "https://api.github.com/repos/Bearer/bearer/releases/assets/685261282"
+          fi
+          # A metadata JSON body or a wrong release fails this exact digest.
           printf '%s  %s\n' '974d4ad7bb71bc578675684d444e345e8fbad91c85557aac035406ef5cc04c68' "$archive" | sha256sum --check --status
           tar --no-same-owner -xzf "$archive" -C "$RUNNER_TEMP" bearer
           chmod 0755 "$RUNNER_TEMP/bearer"
