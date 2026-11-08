@@ -7,7 +7,7 @@ returns text
 language plpgsql
 security definer
 set search_path = public, auth
-as $
+as $$
 declare
   v_user_id uuid := auth.uid();
   v_code text;
@@ -118,7 +118,7 @@ begin
 
   return v_code;
 end;
-$;
+$$;
 
 
 create or replace function public.redeem_parent_link_invite(
