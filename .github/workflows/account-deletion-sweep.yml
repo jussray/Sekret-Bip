@@ -3,7 +3,13 @@ name: Account Deletion Sweep
 on:
   schedule:
     - cron: '17 8 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      check_only:
+        description: 'Read-only Data API queue probe; disable only for an explicitly approved deletion run'
+        type: boolean
+        required: true
+        default: true
 
 permissions:
   contents: read
@@ -36,4 +42,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           ACCOUNT_DELETION_PROCESS_SECRET: ${{ secrets.ACCOUNT_DELETION_PROCESS_SECRET }}
+          SWEEP_CHECK_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.check_only == true }}
         run: node scripts/sweep-account-deletions.mjs
