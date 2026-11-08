@@ -13,6 +13,10 @@ function normalizeTabLabel(label: string): string {
 test.beforeEach(async ({ page }) => {
   await page.goto('/(teen)/room');
   await page.waitForLoadState('domcontentloaded');
+  // TeenLayout can show its sleep/profile loading surface after DOMContentLoaded.
+  // Wait for a real room control before asserting navigation or viewport geometry.
+  await expect(page.getByRole('button', { name: 'Customize your room in VibeLab' }))
+    .toBeVisible({ timeout: 30_000 });
 });
 
 test('keeps the existing teen bottom navigation locked', async ({ page }) => {
