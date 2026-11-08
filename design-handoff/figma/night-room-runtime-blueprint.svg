@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900" viewBox="0 0 1200 900">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#10051f"/>
+      <stop offset="1" stop-color="#26104a"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>
+      .title{font:700 30px Arial;fill:#f5dcff}.sub{font:500 15px Arial;fill:#cdb6e8}.label{font:700 13px Arial;fill:#fff}.small{font:500 11px Arial;fill:#d7c9e8}.anchor{fill:#7c3aed;stroke:#f0abfc;stroke-width:3}.path{fill:none;stroke:#d946ef;stroke-width:4;stroke-dasharray:10 8;marker-end:url(#arrow)}.card{fill:#160a29;stroke:#6d28d9;stroke-width:2}.rule{fill:#25123e;stroke:#a855f7;stroke-width:1.5}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#d946ef"/></marker>
+  </defs>
+  <rect width="1200" height="900" fill="url(#bg)"/>
+  <text x="48" y="55" class="title">Night Room — Runtime Blueprint</text>
+  <text x="48" y="82" class="sub">Figma import • anchors, paths, hitboxes, state labels, and locked bottom navigation</text>
+
+  <rect x="50" y="115" width="390" height="720" rx="42" fill="#08040f" stroke="#a855f7" stroke-width="4"/>
+  <rect x="68" y="145" width="354" height="608" rx="22" fill="#1b0b31" stroke="#4c1d95" stroke-width="2"/>
+  <text x="86" y="176" class="small">ROOM CANVAS 390 × 844</text>
+
+  <rect x="82" y="190" width="140" height="160" rx="10" fill="#132040" stroke="#6d28d9"/>
+  <text x="127" y="268" class="label">WINDOW</text>
+  <rect x="245" y="215" width="145" height="105" rx="12" fill="#2a1741" stroke="#6d28d9"/>
+  <text x="294" y="270" class="label">DESK</text>
+  <path d="M 250 480 Q 320 395 392 470 Q 346 575 270 560 Z" fill="#3a1761" stroke="#c084fc" stroke-width="3"/>
+  <text x="294" y="493" class="label">MOON CHAIR</text>
+  <rect x="90" y="555" width="120" height="75" rx="12" fill="#2a1741" stroke="#6d28d9"/>
+  <text x="126" y="596" class="label">JOURNAL</text>
+  <rect x="310" y="345" width="58" height="125" rx="18" fill="#171126" stroke="#f0abfc"/>
+  <text x="302" y="420" class="small" transform="rotate(-90 302 420)">MICROPHONE</text>
+  <circle cx="110" cy="455" r="42" fill="#21133a" stroke="#6d28d9"/>
+  <text x="76" y="458" class="small">RECORD PLAYER</text>
+  <rect x="82" y="655" width="90" height="62" rx="12" fill="#21133a" stroke="#6d28d9"/>
+  <text x="104" y="690" class="label">DOOR</text>
+  <rect x="196" y="640" width="110" height="70" rx="14" fill="#21133a" stroke="#6d28d9"/>
+  <text x="232" y="680" class="label">FLOOR</text>
+
+  <circle cx="152" cy="300" r="13" class="anchor" filter="url(#glow)"/><text x="104" y="326" class="small">window</text>
+  <circle cx="318" cy="286" r="13" class="anchor" filter="url(#glow)"/><text x="290" y="337" class="small">desk</text>
+  <circle cx="150" cy="585" r="13" class="anchor" filter="url(#glow)"/><text x="124" y="648" class="small">journal</text>
+  <circle cx="325" cy="505" r="13" class="anchor" filter="url(#glow)"/><text x="292" y="540" class="small">moonChair</text>
+  <circle cx="340" cy="395" r="13" class="anchor" filter="url(#glow)"/><text x="333" y="360" class="small">mic</text>
+  <circle cx="110" cy="455" r="13" class="anchor" filter="url(#glow)"/><text x="78" y="515" class="small">recordPlayer</text>
+  <circle cx="128" cy="686" r="13" class="anchor" filter="url(#glow)"/><text x="104" y="737" class="small">door</text>
+  <circle cx="250" cy="676" r="13" class="anchor" filter="url(#glow)"/><text x="234" y="731" class="small">floor</text>
+
+  <path d="M128 686 C130 570 125 430 152 300" class="path"/>
+  <path d="M152 300 C215 280 260 280 318 286" class="path"/>
+  <path d="M318 286 C330 325 338 350 340 395" class="path"/>
+  <path d="M340 395 C340 440 336 475 325 505" class="path"/>
+  <path d="M325 505 C260 540 210 570 150 585" class="path"/>
+  <path d="M150 585 C130 540 115 505 110 455" class="path"/>
+  <path d="M110 455 C155 550 202 620 250 676" class="path"/>
+
+  <rect x="68" y="765" width="354" height="54" rx="17" fill="#111827" stroke="#111827"/>
+  <text x="92" y="797" class="small">🏠 Room</text><text x="158" y="797" class="small">📖 Pages</text><text x="229" y="797" class="small">🌙 Calm</text><text x="293" y="797" class="small">🌐 Circle</text><text x="362" y="797" class="small">••• More</text>
+
+  <rect x="490" y="115" width="660" height="185" rx="24" class="card"/>
+  <text x="520" y="156" class="title" font-size="24">Locked behavior contract</text>
+  <text x="520" y="190" class="sub">• User Room owns update cards, streaks, rewards, reminders, customization.</text>
+  <text x="520" y="220" class="sub">• Night Room owns presence, listening, late-night reflection, room-object interaction.</text>
+  <text x="520" y="250" class="sub">• No dashboard cards in companion rooms. No bottom-nav changes.</text>
+  <text x="520" y="280" class="sub">• Mockup characters are ignored; canonical Night identity controls every state.</text>
+
+  <rect x="490" y="325" width="310" height="510" rx="24" class="card"/>
+  <text x="520" y="368" class="title" font-size="22">Actor states</text>
+  <g class="small">
+    <text x="520" y="405">idle → window</text><text x="520" y="437">walking → named anchor</text>
+    <text x="520" y="469">thinking → window / floor</text><text x="520" y="501">writing → journal / desk</text>
+    <text x="520" y="533">listening → floor / chair</text><text x="520" y="565">usingHeadphones → record player</text>
+    <text x="520" y="597">usingMicrophone → microphone</text><text x="520" y="629">lookingOutWindow → window</text>
+    <text x="520" y="661">resting → moon chair</text><text x="520" y="693">talking → current anchor</text>
+  </g>
+  <rect x="518" y="730" width="252" height="75" rx="16" class="rule"/>
+  <text x="536" y="758" class="label">Reduced motion</text>
+  <text x="536" y="782" class="small">Crossfade between anchors; no travel animation.</text>
+
+  <rect x="830" y="325" width="320" height="510" rx="24" class="card"/>
+  <text x="860" y="368" class="title" font-size="22">Playwright gates</text>
+  <g class="small">
+    <text x="860" y="405">✓ five visible tabs in exact order</text>
+    <text x="860" y="437">✓ room remains phone-width safe</text>
+    <text x="860" y="469">✓ companion uses canonical asset</text>
+    <text x="860" y="501">✓ object opens contracted route</text>
+    <text x="860" y="533">✓ actor reports state + anchor</text>
+    <text x="860" y="565">✓ last activity restores</text>
+    <text x="860" y="597">✓ no User Room cards leak in</text>
+    <text x="860" y="629">✓ phase change preserves geometry</text>
+    <text x="860" y="661">✓ missing pose uses neutral canon</text>
+    <text x="860" y="693">✓ account switch clears private state</text>
+  </g>
+  <rect x="858" y="730" width="264" height="75" rx="16" class="rule"/>
+  <text x="876" y="758" class="label">First release slice</text>
+  <text x="876" y="782" class="small">Night: window → journal → chair → microphone.</text>
+</svg>
