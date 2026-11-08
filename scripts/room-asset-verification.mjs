@@ -8,6 +8,30 @@ const EXPECTED_NAV = ['Room', 'Pages', 'Calm', 'Circle', 'More'];
 const REGISTRY_CONSUMER_FILES = ['src/components/room/character/SekretSprite.tsx'];
 function assert(condition, message) { if (!condition) throw new Error(message); }
 
+// A manifest is data, not permission to read arbitrary local files.
+// Constrain all runtime asset reads to the chosen workspace and reject symlink components.
+export function resolveAssetPath(rootDir, relativePath) {
+  assert(typeof relativePath === 'string' && relativePath.length > 0
+    && !path.isAbsolute(relativePath) && !relativePath.includes('\\0'),
+    'Unsafe room asset path.');
+  assert(!relativePath.split(/[\\\\/]/).includes('..'), 'Room asset path escapes workspace.');
+  const root = path.resolve(rootDir);
+  const absolute = path.resolve(root, relativePath);
+  const withinRoot = path.relative(root, absolute);
+  assert(withinRoot && withinRoot !== '..' && !withinRoot.startsWith(`..${path.sep}`)
+    && !path.isAbsolute(withinRoot), 'Room asset path escapes workspace.');
+  let current = root;
+  for (const part of withinRoot.split(path.sep)) {
+    current = path.join(current, part);
+    try {
+      if (fs.lstatSync(current).isSymbolicLink()) throw new Error('Room asset symlink target rejected.');
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  return absolute;
+}
+
 function fileToken(value) {
   return String(value)
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
@@ -130,7 +154,7 @@ function validateRegistryConsumer(manifest, rootDir) {
     assert(REGISTRY_CONSUMER_FILES.includes(consumer), 'Unknown registry consumer.');
   }
   for (const file of REGISTRY_CONSUMER_FILES) {
-    const source = fs.readFileSync(path.join(rootDir, file), 'utf8');
+    const source = fs.readFileSync(resolveAssetPath(rootDir, file), 'utf8');
     assert(source.includes('NIGHT_ROOM_POSE_ASSETS'), `${file} does not consume NIGHT_ROOM_POSE_ASSETS.`);
   }
 }
@@ -138,12 +162,12 @@ function validateRegistryConsumer(manifest, rootDir) {
 function verifyAssets({ rootDir, manifest, promptPack }) {
   const results = [];
   const registryRelative = manifest.runtime.assetRegistry;
-  const registryPath = path.join(rootDir, registryRelative);
+  const registryPath = resolveAssetPath(rootDir, registryRelative);
   const registrySource = fs.readFileSync(registryPath, 'utf8');
   validateRegistryConsumer(manifest, rootDir);
   const minimum = parseSize(promptPack.output.minimumSize);
   const aspectRatio = parseAspectRatio(promptPack.output.aspectRatio);
-  const canonicalPath = path.join(rootDir, promptPack.canonicalMaster);
+  const canonicalPath = resolveAssetPath(rootDir, promptPack.canonicalMaster);
   const canonicalRequire = requirePathFor(registryRelative, promptPack.canonicalMaster);
   assert(registrySource.includes(`require('${canonicalRequire}')`), 'Canonical Night fallback is not statically required by the runtime registry.');
   let canonicalMetadata;
@@ -155,7 +179,7 @@ function verifyAssets({ rootDir, manifest, promptPack }) {
     return results;
   }
   for (const pose of promptPack.poses) {
-    const absolute = path.join(rootDir, pose.file);
+    const absolute = resolveAssetPath(rootDir, pose.file);
     const entry = registryBlock(registrySource, 'NIGHT_ROOM_POSE_ASSETS', pose.id);
     const block = entry.body;
     const isCanonicalPose = pose.file === promptPack.canonicalMaster;
@@ -198,7 +222,7 @@ function verifyAssets({ rootDir, manifest, promptPack }) {
       results.push({ status: 'fail', label: pose.file, detail: error instanceof Error ? error.message : String(error) });
     }
   }
-  const roomMasterPath = path.join(rootDir, promptPack.roomMaster);
+  const roomMasterPath = resolveAssetPath(rootDir, promptPack.roomMaster);
   let roomMasterMetadata;
   try {
     roomMasterMetadata = validateImage(roomMasterPath, { format: 'jpeg' });
@@ -207,7 +231,7 @@ function verifyAssets({ rootDir, manifest, promptPack }) {
     return results;
   }
   for (const phase of promptPack.roomPhases) {
-    const absolute = path.join(rootDir, phase.file);
+    const absolute = resolveAssetPath(rootDir, phase.file);
     const block = registryBlock(registrySource, 'NIGHT_ROOM_PHASE_ASSETS', phase.id).body;
     assert(block.includes(`file: '${phase.file}'`), `Registry file mismatch for room phase ${phase.id}.`);
     if (!fs.existsSync(absolute)) {
