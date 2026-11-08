@@ -24,3 +24,11 @@ test('production dry-run audits remote versions via read-only database query', (
   assert.match(workflow, /supabase db push --linked --dry-run/);
   assert.doesNotMatch(workflow.slice(auditIndex, dryRunIndex), /migration repair|update supabase_migrations|delete from supabase_migrations/i);
 });
+
+
+test('full Supabase SQL replay runs for PRs and merged main commits', () => {
+  const workflow = read('.github/workflows/supabase-fresh-replay.yml');
+  assert.match(workflow, /on:\n\s+pull_request:\n\s+branches: \[main\]\n\s+push:\n\s+branches: \[main\]/);
+  assert.match(workflow, /Replay migrations from empty local database/);
+  assert.doesNotMatch(workflow, /continue-on-error: true/);
+});
