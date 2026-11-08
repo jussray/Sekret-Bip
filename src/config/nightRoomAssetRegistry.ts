@@ -50,3 +50,18 @@ export const NIGHT_ROOM_POSE_ASSETS: Record<NightPose, PoseAssetEntry> = {
 export function getNightPoseAsset(pose: NightPose = 'neutral'): PoseAssetEntry {
   return NIGHT_ROOM_POSE_ASSETS[pose] ?? NIGHT_ROOM_POSE_ASSETS.neutral;
 }
+
+type PhaseAssetEntry = {
+  source: StaticAsset;
+  file: string;
+};
+
+export const NIGHT_ROOM_PHASE_ASSETS: Record<string, PhaseAssetEntry> = {
+  day: { source: require('../../assets/images/resized-bg/bg-night-room-day.jpg'), file: 'assets/images/resized-bg/bg-night-room-day.jpg' },
+  midday: { source: require('../../assets/images/resized-bg/bg-night-room-midday.jpg'), file: 'assets/images/resized-bg/bg-night-room-midday.jpg' },
+  afternoon: { source: require('../../assets/images/resized-bg/bg-night-room-afternoon.jpg'), file: 'assets/images/resized-bg/bg-night-room-afternoon.jpg' },
+  evening: { source: require('../../assets/images/resized-bg/bg-night-room-evening.jpg'), file: 'assets/images/resized-bg/bg-night-room-evening.jpg' },
+  rain: { source: require('../../assets/images/resized-bg/bg-night-room-rain.jpg'), file: 'assets/images/resized-bg/bg-night-room-rain.jpg' },
+  night: { source: require('../../assets/images/resized-bg/bg-night-room-night.jpg'), file: 'assets/images/resized-bg/bg-night-room-night.jpg' },
+  deepNight: { source: require('../../assets/images/resized-bg/bg-night-room-deep-night.jpg'), file: 'assets/images/resized-bg/bg-night-room-deep-night.jpg' },
+};

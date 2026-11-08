@@ -12,7 +12,6 @@ export * from './pointsCompat';
 
 // Unique exports from sync.ts — everything else is covered by the compat modules above.
 export {
-  ensureAnonymousSession,
   syncMood,
   syncJournal,
   syncCirclePost,
