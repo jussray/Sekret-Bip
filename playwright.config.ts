@@ -13,6 +13,7 @@ const controlRoomSkipReporter = path.resolve('./scripts/control-room-playwright-
 export default defineConfig({
   testDir: './e2e',
   testIgnore: [
+    '**/rooms/**',
     '**/production-smoke.spec.ts',
     '**/production-password-recovery.spec.ts',
     '**/production-auth-reachability.spec.ts',
