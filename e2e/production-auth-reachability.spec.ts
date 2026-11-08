@@ -44,7 +44,7 @@ test('production browser validates the real Supabase publishable key and reaches
 
   await page.goto('/signup?side=teen');
   await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: /13\\s*[–-]\\s*15 Teen mode starts/i }).click();
+  await page.getByRole('button', { name: /Teen mode starts/i }).click();
   await page.getByRole('button', { name: /Continue with teen setup/i }).click();
   await page.getByRole('textbox', { name: 'Email' }).fill('auth-readonly-proof@example.invalid');
   await page.getByRole('textbox', { name: 'Password', exact: true }).fill('PlaywrightOnly-123!');
