@@ -21,8 +21,8 @@ export interface RedeemedParentLink {
   linkId: string;
   teenUserId: string;
   parentUserId: string;
-  status: 'active';
-  activatedAt: string | null;
+  status: 'pending';
+  activatedAt: null;
 }
 
 export type ParentInviteEmailStatus = 'not_requested' | 'sent' | 'failed';
@@ -121,15 +121,15 @@ export function validateRedeemedParentLink(
   if (typeof row.link_id !== 'string' || !UUID_PATTERN.test(row.link_id)) return null;
   if (typeof row.teen_user_id !== 'string' || !UUID_PATTERN.test(row.teen_user_id)) return null;
   if (typeof row.parent_user_id !== 'string' || row.parent_user_id !== expectedParentId) return null;
-  if (row.status !== 'active') return null;
+  if (row.status !== 'pending') return null;
   if (row.activated_at != null && typeof row.activated_at !== 'string') return null;
 
   return {
     linkId: row.link_id,
     teenUserId: row.teen_user_id,
     parentUserId: row.parent_user_id,
-    status: 'active',
-    activatedAt: row.activated_at ?? null,
+    status: 'pending',
+    activatedAt: null,
   };
 }
 
@@ -316,7 +316,7 @@ export async function redeemInviteCodeResult(
     if (Array.isArray(data) && data.length === 0) {
       await auditParentLinkFailure(
         'invite_redemption_expired',
-        new Error('Invite redemption returned no active link'),
+        new Error('Invite redemption returned no pending request'),
       );
       return {
         ok: false,
@@ -335,7 +335,7 @@ export async function redeemInviteCodeResult(
       return {
         ok: false,
         code: 'invalid_response',
-        message: 'The connection response could not be verified. Try again before entering Parent Side.',
+        message: 'The pending request could not be verified. Refresh and retry.',
       };
     }
 
