@@ -65,3 +65,69 @@ test('production Parent journey reaches sign-in and keeps approvals protected', 
     await testInfo.attach('production-parent-protected-journey.png', { body: await page.screenshot({ fullPage: true, animations: 'disabled' }), contentType: 'image/png' });
   });
 });
+
+
+/**
+ * Read-only release witnesses. These screenshots are review artifacts, not
+ * automatic visual approval or proof that authenticated logout works.
+ * Production remains governed by its separately verified Cloudflare release.
+ */
+for (const viewport of [
+  { name: 'small-phone', width: 320, height: 640 },
+  { name: 'phone', width: 390, height: 844 },
+  { name: 'desktop', width: 1440, height: 900 },
+] as const) {
+  test(`production welcome and login remain usable on ${viewport.name}`, async ({ page }, testInfo) => {
+    const failedAssets: string[] = [];
+    page.on('response', response => {
+      if (
+        response.status() >= 400 &&
+        /\\.(?:png|jpe?g|webp|svg|gif|woff2?)(?:[?#]|$)/i.test(response.url())
+      ) {
+        failedAssets.push(`${response.status()} ${new URL(response.url()).pathname}`);
+      }
+    });
+
+    await expectCleanPage(page, async () => {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await page.goto('/?bipDevAudience=teen', { waitUntil: 'networkidle' });
+
+      const hero = page.getByTestId('web-welcome-hero-teen');
+      const enter = page.getByTestId('web-welcome-enter');
+      await expect(hero).toBeVisible({ timeout: 30_000 });
+      await expect(enter).toBeVisible();
+      await expectNoHorizontalOverflow(page);
+
+      // The hero must remain rendered and within the horizontal viewport,
+      // even at a narrow device width. The screenshot is the crop-quality witness.
+      const heroBounds = await hero.boundingBox();
+      expect(heroBounds).not.toBeNull();
+      expect(heroBounds!.width).toBeGreaterThan(0);
+      expect(heroBounds!.x).toBeGreaterThanOrEqual(-1);
+      expect(heroBounds!.x + heroBounds!.width).toBeLessThanOrEqual(viewport.width + 1);
+
+      const entryBounds = await enter.boundingBox();
+      expect(entryBounds).not.toBeNull();
+      expect(entryBounds!.height).toBeGreaterThanOrEqual(40);
+      expect(entryBounds!.width).toBeGreaterThanOrEqual(40);
+
+      await testInfo.attach(`welcome-${viewport.name}.png`, {
+        body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+        contentType: 'image/png',
+      });
+
+      // Follow the existing public entry path, without submitting credentials.
+      await enter.click();
+      await expect(page).toHaveURL(/\\/welcome(?:\\?|$)/);
+      await page.goto('/login', { waitUntil: 'networkidle' });
+      await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 30_000 });
+      await expectNoHorizontalOverflow(page);
+      await testInfo.attach(`login-${viewport.name}.png`, {
+        body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+        contentType: 'image/png',
+      });
+    });
+
+    expect(failedAssets, `Broken image/font assets at ${viewport.name}`).toEqual([]);
+  });
+}
