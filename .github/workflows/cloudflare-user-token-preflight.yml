@@ -6,6 +6,8 @@ on:
     paths:
       - '.github/workflows/cloudflare-user-token-preflight.yml'
       - 'test/cloudflare-user-token-preflight-contract.test.mjs'
+      - 'scripts/verify-cloudflare-workers-builds-read.mjs'
+      - 'test/cloudflare-workers-builds-read-preflight.test.mjs'
   # A trusted operator explicitly initiates the read-only Production diagnostic.
   workflow_dispatch:
 
@@ -28,7 +30,7 @@ jobs:
         with:
           node-version: '24'
       - name: Validate secretless preflight contract
-        run: node --test test/cloudflare-user-token-preflight-contract.test.mjs
+        run: node --test test/cloudflare-user-token-preflight-contract.test.mjs test/cloudflare-workers-builds-read-preflight.test.mjs
   verify-token:
     if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -44,11 +46,17 @@ jobs:
       CF_PAGES_READ_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_READ_API_TOKEN }}
       CF_APP_BINDING_READ_TOKEN: ${{ secrets.CLOUDFLARE_APP_BINDING_READ_API_TOKEN }}
     steps:
+      - name: Check out the trusted exact main commit for read-only helper
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Verify Cloudflare credential transport and read authority
         shell: bash
         run: |
           set -euo pipefail
           node --input-type=module <<'NODE'
+          import { verifyWorkersBuildsRead } from './scripts/verify-cloudflare-workers-builds-read.mjs';
           const API = 'https://api.cloudflare.com/client/v4';
           const accountId = String(process.env.CF_ACCOUNT_ID || '').trim();
           const zoneId = String(process.env.CF_ZONE_ID || '').trim();
@@ -106,7 +114,7 @@ jobs:
           // Each audit must have its OWN active scoped credential.
           // A broad token covering probes must never hide a missing dedicated slot.
           const scopedProbeRequirements = new Map([
-            ['CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', ['workers-scripts']],
+            ['CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', ['workers-scripts','workers-builds-readable']],
             ['CLOUDFLARE_PAGES_READ_API_TOKEN', ['pages-project']],
             ['CLOUDFLARE_ACCESS_API_TOKEN', ['zone-access-apps']],
             ['CLOUDFLARE_APP_BINDING_READ_API_TOKEN', ['zone-identity','pages-domains','worker-domains','worker-routes']],
@@ -179,6 +187,7 @@ jobs:
             if (!active) continue;
             console.log(`TOKEN_VERIFY source=${candidate.source} result=ok shape=${shape} status=active`);
             const passedProbes = new Set();
+            let workerScriptRows = null;
             for (const probe of probes) {
               const result = await request(normalized.token, probe.path);
               if (!result.response.ok || result.body?.success === false) {
@@ -187,7 +196,23 @@ jobs:
               }
               covered.add(probe.name);
               passedProbes.add(probe.name);
+              if (probe.name === 'workers-scripts' && candidate.source === 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN') {
+                workerScriptRows = result.body?.result;
+              }
               console.log(`READ_PROBE source=${candidate.source} probe=${probe.name} result=ok`);
+            }
+            if (candidate.source === 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN' && shape !== 'account-prefixed') {
+              const buildsRead = await verifyWorkersBuildsRead({
+                rows: workerScriptRows,
+                accountId,
+                request: (path) => request(normalized.token, path),
+              });
+              if (buildsRead.ok) {
+                passedProbes.add('workers-builds-readable');
+                console.log('WORKERS_BUILDS_READ_AUTHORITY_VERIFIED');
+              } else {
+                console.log(`WORKERS_BUILDS_READ_AUTHORITY_BLOCKED code=${buildsRead.code}`);
+              }
             }
             const required = scopedProbeRequirements.get(candidate.source);
             if (required && required.every((name) => passedProbes.has(name))
