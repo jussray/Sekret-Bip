@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: '24'
       - name: Test migration extraction and prefix-collision regression
-        run: node --test test/supabase-migration-version-order.test.mjs
+        run: node --test test/supabase-migration-version-order.test.mjs test/supabase-migration-version-workflow.test.mjs
       - name: Audit repository migrations (remote remains unverified)
         shell: bash
         run: |
