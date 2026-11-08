@@ -48,8 +48,12 @@ test('Supabase fresh replay uses immutable workflow dependencies and no checkout
 
   assert.match(content, new RegExp(`actions/checkout@${CHECKOUT_SHA}`));
   assert.match(content, /persist-credentials: false/);
-  assert.match(content, new RegExp(`supabase/setup-cli@${SUPABASE_SETUP_SHA}`));
-  assert.match(content, /version: 2\.113\.0/);
+  assert.match(content, /gh release download v2\.113\.0 --repo supabase\/cli/);
+  assert.match(content, /supabase_2\.113\.0_linux_amd64\.tar\.gz/);
+  assert.match(content, /14659e7148ad17b77e69e5c36b27be572110519c76c796da1b53c07c3590f593/);
+  assert.match(content, /sha256sum --check --status/);
+  assert.match(content, /for attempt in 1 2 3/);
+  assert.match(content, /\$GITHUB_PATH/);
   assert.doesNotMatch(content, /(?:actions\/checkout|supabase\/setup-cli)@v\d+/);
 });
 
