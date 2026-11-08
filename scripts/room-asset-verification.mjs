@@ -128,19 +128,27 @@ function validateImage(filePath, requirements = {}) {
 }
 
 
-function registryBlock(source, collectionName, key) {
+export function registryBlock(source, collectionName, key) {
+  assert(typeof key === 'string' && /^[A-Za-z][A-Za-z0-9_]*$/.test(key),
+    'Invalid room registry asset key.');
   const collectionIndex = source.indexOf(`export const ${collectionName}`);
   assert(collectionIndex >= 0, `Registry is missing ${collectionName}.`);
-  const lines = source.slice(collectionIndex).split('\n');
-  const start = lines.findIndex(line => line.trimStart().startsWith(`${key}:`));
-  assert(start >= 0, `Registry is missing ${collectionName}.${key}.`);
-  const entry = lines[start].trim();
-  if (entry.includes('fallback(')) return { kind: 'fallback-call', body: entry };
-  const candidate = lines.slice(start, start + 20).join('\n');
-  const open = candidate.indexOf('{');
-  const close = candidate.indexOf('}', open + 1);
-  assert(open >= 0 && close > open, `Registry entry ${collectionName}.${key} must be a static object or a reviewed fallback call.`);
-  return { kind: 'object', body: candidate.slice(open + 1, close) };
+  const collectionEnd = source.indexOf('\n};', collectionIndex);
+  const body = source.slice(collectionIndex, collectionEnd >= 0 ? collectionEnd : undefined);
+  const match = new RegExp(`^\\s*${key}:\\s*(\\{|fallback\\()`, 'm').exec(body);
+  assert(match, `Registry is missing ${collectionName}.${key}.`);
+  if (match[1] === 'fallback(') {
+    return { kind: 'fallback-call', body: body.slice(match.index).split('\n')[0].trim() };
+  }
+  const open = match.index + match[0].length - 1;
+  let depth = 0;
+  for (let index = open; index < body.length; index += 1) {
+    if (body[index] === '{') depth += 1;
+    else if (body[index] === '}' && --depth === 0) {
+      return { kind: 'object', body: body.slice(open + 1, index) };
+    }
+  }
+  throw new Error(`Registry entry ${collectionName}.${key} is not closed.`);
 }
 
 function requirePathFor(registryPath, assetPath) {
