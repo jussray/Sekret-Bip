@@ -140,9 +140,17 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: product-design-playwright-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/product-design-playwright
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload room Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: room-playwright-${{ env.EXPECTED_HEAD_SHA }}
           path: |
-            artifacts/product-design-playwright/
             playwright-report/rooms/
             test-results/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
