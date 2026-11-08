@@ -8,7 +8,7 @@ test('local Supabase version integrity check always runs on PRs and main pushes'
   const workflow = read('.github/workflows/supabase-migration-version-integrity.yml');
   assert.match(workflow, /on:\n\s+pull_request:\n\s+branches: \[main\]\n\s+push:\n\s+branches: \[main\]/);
   assert.doesNotMatch(workflow, /\bpaths:|continue-on-error: true/);
-  assert.match(workflow, /node --test test\/supabase-migration-version-order\.test\.mjs/);
+  assert.match(workflow, /node --test test\/supabase-migration-version-order\.test\.mjs test\/supabase-migration-version-workflow\.test\.mjs/);
   assert.match(workflow, /--local-only/);
   assert.match(workflow, /persist-credentials: false/);
 });
