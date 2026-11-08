@@ -12,7 +12,7 @@ function assert(condition, message) { if (!condition) throw new Error(message); 
 // Constrain all runtime asset reads to the chosen workspace and reject symlink components.
 export function resolveAssetPath(rootDir, relativePath) {
   assert(typeof relativePath === 'string' && relativePath.length > 0
-    && !path.isAbsolute(relativePath) && !relativePath.includes('\\0'),
+    && !path.isAbsolute(relativePath) && !relativePath.includes('\0'),
     'Unsafe room asset path.');
   assert(!relativePath.split(/[\\\\/]/).includes('..'), 'Room asset path escapes workspace.');
   const root = path.resolve(rootDir);
