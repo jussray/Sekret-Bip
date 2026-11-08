@@ -236,3 +236,14 @@ test('production Playwright verifies both public variants and their Enter paths'
   assert.match(productionSmoke, /toHaveCount\(0\)/);
   assert.doesNotMatch(productionSmoke, /toHaveText\('Suhana'\)/);
 });
+
+
+test('exact release production smoke fails closed without an expected commit SHA', () => {
+  assert.doesNotMatch(
+    productionSmoke,
+    /test\.skip\(\s*!expectedReleaseSha/,
+    'missing release SHA must fail exact production proof, not silently skip it',
+  );
+  assert.match(productionSmoke, /EXPECTED_RELEASE_SHA is required for exact production release proof/);
+  assert.match(productionSmoke, /\.toMatch\(\/\^\[0-9a-f\]\{40\}\$\/\)/);
+});
