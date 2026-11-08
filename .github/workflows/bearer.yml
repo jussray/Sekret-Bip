@@ -32,6 +32,8 @@ jobs:
         id: report
         uses: bearer/bearer-action@828eeb928ce2f4a7ca5ed57fb8b59508cb8c79bc
         with:
+          # Pin the published scanner release: avoid vendor 'latest' resolution failing on GitHub API outages.
+          version: 2.1.3
           api-key: ${{ secrets.BEARER_TOKEN }}
           format: sarif
           output: results.sarif
