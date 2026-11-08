@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "character": "night",
+  "canonicalMaster": "assets/images/companions/teen/night/neutral.png",
+  "roomMaster": "assets/images/resized-bg/bg-night-room-day.jpg",
+  "identityLock": {
+    "mustPreserve": [
+      "dark brown skin",
+      "coily hair silhouette",
+      "tired expressive eyes",
+      "stud earring",
+      "layered silver chains with star pendant",
+      "deep purple and black Se’kret hoodie",
+      "black baggy cargo pants",
+      "Nike-style dunk silhouette",
+      "same face and body proportions as canonical master"
+    ],
+    "mustNeverChange": ["skin tone", "face shape", "hair length or texture", "age", "outfit", "jewelry", "body proportions"]
+  },
+  "globalPrompt": "Use the supplied Night canonical master as a strict identity reference. Se’kret Bip emotional wellness app illustration, polished hand-drawn digital art, subtle ink texture, cool purple and blue rim lighting, soft floor contact shadow, clean silhouette, transparent background, full body, no text, no room background, production-ready character asset.",
+  "negativePrompt": "different person, lighter skin, darker skin, changed face, changed hairstyle, changed outfit, missing chains, extra jewelry, warm orange skin lighting, photorealistic, 3D render, chibi, child proportions, cropped feet, cropped hands, extra fingers, duplicate limbs, text, watermark, background scene, furniture, glow halo, glitter overload",
+  "output": {
+    "format": "png",
+    "background": "transparent",
+    "aspectRatio": "2:3",
+    "minimumSize": "1536x2304",
+    "runtimeDirectory": "assets/images/companions/teen/night"
+  },
+  "poses": [
+    { "id": "neutral", "file": "assets/images/companions/teen/night/neutral.png", "prompt": "Neutral standing pose, relaxed shoulders, quiet eye contact, hands naturally at sides, calm guarded energy." },
+    { "id": "thinking", "file": "assets/images/companions/teen/night/thinking.png", "prompt": "Quiet thinking pose, one hand near the chin, eyes angled slightly away, reflective rather than distressed." },
+    { "id": "writing", "file": "assets/images/companions/teen/night/writing.png", "prompt": "Seated at a desk writing in a journal, natural grip, head slightly lowered, thoughtful focus." },
+    { "id": "window", "file": "assets/images/companions/teen/night/window.png", "prompt": "Three-quarter back view looking toward a window, one hand near hoodie pocket, reflective late-night posture." },
+    { "id": "listening", "file": "assets/images/companions/teen/night/listening.png", "prompt": "Seated facing the user, leaning slightly forward, attentive eyes, hands loosely joined, safe listening energy." },
+    { "id": "headphones", "file": "assets/images/companions/teen/night/headphones.png", "prompt": "Seated low with headphones on, one knee raised, calm listening posture, hands relaxed." },
+    { "id": "microphone", "file": "assets/images/companions/teen/night/microphone.png", "prompt": "Standing at a microphone, one hand lightly holding the stand, speaking softly, grounded posture." },
+    { "id": "moonChair", "file": "assets/images/companions/teen/night/moon-chair.png", "prompt": "Relaxed seated pose designed to fit naturally inside a crescent moon chair, one elbow resting, quiet presence." },
+    { "id": "resting", "file": "assets/images/companions/teen/night/resting.png", "prompt": "Deep-night resting pose, seated with head supported by one hand, tired but present, not asleep." }
+  ],
+  "roomPhaseRule": "Use the clean Night room master. Preserve exact walls, window, crescent chair, desk, microphone, record player, journals, signs, furniture scale, perspective, camera position, and object placement. Change lighting, sky, practical lights, shadows, rain, and ambience only.",
+  "roomPhases": [
+    { "id": "day", "file": "assets/images/resized-bg/bg-night-room-day.jpg", "prompt": "Cool soft daylight through the city window, practical lights mostly off." },
+    { "id": "midday", "file": "assets/images/resized-bg/bg-night-room-midday.jpg", "prompt": "Brighter neutral daylight, crisp room visibility, unchanged geometry." },
+    { "id": "afternoon", "file": "assets/images/resized-bg/bg-night-room-afternoon.jpg", "prompt": "Muted late-afternoon violet-blue light, subtle lengthened shadows." },
+    { "id": "evening", "file": "assets/images/resized-bg/bg-night-room-evening.jpg", "prompt": "City dusk, purple practical lights beginning to glow, cool palette." },
+    { "id": "rain", "file": "assets/images/resized-bg/bg-night-room-rain.jpg", "prompt": "Rain on the same window, wet city reflections, cool blue-violet ambience." },
+    { "id": "night", "file": "assets/images/resized-bg/bg-night-room-night.jpg", "prompt": "Late-night city lights, microphone and room practicals softly illuminated." },
+    { "id": "deepNight", "file": "assets/images/resized-bg/bg-night-room-deep-night.jpg", "prompt": "2 AM darkness, minimal practical lights, stars and deep violet shadows, readable objects." }
+  ]
+}
