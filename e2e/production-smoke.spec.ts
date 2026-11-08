@@ -11,7 +11,7 @@ async function expectNoHorizontalOverflow(page: import('@playwright/test').Page)
 }
 
 test('production exposes the exact expected Pages and Worker release commit', async ({ request }) => {
-  test.skip(!expectedReleaseSha, 'EXPECTED_RELEASE_SHA is required for exact production release proof.');
+  expect(expectedReleaseSha, 'EXPECTED_RELEASE_SHA is required for exact production release proof').toMatch(/^[0-9a-f]{40}$/);
 
   const response = await request.get(`/.well-known/sekret-release.json?playwright=${Date.now()}`, {
     headers: {
