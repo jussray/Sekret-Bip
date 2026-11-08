@@ -82,7 +82,7 @@ for (const viewport of [
     page.on('response', response => {
       if (
         response.status() >= 400 &&
-        /\\.(?:png|jpe?g|webp|svg|gif|woff2?)(?:[?#]|$)/i.test(response.url())
+        /\.(?:png|jpe?g|webp|svg|gif|woff2?)(?:[?#]|$)/i.test(response.url())
       ) {
         failedAssets.push(`${response.status()} ${new URL(response.url()).pathname}`);
       }
@@ -116,9 +116,30 @@ for (const viewport of [
         contentType: 'image/png',
       });
 
+      // A short phone may place entry below the first viewport. Its scroll
+      // container must bring the existing control fully on screen.
+      const audienceSwitch = page.getByTestId('web-welcome-audience-switch');
+      await audienceSwitch.scrollIntoViewIfNeeded();
+      const switchBounds = await audienceSwitch.boundingBox();
+      expect(switchBounds).not.toBeNull();
+      expect(switchBounds!.height).toBeGreaterThanOrEqual(44);
+      expect(switchBounds!.y).toBeGreaterThanOrEqual(-1);
+      expect(switchBounds!.y + switchBounds!.height).toBeLessThanOrEqual(viewport.height + 1);
+
+      await enter.scrollIntoViewIfNeeded();
+      const visibleEntryBounds = await enter.boundingBox();
+      expect(visibleEntryBounds).not.toBeNull();
+      expect(visibleEntryBounds!.y).toBeGreaterThanOrEqual(-1);
+      expect(visibleEntryBounds!.y + visibleEntryBounds!.height).toBeLessThanOrEqual(viewport.height + 1);
+
+      await testInfo.attach(`welcome-entry-revealed-${viewport.name}.png`, {
+        body: await page.screenshot({ animations: 'disabled' }),
+        contentType: 'image/png',
+      });
+
       // Follow the existing public entry path, without submitting credentials.
       await enter.click();
-      await expect(page).toHaveURL(/\\/welcome(?:\\?|$)/);
+      await expect(page).toHaveURL(/\/welcome(?:\?|$)/);
       await page.goto('/login', { waitUntil: 'networkidle' });
       await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 30_000 });
       await expectNoHorizontalOverflow(page);
