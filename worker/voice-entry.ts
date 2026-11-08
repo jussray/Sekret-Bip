@@ -174,7 +174,12 @@ function requiresPreciseLipSync(body: Record<string, unknown>): boolean {
 
 function protectionUnavailable(cors: Record<string, string>): Response {
   return json(
-    { error: 'request protection temporarily unavailable', retryable: true },
+    {
+      error: 'request protection temporarily unavailable',
+      retryable: true,
+      // A limiter outage must never leave a teen with no crisis resource.
+      crisis_resources: 'If you might hurt yourself or someone is hurting you, call or text 988, text HOME to 741741, or call 911 if it is immediate.',
+    },
     503,
     { ...cors, 'Retry-After': '30' },
   );
