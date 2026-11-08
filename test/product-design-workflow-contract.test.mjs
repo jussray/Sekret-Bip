@@ -48,6 +48,15 @@ test('Product Design browser proof independently runs the reply safety spec', ()
   );
 });
 
+test('read-only production Auth proof changes receive an exact-head PR contract check', () => {
+  const pullRequest = sectionBetween('  pull_request:', '  push:');
+  assert.ok(pullRequest.includes("      - 'e2e/production-auth-reachability.spec.ts'"));
+  assert.ok(pullRequest.includes("      - 'test/production-auth-runtime-proof-contract.test.mjs'"));
+  const contractStep = workflow.split('name: Verify Product Design contracts')[1]
+    ?.split('- run: npx playwright install')[0] || '';
+  assert.ok(contractStep.includes('test/production-auth-runtime-proof-contract.test.mjs'));
+});
+
 test('Product Design proof remains exact-head and failure-preserving', () => {
   for (const required of [
     'EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}',
