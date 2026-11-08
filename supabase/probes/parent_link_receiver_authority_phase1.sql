@@ -210,6 +210,15 @@ from public.redeem_parent_link_invite(
 );
 reset role;
 
+-- Capture the claimed link ID outside the intruder's RLS context.
+-- Never use a foreign owner's inaccessible SELECT result as the RPC parameter.
+insert into parent_link_receiver_runtime(key, value)
+select 'claimed_link_id', id::text
+from public.parent_links
+where teen_user_id = (select user_id from parent_link_receiver_context where label = 'teen_owner')
+  and status = 'pending'
+  and is_active is false;
+
 insert into parent_link_receiver_results
 select
   'unverified_parent_side_receiver_allowed_for_bridge_only',
@@ -244,8 +253,7 @@ select set_config('request.jwt.claims', jsonb_build_object(
 set local role authenticated;
 insert into parent_link_receiver_runtime(key, value)
 select 'intruder_approval', public.approve_parent_link_request(
-  (select id from public.parent_links where teen_user_id =
-    (select user_id from parent_link_receiver_context where label = 'teen_owner')), true
+  (select value::uuid from parent_link_receiver_runtime where key = 'claimed_link_id'), true
 )::text;
 reset role;
 insert into parent_link_receiver_results
@@ -266,8 +274,7 @@ select set_config('request.jwt.claims', jsonb_build_object(
 set local role authenticated;
 insert into parent_link_receiver_runtime(key, value)
 select 'teen_confirmed', public.approve_parent_link_request(
-  (select id from public.parent_links where teen_user_id =
-    (select user_id from parent_link_receiver_context where label = 'teen_owner')), true
+  (select value::uuid from parent_link_receiver_runtime where key = 'claimed_link_id'), true
 )::text;
 reset role;
 
