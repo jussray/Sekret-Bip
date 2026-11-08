@@ -32,3 +32,12 @@ test('full Supabase SQL replay runs for PRs and merged main commits', () => {
   assert.match(workflow, /Replay migrations from empty local database/);
   assert.doesNotMatch(workflow, /continue-on-error: true/);
 });
+
+test('migration auditor writes detailed findings to artifacts, never dynamic logs', () => {
+  const source = read('scripts/audit-supabase-migration-versions.mjs');
+  assert.match(source, /await fs\.writeFile\(options\.output, serialized, 'utf8'\)/);
+  assert.match(source, /SUPABASE_REMOTE_MIGRATION_NOT_IN_REPO/);
+  assert.match(source, /SUPABASE_MIGRATION_VERSION_AUDIT_FAILED/);
+  assert.doesNotMatch(source, /process\.(stdout|stderr)\.write\(/);
+  assert.doesNotMatch(source, /console\.(?:log|error|info|warn)\([^'"`]/);
+});
