@@ -2,6 +2,125 @@ begin;
 -- Forward-only consent gate: existing active links are not rewritten.
 -- An adult with the teen's code may request, but cannot activate, the link.
 -- This is relationship consent, not teen identity/age verification.
+create or replace function public.create_parent_link_invite()
+returns text
+language plpgsql
+security definer
+set search_path = public, auth
+as $
+declare
+  v_user_id uuid := auth.uid();
+  v_code text;
+  v_profile public.app_profiles%rowtype;
+  v_link public.parent_links%rowtype;
+  v_state text;
+  v_has_link boolean := false;
+begin
+  if v_user_id is null
+     or coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception 'unauthorized' using errcode = '42501';
+  end if;
+
+  select * into v_profile
+  from public.app_profiles
+  where user_id = v_user_id;
+
+  if not found
+     or v_profile.account_side <> 'teen'
+     or v_profile.onboarding_complete is not true then
+    raise exception 'completed teen profile required' using errcode = '42501';
+  end if;
+
+  select verification_state into v_state
+  from public.account_verification
+  where user_id = v_user_id;
+
+  if not found then
+    raise exception 'teen verification record required' using errcode = '42501';
+  end if;
+
+  if v_state in ('SUSPENDED', 'MANUAL_REVIEW') then
+    raise exception 'teen account is not eligible to create an invite' using errcode = '42501';
+  end if;
+
+  select * into v_link
+  from public.parent_links
+  where teen_user_id = v_user_id
+  for update;
+  v_has_link := found;
+
+  -- A claimed adult request must not be silently overwritten by a new code.
+  if v_has_link
+     and v_link.status = 'pending'
+     and v_link.parent_user_id is not null then
+    raise exception 'parent_approval_pending' using errcode = '42501';
+  end if;
+
+  if v_has_link
+     and v_link.status = 'active'
+     and v_link.is_active is true then
+    raise exception 'active parent link must be revoked first' using errcode = '42501';
+  end if;
+
+  -- Keep the human-facing code at eight characters while avoiding the old
+  -- eight-hex-character (32-bit) ceiling. Each random byte maps uniformly to
+  -- one symbol in this 32-character, ambiguity-reduced alphabet, yielding
+  -- 40 bits of code entropy without changing the product/UI contract.
+  loop
+    select string_agg(
+      substr('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', (get_byte(raw_bytes, i) % 32) + 1, 1),
+      '' order by i
+    )
+    into v_code
+    from (select extensions.gen_random_bytes(8) as raw_bytes) entropy
+    cross join generate_series(0, 7) as positions(i);
+
+    exit when not exists (
+      select 1 from public.parent_links where invite_code = v_code
+    );
+  end loop;
+
+  if v_has_link then
+    update public.parent_links
+    set parent_user_id = null,
+        is_active = true,
+        status = 'pending',
+        invite_code = v_code,
+        expires_at = now() + interval '48 hours',
+        updated_at = now()
+    where id = v_link.id;
+  else
+    insert into public.parent_links (
+      teen_user_id,
+      parent_user_id,
+      is_active,
+      status,
+      invite_code,
+      expires_at,
+      created_at,
+      updated_at
+    ) values (
+      v_user_id,
+      null,
+      true,
+      'pending',
+      v_code,
+      now() + interval '48 hours',
+      now(),
+      now()
+    );
+  end if;
+
+  update public.account_verification
+  set parent_link_state = 'pending',
+      verification_updated_at = now()
+  where user_id = v_user_id;
+
+  return v_code;
+end;
+$;
+
+
 create or replace function public.redeem_parent_link_invite(
   p_invite_code text
 )
@@ -203,6 +322,8 @@ end;
 $$;
 
 
+revoke all on function public.create_parent_link_invite() from public, anon;
+grant execute on function public.create_parent_link_invite() to authenticated, service_role;
 revoke all on function public.redeem_parent_link_invite(text) from public, anon;
 grant execute on function public.redeem_parent_link_invite(text) to authenticated, service_role;
 revoke all on function public.approve_parent_link_request(uuid, boolean) from public, anon;
