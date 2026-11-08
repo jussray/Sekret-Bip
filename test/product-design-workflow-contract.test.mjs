@@ -63,6 +63,8 @@ test('Product Design proof remains exact-head and failure-preserving', () => {
     'e2e/room-canonical-display.spec.ts',
     'e2e/canonical-companion-identity.spec.ts',
     'e2e/guardrails.spec.ts',
+    'e2e/reply-guard-safety.spec.ts',
+    'test/playwright-spec-import-contract.test.mjs',
     'test/founder-visual-authority-contract.test.mjs',
     'test/pages-companion-asset-contract.test.mjs',
     'test/companion-display-name-canon.test.mjs',
