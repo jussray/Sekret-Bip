@@ -6,10 +6,27 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { inspectLegacyReport } from '../scripts/room-report-recovery.mjs';
+import { registryBlock } from '../scripts/room-asset-verification.mjs';
 import { resolveManifestPath, runtimeOutputFor, safeProjectPath } from '../scripts/room-production-foreman.mjs';
 
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
+
+test('Night registry parses generated, fallback, and room-phase entries without losing main coverage', async () => {
+  const registry = await read('src/config/nightRoomAssetRegistry.ts');
+  const neutral = registryBlock(registry, 'NIGHT_ROOM_POSE_ASSETS', 'neutral');
+  assert.equal(neutral.kind, 'object');
+  assert.match(neutral.body, /generatedFile: canonicalFile/);
+  assert.match(neutral.body, /status: 'generated'/);
+  const thinking = registryBlock(registry, 'NIGHT_ROOM_POSE_ASSETS', 'thinking');
+  assert.equal(thinking.kind, 'fallback-call');
+  assert.match(thinking.body, /thinking: fallback\('assets\/images\/companions\/teen\/night\/thinking\.png'\)/);
+  const day = registryBlock(registry, 'NIGHT_ROOM_PHASE_ASSETS', 'day');
+  assert.equal(day.kind, 'object');
+  assert.match(day.body, /file: 'assets\/images\/resized-bg\/bg-night-room-day\.jpg'/);
+  assert.throws(() => registryBlock(registry, 'NIGHT_ROOM_POSE_ASSETS', 'missingPose'), /Registry is missing/);
+  assert.throws(() => registryBlock(registry, 'NIGHT_ROOM_POSE_ASSETS', '../escape'), /Invalid room registry/);
+});
 
 test('default Playwright isolates rooms while CI executes the dedicated suite', async () => {
   const config = await read('playwright.config.ts');
