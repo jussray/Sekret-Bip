@@ -109,13 +109,18 @@ async function main() {
     await fs.mkdir(path.dirname(options.output), { recursive: true });
     await fs.writeFile(options.output, serialized, 'utf8');
   }
-  process.stdout.write(serialized);
-  if (report.outcome === 'REMOTE_VERSION_MISSING_LOCALLY') process.exitCode = 2;
+  if (report.outcome === 'REMOTE_VERSION_MISSING_LOCALLY') {
+    console.error('SUPABASE_REMOTE_MIGRATION_NOT_IN_REPO');
+    process.exitCode = 2;
+  } else {
+    console.log('SUPABASE_MIGRATION_VERSION_AUDIT_RECORDED');
+  }
 }
 
 if (process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url) {
   main().catch(error => {
-    process.stderr.write((error instanceof Error ? error.message : String(error)) + '\n');
+    // Preserve a fixed failure code without printing provider or account details.
+    console.error('SUPABASE_MIGRATION_VERSION_AUDIT_FAILED');
     process.exitCode = 1;
   });
 }
