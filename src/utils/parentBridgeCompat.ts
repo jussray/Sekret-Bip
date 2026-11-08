@@ -6,7 +6,7 @@ import {
 import { getSupabase } from './supabase';
 import {
   generateInviteCode,
-  redeemInviteCode,
+  redeemInviteCodeResult,
   fetchLinkedTeenId as fetchLinkedTeenIdBase,
 } from './parentLink';
 
@@ -27,9 +27,12 @@ export async function createParentLink(): Promise<string | null> {
   return generateInviteCode();
 }
 
-export async function redeemParentLink(code: string): Promise<'ok' | 'not_found' | 'error'> {
+export async function redeemParentLink(code: string): Promise<'pending' | 'not_found' | 'error'> {
   try {
-    return (await redeemInviteCode(code)) ? 'ok' : 'not_found';
+    const result = await redeemInviteCodeResult(code);
+    if (result.ok) return result.value.status === 'pending' ? 'pending' : 'error';
+    if (result.code === 'invalid_code' || result.code === 'expired_or_used') return 'not_found';
+    return 'error';
   } catch {
     return 'error';
   }
