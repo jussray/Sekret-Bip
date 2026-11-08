@@ -191,7 +191,7 @@ test('exact preview preserves permanent identity, Circle pseudonymity, Teen-cont
 
   await signOut(page);
   await signIn(page, 'teen', teenEmail, teenPassword);
-  await page.goto('/settings');
+  await page.goto('/parent-link-verify');
   await expect(page.getByRole('button', { name: 'Approve parent request' })).toBeVisible({ timeout: 45_000 });
   await page.getByRole('button', { name: 'Approve parent request' }).click();
 
