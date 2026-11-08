@@ -41,3 +41,13 @@ test('offline rules fallback is exact-version pinned and fails closed unless the
   assert.match(scanner, /test -s results\.sarif/);
   assert.doesNotMatch(scanner, /--exit-code\s+0|BEARER_EXIT_CODE|continue-on-error|\|\| true/);
 });
+
+
+test('official Bearer release asset API is a bounded, checksum-verified fallback for HTTP 504', () => {
+  assert.match(workflow, /api\.github\.com\/repos\/Bearer\/bearer\/releases\/assets\/685261282/);
+  assert.match(workflow, /Accept: application\/octet-stream/);
+  assert.match(workflow, /974d4ad7bb71bc578675684d444e345e8fbad91c85557aac035406ef5cc04c68/);
+  assert.match(workflow, /sha256sum --check --status/);
+  assert.match(workflow, /if ! curl --fail/);
+  assert.doesNotMatch(workflow, /continue-on-error: true/);
+});
