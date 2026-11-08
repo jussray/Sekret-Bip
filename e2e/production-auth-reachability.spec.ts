@@ -1,49 +1,70 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import { expect, test } from '@playwright/test';
 
-function readProductionEnv(): Record<string, string> {
-  const source = fs.readFileSync(
-    path.resolve(process.cwd(), '.env.production'),
-    'utf8',
-  );
-
-  return Object.fromEntries(
-    source
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#'))
-      .map((line) => {
-        const separator = line.indexOf('=');
-        if (separator === -1) return [line, ''];
-        return [line.slice(0, separator), line.slice(separator + 1)];
-      }),
-  );
-}
-
-const productionEnv = readProductionEnv();
-const supabaseUrl = productionEnv.EXPO_PUBLIC_SUPABASE_URL;
-const supabasePublishableKey =
-  productionEnv.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-  productionEnv.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+const expectedSupabaseUrl = 'https://tbsevonvegdnlyjgplmm.supabase.co';
 
 type BrowserProbe = {
   ok: boolean;
   status: number;
   contentType: string;
-  body: string;
-  error: string;
+  leaksKey: boolean;
+  leaksRestrictedMarker: boolean;
+  errorKind: string;
 };
 
-test('production browser validates the Supabase publishable key and reaches Auth read-only', async ({
+test('production browser validates the real Supabase publishable key and reaches Auth read-only', async ({
   page,
 }) => {
-  expect(supabaseUrl).toMatch(/^https:\/\/[a-z0-9]+\.supabase\.co$/);
-  expect(supabasePublishableKey).toMatch(/^(sb_publishable_|eyJ)/);
-  expect(supabasePublishableKey).not.toMatch(/^sb_secret_/);
+  const observedAuthRequests: Array<{ url: string; key: string }> = [];
+
+  // Capture the public frontend's actual Auth configuration from a synthetic
+  // signup attempt. Never let a signup or any other Auth write reach production.
+  await page.route('**/auth/v1/**', async (route) => {
+    const request = route.request();
+    const url = new URL(request.url());
+
+    if (request.method() === 'GET' && url.pathname === '/auth/v1/settings') {
+      await route.continue();
+      return;
+    }
+    if (request.method() === 'POST' && url.pathname.endsWith('/signup')) {
+      observedAuthRequests.push({
+        url: url.origin,
+        key: request.headers()['apikey'] ?? '',
+      });
+    }
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 'read_only_verification',
+        message: 'Auth writes are blocked by the production read-only test.',
+      }),
+    });
+  });
 
   await page.goto('/signup?side=teen');
+  await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
+  await page.getByRole('button', { name: /13\\s*[–-]\\s*15 Teen mode starts/i }).click();
+  await page.getByRole('button', { name: /Continue with teen setup/i }).click();
+  await page.getByRole('textbox', { name: 'Email' }).fill('auth-readonly-proof@example.invalid');
+  await page.getByRole('textbox', { name: 'Password', exact: true }).fill('PlaywrightOnly-123!');
+  await page.getByRole('textbox', { name: 'Confirm password', exact: true }).fill('PlaywrightOnly-123!');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('textbox', { name: 'Username' }).fill('auth_readonly_proof');
+  await page.getByRole('button', { name: 'Next' }).click();
+  await page.getByRole('button', { name: 'Create Account' }).click();
 
+  await expect.poll(() => observedAuthRequests.length).toBeGreaterThan(0);
+  const { url, key } = observedAuthRequests[0];
+  expect(url).toBe(expectedSupabaseUrl);
+  expect(
+    key.startsWith('sb_publishable_') || key.startsWith('eyJ'),
+    'The public frontend must use a publishable or legacy anon key',
+  ).toBe(true);
+  expect(key.startsWith('sb_secret_'), 'A secret key must never reach the browser').toBe(false);
+
+  // GET /settings is the only Auth request permitted to reach production.
+  // Return booleans, not raw body text or any key material, in test evidence.
   const probes = await page.evaluate(
     async ({ url, key }) => {
       const read = async (
@@ -56,44 +77,42 @@ test('production browser validates the Supabase publishable key and reaches Auth
             headers,
           });
           const body = await response.text();
-
           return {
             ok: response.ok,
             status: response.status,
             contentType: response.headers.get('content-type') ?? '',
-            body: body.slice(0, 2_000),
-            error: '',
+            leaksKey: body.includes(key),
+            leaksRestrictedMarker: /sb_secret_|service[_-]?role/i.test(body),
+            errorKind: '',
           };
         } catch (error) {
           return {
             ok: false,
             status: 0,
             contentType: '',
-            body: '',
-            error: error instanceof Error ? error.message : String(error),
+            leaksKey: false,
+            leaksRestrictedMarker: false,
+            errorKind: error instanceof Error ? error.name : 'UnknownError',
           };
         }
       };
 
       return {
-        withoutKey: await read('/auth/v1/settings', {
-          Accept: 'application/json',
-        }),
+        withoutKey: await read('/auth/v1/settings', { Accept: 'application/json' }),
         auth: await read('/auth/v1/settings', {
           apikey: key,
           Accept: 'application/json',
         }),
       };
     },
-    { url: supabaseUrl, key: supabasePublishableKey },
+    { url, key },
   );
 
   expect([401, 403], JSON.stringify(probes.withoutKey)).toContain(probes.withoutKey.status);
-  expect(probes.withoutKey.ok, JSON.stringify(probes.withoutKey)).toBe(false);
-
+  expect(probes.withoutKey.ok).toBe(false);
   expect(probes.auth.status, JSON.stringify(probes.auth)).toBe(200);
   expect(probes.auth.ok, JSON.stringify(probes.auth)).toBe(true);
   expect(probes.auth.contentType).toContain('application/json');
-  expect(probes.auth.body).not.toContain(supabasePublishableKey);
-  expect(probes.auth.body).not.toMatch(/sb_secret_|service[_-]?role/i);
+  expect(probes.auth.leaksKey).toBe(false);
+  expect(probes.auth.leaksRestrictedMarker).toBe(false);
 });
