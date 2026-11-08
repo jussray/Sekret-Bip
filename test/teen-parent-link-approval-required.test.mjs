@@ -37,3 +37,17 @@ test('onboarding cannot treat a pending request as linked access', () => {
   assert.match(status, /Approve parent request/);
   assert.match(status, /Reject parent request/);
 });
+
+test('claimed adult request cannot be overwritten by automatic invite regeneration', () => {
+  const sql = read('supabase/migrations/20261108014000_require_teen_parent_link_confirmation.sql');
+  const screen = read('app/(auth)/parent-link-verify.tsx');
+  const create = sql.split('create or replace function public.create_parent_link_invite')[1]
+    .split('create or replace function public.redeem_parent_link_invite')[0];
+  assert.match(create, /v_link.status = 'pending'/);
+  assert.match(create, /v_link.parent_user_id is not null/);
+  assert.match(create, /parent_approval_pending/);
+  assert.match(screen, /readClaimedAdultRequest/);
+  assert.match(screen, /if \(claimed !== 'none'\) return false/);
+  assert.match(screen, /Approve parent request/);
+  assert.match(screen, /Reject parent request/);
+});
