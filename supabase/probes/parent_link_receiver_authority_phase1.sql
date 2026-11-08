@@ -234,6 +234,28 @@ select
   ), false),
   'Parent Side requests Teen-controlled Bridge consent without gaining access or age authority';
 
+-- A different authenticated Teen may not approve another Teen's request.
+select set_config('request.jwt.claim.sub',
+  (select user_id::text from parent_link_receiver_context where label = 'teen_intruder'), true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', (select user_id::text from parent_link_receiver_context where label = 'teen_intruder'),
+  'role', 'authenticated', 'is_anonymous', false
+)::text, true);
+set local role authenticated;
+insert into parent_link_receiver_runtime(key, value)
+select 'intruder_approval', public.approve_parent_link_request(
+  (select id from public.parent_links where teen_user_id =
+    (select user_id from parent_link_receiver_context where label = 'teen_owner')), true
+)::text;
+reset role;
+insert into parent_link_receiver_results
+select 'cross_teen_approval_denied',
+  (select value = 'false' from parent_link_receiver_runtime where key = 'intruder_approval')
+  and coalesce((select status='pending' and is_active is false
+    from public.parent_links where teen_user_id =
+      (select user_id from parent_link_receiver_context where label = 'teen_owner')), false),
+  'A second Teen account cannot approve another Teen-owned adult request';
+
 -- A pending adult request never becomes active without the exact owner Teen's action.
 select set_config('request.jwt.claim.sub',
   (select user_id::text from parent_link_receiver_context where label = 'teen_owner'), true);
