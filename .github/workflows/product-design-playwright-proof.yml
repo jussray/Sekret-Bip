@@ -39,10 +39,12 @@ on:
       - 'e2e/cinematic-dossier.spec.ts'
       - 'e2e/guardrails.spec.ts'
       - 'e2e/reply-guard-safety.spec.ts'
+      - 'e2e/production-auth-reachability.spec.ts'
       - 'e2e/ai-search-discovery.spec.ts'
       - 'test/founder-visual-authority-contract.test.mjs'
       - 'test/product-design-workflow-contract.test.mjs'
       - 'test/playwright-spec-import-contract.test.mjs'
+      - 'test/production-auth-runtime-proof-contract.test.mjs'
       - 'test/companion-display-name-canon.test.mjs'
       - 'test/visual-wonder-contract.test.mjs'
       - 'test/room-intentions-hierarchy-contract.test.mjs'
@@ -111,7 +113,7 @@ jobs:
         run: npm run verify:character-canon
 
       - name: Verify Product Design contracts
-        run: node --test test/founder-visual-authority-contract.test.mjs test/product-design-workflow-contract.test.mjs test/playwright-spec-import-contract.test.mjs test/companion-display-name-canon.test.mjs test/visual-wonder-contract.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/pages-companion-asset-contract.test.mjs test/night-room-runtime-registry.test.mjs test/companion-runtime-contracts.test.mjs test/sorian-character-engine-contract.test.mjs test/dual-front-door-contract.test.mjs test/front-door-motion-contract.test.mjs test/voice-presence-motion-contract.test.mjs test/calm-companion-motion-contract.test.mjs test/character-recognition-gate.test.mjs
+        run: node --test test/founder-visual-authority-contract.test.mjs test/product-design-workflow-contract.test.mjs test/playwright-spec-import-contract.test.mjs test/production-auth-runtime-proof-contract.test.mjs test/companion-display-name-canon.test.mjs test/visual-wonder-contract.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/pages-companion-asset-contract.test.mjs test/night-room-runtime-registry.test.mjs test/companion-runtime-contracts.test.mjs test/sorian-character-engine-contract.test.mjs test/dual-front-door-contract.test.mjs test/front-door-motion-contract.test.mjs test/voice-presence-motion-contract.test.mjs test/calm-companion-motion-contract.test.mjs test/character-recognition-gate.test.mjs
 
       - run: npx playwright install --with-deps chromium
 
