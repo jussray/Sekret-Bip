@@ -61,8 +61,33 @@ jobs:
           BEARER_HIDE_PROGRESS_BAR: 'true'
         run: |
           set -euo pipefail
-          "$RUNNER_TEMP/bearer" scan .
-          test -s results.sarif
+          for attempt in 1 2 3; do
+            # Bearer caches rules under os.TempDir()/bearer-rules. An isolated
+            # TMPDIR prevents reusing a malformed response from a prior attempt.
+            export TMPDIR="$RUNNER_TEMP/bearer-rules-attempt-$attempt"
+            mkdir -p "$TMPDIR"
+            if "$RUNNER_TEMP/bearer" scan . 2>"$RUNNER_TEMP/bearer-scan-stderr"; then
+              test -s results.sarif
+              exit 0
+            else
+              result=$?
+            fi
+            # A report may contain real findings: never retry or suppress them.
+            if test -s results.sarif; then
+              echo 'Bearer returned nonzero after producing SARIF; scan remains blocked.' >&2
+              exit "$result"
+            fi
+            if ! grep -Fq 'error loading remote rules: loading rules failed: gzip: invalid header' "$RUNNER_TEMP/bearer-scan-stderr"; then
+              echo 'Bearer failed without SARIF; not a known transient rules error.' >&2
+              exit "$result"
+            fi
+            if test "$attempt" -eq 3; then
+              echo 'Bearer remote rules invalid after bounded retries.' >&2
+              exit "$result"
+            fi
+            echo 'Retrying remote Bearer rules with isolated temporary cache.' >&2
+            sleep "$((attempt * 5))"
+          done
       # Preserve the exact scanner output so merge-gate failures can be inspected
       # without weakening GitHub Advanced Security or rerunning against a different head.
       - name: Preserve Bearer SARIF evidence

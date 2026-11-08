@@ -20,3 +20,12 @@ test('scanner findings fail the gate and SARIF is still retained', () => {
   assert.match(workflow, /if-no-files-found: error/);
   assert.match(workflow, /name: bearer-sarif-\$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
 });
+
+test('malformed remote rules only receive bounded retries with fresh caches', () => {
+  assert.match(scanner, /for attempt in 1 2 3/);
+  assert.match(scanner, /export TMPDIR="\$RUNNER_TEMP\/bearer-rules-attempt-\$attempt"/);
+  assert.match(scanner, /grep -Fq 'error loading remote rules: loading rules failed: gzip: invalid header'/);
+  assert.match(scanner, /if test -s results\.sarif; then/);
+  assert.match(scanner, /exit "\$result"/);
+  assert.doesNotMatch(scanner, /\|\| true|BEARER_EXIT_CODE|continue-on-error/);
+});
