@@ -29,3 +29,15 @@ test('malformed remote rules only receive bounded retries with fresh caches', ()
   assert.match(scanner, /exit "\$result"/);
   assert.doesNotMatch(scanner, /\|\| true|BEARER_EXIT_CODE|continue-on-error/);
 });
+
+
+test('offline rules fallback is exact-version pinned and fails closed unless the full official rule set loads', () => {
+  assert.match(scanner, /git clone --depth 1 --single-branch --branch v0\.48\.4/);
+  assert.match(scanner, /Bearer\/bearer-rules\.git/);
+  assert.match(scanner, /30a6919acec715bf915ff4704d1b4ffeac998eab/);
+  assert.match(scanner, /test "\$rule_count" -eq 552/);
+  assert.match(scanner, /--disable-default-rules/);
+  assert.match(scanner, /--external-rule-dir/);
+  assert.match(scanner, /test -s results\.sarif/);
+  assert.doesNotMatch(scanner, /--exit-code\s+0|BEARER_EXIT_CODE|continue-on-error|\|\| true/);
+});
