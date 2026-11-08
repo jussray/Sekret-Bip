@@ -210,6 +210,15 @@ from public.redeem_parent_link_invite(
 );
 reset role;
 
+-- Capture the claimed link ID outside the intruder's RLS context.
+-- Never use a foreign owner's inaccessible SELECT result as the RPC parameter.
+insert into parent_link_receiver_runtime(key, value)
+select 'claimed_link_id', id::text
+from public.parent_links
+where teen_user_id = (select user_id from parent_link_receiver_context where label = 'teen_owner')
+  and status = 'pending'
+  and is_active is false;
+
 insert into parent_link_receiver_results
 select
   'unverified_parent_side_receiver_allowed_for_bridge_only',
@@ -221,18 +230,61 @@ select
   ), false)
   and coalesce((
     select verification_state = 'UNVERIFIED'
-      and parent_link_state = 'active'
+      and parent_link_state = 'pending'
     from public.account_verification
     where user_id = (select user_id from parent_link_receiver_context where label = 'teen_owner')
   ), false)
   and coalesce((
-    select status = 'active'
-      and is_active is true
+    select status = 'pending'
+      and is_active is false
       and parent_user_id = (select user_id from parent_link_receiver_context where label = 'trusted_adult')
     from public.parent_links
     where teen_user_id = (select user_id from parent_link_receiver_context where label = 'teen_owner')
   ), false),
-  'Completed Parent Side may accept Teen-controlled Bridge consent without gaining VERIFIED_GUARDIAN or minting VERIFIED_TEEN';
+  'Parent Side requests Teen-controlled Bridge consent without gaining access or age authority';
+
+-- A different authenticated Teen may not approve another Teen's request.
+select set_config('request.jwt.claim.sub',
+  (select user_id::text from parent_link_receiver_context where label = 'teen_intruder'), true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', (select user_id::text from parent_link_receiver_context where label = 'teen_intruder'),
+  'role', 'authenticated', 'is_anonymous', false
+)::text, true);
+set local role authenticated;
+insert into parent_link_receiver_runtime(key, value)
+select 'intruder_approval', public.approve_parent_link_request(
+  (select value::uuid from parent_link_receiver_runtime where key = 'claimed_link_id'), true
+)::text;
+reset role;
+insert into parent_link_receiver_results
+select 'cross_teen_approval_denied',
+  (select value = 'false' from parent_link_receiver_runtime where key = 'intruder_approval')
+  and coalesce((select status='pending' and is_active is false
+    from public.parent_links where teen_user_id =
+      (select user_id from parent_link_receiver_context where label = 'teen_owner')), false),
+  'A second Teen account cannot approve another Teen-owned adult request';
+
+-- A pending adult request never becomes active without the exact owner Teen's action.
+select set_config('request.jwt.claim.sub',
+  (select user_id::text from parent_link_receiver_context where label = 'teen_owner'), true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', (select user_id::text from parent_link_receiver_context where label = 'teen_owner'),
+  'role', 'authenticated', 'is_anonymous', false
+)::text, true);
+set local role authenticated;
+insert into parent_link_receiver_runtime(key, value)
+select 'teen_confirmed', public.approve_parent_link_request(
+  (select value::uuid from parent_link_receiver_runtime where key = 'claimed_link_id'), true
+)::text;
+reset role;
+
+insert into parent_link_receiver_results
+select 'teen_only_confirmation_activates_link',
+  (select value = 'true' from parent_link_receiver_runtime where key = 'teen_confirmed')
+  and coalesce((select status = 'active' and is_active is true
+    from public.parent_links where teen_user_id =
+      (select user_id from parent_link_receiver_context where label = 'teen_owner')), false),
+  'Teen independently accepted a pending adult request';
 
 -- Fail closed with one receipt per behavior.
 do $assertions$
