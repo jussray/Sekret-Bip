@@ -303,7 +303,7 @@ async function main() {
   if (blocking) console.error('ROOM_FOREMAN_ATTENTION_REQUIRED');
   else console.log('ROOM_FOREMAN_REPORT_WRITTEN');
 
-  if (args.mode === 'verify' && blocking) process.exitCode = 1;
+  if (blocking) process.exitCode = 1;
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
