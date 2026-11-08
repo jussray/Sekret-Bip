@@ -51,11 +51,10 @@ jobs:
 
           payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
           body = payload.get("pull_request", {}).get("body") or ""
-          body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
           required = ("Scope", "Verification", "Evidence", "Limits", "Rollback")
           missing = []
           for label in required:
-              pattern = r"(?ims)^###\s+" + re.escape(label) + r"\s*$\n(.*?)(?=^#{1,6}\s+|\Z)"
+              pattern = r"(?ims)^###\s+" + re.escape(label) + r"\s*$\n(.*?)(?=^###\s+|\Z)"
               match = re.search(pattern, body)
               value = match.group(1).strip() if match else ""
               if len(value) < 12 or value.lower() in {"not applicable", "pending", "tbd", "n/a"}:
