@@ -17,7 +17,8 @@ test('client validates the pending RPC request without activating linked access'
   assert.match(source, /teen_user_id/);
   assert.match(source, /parent_user_id !== expectedParentId/);
   assert.match(source, /status !== 'pending'/);
-  assert.match(source, /result\.value\.teenUserId/);
+  assert.match(source, /return null;/);
+  assert.doesNotMatch(source, /return result\.ok \? result\.value\.teenUserId : null/);
 });
 
 test('parent onboarding matches the live contract', async () => {
