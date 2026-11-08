@@ -20,8 +20,8 @@ Supabase Preview.
 ## GitHub checks
 
 `.github/workflows/supabase-migration-version-integrity.yml` runs
-the extracted-version regression and validates all local filenames on every
-pull request to main and every push to main. This does not use credentials
+the extracted-version and CI wiring regressions and validates all local
+filenames on every pull request to main and every push to main. This does not use credentials
 or read production, and explicitly reports LOCAL_ONLY_REMOTE_UNVERIFIED.
 
 The separately maintained `Supabase PR Preview` workflow still replays
