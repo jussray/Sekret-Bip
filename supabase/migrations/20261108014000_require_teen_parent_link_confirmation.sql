@@ -1,0 +1,217 @@
+begin;
+-- Forward-only consent gate: existing active links are not rewritten.
+-- An adult with the teen's code may request, but cannot activate, the link.
+-- This is relationship consent, not teen identity/age verification.
+create or replace function public.redeem_parent_link_invite(
+  p_invite_code text
+)
+returns table (
+  link_id uuid,
+  teen_user_id uuid,
+  parent_user_id uuid,
+  status text,
+  activated_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_parent_id uuid := auth.uid();
+  v_parent_profile public.app_profiles%rowtype;
+  v_link public.parent_links%rowtype;
+begin
+  if v_parent_id is null
+     or coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception 'unauthorized' using errcode = '42501';
+  end if;
+
+  -- Bridge adult eligibility is intentionally weaker than guardian authority:
+  -- the receiver must have completed Parent Side, but does not need
+  -- VERIFIED_GUARDIAN merely to accept Teen-controlled relationship consent.
+  -- Guardian-only powers such as Teen age assurance and Bip Jr remain gated by
+  -- their own explicit VERIFIED_GUARDIAN checks.
+  select * into v_parent_profile
+  from public.app_profiles
+  where user_id = v_parent_id;
+
+  if not found
+     or v_parent_profile.account_side <> 'parent'
+     or v_parent_profile.onboarding_complete is not true then
+    raise exception 'completed parent or trusted-adult profile required' using errcode = '42501';
+  end if;
+
+  if p_invite_code is null
+     or upper(trim(p_invite_code)) !~ '^[A-Z0-9]{8}$' then
+    raise exception 'invalid_invite_code' using errcode = '22023';
+  end if;
+
+  select * into v_link
+  from public.parent_links
+  where invite_code = upper(trim(p_invite_code))
+  for update;
+
+  if not found then
+    raise exception 'invite_not_found' using errcode = 'P0002';
+  end if;
+
+  if v_link.status <> 'pending'
+     or v_link.is_active is not true then
+    raise exception 'invite_not_pending' using errcode = '22023';
+  end if;
+
+  if v_link.expires_at is null
+     or v_link.expires_at <= now() then
+    update public.parent_links
+    set status = 'expired',
+        is_active = false,
+        invite_code = null,
+        expires_at = null,
+        updated_at = now()
+    where id = v_link.id;
+
+    update public.account_verification
+    set parent_link_state = 'expired',
+        verification_updated_at = now()
+    where user_id = v_link.teen_user_id;
+
+    return;
+  end if;
+
+  if v_link.teen_user_id = v_parent_id then
+    raise exception 'cannot_link_self' using errcode = '42501';
+  end if;
+
+  update public.parent_links
+  set parent_user_id = v_parent_id,
+      status = 'pending',
+      is_active = false,
+      invite_code = null,
+      expires_at = null,
+      updated_at = now()
+  where id = v_link.id;
+
+  update public.account_verification
+  set parent_link_state = 'pending',
+      verification_updated_at = now()
+  where user_id = v_link.teen_user_id;
+
+  return query
+  select
+    pl.id,
+    pl.teen_user_id,
+    pl.parent_user_id,
+    pl.status,
+    null::timestamptz
+  from public.parent_links pl
+  where pl.id = v_link.id;
+end;
+$$;
+
+
+-- The owner teen makes the second, independent consent decision.
+create or replace function public.approve_parent_link_request(p_link_id uuid, p_approve boolean)
+returns boolean
+language plpgsql
+security definer
+set search_path = pg_catalog, public, auth
+as $$
+declare
+  v_teen_id uuid := auth.uid();
+  v_link public.parent_links%rowtype;
+begin
+  if v_teen_id is null or coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception 'unauthorized' using errcode = '42501';
+  end if;
+  if p_link_id is null or p_approve is null then
+    raise exception 'invalid_parent_link_review' using errcode = '22023';
+  end if;
+  perform 1 from public.app_profiles
+  where user_id = v_teen_id and account_side = 'teen' and onboarding_complete is true;
+  if not found then
+    raise exception 'completed teen profile required' using errcode = '42501';
+  end if;
+  select * into v_link from public.parent_links
+  where id = p_link_id and teen_user_id = v_teen_id for update;
+  if not found or v_link.status <> 'pending' or v_link.is_active is true
+     or v_link.parent_user_id is null or v_link.invite_code is not null then
+    return false;
+  end if;
+  if p_approve then
+    perform 1 from public.app_profiles
+    where user_id = v_link.parent_user_id
+      and account_side = 'parent' and onboarding_complete is true;
+    if not found then return false; end if;
+    update public.parent_links set status = 'active', is_active = true, updated_at = now()
+    where id = v_link.id;
+    update public.account_verification set parent_link_state = 'active',
+      verification_updated_at = now() where user_id = v_teen_id;
+  else
+    update public.parent_links set status = 'revoked', is_active = false,
+      parent_user_id = null, updated_at = now() where id = v_link.id;
+    update public.account_verification set parent_link_state = 'revoked',
+      verification_updated_at = now() where user_id = v_teen_id;
+  end if;
+  return true;
+end;
+$$;
+
+create or replace function public.revoke_parent_link(p_link_id uuid default null)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_link public.parent_links%rowtype;
+begin
+  if v_user_id is null
+     or coalesce((auth.jwt() ->> 'is_anonymous')::boolean, false) then
+    raise exception 'unauthorized' using errcode = '42501';
+  end if;
+
+  select * into v_link
+  from public.parent_links
+  where (p_link_id is null or id = p_link_id)
+    and (is_active = true or (status = 'pending' and parent_user_id is not null))
+    and status in ('pending', 'active')
+    and (teen_user_id = v_user_id or parent_user_id = v_user_id)
+  order by updated_at desc
+  limit 1
+  for update;
+
+  if not found then
+    return false;
+  end if;
+
+  update public.parent_links
+  set status = 'revoked',
+      is_active = false,
+      invite_code = null,
+      expires_at = null,
+      updated_at = now()
+  where id = v_link.id;
+
+  update public.account_verification
+  set parent_link_state = 'revoked',
+      verification_updated_at = now()
+  where user_id = v_link.teen_user_id;
+
+  return true;
+end;
+$$;
+
+
+revoke all on function public.redeem_parent_link_invite(text) from public, anon;
+grant execute on function public.redeem_parent_link_invite(text) to authenticated, service_role;
+revoke all on function public.approve_parent_link_request(uuid, boolean) from public, anon;
+grant execute on function public.approve_parent_link_request(uuid, boolean) to authenticated, service_role;
+revoke all on function public.revoke_parent_link(uuid) from public, anon;
+grant execute on function public.revoke_parent_link(uuid) to authenticated, service_role;
+
+comment on function public.redeem_parent_link_invite(text) is
+  'Code redemption creates a pending disabled request; explicit Teen approval is required before sharing.';
+comment on function public.approve_parent_link_request(uuid, boolean) is
+  'Teen-only approval or rejection of a claimed Parent Link, without changing Teen verification authority.';
+commit;
