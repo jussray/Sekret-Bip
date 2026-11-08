@@ -112,11 +112,20 @@ jobs:
       - name: Run exact-release unit tests
         run: node --test test/cloudflare-native-deploy.test.mjs test/release-metadata.test.mjs test/playwright-evidence-provenance-workflow.test.mjs
 
+      - name: Run room production contract tests
+        run: node --test test/room-production-contract.test.mjs
+
+      - name: Verify room assets and runtime fallbacks
+        run: npm run room:foreman:verify
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Run Playwright smoke and guardrail tests
         run: npx playwright test
+
+      - name: Verify signup retry transport without contacting Auth
+        run: npm run test:e2e:auth-transport
 
       - name: Verify founder-preview Comfort and Cloud routes
         run: npx playwright test --config=playwright.founder-preview.config.ts
@@ -130,6 +139,9 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Run founder-preview room contract tests
+        run: npm run test:e2e:rooms
+
       - name: Upload failure-scoped Playwright evidence
         if: failure()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -139,5 +151,6 @@ jobs:
             artifacts/playwright-smoke/
             playwright-report-founder-preview/
             test-results/
+            .room-foreman/runs/
           if-no-files-found: warn
           retention-days: 14
