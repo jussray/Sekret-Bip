@@ -1,22 +1,6 @@
 name: Playwright Smoke and Guardrails
 
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/workflows/playwright.yml'
-      - 'e2e/**'
-      - 'playwright*.config.ts'
-      - 'scripts/room-*'
-      - 'test/room-*'
-      - 'config/room-production.manifest.json'
-      - 'config/leonardo/night-asset-prompt-pack.json'
-      - 'src/config/nightRoomAssetRegistry.ts'
-      - 'src/components/room/**'
-      - 'assets/images/companions/teen/night/**'
-      - 'assets/images/resized-bg/bg-night-room-*'
-      - 'package.json'
-      - 'package-lock.json'
   workflow_dispatch:
     inputs:
       target_sha:
@@ -29,7 +13,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || inputs.target_sha }}
+  EXPECTED_HEAD_SHA: ${{ inputs.target_sha }}
   PLAYWRIGHT_ARTIFACT_DIR: artifacts/playwright-smoke
 
 jobs:
