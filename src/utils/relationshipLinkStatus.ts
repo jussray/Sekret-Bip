@@ -134,7 +134,7 @@ export async function fetchParentLinkStatuses(
         isActive: row.is_active,
         updatedAt: row.updated_at ?? null,
         expiresAt: row.expires_at ?? null,
-        canRevoke: row.is_active && (status === 'pending' || status === 'active'),
+        canRevoke: status === 'pending' || (row.is_active && status === 'active'),
       });
     }
 
@@ -182,5 +182,42 @@ export async function revokeParentLinkResult(
   } catch (error) {
     await auditParentLinkFailure('link_revocation_threw', error);
     return { ok: false, code: 'server_error', message: 'Could not unlink right now. Check your connection and try again.' };
+  }
+}
+
+/** Only the owner Teen may review a pending Parent Link request. */
+export async function reviewParentLinkRequestResult(
+  linkId: string,
+  approve: boolean,
+): Promise<ParentLinkResult<boolean>> {
+  const sb = getSupabase();
+  if (!sb) {
+    return { ok: false, code: 'not_configured', message: 'The secure connection service is not configured.' };
+  }
+  if (!UUID_PATTERN.test(linkId)) {
+    return { ok: false, code: 'invalid_response', message: 'Invalid request. Refresh and try again.' };
+  }
+
+  const userResult = await currentUserIdResult();
+  if (!userResult.ok) return userResult;
+
+  try {
+    const { data, error } = await sb.rpc('approve_parent_link_request', {
+      p_link_id: linkId,
+      p_approve: approve,
+    });
+    if (error) {
+      await auditParentLinkFailure('teen_link_review_failed', new Error(error.message), {
+        error_code: error.code ?? null,
+      });
+      return { ok: false, ...rpcFailure(error) };
+    }
+    if (typeof data !== 'boolean') {
+      return { ok: false, code: 'invalid_response', message: 'Invalid server response. Refresh before retrying.' };
+    }
+    return { ok: true, value: data };
+  } catch (error) {
+    await auditParentLinkFailure('teen_link_review_threw', error);
+    return { ok: false, code: 'server_error', message: 'Could not review the request. Check your connection and retry.' };
   }
 }
