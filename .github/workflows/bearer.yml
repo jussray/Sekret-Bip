@@ -82,12 +82,30 @@ jobs:
               exit "$result"
             fi
             if test "$attempt" -eq 3; then
-              echo 'Bearer remote rules invalid after bounded retries.' >&2
-              exit "$result"
+              echo 'Remote Bearer rule archives invalid; testing pinned official rule source.' >&2
+              break
             fi
             echo 'Retrying remote Bearer rules with isolated temporary cache.' >&2
             sleep "$((attempt * 5))"
           done
+
+          # The remote default rules are distributed from Bearer/bearer-rules.
+          # Load the complete official release directly when its archive server
+          # repeatedly returns invalid gzip data. Do not skip SAST or findings.
+          official_rules="$RUNNER_TEMP/bearer-official-rules"
+          git clone --depth 1 --single-branch --branch v0.48.4 \
+            https://github.com/Bearer/bearer-rules.git "$official_rules"
+          test "$(git -C "$official_rules" rev-parse HEAD)" = \
+            '30a6919acec715bf915ff4704d1b4ffeac998eab'
+          rule_count="$(find "$official_rules/rules" -type f \
+            \( -name '*.yaml' -o -name '*.yml' \) | wc -l | tr -d '[:space:]')"
+          test "$rule_count" -eq 552
+          export TMPDIR="$RUNNER_TEMP/bearer-offline-rules-cache"
+          mkdir -p "$TMPDIR"
+          "$RUNNER_TEMP/bearer" scan . \
+            --disable-default-rules \
+            --external-rule-dir "$official_rules/rules"
+          test -s results.sarif
       # Preserve the exact scanner output so merge-gate failures can be inspected
       # without weakening GitHub Advanced Security or rerunning against a different head.
       - name: Preserve Bearer SARIF evidence
