@@ -52,6 +52,9 @@ test('asset verifier rejects traversal, absolute paths and symlink escapes', { s
     assert.equal(resolveAssetPath(root, 'assets/night/neutral.png'),
       path.join(root, 'assets/night/neutral.png'));
     assert.throws(() => resolveAssetPath(root, '../secret.png'), /escapes workspace/);
+    assert.throws(() => resolveAssetPath(root, 'secret\0.jpg'), /Unsafe room asset path/);
+    assert.throws(() => resolveAssetPath(root, 'assets\\\\..\\\\secret.png'), /escapes workspace/);
+    assert.throws(() => resolveAssetPath(root, '../room-asset-path-neighbor/secret.png'), /escapes workspace/);
     assert.throws(() => resolveAssetPath(root, 'assets/../secret.png'), /escapes workspace/);
     assert.throws(() => resolveAssetPath(root, path.resolve(outside, 'secret.png')), /Unsafe room asset path/);
     assert.throws(() => verifyAssets({

@@ -33,3 +33,12 @@ The exact-head GitHub Advanced Security Bearer check on `e4f414ea301def4cb803941
 - **Piper command warning:** User content is passed as subprocess standard input. The command is a fixed argument array with an installed, validated model, private output filename and explicit `shell=False`; no shell parses client text. A narrow exception is retained with regression checks.
 
 Re-run exact-head CodeQL/Bearer/DevSkim and the Control Room ledger to verify before any merge. Scanner success alone does not establish production safety.
+
+
+## 2026-11-08: new asset verifier SARIF triage on PR #481
+
+The retained Bearer v2.1.3 SARIF from the completed exact-head workflow contained 354 total scanner results. The four findings in the newly extracted `scripts/room-asset-verification.mjs` target three path-construction lines (formerly 18, 19 and 25) and one dynamic regular expression (formerly line 138). These correspond to the GHAS count of four new alerts; the exact GHAS annotations remain independently reviewable and are not assumed to be identical without confirmation.
+
+The registry-key regex was replaced by a fixed-expression parser, which compares a validated identifier without building a regex from input. The path operations retain their explicit containment, no-parent-traversal and symlink checks. Only those three guarded path-construction operations carry documented single-line Bearer exceptions. No global scanner rule, ignore file, or failure exit code is weakened. The focused regression suite adds NUL, Windows-style traversal and sibling-prefix checks alongside the existing absolute-path, parent traversal and symlink cases.
+
+Release remains blocked until a fresh exact-head Bearer scan, code scanning alerts, suite execution and real Playwright proof are reviewed. This review does not establish immunity to concurrent local filesystem modification, so the trusted workspace boundary remains required.
