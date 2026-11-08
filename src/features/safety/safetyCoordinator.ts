@@ -162,17 +162,18 @@ function tierForSeverity(severity: string): SafetyTier {
 const PRE_FLIGHT_RULES: { re: RegExp; tier: SafetyTier }[] = [
   // immediate_danger (high)
   {
-    re:   /\b(kill myself|end my life|want to die|suicidal|cut myself|self[- ]?harm|not safe|being abused|he hits|she hits)\b/i,
+    // Terms mirror server CRISIS_RE (worker/sekret-reply.ts) so the sheet and the reply agree.
+    re:   /\b(kill myself|end my life|want to die|suicid(?:e|al)|cut myself|self[- ]?harm|hurt myself|disappear forever|run away|abuse|abused|being abused|assault|unsafe|not safe|danger|emergency|he hits|she hits)\b/i,
     tier: 'immediate_danger',
   },
   // concerning_pattern (medium)
   {
-    re:   /\b(can't take it|cant take it|i hate myself|nobody cares|give up|disappear forever|running away|leaving forever|goodbye forever)\b/i,
+    re:   /\b(can't take it|cant take it|i hate myself|nobody cares|give up|running away|leaving forever|goodbye forever)\b/i,
     tier: 'concerning_pattern',
   },
   // emotional_support (low)
   {
-    re:   /\b(worst day|nothing matters|hate everything|end it all|hurt myself)\b/i,
+    re:   /\b(worst day|nothing matters|hate everything|end it all)\b/i,
     tier: 'emotional_support',
   },
 ];

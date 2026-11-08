@@ -148,12 +148,38 @@ const TOOL_EVIDENCE_FILES = {
   app: { workspace: 'app-workspace.png', checkpoint: 'app-checkpoint.png' },
 };
 
-function registryBlock(source, collectionName, key) {
+// Returns the text of one registry entry. Handles both forms the runtime registry uses:
+//   key: { ...multi-line object... }
+//   key: fallback('<generatedFile>')   (expanded exactly as the registry's fallback() helper defines it)
+export function registryBlock(source, collectionName, key) {
   const collectionIndex = source.indexOf(`export const ${collectionName}`);
   assert(collectionIndex >= 0, `Registry is missing ${collectionName}.`);
-  const line = source.slice(collectionIndex).split('\n').find(entry => entry.trimStart().startsWith(`${key}: {`));
-  assert(line, `Registry is missing ${collectionName}.${key}.`);
-  return line.slice(line.indexOf('{') + 1, line.lastIndexOf('}'));
+  const collectionEnd = source.indexOf('\n};', collectionIndex);
+  const body = source.slice(collectionIndex, collectionEnd > 0 ? collectionEnd : undefined);
+  const entry = new RegExp(`^\\s*${key}:\\s*(\\{|fallback\\()`, 'm').exec(body);
+  assert(entry, `Registry is missing ${collectionName}.${key}.`);
+  if (entry[1] !== '{') {
+    const call = /^\s*\w+:\s*fallback\(\s*'([^']+)'\s*\)/.exec(body.slice(entry.index));
+    assert(call, `Registry entry ${collectionName}.${key} has a malformed fallback call.`);
+    const canonical = /const canonicalFile = '([^']+)'/.exec(source);
+    assert(canonical, 'Registry is missing canonicalFile for fallback entries.');
+    return `generatedFile: '${call[1]}', activeFile: '${canonical[1]}', status: 'fallback'`;
+  }
+  const open = entry.index + entry[0].length - 1;
+  let depth = 0;
+  let end = -1;
+  for (let index = open; index < body.length && end < 0; index += 1) {
+    if (body[index] === '{') depth += 1;
+    else if (body[index] === '}') {
+      depth -= 1;
+      if (depth === 0) end = index;
+    }
+  }
+  assert(end > 0, `Registry entry ${collectionName}.${key} is not closed.`);
+  // Resolve bare references to string constants (e.g. generatedFile: canonicalFile) into literals.
+  const constants = new Map([...source.matchAll(/const (\w+) = '([^']+)'/g)].map(match => [match[1], match[2]]));
+  return body.slice(open + 1, end).replace(/(\w+):\s*([A-Za-z_]\w*)(?=\s*[,}\n]|\s*$)/g, (match, prop, identifier) =>
+    constants.has(identifier) ? `${prop}: '${constants.get(identifier)}'` : match);
 }
 
 function requirePathFor(registryPath, assetPath) {
