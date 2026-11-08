@@ -221,18 +221,41 @@ select
   ), false)
   and coalesce((
     select verification_state = 'UNVERIFIED'
-      and parent_link_state = 'active'
+      and parent_link_state = 'pending'
     from public.account_verification
     where user_id = (select user_id from parent_link_receiver_context where label = 'teen_owner')
   ), false)
   and coalesce((
-    select status = 'active'
-      and is_active is true
+    select status = 'pending'
+      and is_active is false
       and parent_user_id = (select user_id from parent_link_receiver_context where label = 'trusted_adult')
     from public.parent_links
     where teen_user_id = (select user_id from parent_link_receiver_context where label = 'teen_owner')
   ), false),
-  'Completed Parent Side may accept Teen-controlled Bridge consent without gaining VERIFIED_GUARDIAN or minting VERIFIED_TEEN';
+  'Parent Side requests Teen-controlled Bridge consent without gaining access or age authority';
+
+-- A pending adult request never becomes active without the exact owner Teen's action.
+select set_config('request.jwt.claim.sub',
+  (select user_id::text from parent_link_receiver_context where label = 'teen_owner'), true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', (select user_id::text from parent_link_receiver_context where label = 'teen_owner'),
+  'role', 'authenticated', 'is_anonymous', false
+)::text, true);
+set local role authenticated;
+insert into parent_link_receiver_runtime(key, value)
+select 'teen_confirmed', public.approve_parent_link_request(
+  (select id from public.parent_links where teen_user_id =
+    (select user_id from parent_link_receiver_context where label = 'teen_owner')), true
+)::text;
+reset role;
+
+insert into parent_link_receiver_results
+select 'teen_only_confirmation_activates_link',
+  (select value = 'true' from parent_link_receiver_runtime where key = 'teen_confirmed')
+  and coalesce((select status = 'active' and is_active is true
+    from public.parent_links where teen_user_id =
+      (select user_id from parent_link_receiver_context where label = 'teen_owner')), false),
+  'Teen independently accepted a pending adult request';
 
 -- Fail closed with one receipt per behavior.
 do $assertions$
