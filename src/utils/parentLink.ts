@@ -346,9 +346,10 @@ export async function redeemInviteCodeResult(
   }
 }
 
+/** Legacy adapter: requesting a link never returns an active Teen ID. */
 export async function redeemInviteCode(code: string): Promise<string | null> {
-  const result = await redeemInviteCodeResult(code);
-  return result.ok ? result.value.teenUserId : null;
+  await redeemInviteCodeResult(code);
+  return null;
 }
 
 export async function fetchLinkedTeenId(): Promise<string | null> {
