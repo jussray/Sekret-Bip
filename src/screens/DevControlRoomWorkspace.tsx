@@ -175,8 +175,9 @@ export default function DevControlRoomWorkspace(){
       setLocalAgentHealth(current=>current?{...current,activeMission:null,latestRun:run}:current);
       setLocalAgentStatus('online');
     }catch(error){
-      setLocalAgentError(error instanceof Error?error.message:'mission_failed');
+      const message=error instanceof Error?error.message:'mission_failed';
       await refreshLocalAgent();
+      setLocalAgentError(message);
     }finally{
       setRunningMission(null);
     }
