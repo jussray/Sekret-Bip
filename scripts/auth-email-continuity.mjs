@@ -140,7 +140,7 @@ async function main() {
 }
 
 if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1]).href) {
-  main().catch((error) => {
+  main().catch(() => {
     console.error('AUTH_EMAIL_COOKIE_FAILED');
     process.exitCode = 1;
   });
