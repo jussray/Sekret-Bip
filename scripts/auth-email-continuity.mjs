@@ -136,12 +136,12 @@ async function main() {
   const output = 'gate-evidence/auth-email-proof-cookie.json';
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, JSON.stringify(receipt, null, 2) + '\n', 'utf8');
-  process.stdout.write('AUTH_EMAIL_SOURCE_COOKIE_RECORDED ' + receipt.fingerprint + '\n');
+  console.log('AUTH_EMAIL_SOURCE_COOKIE_RECORDED');
 }
 
 if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1]).href) {
   main().catch((error) => {
-    process.stderr.write((error instanceof Error ? error.message : 'AUTH_EMAIL_COOKIE_FAILED') + '\n');
+    console.error('AUTH_EMAIL_COOKIE_FAILED');
     process.exitCode = 1;
   });
 }
