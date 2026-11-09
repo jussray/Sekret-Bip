@@ -54,7 +54,11 @@ test('opaque 504 signup responses enter the existing ambiguous recovery path', (
   assert.match(source, /const status = authErrorStatus\(error\);\s*return status !== null && status >= 400;/);
   assert.match(source, /options: \{ emailRedirectTo: redirectTo, data: metadata \}/);
   assert.match(source, /if \(isAmbiguousSignupError\(authErr\)\) \{[\s\S]*recoverAmbiguousSignup\(sb, e, p, metadata, redirectTo, authErr\)/);
-  assert.match(source, /The account server received your signup request, but confirmation is delayed/);
+  assert.doesNotMatch(source, /The account server received your signup request, but confirmation is delayed/);
+  assert.match(source, /function showUnconfirmedSignupOutcome\(\)/);
+  assert.match(source, /We cannot confirm that your account was created or that a confirmation email was sent/);
+  assert.match(source, /if \(initialSignupReachedAuth\) \{\s*showUnconfirmedSignupOutcome\(\);\s*return true;/);
+  assert.equal((source.match(/showUnconfirmedSignupOutcome\(\);/g) ?? []).length, 3);
 });
 
 test('server-reached ambiguous signup never resubmits signUp', () => {
