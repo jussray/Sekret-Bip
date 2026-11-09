@@ -174,6 +174,16 @@ export default function SignupScreen() {
     setSuccess(true);
   }
 
+  // A 504 only proves that the request reached Auth, not that the account
+  // was persisted or a confirmation email was delivered.
+  function showUnconfirmedSignupOutcome() {
+    setSuccess(false);
+    setError(
+      'The account server timed out. We cannot confirm that your account was created or that a confirmation email was sent. Please try again later.',
+    );
+    shakeCard();
+  }
+
   async function recoverAmbiguousSignup(
     sb: NonNullable<ReturnType<typeof getSupabase>>,
     signupEmail: string,
@@ -205,9 +215,7 @@ export default function SignupScreen() {
     // signUp again here: duplicate submissions can emit duplicate confirmation
     // emails and consume the project-wide email-send quota.
     if (initialSignupReachedAuth) {
-      showConfirmationSuccess(
-        `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
-      );
+      showUnconfirmedSignupOutcome();
       return true;
     }
 
@@ -234,9 +242,7 @@ export default function SignupScreen() {
         return true;
       }
       if (isAmbiguousSignupError(retryError) && hasAuthServerResponse(retryError)) {
-        showConfirmationSuccess(
-          `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
-        );
+        showUnconfirmedSignupOutcome();
         return true;
       }
     } catch (retryError) {
@@ -245,9 +251,7 @@ export default function SignupScreen() {
     }
 
     if (isAmbiguousSignupError(retryThrown) && hasAuthServerResponse(retryThrown)) {
-      showConfirmationSuccess(
-        `The account server received your signup request, but confirmation is delayed for ${signupEmail}.\nCheck your inbox before trying again.`,
-      );
+      showUnconfirmedSignupOutcome();
       return true;
     }
     return false;
