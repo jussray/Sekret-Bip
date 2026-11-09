@@ -247,10 +247,7 @@ Deno.serve(async (req: Request) => {
 
   const providerPayload = await providerResponse.json().catch(() => null);
   if (!providerResponse.ok) {
-    console.error("[send-welcome-email] provider rejected request", {
-      status: providerResponse.status,
-      provider_error: providerPayload && typeof providerPayload === "object" ? "present" : "unavailable",
-    });
+    console.error("SEND_WELCOME_EMAIL_PROVIDER_REJECTED");
     return json({ error: "provider_rejected" }, 502);
   }
 
@@ -280,7 +277,7 @@ Deno.serve(async (req: Request) => {
       receiptPersisted = true;
       break;
     }
-    console.error("[send-welcome-email] receipt persistence failed", { attempt: attempt + 1 });
+    console.error("SEND_WELCOME_EMAIL_RECEIPT_PERSIST_FAILED");
   }
 
   return json({
