@@ -65,17 +65,23 @@ function cleanText(value: unknown, maxLength = 64): string | null {
 }
 
 function normalizeOrigin(value: string | undefined, fallback: string): string {
-  const candidate = value?.trim() || fallback;
-  return candidate.replace(/\/+$/, "");
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
+  const allowed = new URL(fallback);
+  try {
+    const candidate = new URL(value?.trim() || fallback);
+    if (
+      candidate.protocol !== "https:"
+      || candidate.hostname !== allowed.hostname
+      || candidate.username
+      || candidate.password
+      || candidate.port
+      || candidate.pathname !== "/"
+      || candidate.search
+      || candidate.hash
+    ) return allowed.origin;
+    return candidate.origin;
+  } catch {
+    return allowed.origin;
+  }
 }
 
 function normalizeSide(value: unknown): AccountSide {
@@ -124,9 +130,10 @@ function buildWelcomeCopy(params: {
     "You stay in control of what you choose to share. Se'kret Bip is not a diagnosis.",
   ].join("\n");
 
-  const htmlTips = tips.map((tip) => `<li>${escapeHtml(tip)}</li>`).join("");
+  // Markup uses only fixed copy; the plain-text email keeps the personal greeting.
+  const htmlTips = tips.map((tip) => `<li>${tip}</li>`).join("");
   const html = [
-    `<p>Hi ${escapeHtml(displayName)},</p>`,
+    "<p>Hi there,</p>",
     "<p>Welcome to Se'kret Bip. Your account is confirmed and your space is ready.</p>",
     "<p><strong>A few good first steps:</strong></p>",
     `<ul>${htmlTips}</ul>`,

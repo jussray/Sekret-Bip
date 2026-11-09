@@ -63,3 +63,18 @@ test('welcome delivery cannot indefinitely block onboarding', () => {
   assert.match(client, /Promise\.race\(\[invocation, timeout\]\)/);
   assert.match(client, /if \(timeoutId !== null\) clearTimeout\(timeoutId\)/);
 });
+
+test('HTML welcome copy contains only fixed text and canonical HTTPS links', () => {
+  assert.doesNotMatch(edge, /function escapeHtml\(/);
+  assert.match(edge, /const allowed = new URL\(fallback\)/);
+  assert.match(edge, /candidate\.protocol !== "https:"/);
+  assert.match(edge, /candidate\.hostname !== allowed\.hostname/);
+  assert.match(edge, /candidate\.pathname !== "\/"/);
+  const htmlStart = edge.indexOf('  const htmlTips = ');
+  const htmlEnd = edge.indexOf('  return { text, html };', htmlStart);
+  assert.ok(htmlStart >= 0 && htmlEnd > htmlStart);
+  const markup = edge.slice(htmlStart, htmlEnd);
+  assert.doesNotMatch(markup, /displayName|user_metadata|profile/);
+  assert.match(markup, /Hi there/);
+  assert.match(edge, /Hi \${displayName}/);
+});
