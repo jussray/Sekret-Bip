@@ -218,7 +218,7 @@ test.describe('live onboarding email smoke', () => {
   });
 
   test('unconfirmed teen account is rejected by Supabase Auth before email confirmation', async ({ page }) => {
-    test.setTimeout(90_000);
+    // The dedicated live-onboarding config enforces a 120-second deadline.
     test.skip(!shouldRunUnverified, 'Run only before the disposable signup email is confirmed.');
     test.skip(!liveEmail, 'A disposable LIVE_ONBOARDING_EMAIL is required for this live-write proof.');
 

@@ -27,14 +27,20 @@ export async function ensureWelcomeEmail(): Promise<WelcomeEmailResult> {
 
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
   try {
+    const controller = new AbortController();
     const invocation = supabase.functions.invoke('send-welcome-email', {
       body: {},
+      signal: controller.signal,
     });
     const timeout = new Promise<{ data: null; error: Error }>((resolve) => {
-      timeoutId = setTimeout(() => resolve({
-        data: null,
-        error: new Error('welcome_email_timeout'),
-      }), WELCOME_EMAIL_TIMEOUT_MS);
+      timeoutId = setTimeout(() => {
+        // Abort the in-flight request as well as bounding the background task.
+        controller.abort();
+        resolve({
+          data: null,
+          error: new Error('welcome_email_timeout'),
+        });
+      }, WELCOME_EMAIL_TIMEOUT_MS);
     });
     const { data, error } = await Promise.race([invocation, timeout]);
 
