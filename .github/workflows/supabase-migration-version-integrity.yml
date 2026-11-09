@@ -1,0 +1,50 @@
+name: Supabase Migration Version Integrity
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  migration-version-integrity:
+    name: Verify Supabase local version ordering
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Assert checkout is exact proof subject
+        shell: bash
+        env:
+          EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Test migration extraction and prefix-collision regression
+        run: node --test test/supabase-migration-version-order.test.mjs test/supabase-migration-version-workflow.test.mjs
+      - name: Audit repository migrations (remote remains unverified)
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/audit-supabase-migration-versions.mjs \
+            --local-only --output artifacts/supabase-migration-version-local.json
+      - name: Retain version-integrity audit
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: supabase-migration-version-integrity-${{ github.event.pull_request.head.sha || github.sha }}
+          path: artifacts/supabase-migration-version-local.json
+          if-no-files-found: warn
+          retention-days: 14

@@ -99,7 +99,23 @@ test('apply is explicit, exact-current-main, dry-run-first, and post-verified', 
 });
 
 test('routine workflow cannot perform migration-history surgery through alternate commands', () => {
-  assert.doesNotMatch(workflow, /migration repair|repair_version|normalize-alias|--include-all|--include-seed|psql\s|execute_sql|apply_migration/i);
+  const audit = stepBlock('Audit live migration versions without altering history', 'Preview production migration plan');
+  const outsideAudit = workflow.replace(audit, '');
+  const activeOutsideAudit = outsideAudit.split('\n').filter(line => !/^\s*#/.test(line)).join('\n');
+
+  // A single approved psql invocation reads version metadata only.
+  const psqlCommands = audit.match(/^\s*psql\s+.*$/gm) ?? [];
+  assert.equal(psqlCommands.length, 1, 'exactly one read-only psql invocation is permitted');
+  assert.match(audit, /psql --no-psqlrc --quiet --tuples-only --no-align/);
+  assert.match(audit, /--set ON_ERROR_STOP=1/);
+  const statement = audit.match(/--command "([^"\n]+)"/)?.[1] ?? '';
+  assert.match(statement, /^select\s+coalesce\(/i);
+  assert.match(statement, /\bfrom\s+supabase_migrations\.schema_migrations\s*$/i);
+  assert.doesNotMatch(statement, /;|\b(insert|update|delete|alter|drop|truncate|create|grant|revoke|copy|call|execute|do)\b/i);
+
+  // All other steps remain barred from running ad-hoc SQL or migration-history repair.
+  assert.doesNotMatch(activeOutsideAudit, /(?:^|\n)\s*psql\s/m);
+  assert.doesNotMatch(workflow, /migration repair|repair_version|normalize-alias|--include-all|--include-seed|execute_sql|apply_migration/i);
 });
 
 test('migration evidence is retained without weakening failed runs', () => {

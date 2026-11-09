@@ -131,6 +131,34 @@ jobs:
           set -euo pipefail
           supabase link --project-ref "$SUPABASE_PROJECT_REF"
 
+      - name: Audit live migration versions without altering history
+        shell: bash
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          command -v psql >/dev/null || {
+            echo 'psql is required for the read-only migration ledger check.' >&2
+            exit 1
+          }
+          mkdir -p artifacts
+          ledger="$(mktemp)"
+          trap 'rm -f "$ledger"' EXIT
+          export PGPASSWORD="$SUPABASE_DB_PASSWORD"
+          export PGHOST="aws-1-us-east-1.pooler.supabase.com"
+          export PGPORT=5432
+          export PGDATABASE=postgres
+          export PGUSER="postgres.${SUPABASE_PROJECT_REF}"
+          export PGSSLMODE=require
+          # Read migration versions only. Never invoke repair or apply a missing version.
+          psql --no-psqlrc --quiet --tuples-only --no-align \
+            --set ON_ERROR_STOP=1 \
+            --command "select coalesce(jsonb_agg(jsonb_build_object('version',version) order by version),'[]'::jsonb)::text from supabase_migrations.schema_migrations" \
+            > "$ledger"
+          node scripts/audit-supabase-migration-versions.mjs \
+            --remote-file "$ledger" \
+            --output artifacts/supabase-migration-version-live-audit.json
+
       - name: Preview production migration plan
         shell: bash
         env:
@@ -192,6 +220,7 @@ jobs:
         with:
           name: supabase-production-migration-${{ inputs.mode }}-${{ inputs.target_sha }}
           path: |
+            artifacts/supabase-migration-version-live-audit.json
             artifacts/supabase-db-push-dry-run.txt
             artifacts/supabase-db-push-apply.txt
             artifacts/supabase-production-schema.json

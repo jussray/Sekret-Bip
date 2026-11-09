@@ -25,24 +25,108 @@ jobs:
   bearer:
     runs-on: ubuntu-latest
     steps:
-      # Checkout project source
+      # Bind scanner evidence to the exact PR head rather than a synthetic merge ref.
       - uses: actions/checkout@v4
-      # Scan code using Bearer CLI
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact scanned revision
+        env:
+          EXPECTED_SCANNED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SCANNED_SHA"
+      # Install the exact official Bearer asset with SHA-256 integrity proof.
+      # The third-party action's installer did not retry release-asset HTTP failures.
+      - name: Install checksum-verified Bearer v2.1.3
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          asset="bearer_2.1.3_linux_amd64.tar.gz"
+          archive="$RUNNER_TEMP/$asset"
+          # GitHub release CDN has returned HTTP 504. The official API can
+          # stream the same pinned release asset from an alternate route.
+          if ! curl --fail --silent --show-error --location \
+            --retry 6 --retry-all-errors --retry-delay 3 \
+            --connect-timeout 20 --max-time 180 \
+            --output "$archive" \
+            "https://github.com/Bearer/bearer/releases/download/v2.1.3/$asset"; then
+            rm -f "$archive"
+            curl --fail --silent --show-error --location \
+              --retry 5 --retry-all-errors --retry-delay 4 \
+              --connect-timeout 20 --max-time 180 \
+              --header "Accept: application/octet-stream" \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --output "$archive" \
+              "https://api.github.com/repos/Bearer/bearer/releases/assets/685261282"
+          fi
+          # A metadata JSON body or a wrong release fails this exact digest.
+          printf '%s  %s\n' '974d4ad7bb71bc578675684d444e345e8fbad91c85557aac035406ef5cc04c68' "$archive" | sha256sum --check --status
+          tar --no-same-owner -xzf "$archive" -C "$RUNNER_TEMP" bearer
+          chmod 0755 "$RUNNER_TEMP/bearer"
+      # Retain SARIF output and the scanner's native nonzero status for findings.
       - name: Run Report
         id: report
-        uses: bearer/bearer-action@828eeb928ce2f4a7ca5ed57fb8b59508cb8c79bc
-        with:
-          api-key: ${{ secrets.BEARER_TOKEN }}
-          format: sarif
-          output: results.sarif
-          exit-code: 0
+        shell: bash
+        env:
+          BEARER_API_KEY: ${{ secrets.BEARER_TOKEN }}
+          BEARER_FORMAT: sarif
+          BEARER_OUTPUT: results.sarif
+          BEARER_HIDE_PROGRESS_BAR: 'true'
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            # Bearer caches rules under os.TempDir()/bearer-rules. An isolated
+            # TMPDIR prevents reusing a malformed response from a prior attempt.
+            export TMPDIR="$RUNNER_TEMP/bearer-rules-attempt-$attempt"
+            mkdir -p "$TMPDIR"
+            if "$RUNNER_TEMP/bearer" scan . 2>"$RUNNER_TEMP/bearer-scan-stderr"; then
+              test -s results.sarif
+              exit 0
+            else
+              result=$?
+            fi
+            # A report may contain real findings: never retry or suppress them.
+            if test -s results.sarif; then
+              echo 'Bearer returned nonzero after producing SARIF; scan remains blocked.' >&2
+              exit "$result"
+            fi
+            if ! grep -Fq 'error loading remote rules: loading rules failed: gzip: invalid header' "$RUNNER_TEMP/bearer-scan-stderr"; then
+              echo 'Bearer failed without SARIF; not a known transient rules error.' >&2
+              exit "$result"
+            fi
+            if test "$attempt" -eq 3; then
+              echo 'Remote Bearer rule archives invalid; testing pinned official rule source.' >&2
+              break
+            fi
+            echo 'Retrying remote Bearer rules with isolated temporary cache.' >&2
+            sleep "$((attempt * 5))"
+          done
+
+          # The remote default rules are distributed from Bearer/bearer-rules.
+          # Load the complete official release directly when its archive server
+          # repeatedly returns invalid gzip data. Do not skip SAST or findings.
+          official_rules="$RUNNER_TEMP/bearer-official-rules"
+          git clone --depth 1 --single-branch --branch v0.48.4 \
+            https://github.com/Bearer/bearer-rules.git "$official_rules"
+          test "$(git -C "$official_rules" rev-parse HEAD)" = \
+            '30a6919acec715bf915ff4704d1b4ffeac998eab'
+          rule_count="$(find "$official_rules/rules" -type f \
+            \( -name '*.yaml' -o -name '*.yml' \) | wc -l | tr -d '[:space:]')"
+          test "$rule_count" -eq 552
+          export TMPDIR="$RUNNER_TEMP/bearer-offline-rules-cache"
+          mkdir -p "$TMPDIR"
+          "$RUNNER_TEMP/bearer" scan . \
+            --disable-default-rules \
+            --external-rule-dir "$official_rules/rules"
+          test -s results.sarif
       # Preserve the exact scanner output so merge-gate failures can be inspected
       # without weakening GitHub Advanced Security or rerunning against a different head.
       - name: Preserve Bearer SARIF evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: bearer-sarif-${{ github.sha }}
+          name: bearer-sarif-${{ github.event.pull_request.head.sha || github.sha }}
           path: results.sarif
           if-no-files-found: error
           retention-days: 14
