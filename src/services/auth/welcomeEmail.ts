@@ -39,7 +39,7 @@ export async function ensureWelcomeEmail(): Promise<WelcomeEmailResult> {
     const { data, error } = await Promise.race([invocation, timeout]);
 
     if (error || !data || typeof data !== 'object') {
-      console.warn('[welcome-email] delivery function unavailable');
+      console.warn('WELCOME_EMAIL_FUNCTION_UNAVAILABLE');
       return { ok: false, status: 'failed' };
     }
 
@@ -57,7 +57,7 @@ export async function ensureWelcomeEmail(): Promise<WelcomeEmailResult> {
       status,
     };
   } catch {
-    console.warn('[welcome-email] delivery function failed');
+    console.warn('WELCOME_EMAIL_DELIVERY_FAILED');
     return { ok: false, status: 'failed' };
   } finally {
     if (timeoutId !== null) clearTimeout(timeoutId);
