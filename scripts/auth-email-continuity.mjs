@@ -51,8 +51,19 @@ function requireSourceTruth(contents) {
   if ((context.match(sessionGate) || []).length !== 3) {
     throw new Error('AUTH_EMAIL_SESSION_RESTORATION_GATE_MISSING');
   }
-  if (!config.includes('mailer_autoconfirm: false') ||
-      !config.includes('mailer_allow_unverified_email_sign_ins: false')) {
+  // The provider script has independent write and verify-only policies.
+  // Checking for either string anywhere can hide a drifted effective setting.
+  const desiredStart = config.indexOf('function desiredConfig(');
+  const desiredEnd = config.indexOf('function comparable(', desiredStart);
+  const readbackStart = config.indexOf('const mandatory = {', desiredEnd);
+  const readbackEnd = config.indexOf('const mismatched =', readbackStart);
+  const requiresConfirmation = (section) =>
+    /^\s*mailer_autoconfirm:\s*false,\s*$/m.test(section)
+    && /^\s*mailer_allow_unverified_email_sign_ins:\s*false,\s*$/m.test(section);
+  if (!(desiredStart >= 0 && desiredEnd > desiredStart
+      && readbackStart > desiredEnd && readbackEnd > readbackStart)
+      || !requiresConfirmation(config.slice(desiredStart, desiredEnd))
+      || !requiresConfirmation(config.slice(readbackStart, readbackEnd))) {
     throw new Error('AUTH_EMAIL_PROVIDER_DESIRED_CONFIRMATION_MISSING');
   }
   if (!entry.includes('await bootstrapModule.fetchPostAuthBootstrap(buildSide)') ||
