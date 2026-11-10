@@ -44,7 +44,7 @@ test('the shared card separates loading, no-link, offline retry, and recorded st
     assert.match(card, new RegExp(`kind: '${state}'`));
   }
   for (const status of ['active', 'pending', 'revoked', 'expired']) {
-    assert.match(card, new RegExp(`link\.status === '${status}'`));
+    assert.match(card, new RegExp(`link\\.status === '${status}'`));
   }
   assert.match(card, /Retry status/);
   assert.match(card, /links\.length === 0/);
@@ -71,4 +71,13 @@ test('both settings screens use the shared state machine and refresh after paren
 
 test('teen settings preserves current-main onboarding parent_link_sent signal', () => {
   assert.match(teenSettings, /advanceStage\(data\.user\.id, 'parent_link_sent'\)/);
+});
+
+test('link status and unlink actions fail closed for anonymous Supabase sessions', () => {
+  const start = helper.indexOf('async function currentUserIdResult()');
+  const end = helper.indexOf('export async function fetchParentLinkStatuses', start);
+  assert.ok(start >= 0 && end > start);
+  const resolveUser = helper.slice(start, end);
+  assert.match(resolveUser, /user\.is_anonymous === true/);
+  assert.match(resolveUser, /code: 'not_authenticated'/);
 });

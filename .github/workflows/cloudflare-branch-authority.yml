@@ -45,15 +45,16 @@ jobs:
         with:
           node-version: 24
 
-      # CLOUDFLARE_API_TOKEN is intentionally excluded from both dedicated
-      # authority lanes. A missing or under-scoped dedicated token must fail
-      # explicitly instead of falling through to a broader general credential.
+      # Two-phase credential migration: prefer the dedicated read credential,
+      # but retain the previous general user token as a read-only fallback until
+      # provider-backed proof establishes that the dedicated secret is active.
       - name: Read current three-Worker topology and verify Worker build authority
         id: workers_audit
         continue-on-error: true
         shell: bash
         env:
           CLOUDFLARE_WORKERS_BUILDS_API_TOKEN: ${{ secrets.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -euo pipefail
@@ -64,6 +65,7 @@ jobs:
         continue-on-error: true
         env:
           CLOUDFLARE_PAGES_READ_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_READ_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_PAGES_PROJECT: sekret-bip
           CLOUDFLARE_PAGES_PRODUCTION_BRANCH: main
