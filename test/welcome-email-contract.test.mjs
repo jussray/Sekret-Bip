@@ -26,7 +26,7 @@ test('welcome delivery never blocks post-auth routing', () => {
 });
 
 test('client never supplies recipient identity or personalization fields', () => {
-  assert.match(client, /functions\.invoke\('send-welcome-email',\s*\{\s*body:\s*\{\},\s*signal:\s*controller\.signal,?\s*\}\)/);
+  assert.match(client, /functions\.invoke\('send-welcome-email',\s*\{\s*body:\s*\{\},\s*signal:\s*AbortSignal\.timeout\(WELCOME_EMAIL_TIMEOUT_MS\),?\s*\}\)/);
   assert.doesNotMatch(client, /email\s*:/);
   assert.doesNotMatch(client, /displayName\s*:/);
   assert.doesNotMatch(client, /accountSide\s*:/);
@@ -58,13 +58,19 @@ test('welcome email includes onboarding and public documentation links', () => {
 });
 
 
-test('welcome delivery cannot indefinitely block onboarding', () => {
+test('welcome delivery uses a cancellable 4-second platform timeout', () => {
   assert.match(client, /WELCOME_EMAIL_TIMEOUT_MS = 4_000/);
-  assert.match(client, /Promise\.race\(\[invocation, timeout\]\)/);
-  assert.match(client, /const controller = new AbortController\(\)/);
-  assert.match(client, /controller\.abort\(\)/);
-  assert.match(client, /signal: controller\.signal/);
-  assert.match(client, /if \(timeoutId !== null\) clearTimeout\(timeoutId\)/);
+  assert.match(client, /signal:\s*AbortSignal\.timeout\(WELCOME_EMAIL_TIMEOUT_MS\)/);
+  assert.doesNotMatch(client, /Promise\.race\(/);
+  assert.doesNotMatch(client, /\bsetTimeout\s*\(/);
+  assert.doesNotMatch(client, /new AbortController\(/);
+});
+
+test('the standard timeout signal aborts without evaluating text', async () => {
+  assert.equal(typeof AbortSignal.timeout, 'function');
+  const signal = AbortSignal.timeout(10);
+  await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }));
+  assert.equal(signal.aborted, true);
 });
 
 test('HTML welcome copy contains only fixed text and canonical HTTPS links', () => {

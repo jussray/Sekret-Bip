@@ -25,24 +25,13 @@ export async function ensureWelcomeEmail(): Promise<WelcomeEmailResult> {
   const supabase = getSupabase();
   if (!supabase) return { ok: false, status: 'unavailable' };
 
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
   try {
-    const controller = new AbortController();
-    const invocation = supabase.functions.invoke('send-welcome-email', {
+    // Expo SDK 56 supplies AbortSignal.timeout on native and web supports
+    // this standard signal. Abort the request at the deadline.
+    const { data, error } = await supabase.functions.invoke('send-welcome-email', {
       body: {},
-      signal: controller.signal,
+      signal: AbortSignal.timeout(WELCOME_EMAIL_TIMEOUT_MS),
     });
-    const timeout = new Promise<{ data: null; error: Error }>((resolve) => {
-      timeoutId = setTimeout(() => {
-        // Abort the in-flight request as well as bounding the background task.
-        controller.abort();
-        resolve({
-          data: null,
-          error: new Error('welcome_email_timeout'),
-        });
-      }, WELCOME_EMAIL_TIMEOUT_MS);
-    });
-    const { data, error } = await Promise.race([invocation, timeout]);
 
     if (error || !data || typeof data !== 'object') {
       console.warn('WELCOME_EMAIL_FUNCTION_UNAVAILABLE');
@@ -65,7 +54,5 @@ export async function ensureWelcomeEmail(): Promise<WelcomeEmailResult> {
   } catch {
     console.warn('WELCOME_EMAIL_DELIVERY_FAILED');
     return { ok: false, status: 'failed' };
-  } finally {
-    if (timeoutId !== null) clearTimeout(timeoutId);
   }
 }
