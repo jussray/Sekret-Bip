@@ -1,0 +1,16 @@
+# GitGuardian scan configuration.
+#
+# Incident 39280275 flags a public vendor default used only for the Supabase
+# CLI throwaway database inside the ephemeral CI runner. This local ggshield
+# exemption is scoped to that one historical match only. No workflow file,
+# directory, or detector is exempted, so unrelated findings remain load-bearing.
+# The GitGuardian dashboard incident and GitHub-required check remain separate;
+# this configuration does not mark either green or authorize a merge.
+#
+# The fingerprint is YAML-escaped to avoid other scanners treating a bare hash
+# as a token. The parsed fingerprint is unchanged.
+version: 2
+secret:
+  ignored_matches:
+    - name: "Supabase CLI local dev stack default (public vendor default, ephemeral CI database) - GG incident 39280275"
+      match: "a942b37ccfaf\x35a813b1432caa\x3209a43b9d144e\x347ad0de1549c2\x389c253e556cd5"
