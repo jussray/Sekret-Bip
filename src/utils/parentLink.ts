@@ -21,8 +21,8 @@ export interface RedeemedParentLink {
   linkId: string;
   teenUserId: string;
   parentUserId: string;
-  status: 'active';
-  activatedAt: string | null;
+  status: 'pending';
+  activatedAt: null;
 }
 
 export type ParentInviteEmailStatus = 'not_requested' | 'sent' | 'failed';
@@ -121,15 +121,15 @@ export function validateRedeemedParentLink(
   if (typeof row.link_id !== 'string' || !UUID_PATTERN.test(row.link_id)) return null;
   if (typeof row.teen_user_id !== 'string' || !UUID_PATTERN.test(row.teen_user_id)) return null;
   if (typeof row.parent_user_id !== 'string' || row.parent_user_id !== expectedParentId) return null;
-  if (row.status !== 'active') return null;
+  if (row.status !== 'pending') return null;
   if (row.activated_at != null && typeof row.activated_at !== 'string') return null;
 
   return {
     linkId: row.link_id,
     teenUserId: row.teen_user_id,
     parentUserId: row.parent_user_id,
-    status: 'active',
-    activatedAt: row.activated_at ?? null,
+    status: 'pending',
+    activatedAt: null,
   };
 }
 
@@ -144,7 +144,9 @@ async function currentUserId(): Promise<string | null> {
       });
       return null;
     }
-    return data?.user?.id ?? null;
+    const user = data?.user;
+    if (!user || user.is_anonymous === true) return null;
+    return user.id;
   } catch (error) {
     await auditParentLinkFailure('auth_user_lookup_threw', error);
     return null;
@@ -314,7 +316,7 @@ export async function redeemInviteCodeResult(
     if (Array.isArray(data) && data.length === 0) {
       await auditParentLinkFailure(
         'invite_redemption_expired',
-        new Error('Invite redemption returned no active link'),
+        new Error('Invite redemption returned no pending request'),
       );
       return {
         ok: false,
@@ -333,7 +335,7 @@ export async function redeemInviteCodeResult(
       return {
         ok: false,
         code: 'invalid_response',
-        message: 'The connection response could not be verified. Try again before entering Parent Side.',
+        message: 'The pending request could not be verified. Refresh and retry.',
       };
     }
 
@@ -344,9 +346,10 @@ export async function redeemInviteCodeResult(
   }
 }
 
+/** Legacy adapter: requesting a link never returns an active Teen ID. */
 export async function redeemInviteCode(code: string): Promise<string | null> {
-  const result = await redeemInviteCodeResult(code);
-  return result.ok ? result.value.teenUserId : null;
+  await redeemInviteCodeResult(code);
+  return null;
 }
 
 export async function fetchLinkedTeenId(): Promise<string | null> {
@@ -414,6 +417,7 @@ export async function fetchLinkedParentId(): Promise<string | null> {
 export async function revokeParentLink(): Promise<boolean> {
   const sb = getSupabase();
   if (!sb) return false;
+  if (!(await currentUserId())) return false;
 
   try {
     const { data, error } = await sb.rpc('revoke_parent_link');
