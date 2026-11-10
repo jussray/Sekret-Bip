@@ -4,6 +4,8 @@ import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { useVerificationContext } from '@/context/VerificationContext';
 import { SplashScreen } from '@screens/SplashScreen';
+import { checkCompliance } from '@utils/compliance';
+
 import { WebWelcomeScreen } from '@screens/WebWelcomeScreen';
 import { FrontDoorSceneArrival } from '@/components/FrontDoorSceneArrival';
 import { getDevSplitViewSideOverride } from '@/utils/devSplitViewSide';
@@ -177,6 +179,12 @@ export default function Index() {
         } else {
           router.replace(publicEntrySide === 'parent' ? '/(onboarding)/parent-splash' : '/(onboarding)/welcome');
         }
+        return;
+      }
+
+      const compliance = await checkCompliance();
+      if (compliance.status === 'needs_age_gate') {
+        router.replace('/(auth)/age-gate');
         return;
       }
 
