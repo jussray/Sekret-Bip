@@ -4,6 +4,19 @@ import { readFile } from 'node:fs/promises';
 
 const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 
+test('ParentOnboarding component exists and exports form interface', async () => {
+  const source = await read('components/ParentOnboarding.tsx');
+  assert.match(source, /export default function ParentOnboarding/);
+  assert.match(source, /export interface ParentOnboardingFormData/);
+  assert.match(source, /email: string/);
+  assert.match(source, /password: string/);
+  assert.match(source, /passwordVerify: string/);
+  assert.match(source, /onSubmit: \(data: ParentOnboardingFormData\)/);
+  assert.match(source, /placeholder="guardian@example.com"/);
+  assert.match(source, /secureTextEntry=/);
+  assert.match(source, /onChangeText=\{handleVerifyChange\}/);
+});
+
 test('parent setup completes profile and continues to optional code entry', async () => {
   const source = await read('app/(onboarding)/parent-setup.tsx');
   assert.match(source, /saveAccountProfile\(\{/);
