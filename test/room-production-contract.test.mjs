@@ -8,12 +8,28 @@ import {
   fileToken,
   hasBlockingResults,
   readImageMetadata,
+  registryBlock,
   validateImage,
   validateManifest,
   verifyAssets,
 } from '../scripts/room-production-foreman.mjs';
 
 const read = file => fs.readFileSync(new URL(`../${file}`, import.meta.url), 'utf8');
+
+test('registryBlock reads multi-line generated entries and expands fallback entries in the real registry', () => {
+  const registry = read('src/config/nightRoomAssetRegistry.ts');
+  const neutral = registryBlock(registry, 'NIGHT_ROOM_POSE_ASSETS', 'neutral');
+  assert.match(neutral, /generatedFile: 'assets\/images\/companions\/teen\/night\/neutral\.png'/);
+  assert.match(neutral, /status: 'generated'/);
+  const thinking = registryBlock(registry, 'NIGHT_ROOM_POSE_ASSETS', 'thinking');
+  assert.equal(
+    thinking,
+    "generatedFile: 'assets/images/companions/teen/night/thinking.png', activeFile: 'assets/images/companions/teen/night/neutral.png', status: 'fallback'",
+  );
+  const day = registryBlock(registry, 'NIGHT_ROOM_PHASE_ASSETS', 'day');
+  assert.match(day, /file: 'assets\/images\/resized-bg\/bg-night-room-day\.jpg'/);
+  assert.throws(() => registryBlock(registry, 'NIGHT_ROOM_POSE_ASSETS', 'missingPose'), /Registry is missing/);
+});
 
 function png(width, height, colorType = 6) {
   const buffer = Buffer.alloc(33);

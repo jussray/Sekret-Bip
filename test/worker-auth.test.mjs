@@ -203,3 +203,14 @@ test('authoritative API responses carry baseline transport and framing protectio
   assert.ok(/frame-ancestors 'none'/.test(voiceEntry));
   assert.ok(/withSecurityHeaders\(response, cors\)/.test(voiceEntry), 'delegated responses are wrapped at the authoritative front door');
 });
+
+test('crisis resources survive limiter outages and the no-key reply path', () => {
+  const outageBody = voiceEntry.slice(voiceEntry.indexOf('function protectionUnavailable('));
+  assert.ok(/crisis_resources:[\s\S]*988[\s\S]*741741[\s\S]*911/.test(outageBody.slice(0, 600)),
+    'the retryable 503 must carry 988, 741741 and 911 so a limiter outage never hides crisis help');
+  const noKeyAt = index.indexOf("console.error('[sekret/reply] OPENAI_API_KEY is not configured, serving fallback');");
+  const crisisAt = index.lastIndexOf('CRISIS_RE.test(userText)', noKeyAt);
+  assert.ok(crisisAt > 0 && noKeyAt > crisisAt, 'the no-key canned reply must run the crisis check first');
+  assert.ok(/export const CRISIS_RE/.test(fs.readFileSync(new URL('../worker/sekret-reply.ts', import.meta.url), 'utf8')),
+    'the crisis pattern is shared, not duplicated, so the two paths cannot drift');
+});
