@@ -34,9 +34,9 @@ test('Night registry uses one real canonical PNG and explicit fallbacks', async 
     /require\('\.\.\/\.\.\/assets\/images\/companions\/teen\/night\/neutral\.png'\)/,
   );
   assert.equal(
-    (registry.match(/\brequire\s*\(/g) ?? []).length,
+    (registry.match(/\brequire\s*\(\s*'[^']*\/companions\/[^']*'\s*\)/g) ?? []).length,
     1,
-    'unavailable poses must not be statically required as if they exist',
+    'unavailable poses must not be statically required as if they exist (phase backgrounds under resized-bg are not poses)',
   );
   assert.match(registry, /neutral:\s*\{[\s\S]*?status:\s*'generated'/);
 

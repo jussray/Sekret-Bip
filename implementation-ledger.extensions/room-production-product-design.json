@@ -1,0 +1,26 @@
+{
+  "id": "room-production-product-design",
+  "name": "Night room production and Product Design release gates",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/609",
+  "acceptanceCriteria": [
+    "The visible teen navigation remains exactly Room, Pages, Calm, Circle, More and the dedicated room browser contract compares semantic labels after icon removal.",
+    "Night room phases and pose assets use an explicit static runtime registry, and any generated file that appears must pass byte-level validation and be statically wired before verification passes.",
+    "The room foreman, contract tests, and dedicated Playwright suite run in CI and retain evidence while blocked interactive work exits nonzero."
+  ],
+  "contractPaths": [
+    "batches/481/04-room-production-product-design.md",
+    "docs/ROOM_PRODUCTION_ENGINE.md",
+    "config/room-production.manifest.json",
+    "config/leonardo/night-asset-prompt-pack.json",
+    "src/config/nightRoomAssetRegistry.ts"
+  ],
+  "testPaths": [
+    "test/room-production-contract.test.mjs",
+    "e2e/rooms/room-contract.spec.ts"
+  ],
+  "verification": {
+    "state": "partial",
+    "evidence": "Local fixture evidence on July 24, 2026: 6/6 room production contracts passed, including image metadata, transparency, fallback, unwired-pose, geometry, navigation, and blocking-outcome checks; exact-head repository assets and Playwright remain required before merge."
+  }
+}
