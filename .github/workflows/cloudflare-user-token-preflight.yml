@@ -8,6 +8,12 @@ on:
       - 'test/cloudflare-user-token-preflight-contract.test.mjs'
       - 'scripts/verify-cloudflare-workers-builds-read.mjs'
       - 'test/cloudflare-workers-builds-read-preflight.test.mjs'
+  push:
+    paths:
+      - '.github/workflows/cloudflare-user-token-preflight.yml'
+      - 'test/cloudflare-user-token-preflight-contract.test.mjs'
+      - 'scripts/verify-cloudflare-workers-builds-read.mjs'
+      - 'test/cloudflare-workers-builds-read-preflight.test.mjs'
   # A trusted operator explicitly initiates the read-only Production diagnostic.
   workflow_dispatch:
 
@@ -16,14 +22,14 @@ permissions:
 
 jobs:
   contract:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check out exact PR head, without credentials
+      - name: Check out exact tested head, without credentials
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
       - name: Set up Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
