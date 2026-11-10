@@ -8,7 +8,7 @@ const OPTIONAL = 'sekret-backend-alpha';
 const failure = (code) => ({ok:false,code,checkedWorkers:0});
 
 export async function verifyWorkersBuildsRead({rows,accountId,request}={}) {
-  if (!Array.isArray(rows) || typeof accountId!=='string' || !accountId || typeof request!=='function') {
+  if (!Array.isArray(rows) || typeof accountId!=='string' || !/^[0-9a-f]{32}$/i.test(accountId) || typeof request!=='function') {
     return failure('scripts-response-invalid');
   }
   const targets=[];
