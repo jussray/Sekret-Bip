@@ -162,6 +162,17 @@ test('PR live signup readiness fails closed until an isolated exact-head Pages p
   assert.match(workflow, /releaseMarkerEnvironment/);
   assert.match(workflow, /providerState/);
   assert.match(workflow, /liveWriteAuthorized/);
+  assert.match(workflow, /PR_HEAD_REF:/);
+  assert.match(workflow, /PAGES_PROJECT: sekret-bip/);
+  assert.match(workflow, /branchAliasCandidates/);
+  assert.match(workflow, /slug\.slice\(0, 28\)/);
+  assert.match(workflow, /probeExactBranchAlias/);
+  assert.match(workflow, /body\?\.commitSha === expected/);
+  assert.match(workflow, /body\?\.environment === 'preview'/);
+  assert.match(workflow, /body\?\.branch === headRef/);
+  assert.match(workflow, /branch-alias-exact-release-marker/);
+  assert.match(workflow, /Date\.now\(\) \+ 600_000/);
+  assert.match(workflow, /setTimeout\(resolve, 10_000\)/);
   assert.match(workflow, /CONFIRM_LIVE_WRITE: \$\{\{ inputs\.confirm_live_write \|\| false \}\}/);
   assert.doesNotMatch(workflow, /releaseMarkerCommitSha/);
   assert.doesNotMatch(workflow, /fix-production-signup-age-co\.sekret-bip\.pages\.dev/);
