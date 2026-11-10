@@ -20,6 +20,9 @@ npm-debug.*
 *.orig.*
 web-build/
 
+# ── Room production foreman local state ──────────────────────────────────
+.room-foreman/
+
 # ── Browser test artifacts ────────────────────────────────────────────────
 playwright-report/
 test-results/
