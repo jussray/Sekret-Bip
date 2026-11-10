@@ -62,7 +62,9 @@ test('credential preflight reads the same Production-scoped slots as the failing
 
 test('PR contract checking cannot read Production credentials', () => {
   assert.match(workflow, /pull_request:[\s\S]*?paths:/);
-  assert.match(workflow, /contract:[\s\S]*?if: github\.event_name == 'pull_request'/);
+  assert.match(workflow, /contract:[\s\S]*?if: github\.event_name == 'pull_request' \|\| github\.event_name == 'push'/);
+  assert.match(workflow, /push:[\s\S]*?paths:/);
+  assert.match(workflow, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
   assert.match(workflow, /verify-token:[\s\S]*?if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /node --test test\/cloudflare-user-token-preflight-contract\.test\.mjs/);
 });
