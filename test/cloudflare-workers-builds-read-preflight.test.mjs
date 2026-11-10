@@ -55,3 +55,12 @@ test('provider transport exception fails safely',async()=>{
   const result=await verifyWorkersBuildsRead({rows,accountId,request:async()=>{throw new Error('SECRET material from provider')}});
   assert.deepEqual(result,{ok:false,code:'builds-read-unavailable',checkedWorkers:0});
 });
+
+test('invalid account identifiers fail before any provider request',async()=>{
+  for(const badId of ['', '../other', '1'.repeat(31), 'z'.repeat(32)]){
+    const p=provider();
+    const result=await verifyWorkersBuildsRead({rows:p.scriptRows,accountId:badId,request:p.request});
+    assert.deepEqual(result,{ok:false,code:'scripts-response-invalid',checkedWorkers:0});
+    assert.equal(p.calls.length,0);
+  }
+});
