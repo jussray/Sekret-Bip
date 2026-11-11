@@ -36,22 +36,22 @@ export const AGE_OPTIONS: AgeOption[] = [
   {
     id: 'under-13',
     label: 'Under 13',
-    helper: 'Bip needs a parent or guardian first.',
+    helper: 'Start with a parent or guardian.',
   },
   {
     id: '13-15',
     label: '13 – 15',
-    helper: 'Teen mode starts with extra guardian protection.',
+    helper: 'A parent or guardian helps you get started.',
   },
   {
     id: '16-17',
     label: '16 – 17',
-    helper: 'Teen mode keeps safety and guardian checks available.',
+    helper: 'Your space includes teen safety checks.',
   },
   {
     id: '18-19',
     label: '18 – 19',
-    helper: 'Teen mode can continue with a self-declared age bucket.',
+    helper: 'Continue to the teen space.',
   },
 ];
 
@@ -73,8 +73,8 @@ export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
       guardianRequired: true,
       nextSide: 'parent',
       nextRoute: '/(onboarding)/parental-consent',
-      actionLabel: 'Ask a parent or guardian →',
-      message: 'Bip needs a parent or guardian before any child account can be created. We will not collect account details on this path.',
+      actionLabel: 'Ask a parent to help',
+      message: "A parent or guardian must help first. We won't ask for your account details yet.",
     };
   }
 
@@ -87,8 +87,8 @@ export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
       guardianRequired: true,
       nextSide: 'teen',
       nextRoute: '/(auth)/signup?side=teen',
-      actionLabel: 'Continue with teen setup →',
-      message: 'We will save only your age bucket and continue with teen protections. Stronger checks can happen later if needed.',
+      actionLabel: 'Continue to sign up',
+      message: "We'll save your age range and guide you through teen sign-up. A parent or guardian will need to help.",
     };
   }
 
@@ -100,7 +100,7 @@ export function decideAgeAssurance(ageBucket: AgeBucket): AgeAssuranceDecision {
     guardianRequired: false,
     nextSide: 'teen',
     nextRoute: '/(auth)/signup?side=teen',
-    actionLabel: 'Continue with teen setup →',
-    message: 'We will save only your age bucket. No ID image, selfie, or raw proof is stored in this step.',
+    actionLabel: 'Continue to sign up',
+    message: "We'll save your age range. No ID or photo is needed here.",
   };
 }

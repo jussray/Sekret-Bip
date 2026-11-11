@@ -45,7 +45,7 @@ export default function Index() {
   const buildSide = useMemo(getBuildSide, []);
   const previewSide = useMemo(getDevSplitViewSideOverride, []);
   const effectiveSide: AccountSide = accountProfile?.accountSide ?? buildSide ?? userSide ?? 'teen';
-  const publicWelcomeSide: AccountSide = previewSide ?? buildSide ?? userSide ?? 'teen';
+  const publicWelcomeSide: AccountSide = previewSide ?? buildSide ?? 'teen';
   const publicEntrySide: AccountSide = selectedEntrySide ?? previewSide ?? buildSide ?? userSide ?? 'teen';
   const canOfferSignIn = authChecked
     && profileResolved

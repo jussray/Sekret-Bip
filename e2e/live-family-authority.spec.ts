@@ -112,7 +112,7 @@ test('exact preview preserves permanent identity, Circle pseudonymity, Teen-cont
   await page.goto('/age');
   await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: /13\s*[–-]\s*15/ }).click();
-  await page.getByRole('button', { name: /Continue with teen setup/i }).click();
+  await page.getByRole('button', { name: /Continue to sign up/i }).click();
 
   await expect(page.getByText('Your choices should be clear.')).toBeVisible({ timeout: 30_000 });
   const consentBoxes = page.getByRole('checkbox');

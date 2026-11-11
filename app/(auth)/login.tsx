@@ -216,7 +216,7 @@ export default function LoginScreen() {
           <Text style={s.heart}>♡</Text>
         </View>
 
-        <Text style={s.tagline}>sign in to continue</Text>
+        <Text style={s.tagline}>{preferredSide === 'parent' ? 'Welcome back to Parent Space.' : 'Your space is waiting.'}</Text>
 
         {passwordReset ? (
           <View style={s.successBanner}>
@@ -229,7 +229,7 @@ export default function LoginScreen() {
         <View style={[s.inputWrap, error && !email ? s.inputError : null]}>
           <TextInput
             style={s.input}
-            placeholder="Phone number, username or email"
+            placeholder="Email address"
             placeholderTextColor={MUTED}
             autoCapitalize="none"
             autoComplete="email"
