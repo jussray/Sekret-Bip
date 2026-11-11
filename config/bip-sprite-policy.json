@@ -1,0 +1,37 @@
+{
+  "schema": "juss/bip-sprite-policy@v1",
+  "product": "Se’kret Bip",
+  "sprite": "sekret-bip-governed-proof",
+  "role": "founder-only-read-only-repository-proof",
+  "authority": "Founder Control Room",
+  "runtime": "isolated-sprite",
+  "network": "deny-all",
+  "access": "sprite-private-admins",
+  "allowedMissions": [
+    "repo-truth",
+    "agent-contract",
+    "companion-contract"
+  ],
+  "allowedData": [
+    "public-repository-source",
+    "test-metadata",
+    "output-hashes"
+  ],
+  "deniedData": [
+    "teen-personal-data",
+    "guardian-personal-data",
+    "auth-sessions",
+    "database-records",
+    "production-secrets"
+  ],
+  "neverAuthorized": [
+    "public-app-actions",
+    "arbitrary-shell",
+    "production-mutation",
+    "git-push",
+    "git-merge",
+    "deploy",
+    "approval"
+  ],
+  "receiptAuthority": false
+}

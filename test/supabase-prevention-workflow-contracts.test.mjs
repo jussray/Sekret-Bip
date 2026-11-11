@@ -52,3 +52,35 @@ test('Supabase fresh replay uses immutable workflow dependencies and no checkout
   assert.match(content, /version: 2\.113\.0/);
   assert.doesNotMatch(content, /(?:actions\/checkout|supabase\/setup-cli)@v\d+/);
 });
+
+
+test('Supabase fresh replay retries only transient registry pull failures', () => {
+  const content = workflow('supabase-fresh-replay.yml');
+
+  assert.match(content, /for attempt in 1 2 3 4 5/);
+  assert.match(content, /PIPESTATUS\[0\]/);
+  assert.match(content, /toomanyrequests\|too many requests\|rate\.\?limit/);
+  assert.match(content, /failed to pull docker image/);
+  assert.match(content, /error pulling image configuration/);
+  assert.match(content, /exit "\$status"/);
+  assert.match(content, /supabase stop --no-backup \|\| true/);
+  assert.match(content, /sleep "\$\(\(attempt \* 30\)\)"/);
+});
+
+
+test('Supabase fresh replay serializes container-heavy PR proof across the repository', () => {
+  const content = workflow('supabase-fresh-replay.yml');
+
+  assert.match(content, /group: supabase-fresh-replay-\$\{\{ github\.repository \}\}/);
+  assert.match(content, /cancel-in-progress: false/);
+});
+
+
+test('Supabase fresh replay restores registry fallbacks when setup-cli exports GHCR', () => {
+  const content = workflow('supabase-fresh-replay.yml');
+
+  // The action exports SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io. Passing this
+  // override to the CLI disables its built-in alternate registry candidates.
+  assert.ok(content.includes('env -u SUPABASE_INTERNAL_IMAGE_REGISTRY supabase start -x "$excluded_services"'));
+  assert.ok(!content.includes('SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io'));
+});

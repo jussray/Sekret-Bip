@@ -1,5 +1,6 @@
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const TIMEOUT_MS = 60_000;
+const SAFE_MUSE_MODEL = /^muse-spark-1\.(?:1|2|3)$/;
 
 type ProviderName = 'openai' | 'anthropic' | 'muse';
 
@@ -20,10 +21,14 @@ const PROVIDERS = {
 
 function configFor(env: BipProviderEnv, provider: ProviderName) {
   const config = PROVIDERS[provider];
+  const modelName = String(env[config.model] || '').trim() || config.defaultModel;
   return {
     ...config,
-    keyValue: String(env[config.key] || '').trim(),
-    modelName: String(env[config.model] || '').trim() || config.defaultModel,
+    // Muse is advertised only with an allow-listed model (family parity).
+    keyValue: provider === 'muse' && !SAFE_MUSE_MODEL.test(modelName)
+      ? ''
+      : String(env[config.key] || '').trim(),
+    modelName,
   };
 }
 

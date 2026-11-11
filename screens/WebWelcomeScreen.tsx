@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   Animated,
@@ -19,6 +19,7 @@ import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
 
 const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
+const TEEN_CUE_REST_OPACITY = 0.62;
 const GRID_POSITIONS = ['20%', '40%', '60%', '80%'] as const;
 
 export type WelcomeAudience = 'teen' | 'bip-jr';
@@ -73,6 +74,7 @@ export function WebWelcomeScreen({
   const [activeAudience, setActiveAudience] = useState<WelcomeAudience>(() =>
     getPreviewAudience(defaultAudience),
   );
+  const [heroLoadedFor, setHeroLoadedFor] = useState<WelcomeAudience | null>(null);
   const motionEnabled = reduceMotion === false;
   const compact = width < 520;
   const shortViewport = compact && height < 700;
@@ -89,6 +91,11 @@ export function WebWelcomeScreen({
       : heroContract.desktopHeight;
   const worldPulse = useRef(new Animated.Value(0)).current;
   const heroDrift = useRef(new Animated.Value(0)).current;
+  // A first paint at full opacity would flash before the reveal effect starts.
+  const firstFrameReveal = motionEnabled ? 0 : 1;
+  const audienceCopyReveal = useRef(new Animated.Value(firstFrameReveal)).current;
+  const audienceHeroReveal = useRef(new Animated.Value(firstFrameReveal)).current;
+  const audienceCuesReveal = useRef(new Animated.Value(firstFrameReveal)).current;
 
   useEffect(() => {
     if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
@@ -170,6 +177,80 @@ export function WebWelcomeScreen({
       driftLoop.stop();
     };
   }, [heroDrift, motionEnabled, worldPulse]);
+
+  // Reset before the first paint of each audience (not in a passive effect).
+  // A slow image cannot be revealed until its current Image mount has finished loading.
+  // Characters remain in their approved composite art; never redraw or cover Cloud.
+  useLayoutEffect(() => {
+    const values = [audienceCopyReveal, audienceHeroReveal, audienceCuesReveal];
+    values.forEach(value => value.stopAnimation());
+
+    if (!motionEnabled) {
+      values.forEach(value => value.setValue(1));
+      return;
+    }
+
+    values.forEach(value => value.setValue(0));
+    const copyReveal = Animated.timing(audienceCopyReveal, {
+      toValue: 1,
+      duration: FRONT_DOOR_MOTION.audienceRevealDurationMs,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    copyReveal.start();
+    return () => copyReveal.stop();
+  }, [activeAudience, audienceCopyReveal, audienceHeroReveal, audienceCuesReveal, motionEnabled]);
+
+  useEffect(() => {
+    if (!motionEnabled || heroLoadedFor !== activeAudience) return;
+
+    // Copy can reveal immediately; the image and subsequent cues wait for image load.
+    const reveal = Animated.sequence([
+      Animated.delay(FRONT_DOOR_MOTION.audienceRevealStaggerMs),
+      Animated.stagger(FRONT_DOOR_MOTION.audienceRevealStaggerMs, [
+        Animated.timing(audienceHeroReveal, {
+          toValue: 1,
+          duration: FRONT_DOOR_MOTION.audienceRevealDurationMs,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(audienceCuesReveal, {
+          toValue: 1,
+          duration: FRONT_DOOR_MOTION.audienceRevealDurationMs,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+    reveal.start();
+    return () => reveal.stop();
+  }, [activeAudience, audienceHeroReveal, audienceCuesReveal, heroLoadedFor, motionEnabled]);
+
+  const audienceRevealStyle = (value: Animated.Value, restOpacity = 1) => ({
+    opacity: motionEnabled
+      ? value.interpolate({ inputRange: [0, 1], outputRange: [0, restOpacity] })
+      : restOpacity,
+    transform: [{
+      translateY: motionEnabled
+        ? value.interpolate({
+            inputRange: [0, 1],
+            outputRange: FRONT_DOOR_MOTION.audienceRevealTranslateY,
+          })
+        : 0,
+    }],
+  });
+
+  const audienceHeroRevealStyle = {
+    opacity: motionEnabled ? audienceHeroReveal : 1,
+    transform: [{
+      scale: motionEnabled
+        ? audienceHeroReveal.interpolate({
+            inputRange: [0, 1],
+            outputRange: FRONT_DOOR_MOTION.audienceHeroScale,
+          })
+        : 1,
+    }],
+  };
 
   const ambientMotionStyle = motionEnabled
     ? {
@@ -372,7 +453,10 @@ export function WebWelcomeScreen({
             </View>
           )}
 
-          <View style={[styles.copy, isBipJr && styles.copyBipJr]}>
+          <Animated.View
+            testID="web-welcome-copy-reveal"
+            style={[styles.copy, isBipJr && styles.copyBipJr, audienceRevealStyle(audienceCopyReveal)]}
+          >
             <Text
               testID="web-welcome-eyebrow"
               style={[styles.eyebrow, isBipJr && styles.eyebrowBipJr]}
@@ -382,37 +466,45 @@ export function WebWelcomeScreen({
             <Text style={[styles.title, isBipJr && styles.titleBipJr]}>{copy.title}</Text>
             <Text style={[styles.lead, isBipJr && styles.leadBipJr]}>{copy.lead}</Text>
             <Text style={[styles.subtitle, isBipJr && styles.subtitleBipJr]}>{copy.subtitle}</Text>
-          </View>
+          </Animated.View>
 
           <View
             testID="web-welcome-hero-safe-area"
             style={{ paddingBottom: heroContract.bottomGap }}
           >
-            <Animated.View
-              testID="web-welcome-hero-motion"
-              style={[
-                styles.heroWrap,
-                { height: heroHeight },
-                isBipJr && styles.heroWrapBipJr,
-                heroMotionStyle,
-              ]}
-            >
-              <Animated.View style={[styles.heroGlow, ambientMotionStyle]} />
-              <Image
-                testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
-                source={copy.hero}
-                resizeMode="contain"
-                style={[styles.hero, isBipJr && styles.heroBipJr]}
-                accessibilityLabel={copy.heroLabel}
-              />
+            <Animated.View testID="web-welcome-hero-reveal" style={audienceHeroRevealStyle}>
+              <Animated.View
+                testID="web-welcome-hero-motion"
+                style={[
+                  styles.heroWrap,
+                  { height: heroHeight },
+                  isBipJr && styles.heroWrapBipJr,
+                  heroMotionStyle,
+                ]}
+              >
+                <Animated.View style={[styles.heroGlow, ambientMotionStyle]} />
+                <Image
+                  key={activeAudience}
+                  onLoadEnd={() => setHeroLoadedFor(activeAudience)}
+                  testID={isBipJr ? 'web-welcome-hero-bip-jr' : 'web-welcome-hero-teen'}
+                  source={copy.hero}
+                  resizeMode="contain"
+                  style={[styles.hero, isBipJr && styles.heroBipJr]}
+                  accessibilityLabel={copy.heroLabel}
+                />
+              </Animated.View>
             </Animated.View>
           </View>
 
-          <View
+          <Animated.View
             testID="web-welcome-world-cues"
             accessible
             accessibilityLabel={copy.cueLabel}
-            style={[styles.worldCues, !isBipJr && styles.worldCuesTeen]}
+            style={[
+              styles.worldCues,
+              !isBipJr && styles.worldCuesTeen,
+              audienceRevealStyle(audienceCuesReveal, isBipJr ? 1 : TEEN_CUE_REST_OPACITY),
+            ]}
           >
             {copy.cues.map(cue => (
               <View
@@ -425,7 +517,7 @@ export function WebWelcomeScreen({
                 <Text style={styles.worldCueLabel}>{cue.label}</Text>
               </View>
             ))}
-          </View>
+          </Animated.View>
 
           <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
 
@@ -464,7 +556,10 @@ export function WebWelcomeScreen({
             testID="web-welcome-audience-switch"
             accessibilityRole="button"
             accessibilityLabel={copy.switchLabel}
-            onPress={() => setActiveAudience(copy.nextAudience)}
+            onPress={() => {
+              setHeroLoadedFor(null);
+              setActiveAudience(copy.nextAudience);
+            }}
             style={({ pressed }) => [styles.audienceSwitch, pressed && styles.controlPressed]}
           >
             <Text style={styles.audienceSwitchText}>{copy.switchText}</Text>
@@ -796,7 +891,7 @@ const styles = StyleSheet.create({
     gap: SPACE[2],
   },
   worldCuesTeen: {
-    opacity: 0.62,
+    opacity: TEEN_CUE_REST_OPACITY,
     marginTop: -SPACE[2],
   },
   worldCue: {
