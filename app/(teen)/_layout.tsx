@@ -84,7 +84,8 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
       {/* Trust-03/#414: persistent, always-accessible crisis support across every
           teen-facing surface — including Quiet Bip, where other floating controls
           are intentionally hidden but safety access must not be. */}
-      <View style={{ position: 'absolute', bottom: 80, right: 14, zIndex: 1000, elevation: 20 }}>
+      {/* Keep the always-accessible help control above the Pages composer/send area. */}
+      <View style={{ position: 'absolute', bottom: 174, right: 14, zIndex: 1000, elevation: 20 }}>
         <CrisisSupportButton />
       </View>
     </View>
