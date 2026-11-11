@@ -64,6 +64,9 @@ test('confirmation screen can request one provider-owned resend without duplicat
   const handler = source.slice(start, end);
   assert.match(handler, /if \(!success \|\| resendAttempted \|\| resendLoading\) return;/);
   assert.match(handler, /setResendAttempted\(true\)/);
+  assert.match(handler, /console\.warn\('SIGNUP_CONFIRMATION_RESEND_FAILED'\)/);
+  assert.doesNotMatch(handler, /console\.warn\(.*(?:resendError|error\.message)/);
+
   assert.match(handler, /await sb\.auth\.resend\(\{/);
   assert.match(handler, /type: 'signup'/);
   assert.match(handler, /email: email\.trim\(\)/);

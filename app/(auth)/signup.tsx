@@ -201,6 +201,8 @@ export default function SignupScreen() {
         setResendFeedback('Request accepted. A link may arrive if this account still needs confirmation and email delivery is available. Check spam too.');
       }
     } catch {
+      // Fixed event code only: no email, provider error, or credential in logs.
+      console.warn('SIGNUP_CONFIRMATION_RESEND_FAILED');
       setResendFeedback('We could not request another link right now. Please try again later.');
     } finally {
       setResendLoading(false);
