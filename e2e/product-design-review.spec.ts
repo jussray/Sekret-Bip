@@ -372,3 +372,29 @@ test('Founder Visual Truth: Teen first-five-minute packet', async ({ page }, tes
     throw error;
   }
 });
+
+test('S2Tell synthetic draft stays private before deliberate sharing', async ({ page }, testInfo) => {
+  const sharedWrites: string[] = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && request.url().includes('/rest/v1/bridge_shares')) {
+      sharedWrites.push(request.url());
+    }
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/s2tell?bipDevSide=teen', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByText('Say it here first.', { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Nothing reaches your parent until you press send/)).toBeVisible();
+
+  const draft = page.getByPlaceholder('What do you need to say?');
+  await draft.fill('Synthetic school conversation practice. No real teen information.');
+  await expect(draft).toHaveValue('Synthetic school conversation practice. No real teen information.');
+  await expect(page.getByText('Help me say it', { exact: true })).toBeVisible();
+  await expect(page.getByText('Send to Parent Bridge', { exact: true })).toHaveCount(0);
+  expect(sharedWrites, 'Typing a private draft must not automatically share it').toEqual([]);
+
+  await testInfo.attach('s2tell-private-draft-before-share.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png',
+  });
+});

@@ -21,6 +21,7 @@ test('each HTTP status maps to exactly one fixed event code', async () => {
     [401, 'SAUCE_GUARD_DELETE_HTTP_401'],
     [403, 'SAUCE_GUARD_DELETE_HTTP_403'],
     [404, 'SAUCE_GUARD_DELETE_HTTP_404'],
+    [406, 'SAUCE_GUARD_DELETE_HTTP_406'],
     [409, 'SAUCE_GUARD_DELETE_HTTP_409'],
     [500, 'SAUCE_GUARD_DELETE_HTTP_500'],
     [502, 'SAUCE_GUARD_DELETE_HTTP_OTHER'],
