@@ -10,6 +10,12 @@ const login = read('app/(auth)/login.tsx');
 const entry = read('app/index.tsx');
 const notificationBootstrap = read('src/components/shared/NotificationBootstrap.tsx');
 
+test('login promises email-only credentials, matching the actual provider call', () => {
+  assert.match(login, /placeholder="Email address"/);
+  assert.doesNotMatch(login, /Phone number, username or email/);
+  assert.match(login, /auth\.signInWithPassword\(\{ email: e, password: p \}\)/);
+});
+
 test('post-auth routing requires authoritative Supabase email confirmation first', () => {
   const sessionCheck = bootstrap.indexOf('const user = data.session?.user');
   const serverRead = bootstrap.indexOf('await supabase.auth.getUser()');

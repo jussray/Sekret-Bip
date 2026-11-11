@@ -61,7 +61,7 @@ async function attachPageState(page: Page, name: string, extra: Record<string, u
 
 async function signInTeen(page: Page) {
   await page.goto('/login?side=teen');
-  await page.getByPlaceholder('Phone number, username or email').fill(liveEmail!);
+  await page.getByPlaceholder('Email address').fill(liveEmail!);
   await page.getByPlaceholder('Password').fill(livePassword);
 
   await page.getByRole('button', { name: /log in/i }).click();
@@ -223,7 +223,7 @@ test.describe('live onboarding email smoke', () => {
     test.skip(!liveEmail, 'A disposable LIVE_ONBOARDING_EMAIL is required for this live-write proof.');
 
     await page.goto('/login?side=teen');
-    await page.getByPlaceholder('Phone number, username or email').fill(liveEmail!);
+    await page.getByPlaceholder('Email address').fill(liveEmail!);
     await page.getByPlaceholder('Password').fill(livePassword);
 
     // An inaccessible server or a client-side redirect cannot prove the
