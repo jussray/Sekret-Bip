@@ -169,7 +169,7 @@ export default function SignupScreen() {
 
   function showConfirmationSuccess(message?: string) {
     setSuccessMessage(
-      message ?? `We sent a confirmation link to ${email.trim()}.\nOpen it, then come back and sign in.`,
+      message ?? `Check ${email.trim()} for a confirmation link.\nThis screen cannot verify delivery. If no message arrives, check spam and contact support before trying to create another account.`,
     );
     setSuccess(true);
   }

@@ -46,6 +46,16 @@ test('live onboarding email smoke separates always-run readiness from explicit l
   assert.doesNotMatch(workflow, /wrangler deploy|deploy:web:production|deploy:api:production/);
 });
 
+test('confirmation checkpoint does not claim verified email delivery', () => {
+  const source = readText(signupSourcePath);
+  const start = source.indexOf('function showConfirmationSuccess');
+  const end = source.indexOf('function showUnconfirmedSignupOutcome', start);
+  assert.ok(start >= 0 && end > start);
+  const prompt = source.slice(start, end);
+  assert.match(prompt, /This screen cannot verify delivery/);
+  assert.doesNotMatch(prompt, /We sent a confirmation link/);
+});
+
 test('opaque 504 signup responses enter the existing ambiguous recovery path', () => {
   const source = readText(signupSourcePath);
 
