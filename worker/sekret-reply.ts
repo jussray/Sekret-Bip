@@ -1227,7 +1227,7 @@ const VOICE_INSTRUCTIONS: Record<CharacterId, string> = {
   parentCoach: "Speak as a warm, grounded coaching presence for a parent. Sound calm, real, and quietly knowing — like a trusted person sitting across the table, not a wellness app.",
 };
 
-const CRISIS_RE = /\b(kill myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm|hurt myself|cut myself|disappear forever|run away|abuse|abused|assault|unsafe|not safe|danger|emergency)\b/i;
+export const CRISIS_RE = /\b(kill myself|killing myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm(?:ing|ed|s)?|hurt myself|hurting myself|cut myself|cutting myself|disappear forever|run away|abuse(?:s|d)?|abusing|assault(?:s|ed|ing)?|unsafe|not safe|danger|emergency)\b/i;
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
@@ -1393,7 +1393,7 @@ function normalizeAudioFormat(value: unknown): AudioFormat {
   return value === 'opus' || value === 'aac' || value === 'flac' || value === 'wav' ? value : 'mp3';
 }
 
-function crisisReply(characterId: CharacterId, parentSharingEnabled: boolean): CompanionReply {
+export function crisisReply(characterId: CharacterId, parentSharingEnabled: boolean): CompanionReply {
   const lead = characterId === 'rylane'
     ? 'Real talk: your safety comes first.'
     : characterId === 'cloud'
@@ -1678,8 +1678,8 @@ async function handleReply(request: Request, env: Env, principal: PreflightPrinc
       },
       durationMs: Date.now() - startedAt,
     });
-  } catch (error) {
-    console.error('[sekret/reply]', error);
+  } catch {
+    console.error('SEKRET_REPLY_PROVIDER_FAILED');
     return json({
       reply: fallbackReply,
       tone: intent === 'greeting' ? 'casual' : characterId,
@@ -1765,8 +1765,8 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
     if (!res.ok) return json({ error: 'transcription failed' }, 502);
     const data = await res.json() as { text?: string };
     return json({ transcript: typeof data.text === 'string' ? data.text.trim() : '', model: getModels(env).stt });
-  } catch (error) {
-    console.error('[sekret/transcribe]', error);
+  } catch {
+    console.error('SEKRET_TRANSCRIPTION_FAILED');
     return json({ error: 'transcription error' }, 500);
   }
 }
