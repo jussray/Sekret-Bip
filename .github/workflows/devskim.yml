@@ -69,3 +69,12 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: devskim-results.sarif
+
+      - name: Retain DevSkim SARIF for exact-head security triage
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devskim-sarif-${{ github.sha }}
+          path: devskim-results.sarif
+          if-no-files-found: warn
+          retention-days: 7
