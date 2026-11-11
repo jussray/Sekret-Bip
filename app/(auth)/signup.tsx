@@ -134,6 +134,7 @@ export default function SignupScreen() {
   const [resendAttempted, setResendAttempted] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
   const [resendFeedback, setResendFeedback] = useState('');
+  const resendAttemptRef = useRef(false);
 
 
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -181,7 +182,8 @@ export default function SignupScreen() {
   // A single bounded request per confirmation view. The Auth provider owns
   // account-existence checks and sending limits; never create another account.
   async function handleResendConfirmation() {
-    if (!success || resendAttempted || resendLoading) return;
+    if (!success || resendAttemptRef.current || resendLoading) return;
+    resendAttemptRef.current = true;
     setResendAttempted(true);
     setResendLoading(true);
     try {

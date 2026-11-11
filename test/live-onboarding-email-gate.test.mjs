@@ -62,7 +62,8 @@ test('confirmation screen can request one provider-owned resend without duplicat
   const end = source.indexOf('function showUnconfirmedSignupOutcome', start);
   assert.ok(start >= 0 && end > start);
   const handler = source.slice(start, end);
-  assert.match(handler, /if \(!success \|\| resendAttempted \|\| resendLoading\) return;/);
+  assert.match(handler, /if \(!success \|\| resendAttemptRef\.current \|\| resendLoading\) return;/);
+  assert.match(handler, /resendAttemptRef\.current = true;/);
   assert.match(handler, /setResendAttempted\(true\)/);
   assert.match(handler, /console\.warn\('SIGNUP_CONFIRMATION_RESEND_FAILED'\)/);
   assert.doesNotMatch(handler, /console\.warn\(.*(?:resendError|error\.message)/);
