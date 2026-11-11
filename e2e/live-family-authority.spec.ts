@@ -179,7 +179,21 @@ test('exact preview preserves permanent identity, Circle pseudonymity, Teen-cont
   await signIn(page, 'parent', guardianEmail, guardianPassword);
   await page.goto('/parent-link');
   await page.getByLabel('Teen private invite code').fill(inviteCode!);
-  await page.getByRole('button', { name: 'Connect accounts' }).click();
+  await page.getByRole('button', { name: 'Request teen approval' }).click();
+
+  await expect.poll(async () => {
+    const rows = await restRows<{ verification_state: string; parent_link_state: string }>(
+      teenProvider,
+      `account_verification?select=verification_state,parent_link_state&user_id=eq.${teenProvider.userId}`,
+    );
+    return rows[0] ?? null;
+  }, { timeout: 45_000 }).toEqual(expect.objectContaining({ parent_link_state: 'pending' }));
+
+  await signOut(page);
+  await signIn(page, 'teen', teenEmail, teenPassword);
+  await page.goto('/parent-link-verify');
+  await expect(page.getByRole('button', { name: 'Approve parent request' })).toBeVisible({ timeout: 45_000 });
+  await page.getByRole('button', { name: 'Approve parent request' }).click();
 
   await expect.poll(async () => {
     const rows = await restRows<{ verification_state: string; parent_link_state: string }>(

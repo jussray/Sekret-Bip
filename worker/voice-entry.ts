@@ -174,7 +174,12 @@ function requiresPreciseLipSync(body: Record<string, unknown>): boolean {
 
 function protectionUnavailable(cors: Record<string, string>): Response {
   return json(
-    { error: 'request protection temporarily unavailable', retryable: true },
+    {
+      error: 'request protection temporarily unavailable',
+      retryable: true,
+      // A limiter outage must never leave a teen with no crisis resource.
+      crisis_resources: 'If you might hurt yourself or someone is hurting you, call or text 988, text HOME to 741741, or call 911 if it is immediate.',
+    },
     503,
     { ...cors, 'Retry-After': '30' },
   );
@@ -370,13 +375,8 @@ async function handleVoice(
       questionBudget: style.maxQuestions,
       styleDecision: 'allow',
     }, 200, cors);
-  } catch (error) {
-    console.error('[voice-entry:synthesis]', {
-      actorId,
-      provider: route.provider,
-      fallbackProvider: route.fallbackProvider,
-      error: error instanceof Error ? error.message : 'unknown',
-    });
+  } catch {
+    console.error('SEKRET_VOICE_SYNTHESIS_FAILED');
     return json({
       error: 'voice synthesis unavailable',
       characterId: route.canonicalCharacterId,
@@ -421,10 +421,8 @@ export default {
           releaseSha: WORKER_RELEASE_SHA,
           version: workerVersionEvidence(env),
         }, response.status, cors);
-      } catch (error) {
-        console.error('[voice-entry:health]', {
-          error: error instanceof Error ? error.message : 'invalid delegated health response',
-        });
+      } catch {
+        console.error('SEKRET_DELEGATED_HEALTH_INVALID');
         return json({
           ok: false,
           worker: 'sekret-backend',
