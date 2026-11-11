@@ -152,6 +152,13 @@ export function VoiceBipScreen({
   const glowLoop  = useRef<any>(null);
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // #667: Cloud's subtle "talking" pulse during reply playback, cued to the
+  // Worker's per-character timing (requested only for this screen's canon
+  // companions, consumed only here — never logged, per the AGENTS.md no
+  // private-content-in-logs boundary this metadata is already held to).
+  const talkAnim = useRef(new Animated.Value(1)).current;
+  const talkTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
   // Cloud drift + breath
   const cloudFloat = useRef(new Animated.Value(0)).current;
   const cloudBreath = useRef(new Animated.Value(0)).current;
@@ -232,6 +239,7 @@ export function VoiceBipScreen({
       { translateX: cloudFloat.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudTranslateX }) },
       { translateY: cloudFloat.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudTranslateY }) },
       { scale: cloudBreath.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudScale }) },
+      { scale: talkAnim },
     ],
     opacity: cloudBreath.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudOpacity }),
   };
@@ -253,6 +261,9 @@ export function VoiceBipScreen({
     setSekretReply('');
     setReplyAudioUri('');
     setReplyVoiceMeta(null);
+    talkTimersRef.current.forEach(clearTimeout);
+    talkTimersRef.current = [];
+    talkAnim.setValue(1);
     setRecordingTime(0);
     setTranscriptFailed(false);
     setShowBipMenu(false);
@@ -386,7 +397,11 @@ export function VoiceBipScreen({
     ].slice(-20);
     setSekretReply(reply);
     setIsVoiceLoading(true);
-    const audio = await fetchSekretVoice({ reply, characterId: avatar.personality });
+    // includeTiming only matters when the Worker is in hybrid provider mode —
+    // otherwise it's a harmless no-op flag the server ignores (worker/voice-entry.ts).
+    // Safe to request for every VOICE_BIP_AVATARS entry: all four are canon
+    // companions (suhana/sy/cloud/night), never the legacy/parentCoach ids.
+    const audio = await fetchSekretVoice({ reply, characterId: avatar.personality, includeTiming: true });
     if (audio) {
       setReplyAudioUri(`data:${audio.contentType};base64,${audio.audioBase64}`);
       const { audioBase64, contentType, characterId, ...meta } = audio;
@@ -450,15 +465,44 @@ export function VoiceBipScreen({
       if (timerRef.current) clearInterval(timerRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => null);
       replySoundRef.current?.unloadAsync().catch(() => null);
+      talkTimersRef.current.forEach(clearTimeout);
     };
   }, []);
 
+
+  // Caps how many character-boundary pulses a single reply can schedule —
+  // long replies still get the effect without flooding setTimeout.
+  const MAX_TALK_PULSES = 60;
+
+  const clearTalkPulses = () => {
+    talkTimersRef.current.forEach(clearTimeout);
+    talkTimersRef.current = [];
+    talkAnim.stopAnimation();
+    talkAnim.setValue(1);
+  };
+
+  const scheduleTalkPulses = (timing: SekretVoiceResponse['timing'] | undefined) => {
+    clearTalkPulses();
+    if (reduceMotion) return;
+    const starts = timing?.characterStartTimesSeconds;
+    if (!starts || starts.length === 0) return;
+    starts.slice(0, MAX_TALK_PULSES).forEach(startSeconds => {
+      const timer = setTimeout(() => {
+        Animated.sequence([
+          Animated.timing(talkAnim, { toValue: 1.08, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(talkAnim, { toValue: 1,    duration: 90, easing: Easing.in(Easing.quad),  useNativeDriver: true }),
+        ]).start();
+      }, Math.max(0, startSeconds * 1000));
+      talkTimersRef.current.push(timer);
+    });
+  };
 
   const playReplyAudio = async () => {
     if (!replyAudioUri) return;
     if (replySoundRef.current) {
       const prior = replySoundRef.current;
       replySoundRef.current = null;
+      clearTalkPulses();
       await prior.unloadAsync().catch(() => null);
     }
     const { sound } = await Audio.Sound.createAsync({ uri: replyAudioUri });
@@ -470,10 +514,12 @@ export function VoiceBipScreen({
       return;
     }
     replySoundRef.current = sound;
+    scheduleTalkPulses(replyVoiceMeta?.timing);
     sound.setOnPlaybackStatusUpdate(status => {
       if ('didJustFinish' in status && status.didJustFinish) {
         sound.unloadAsync().catch(() => null);
         if (replySoundRef.current === sound) replySoundRef.current = null;
+        clearTalkPulses();
       }
     });
     // A newer overlapping tap can unload this exact sound while playAsync()

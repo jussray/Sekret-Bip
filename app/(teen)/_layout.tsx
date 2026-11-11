@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { GlobalMoodButton } from '@/components/GlobalMoodButton';
 import { SideSafeBackButton } from '@/components/SideSafeBackButton';
+import { CrisisSupportButton } from '../../components/CrisisSupport';
 import { SafetyExperienceSheet } from '../../components/safety/SafetyExperienceSheet';
 import { useAppContext } from '@/context/AppContext';
 import { useSafetyCheck } from '@/hooks/useSafetyCheck';
@@ -80,6 +81,13 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
       </Tabs>
       {!quietActive && <SideSafeBackButton side="teen" />}
       {!quietActive && <GlobalMoodButton />}
+      {/* Trust-03/#414: persistent, always-accessible crisis support across every
+          teen-facing surface — including Quiet Bip, where other floating controls
+          are intentionally hidden but safety access must not be. */}
+      {/* Keep the always-accessible help control above the Pages composer/send area. */}
+      <View style={{ position: 'absolute', bottom: 174, right: 14, zIndex: 1000, elevation: 20 }}>
+        <CrisisSupportButton />
+      </View>
     </View>
   );
 }
