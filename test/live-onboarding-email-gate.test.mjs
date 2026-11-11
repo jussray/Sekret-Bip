@@ -56,6 +56,25 @@ test('confirmation checkpoint does not claim verified email delivery', () => {
   assert.doesNotMatch(prompt, /We sent a confirmation link/);
 });
 
+test('confirmation screen can request one provider-owned resend without duplicating signup', () => {
+  const source = readText(signupSourcePath);
+  const start = source.indexOf('async function handleResendConfirmation()');
+  const end = source.indexOf('function showUnconfirmedSignupOutcome', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = source.slice(start, end);
+  assert.match(handler, /if \(!success \|\| resendAttempted \|\| resendLoading\) return;/);
+  assert.match(handler, /setResendAttempted\(true\)/);
+  assert.match(handler, /await sb\.auth\.resend\(\{/);
+  assert.match(handler, /type: 'signup'/);
+  assert.match(handler, /email: email\.trim\(\)/);
+  assert.match(handler, /emailRedirectTo: buildEmailConfirmationRedirectUrl\(preferredSide\)/);
+  assert.doesNotMatch(handler, /auth\.signUp\(|updateUser\(|setSuccess\(true\)/);
+  assert.match(source, /accessibilityLabel="Resend confirmation link"/);
+  assert.match(source, /disabled=\{resendAttempted \|\| resendLoading\}/);
+  assert.match(source, /Request accepted\. A link may arrive/);
+  assert.doesNotMatch(handler, /Email sent successfully|Another email was sent/);
+});
+
 test('opaque 504 signup responses enter the existing ambiguous recovery path', () => {
   const source = readText(signupSourcePath);
 

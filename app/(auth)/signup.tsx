@@ -131,6 +131,10 @@ export default function SignupScreen() {
   const [loading, setLoading]     = useState(false);
   const [success, setSuccess]     = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [resendAttempted, setResendAttempted] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendFeedback, setResendFeedback] = useState('');
+
 
   const slideAnim = useRef(new Animated.Value(0)).current;
   const shakeAnim = useRef(new Animated.Value(0)).current;
@@ -172,6 +176,35 @@ export default function SignupScreen() {
       message ?? `Check ${email.trim()} for a confirmation link.\nThis screen cannot verify delivery. If no message arrives, check spam and contact support before trying to create another account.`,
     );
     setSuccess(true);
+  }
+
+  // A single bounded request per confirmation view. The Auth provider owns
+  // account-existence checks and sending limits; never create another account.
+  async function handleResendConfirmation() {
+    if (!success || resendAttempted || resendLoading) return;
+    setResendAttempted(true);
+    setResendLoading(true);
+    try {
+      const sb = getSupabase();
+      if (!sb) {
+        setResendFeedback('We could not request another link right now. Please try again later.');
+        return;
+      }
+      const { error: resendError } = await sb.auth.resend({
+        type: 'signup',
+        email: email.trim(),
+        options: { emailRedirectTo: buildEmailConfirmationRedirectUrl(preferredSide) },
+      });
+      if (resendError) {
+        setResendFeedback('We could not request another link right now. Please try again later.');
+      } else {
+        setResendFeedback('Request accepted. A link may arrive if this account still needs confirmation and email delivery is available. Check spam too.');
+      }
+    } catch {
+      setResendFeedback('We could not request another link right now. Please try again later.');
+    } finally {
+      setResendLoading(false);
+    }
   }
 
   // A 504 only proves that the request reached Auth, not that the account
@@ -404,6 +437,21 @@ export default function SignupScreen() {
           >
             <Text style={s.btnText}>Go to Sign In</Text>
           </TouchableOpacity>
+          <TouchableOpacity
+            style={s.resendBtn}
+            onPress={handleResendConfirmation}
+            disabled={resendAttempted || resendLoading}
+            accessibilityRole="button"
+            accessibilityLabel="Resend confirmation link"
+            accessibilityState={{ disabled: resendAttempted || resendLoading }}
+          >
+            {resendLoading
+              ? <ActivityIndicator color={PURPLE} size="small" />
+              : <Text style={s.resendBtnText}>{resendAttempted ? 'Request made' : 'Resend confirmation link'}</Text>}
+          </TouchableOpacity>
+          {resendFeedback
+            ? <Text style={s.resendFeedback} accessibilityRole="alert">{resendFeedback}</Text>
+            : null}
         </View>
       </View>
     );
@@ -790,6 +838,19 @@ const s = StyleSheet.create({
   switchCta: { color: '#a78bfa', fontSize: 14, fontWeight: '700' },
 
   // Success
+  resendBtn: {
+    minHeight: 44,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: PURPLE,
+  },
+  resendBtnText: { color: '#c4b5fd', fontWeight: '700', fontSize: 14 },
+  resendFeedback: { color: TEXT, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   successCard: {
     flex: 1,
     alignItems: 'center',
