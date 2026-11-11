@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import { IMAGES } from '../constants/theme';
+import { IMAGES, getRoomBg } from '../constants/theme';
 import { SekretCompanionCard } from '../components/SekretCompanionCard';
 import type { CompanionCheckIn } from '../types/sekretCompanion';
 import {
@@ -32,23 +32,6 @@ const ART: Record<string, Record<string, any>> = {
   },
 };
 
-// Time-of-day ambient room background per vision:
-// morning → bright room · afternoon → sunny room · night → purple cozy room
-// (late-night rainy city is owned by ComfortScreen — Home stays softer)
-const AMBIENT_BG: Record<string, Record<TimeOfDay, any>> = {
-  raylene: {
-    morning: IMAGES.bgRayleneRoomDay,
-    day:     IMAGES.bgRayleneRoomDay,
-    evening: IMAGES.bgRayleneRoomEvening,
-    night:   IMAGES.bgRayleneRoomNight,
-  },
-  rylane: {
-    morning: IMAGES.bgRylaneRoomDay,
-    day:     IMAGES.bgRylaneRoomDay,
-    evening: IMAGES.bgRylaneRoomEvening,
-    night:   IMAGES.bgRylaneRoomNight,
-  },
-};
 
 // ─── Static data ──────────────────────────────────────────────────────────────
 
@@ -305,7 +288,7 @@ export function HomeScreen({
   const art       = ART[charKey];
   const cloudImg  = CLOUD_ASSETS[charKey];
   const timeOfDay = useMemo<TimeOfDay>(() => getTimeOfDay(), []);
-  const ambientBg = AMBIENT_BG[charKey]?.[timeOfDay];
+  const ambientBg = getRoomBg(charKey as 'raylene' | 'rylane', timeOfDay);
   const moodGlow  = MOOD_GLOW[mood.toLowerCase()] ?? MOOD_GLOW[mood] ?? t.accent;
 
   // Mood category picker state — defaults to the category that matches current mood
