@@ -37,6 +37,7 @@ export default function Index() {
   const [hasPermanentSession, setHasPermanentSession] = useState(false);
   const [requiresAccountUpgrade, setRequiresAccountUpgrade] = useState(false);
   const [requiredConsentsComplete, setRequiredConsentsComplete] = useState(false);
+  const [postAuthNextRoute, setPostAuthNextRoute] = useState<string | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [splashEntered, setSplashEntered] = useState(false);
@@ -78,6 +79,7 @@ export default function Index() {
 
     async function bootstrap() {
       setBootstrapError(null);
+      setPostAuthNextRoute(null);
       setProfileResolved(false);
       setRequiresAccountUpgrade(false);
       try {
@@ -136,6 +138,9 @@ export default function Index() {
         const bootstrapModule = await import('@/services/auth/postAuthBootstrap');
         const result = await bootstrapModule.fetchPostAuthBootstrap(buildSide);
         if (cancelled) return;
+        // Bootstrap has already revalidated email and founder authority against
+        // Supabase. Honor its founder destination before public consent gates.
+        setPostAuthNextRoute(result.nextRoute);
         setRequiredConsentsComplete(result.requiredConsentsComplete);
         setAccountProfile(result.profile);
         if (result.accountSide !== userSide) {
@@ -186,6 +191,11 @@ export default function Index() {
         } else {
           router.replace(publicEntrySide === 'parent' ? '/(onboarding)/parent-splash' : '/(onboarding)/welcome');
         }
+        return;
+      }
+
+      if (postAuthNextRoute === '/(dev)/control-room') {
+        router.replace('/(dev)/control-room' as never);
         return;
       }
 
@@ -249,6 +259,7 @@ export default function Index() {
     isLoading,
     isVerificationLoading,
     profileResolved,
+    postAuthNextRoute,
     publicEntrySide,
     requiredConsentsComplete,
     requiresAccountUpgrade,
