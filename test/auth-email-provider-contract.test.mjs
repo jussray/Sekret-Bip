@@ -24,7 +24,7 @@ test('dispatch contract normalizes input and rejects malformed or stale producti
   assert.match(workflow, /printf 'target_sha=%s\\n' \"\$target_sha\" >> \"\$GITHUB_OUTPUT\"/);
   assert.match(workflow, /Pass apply as its own boolean input/);
   assert.match(workflow, /repos\/\$\{GITHUB_REPOSITORY\}\/commits\/main/);
-  assert.match(workflow, /Production apply requires current main HEAD/);
+  assert.match(workflow, /Production provider operation requires current main HEAD/);
   assert.match(workflow, /if \[ \"\$target_sha\" != \"\$current_main\" \]; then/);
 
   const validation = workflow.indexOf('- name: Normalize and validate dispatch contract');
@@ -36,6 +36,26 @@ test('dispatch contract normalizes input and rejects malformed or stale producti
   const checkoutBlock = workflow.slice(checkout, workflow.indexOf('- name: Verify exact target'));
   assert.match(checkoutBlock, /steps\.target\.outputs\.target_sha/);
   assert.doesNotMatch(checkoutBlock, /inputs\.target_sha/);
+});
+
+test('trusted read-only verification checks current main and records SMTP metadata without claiming delivery', () => {
+  assert.match(workflow, /verify_only:/);
+  assert.match(workflow, /if \[ "\$APPLY" = true \] && \[ "\$VERIFY_ONLY" = true \]/);
+  assert.match(workflow, /if \[ "\$APPLY" = true \] \|\| \[ "\$VERIFY_ONLY" = true \]/);
+  assert.match(workflow, /if: inputs.apply == true \|\| inputs.verify_only == true/);
+  assert.match(workflow, /node scripts\/configure-supabase-auth-email\.mjs --verify-only/);
+  const verifyStep = workflow.slice(
+    workflow.indexOf('- name: Verify live Auth email settings without mutation'),
+    workflow.indexOf('- name: Require provider credentials before apply'),
+  );
+  assert.match(verifyStep, /SUPABASE_ACCESS_TOKEN:/);
+  assert.doesNotMatch(verifyStep, /RESEND_API_KEY|method: 'PATCH'/);
+  assert.match(script, /const mandatory = comparable\(desiredPublic\)/);
+  assert.match(script, /const observed = comparable\(live\)/);
+  assert.match(script, /smtpCredentialVerified: false/);
+  assert.match(script, /emailDeliveryVerified: false/);
+  const readback = script.slice(script.indexOf('if (verifyOnly) {'),script.indexOf('if (!apply) {'));
+  assert.doesNotMatch(readback, /method: 'PATCH'/);
 });
 
 test('production Auth email provider keeps confirmation enabled and secrets out of source', () => {
