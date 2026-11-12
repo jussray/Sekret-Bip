@@ -22,7 +22,7 @@ function isCloudflareAccessUrl(rawUrl) {
   }
 }
 
-function hasCloudflareAccessHtmlMarker(rawBody) {
+export function hasCloudflareAccessHtmlMarker(rawBody) {
   if (typeof rawBody !== 'string' || !rawBody) return false;
   const normalized = rawBody.toLowerCase();
   if (!normalized.includes('cloudflare access')) return false;
@@ -30,6 +30,23 @@ function hasCloudflareAccessHtmlMarker(rawBody) {
     normalized.includes('<title>sign in') ||
     normalized.includes('/cdn-cgi/access/') ||
     normalized.includes('that account does not have access')
+  );
+}
+
+// Distinct from Cloudflare Access (Zero Trust SSO login): this is Cloudflare's
+// WAF-layer bot/managed-challenge page (Bot Fight Mode, "I'm Under Attack
+// Mode", or a custom WAF challenge rule). A service-token Access bypass does
+// NOT clear this — it needs a WAF/Bot Fight Mode exception for the route.
+// Discovered 2026-10-18 on #696: the verifier polled blind for ~30 minutes
+// because this page was indistinguishable from "worker not yet deployed".
+export function hasCloudflareChallengeHtmlMarker(rawBody) {
+  if (typeof rawBody !== 'string' || !rawBody) return false;
+  const normalized = rawBody.toLowerCase();
+  return (
+    normalized.includes('_cf_chl_opt') ||
+    normalized.includes('/cdn-cgi/challenge-platform/') ||
+    normalized.includes('checking your browser before accessing') ||
+    (normalized.includes('just a moment') && normalized.includes('cloudflare'))
   );
 }
 
@@ -54,6 +71,7 @@ export function classifyEndpointProbe(evidence) {
     return 'cloudflare-access-intercepted';
   }
   if (evidence?.accessBlockPage === true) return 'cloudflare-access-intercepted';
+  if (evidence?.challengeBlockPage === true) return 'cloudflare-challenge-intercepted';
   if (evidence?.jsonState === 'fetch-error') return 'fetch-error';
   if (evidence?.ok !== true) return 'http-error';
   if (evidence?.jsonState !== 'ok') return 'invalid-json';
@@ -79,24 +97,29 @@ export async function probeJsonEndpoint(rawUrl, {fetchImpl = fetch, accessAuth} 
     let json = null;
     let jsonState = response.ok ? 'invalid' : 'skipped-non-ok';
     let accessBlockPage = false;
+    let challengeBlockPage = false;
 
-    if (response.ok) {
-      if (contentType?.toLowerCase().startsWith('text/html') && typeof response.clone === 'function') {
-        try {
-          const responseBody = await response.clone().text();
-          accessBlockPage = hasCloudflareAccessHtmlMarker(responseBody);
-        } catch {
-          accessBlockPage = false;
-        }
+    // Cloudflare's WAF-layer bot/managed challenge is commonly served as a
+    // non-2xx HTML response to non-browser clients, so this check must not
+    // be gated on response.ok the way the JSON parse below is — an un-ok
+    // response is exactly the shape a challenge page takes.
+    if (contentType?.toLowerCase().startsWith('text/html') && typeof response.clone === 'function') {
+      try {
+        const responseBody = await response.clone().text();
+        accessBlockPage = hasCloudflareAccessHtmlMarker(responseBody);
+        if (!accessBlockPage) challengeBlockPage = hasCloudflareChallengeHtmlMarker(responseBody);
+      } catch {
+        accessBlockPage = false;
+        challengeBlockPage = false;
       }
+    }
 
-      if (!accessBlockPage) {
-        try {
-          json = await response.json();
-          jsonState = 'ok';
-        } catch {
-          jsonState = 'invalid';
-        }
+    if (response.ok && !accessBlockPage && !challengeBlockPage) {
+      try {
+        json = await response.json();
+        jsonState = 'ok';
+      } catch {
+        jsonState = 'invalid';
       }
     }
 
@@ -108,6 +131,7 @@ export async function probeJsonEndpoint(rawUrl, {fetchImpl = fetch, accessAuth} 
       redirected: response.redirected,
       jsonState,
       accessBlockPage,
+      challengeBlockPage,
     };
     const evidence = {
       requestedUrl: rawUrl,
@@ -118,6 +142,7 @@ export async function probeJsonEndpoint(rawUrl, {fetchImpl = fetch, accessAuth} 
       contentType,
       jsonState,
       accessBlockPage,
+      challengeBlockPage,
       accessServiceAuthConfigured: resolvedAccessAuth.configured,
       commitSha: safeString(json?.commitSha),
       releaseSha: safeString(json?.releaseSha),
@@ -165,13 +190,29 @@ export async function collectProductionReleaseEndpointEvidence({
     backend.classification === 'cloudflare-access-intercepted' ? 'backend' : null,
   ].filter(Boolean);
 
+  // Symmetric to blockedByAccess: a WAF/bot-challenge block is a distinct
+  // failure mode from an Access-login block (see hasCloudflareChallengeHtmlMarker)
+  // and must not be silently folded into "observed" or misreported as Access.
+  const blockedByChallenge = [
+    frontend.classification === 'cloudflare-challenge-intercepted' ? 'frontend' : null,
+    backend.classification === 'cloudflare-challenge-intercepted' ? 'backend' : null,
+  ].filter(Boolean);
+
+  const status =
+    blockedByAccess.length > 0
+      ? 'cloudflare-access-intercepted'
+      : blockedByChallenge.length > 0
+        ? 'cloudflare-challenge-intercepted'
+        : 'observed';
+
   return {
     version: 3,
     observedAt: new Date().toISOString(),
     expectedSha: safeString(expectedSha)?.toLowerCase() ?? null,
-    status: blockedByAccess.length > 0 ? 'cloudflare-access-intercepted' : 'observed',
+    status,
     accessServiceAuthConfigured: accessAuth.configured,
     blockedByAccess,
+    blockedByChallenge,
     frontend,
     backend,
   };
@@ -185,18 +226,23 @@ export function writeProductionReleaseEndpointEvidence(evidence, evidencePath = 
 
 export function buildCloudflareAccessBlockerEvidence(evidence) {
   const expectedSha = safeString(evidence?.expectedSha)?.toLowerCase() ?? null;
+  const readinessState =
+    evidence?.status === 'cloudflare-challenge-intercepted'
+      ? 'cloudflare-challenge-intercepted'
+      : 'cloudflare-access-intercepted';
   return {
     version: 5,
     commitSha: expectedSha,
     expectedSha,
     status: 'failed',
     complete: false,
-    readinessState: 'cloudflare-access-intercepted',
+    readinessState,
     observerError: null,
     transportBlocker: {
-      status: 'cloudflare-access-intercepted',
+      status: readinessState,
       accessServiceAuthConfigured: evidence?.accessServiceAuthConfigured === true,
       blockedSurfaces: Array.isArray(evidence?.blockedByAccess) ? [...evidence.blockedByAccess] : [],
+      blockedByChallenge: Array.isArray(evidence?.blockedByChallenge) ? [...evidence.blockedByChallenge] : [],
       frontendClassification: safeString(evidence?.frontend?.classification),
       backendClassification: safeString(evidence?.backend?.classification),
     },
@@ -233,6 +279,11 @@ async function main() {
   if (evidence.status === 'cloudflare-access-intercepted') {
     writeCloudflareAccessBlockerEvidence(evidence);
     throw new Error(`CLOUDFLARE_ACCESS_INTERCEPTED surfaces=${evidence.blockedByAccess.join(',')}`);
+  }
+
+  if (evidence.status === 'cloudflare-challenge-intercepted') {
+    writeCloudflareAccessBlockerEvidence(evidence);
+    throw new Error(`CLOUDFLARE_CHALLENGE_INTERCEPTED surfaces=${evidence.blockedByChallenge.join(',')}`);
   }
 }
 
