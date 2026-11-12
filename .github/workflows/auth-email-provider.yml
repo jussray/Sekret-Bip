@@ -12,6 +12,11 @@ on:
         required: true
         default: false
         type: boolean
+      verify_only:
+        description: Read back production Auth email settings without changing them
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -32,7 +37,7 @@ env:
 
 jobs:
   reconcile-auth-email:
-    name: Plan or apply production Auth email
+    name: Plan, verify or apply production Auth email
     runs-on: ubuntu-latest
     # Founder-owned provider credentials live in the `Production` Actions environment.
     # The Resend key is stored there as the secret `login` and mapped to RESEND_API_KEY.
@@ -45,9 +50,15 @@ jobs:
         env:
           TARGET_SHA_INPUT: ${{ inputs.target_sha }}
           APPLY: ${{ inputs.apply }}
+          VERIFY_ONLY: ${{ inputs.verify_only }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+
+          if [ "$APPLY" = true ] && [ "$VERIFY_ONLY" = true ]; then
+            echo '::error title=Conflicting modes::Select either apply or verify_only, never both.'
+            exit 64
+          fi
 
           target_sha="$TARGET_SHA_INPUT"
           target_sha="${target_sha#"${target_sha%%[![:space:]]*}"}"
@@ -65,7 +76,7 @@ jobs:
           target_sha="${target_sha,,}"
           printf 'target_sha=%s\n' "$target_sha" >> "$GITHUB_OUTPUT"
 
-          if [ "$APPLY" = true ]; then
+          if [ "$APPLY" = true ] || [ "$VERIFY_ONLY" = true ]; then
             current_main="$(
               curl --fail --silent --show-error \
                 -H 'Accept: application/vnd.github+json' \
@@ -79,13 +90,13 @@ jobs:
               exit 65
             }
             if [ "$target_sha" != "$current_main" ]; then
-              echo "::error title=Stale target_sha::Production apply requires current main HEAD. target_sha=$target_sha current_main=$current_main"
+              echo "::error title=Stale target_sha::Production provider operation requires current main HEAD. target_sha=$target_sha current_main=$current_main"
               exit 66
             fi
           fi
 
-      - name: Require main for production apply
-        if: inputs.apply == true
+      - name: Require main for trusted provider operation
+        if: inputs.apply == true || inputs.verify_only == true
         shell: bash
         run: |
           set -euo pipefail
@@ -112,7 +123,18 @@ jobs:
           node-version: '24'
 
       - name: Show redacted non-destructive plan
+        if: inputs.apply != true && inputs.verify_only != true
         run: node scripts/configure-supabase-auth-email.mjs
+
+      - name: Verify live Auth email settings without mutation
+        if: inputs.verify_only == true
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_ACCESS_TOKEN" || { echo 'SUPABASE_ACCESS_TOKEN is not configured.' >&2; exit 1; }
+          node scripts/configure-supabase-auth-email.mjs --verify-only
 
       - name: Require provider credentials before apply
         if: inputs.apply == true
