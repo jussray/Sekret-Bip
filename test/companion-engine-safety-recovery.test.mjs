@@ -14,10 +14,21 @@ const read = (path) => readFile(new URL(`../${path}`, import.meta.url), 'utf8');
 test('sendCompanionMessage recovers crisis resources from the upstream fallback', async () => {
   const source = await read('src/features/sekret/companionEngine.ts');
 
-  assert.match(source, /import\s*\{\s*recoverSafetyResourcesFromUpstreamFallback\s*\}\s*from\s*['"].*sekretSafety['"]/);
+  assert.match(source, /import\s*\{[^}]*\brecoverSafetyResourcesFromUpstreamFallback\b[^}]*\}\s*from\s*['"].*sekretSafety['"]/);
   assert.match(
     source,
     /const result = await fetchSekretBrainReply\(request\);[\s\S]*recoverSafetyResourcesFromUpstreamFallback\(\s*input\.text,\s*result\.reply,\s*result\.replySource,\s*\)/,
   );
-  assert.match(source, /reply:\s*safetyRecovery\.reply/);
+  assert.match(source, /shouldBypassReplyGuard\(\s*safetyRecovery\.reply,/);
+  assert.match(source, /guardSekretReply\(safetyRecovery\.reply, fallback\)/);
+  assert.match(source, /reply:\s*guardedReply/);
+});
+
+test('sendCompanionMessage applies the voice guard without replacing safety replies', async () => {
+  const source = await read('src/features/sekret/companionEngine.ts');
+
+  assert.match(source, /guardBypass\.bypass\s*\?\s*\{ reply: safetyRecovery\.reply, blocked: false \}/);
+  assert.match(source, /result\.safetyFlag \|\| safetyRecovery\.substituted/);
+  assert.match(source, /getLocalSafetyFallback\(input\.text\) \?\? getSekretFallback\(companionId, input\.text\)/);
+  assert.match(source, /replySource:\s*guardBlocked \? 'fallback'/);
 });
