@@ -68,7 +68,7 @@ export function BottomNav({ userSide }: BottomNavProps) {
           ['parentMore',   '☰',  'More'],
         ]
       : [
-          ['home',   '🏠', 'Home'],
+          ['home',   '🏠', 'Room'],
           ['pages',  '📖', 'Pages'],
           ['calm',   '🌙', 'Calm'],
           ['circle', '🌐', 'Circle'],
