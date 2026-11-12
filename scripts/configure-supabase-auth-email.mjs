@@ -160,13 +160,13 @@ async function main() {
     const accessToken = required('SUPABASE_ACCESS_TOKEN');
     const supabaseIdentity = await verifySupabaseManagementIdentity({ target, accessToken });
     const live = await request(projectRef, accessToken);
-    const mandatory = {
-      external_email_enabled: true,
-      mailer_autoconfirm: false,
-      mailer_allow_unverified_email_sign_ins: false,
-    };
+    // Compare non-secret SMTP routing metadata as well as confirmation flags.
+    // These values prove configuration only, never a delivered email or valid
+    // SMTP password. All comparisons fail closed when fields are absent.
+    const mandatory = comparable(desiredPublic);
+    const observed = comparable(live);
     const mismatched = Object.entries(mandatory)
-      .filter(([key, expected]) => live?.[key] !== expected)
+      .filter(([key, expected]) => observed[key] !== expected)
       .map(([key]) => key);
     const verified = mismatched.length === 0;
     await writeReceipt({
@@ -181,6 +181,9 @@ async function main() {
       requiredSettings: mandatory,
       mismatchedSettingNames: mismatched,
       providerSettingsVerified: verified,
+      smtpCredentialVerified: false,
+      emailDeliveryVerified: false,
+      verificationScope: 'email-confirmation-flags-and-nonsecret-smtp-routing-only',
       authorizesMerge: false,
       authorizesDeploy: false,
       invalidatesOn: ['projectRef', 'supabaseIdentity', 'providerAuthSettings', 'observationAge'],
@@ -190,7 +193,7 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    console.log('AUTH_EMAIL_PROVIDER_CONFIRMED');
+    console.log('AUTH_EMAIL_PROVIDER_ROUTING_METADATA_VERIFIED');
     return;
   }
 
