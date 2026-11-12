@@ -10,7 +10,7 @@ async function signInTeen(page: Page) {
   test.skip(!controlledPassword, 'SEKRET_CONTROLLED_ACCOUNT_PASSWORD is required.');
 
   await page.goto('/login?side=teen');
-  await page.getByPlaceholder('Phone number, username or email').fill(controlledEmail!);
+  await page.getByPlaceholder('Email address').fill(controlledEmail!);
   await page.getByPlaceholder('Password').fill(controlledPassword!);
   await page.getByRole('button', { name: /log in/i }).click();
   await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => null);
