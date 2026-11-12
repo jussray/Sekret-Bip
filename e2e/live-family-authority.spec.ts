@@ -62,7 +62,7 @@ async function restRows<T>(session: ProviderSession, pathAndQuery: string): Prom
 
 async function signIn(page: Page, side: 'teen' | 'parent', email: string, password: string) {
   await page.goto(`/login?side=${side}`);
-  await page.getByPlaceholder('Phone number, username or email').fill(email);
+  await page.getByPlaceholder('Email address').fill(email);
   await page.getByPlaceholder('Password').fill(password);
   await page.getByRole('button', { name: /log in/i }).click();
   await page.waitForLoadState('networkidle', { timeout: 45_000 }).catch(() => null);

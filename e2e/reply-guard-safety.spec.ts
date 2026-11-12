@@ -22,5 +22,6 @@ test('Pages preserves explicit safety resources when the Worker is unavailable',
   await expect(reply).toContainText('988');
   await expect(reply).toContainText('741741');
 
-  await expect(page.getByText('I am not safe here', { exact: true })).toBeVisible();
+  // The page also shows as a "My little universe" tile above; assert the thread bubble.
+  await expect(page.getByText('I am not safe here', { exact: true }).last()).toBeVisible();
 });

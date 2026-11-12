@@ -37,6 +37,7 @@ export default function Index() {
   const [hasPermanentSession, setHasPermanentSession] = useState(false);
   const [requiresAccountUpgrade, setRequiresAccountUpgrade] = useState(false);
   const [requiredConsentsComplete, setRequiredConsentsComplete] = useState(false);
+  const [postAuthNextRoute, setPostAuthNextRoute] = useState<string | null>(null);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
   const [bootstrapAttempt, setBootstrapAttempt] = useState(0);
   const [splashEntered, setSplashEntered] = useState(false);
@@ -47,6 +48,19 @@ export default function Index() {
   const effectiveSide: AccountSide = accountProfile?.accountSide ?? buildSide ?? userSide ?? 'teen';
   const publicWelcomeSide: AccountSide = previewSide ?? buildSide ?? userSide ?? 'teen';
   const publicEntrySide: AccountSide = selectedEntrySide ?? previewSide ?? buildSide ?? userSide ?? 'teen';
+  // A restored permanent web session should resume its private, server-
+  // checked onboarding/role route without requiring another public Enter tap.
+  // This only starts routing: fetchPostAuthBootstrap still independently
+  // validates confirmed email, founder authority, profile, and consent.
+  const hasSignedInWebSession = isAuthResolved
+    && Boolean(session?.user && !session.user.is_anonymous);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && hasSignedInWebSession && !splashEntered) {
+      setSplashEntered(true);
+    }
+  }, [hasSignedInWebSession, splashEntered]);
+
   const canOfferSignIn = authChecked
     && profileResolved
     && !hasPermanentSession
@@ -65,6 +79,7 @@ export default function Index() {
 
     async function bootstrap() {
       setBootstrapError(null);
+      setPostAuthNextRoute(null);
       setProfileResolved(false);
       setRequiresAccountUpgrade(false);
       try {
@@ -118,18 +133,17 @@ export default function Index() {
           return;
         }
 
-        const [profileModule, bootstrapModule] = await Promise.all([
-          import('@/features/identity/accountProfile'),
-          import('@/services/auth/postAuthBootstrap'),
-        ]);
-        const profile = await profileModule.hydrateAccountProfile(buildSide);
-        const result = await bootstrapModule.fetchPostAuthBootstrap(profile?.accountSide ?? buildSide, profile);
+        // The server-confirmed-email check in canonical bootstrap MUST run
+        // before any protected profile data is hydrated on session restoration.
+        const bootstrapModule = await import('@/services/auth/postAuthBootstrap');
+        const result = await bootstrapModule.fetchPostAuthBootstrap(buildSide);
         if (cancelled) return;
+        // Bootstrap has already revalidated email and founder authority against
+        // Supabase. Honor its founder destination before public consent gates.
+        setPostAuthNextRoute(result.nextRoute);
         setRequiredConsentsComplete(result.requiredConsentsComplete);
         setAccountProfile(result.profile);
-        if (profile?.accountSide && profile.accountSide !== userSide) {
-          setUserSide(profile.accountSide);
-        } else if (result.accountSide !== userSide) {
+        if (result.accountSide !== userSide) {
           setUserSide(result.accountSide);
         }
       } catch (error) {
@@ -177,6 +191,11 @@ export default function Index() {
         } else {
           router.replace(publicEntrySide === 'parent' ? '/(onboarding)/parent-splash' : '/(onboarding)/welcome');
         }
+        return;
+      }
+
+      if (postAuthNextRoute === '/(dev)/control-room') {
+        router.replace('/(dev)/control-room' as never);
         return;
       }
 
@@ -240,6 +259,7 @@ export default function Index() {
     isLoading,
     isVerificationLoading,
     profileResolved,
+    postAuthNextRoute,
     publicEntrySide,
     requiredConsentsComplete,
     requiresAccountUpgrade,
@@ -249,7 +269,7 @@ export default function Index() {
   ]);
 
   // This watched entrypoint intentionally participates in the exact-head release gate.
-  if (Platform.OS === 'web' && !splashEntered) {
+  if (Platform.OS === 'web' && !splashEntered && !hasSignedInWebSession) {
     return (
       <FrontDoorSceneArrival>
         <WebWelcomeScreen
