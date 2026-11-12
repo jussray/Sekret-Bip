@@ -47,6 +47,19 @@ export default function Index() {
   const effectiveSide: AccountSide = accountProfile?.accountSide ?? buildSide ?? userSide ?? 'teen';
   const publicWelcomeSide: AccountSide = previewSide ?? buildSide ?? userSide ?? 'teen';
   const publicEntrySide: AccountSide = selectedEntrySide ?? previewSide ?? buildSide ?? userSide ?? 'teen';
+  // A restored permanent web session should resume its private, server-
+  // checked onboarding/role route without requiring another public Enter tap.
+  // This only starts routing: fetchPostAuthBootstrap still independently
+  // validates confirmed email, founder authority, profile, and consent.
+  const hasSignedInWebSession = isAuthResolved
+    && Boolean(session?.user && !session.user.is_anonymous);
+
+  useEffect(() => {
+    if (Platform.OS === 'web' && hasSignedInWebSession && !splashEntered) {
+      setSplashEntered(true);
+    }
+  }, [hasSignedInWebSession, splashEntered]);
+
   const canOfferSignIn = authChecked
     && profileResolved
     && !hasPermanentSession
@@ -245,7 +258,7 @@ export default function Index() {
   ]);
 
   // This watched entrypoint intentionally participates in the exact-head release gate.
-  if (Platform.OS === 'web' && !splashEntered) {
+  if (Platform.OS === 'web' && !splashEntered && !hasSignedInWebSession) {
     return (
       <FrontDoorSceneArrival>
         <WebWelcomeScreen
