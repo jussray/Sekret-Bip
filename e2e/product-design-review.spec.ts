@@ -248,6 +248,32 @@ test('Circle renders Open Bip as the public audience layer with the face rule', 
   });
 });
 
+test('Pages renders the scrapbook home and keeps companion conversation and the teen nav', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/pages?bipDevSide=teen', { waitUntil: 'domcontentloaded' });
+
+  await expect(page.getByText("Se'kret Pages ♡", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('your thoughts live here ♡', { exact: true })).toBeVisible();
+  await expect(page.getByText('Dear me…', { exact: true })).toBeVisible();
+  for (const action of ['Photo', 'Voice Bip', 'Write', 'Stickers', 'Video', 'Make a Page', 'See all pages']) {
+    await expect(page.getByRole('button', { name: action, exact: true })).toBeVisible();
+  }
+  await expect(page.getByText('♡ My little universe', { exact: true })).toBeVisible();
+  await expect(page.getByText('talk it out with…', { exact: true })).toBeVisible();
+  await expect(page.getByText('Start talking to Suhana', { exact: true })).toBeVisible();
+  for (const nav of ['Room', 'Pages', 'Calm', 'Circle', 'More']) {
+    await expect(page.getByText(nav, { exact: true }).last()).toBeVisible();
+  }
+
+  await page.getByRole('button', { name: 'Write', exact: true }).click();
+  await expect(page.getByRole('textbox').first()).toBeFocused();
+
+  await testInfo.attach('pages-scrapbook-home.png', {
+    body: await page.screenshot({ animations: 'disabled' }),
+    contentType: 'image/png',
+  });
+});
+
 for (const viewport of VIEWPORTS) {
   test(`Voice Bip complete presence room holds still with reduced motion on ${viewport.name}`, async ({ page }, testInfo) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
