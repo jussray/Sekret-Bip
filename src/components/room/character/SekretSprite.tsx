@@ -13,6 +13,7 @@ import Animated, {
   withSpring,
   Easing,
 } from 'react-native-reanimated';
+import { NIGHT_ROOM_POSE_ASSETS } from '@/config/nightRoomAssetRegistry';
 import {
   getCompanionRuntime,
   type CompanionRuntimeKey,
@@ -71,7 +72,7 @@ export function SekretSprite({ sekret, mood = 'neutral', size }: SekretSpritePro
   return (
     <Animated.View style={spriteStyle} testID={`companion-${runtime.id}`}>
       <Image
-        source={runtime.source}
+        source={sekret === 'night' ? NIGHT_ROOM_POSE_ASSETS.neutral.source : runtime.source}
         style={{ width: resolvedSize, height: resolvedSize / runtime.aspectRatio }}
         resizeMode="contain"
         accessibilityLabel={runtime.label}

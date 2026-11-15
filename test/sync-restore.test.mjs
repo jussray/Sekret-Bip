@@ -146,7 +146,7 @@ test('safeUpsert catches all exceptions (never throws to caller)', () => {
 test('safeDelete matches on both id AND user_id (cannot delete another user\'s row)', () => {
   const fn = syncSrc.slice(
     syncSrc.indexOf('async function safeDelete'),
-    syncSrc.indexOf('// ── Anonymous sign-in'),
+    syncSrc.indexOf('// ── Mood'),
   );
   assert.match(fn, /\.match\(\{ id, user_id: uid \}\)/);
 });
@@ -154,7 +154,7 @@ test('safeDelete matches on both id AND user_id (cannot delete another user\'s r
 test('safeDelete catches all exceptions (never throws to caller)', () => {
   const fn = syncSrc.slice(
     syncSrc.indexOf('async function safeDelete'),
-    syncSrc.indexOf('// ── Anonymous sign-in'),
+    syncSrc.indexOf('// ── Mood'),
   );
   assert.match(fn, /catch.*console\.warn/s);
   assert.doesNotMatch(fn, /throw /);
@@ -418,23 +418,27 @@ test('TABLES has a teen activity summary entry', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ANONYMOUS SESSION
+// AUTH / ANONYMITY SEPARATION (founder canon, 2026-10-30)
+// Anonymous participation lives in Circle; it is never a sign-in path.
+// The sync layer must not be able to create an anonymous session.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-test('ensureAnonymousSession returns null when Supabase is not configured', () => {
-  const fn = syncSrc.slice(syncSrc.indexOf('export async function ensureAnonymousSession'));
-  assert.match(fn, /if \(!sb\) return null/);
+test('sync layer exposes no anonymous session bootstrap', () => {
+  assert.doesNotMatch(syncSrc, /ensureAnonymousSession/);
+  assert.doesNotMatch(syncSrc, /startAnonymousSession/);
+  assert.doesNotMatch(syncSrc, /signInAnonymously/);
 });
 
-test('ensureAnonymousSession delegates session reuse and anonymous fallback to the session service', () => {
-  const fn = syncSrc.slice(syncSrc.indexOf('export async function ensureAnonymousSession'));
-  assert.match(syncSrc, /ensureAnonymousSession as startAnonymousSession/);
-  assert.match(fn, /await startAnonymousSession\(\)/);
+test('session service never creates an anonymous session', () => {
+  const sessionSrc = fs.readFileSync(new URL('../src/services/session.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(sessionSrc, /signInAnonymously/);
+  assert.doesNotMatch(sessionSrc, /ensureAnonymousSession/);
 });
 
-test('ensureAnonymousSession catches errors and returns null (never throws)', () => {
-  const fn = syncSrc.slice(syncSrc.indexOf('export async function ensureAnonymousSession'));
-  assert.match(fn, /catch.*return null/s);
+test('session service resolves only permanent accounts', () => {
+  const sessionSrc = fs.readFileSync(new URL('../src/services/session.ts', import.meta.url), 'utf8');
+  const fn = sessionSrc.slice(sessionSrc.indexOf('export async function getCurrentSessionUserId'));
+  assert.match(fn, /user\.is_anonymous\) return null/);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

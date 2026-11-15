@@ -22,10 +22,6 @@ import {
   createDevTestFamily,
   isDevTestFamilyEnabled,
 } from '@/features/testing/devTestFamily';
-import {
-  resolveParentEntryState,
-  routeForParentEntryState,
-} from '@/services/parentEntryState';
 import { advanceStage } from '@/services/onboarding';
 import { getSupabase } from '@/utils/supabase';
 
@@ -35,20 +31,11 @@ export default function ParentLinkOnboarding() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [needsCodeHelp, setNeedsCodeHelp] = useState(false);
+  const [pendingApproval, setPendingApproval] = useState(false);
   const showFounderTools = isDevTestFamilyEnabled();
 
   const normalized = normalizeParentInviteCode(code);
   const ready = normalized.length === PARENT_INVITE_CODE_LENGTH && !loading;
-
-  async function completeParentLink(linkedTeenId: string) {
-    setUserSide('parent');
-    await AsyncStorage.setItem('linked_teen_id', linkedTeenId);
-    getSupabase()?.auth.getUser().then(({ data }) => {
-      if (data.user) advanceStage(data.user.id, 'parent_linked').catch(() => null);
-    });
-    const parentEntry = await resolveParentEntryState();
-    router.replace(routeForParentEntryState(parentEntry) as never);
-  }
 
   async function handleLink() {
     if (!ready) {
@@ -67,7 +54,14 @@ export default function ParentLinkOnboarding() {
         return;
       }
 
-      await completeParentLink(result.value.teenUserId);
+      if (result.value.status !== 'pending') {
+        await AsyncStorage.removeItem('linked_teen_id');
+        setError('The secure server did not return a pending approval request.');
+        return;
+      }
+      setUserSide('parent');
+      await AsyncStorage.removeItem('linked_teen_id');
+      setPendingApproval(true);
     } catch {
       await AsyncStorage.removeItem('linked_teen_id');
       setError('Could not connect right now. Check your connection and try again.');
@@ -131,6 +125,7 @@ export default function ParentLinkOnboarding() {
               setCode(text);
               setError('');
               setNeedsCodeHelp(false);
+              setPendingApproval(false);
             }}
             placeholder="AB12CD34"
             placeholderTextColor="#355246"
@@ -157,6 +152,11 @@ export default function ParentLinkOnboarding() {
           </View>
         ) : null}
 
+        {pendingApproval ? (
+          <Text style={styles.privacy}>
+            Request sent. Your teen must approve it under Parent Link in Teen Settings before any sharing begins.
+          </Text>
+        ) : null}
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TouchableOpacity
@@ -168,7 +168,7 @@ export default function ParentLinkOnboarding() {
           {loading && ready ? (
             <ActivityIndicator color="#062015" />
           ) : (
-            <Text style={styles.primaryText}>Connect accounts</Text>
+            <Text style={styles.primaryText}>Request teen approval</Text>
           )}
         </TouchableOpacity>
 
