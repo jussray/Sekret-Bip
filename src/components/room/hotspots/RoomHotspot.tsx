@@ -29,8 +29,10 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   withDelay,
+  withRepeat,
   Easing,
 } from 'react-native-reanimated';
+import { useReducedMotion } from '../../../../hooks/useReducedMotion';
 
 const { width: W, height: H } = Dimensions.get('window');
 
@@ -56,7 +58,11 @@ export function RoomHotspot({
   onPress,
 }: RoomHotspotProps) {
   const [showLabel, setShowLabel] = useState(false);
+  const [hasInteracted, setHasInteracted] = useState(false);
+  const [discoveryWindowOpen, setDiscoveryWindowOpen] = useState(true);
   const labelOpacity = useSharedValue(0);
+  const discoverPulse = useSharedValue(0);
+  const reduceMotion = useReducedMotion();
 
   const hideLabel = useCallback(() => {
     labelOpacity.value = withTiming(0, { duration: 300, easing: Easing.out(Easing.ease) });
@@ -74,7 +80,41 @@ export function RoomHotspot({
 
   const labelStyle = useAnimatedStyle(() => ({ opacity: labelOpacity.value }));
 
+  // #958: an interactive hotspot is otherwise a fully invisible touch zone —
+  // a first-time user has no way to know it's there. A soft, bounded glow
+  // invites discovery, then gets out of the way on its own (8s) even if
+  // never pressed — never a persistent icon sitting on top of the room art.
+  useEffect(() => {
+    const t = setTimeout(() => setDiscoveryWindowOpen(false), 8000);
+    return () => clearTimeout(t);
+  }, []);
+
+  const showDiscoverCue = Boolean(onPress) && !hasInteracted && discoveryWindowOpen;
+
+  useEffect(() => {
+    if (!showDiscoverCue) {
+      discoverPulse.value = withTiming(0, { duration: 200 });
+      return;
+    }
+    if (reduceMotion) {
+      // Static, non-animated cue — no unnecessary motion for reduced-motion users.
+      discoverPulse.value = withTiming(0.5, { duration: 1 });
+      return;
+    }
+    discoverPulse.value = withRepeat(
+      withTiming(1, { duration: 1400, easing: Easing.inOut(Easing.sin) }),
+      -1,
+      true,
+    );
+  }, [showDiscoverCue, reduceMotion, discoverPulse]);
+
+  const discoverStyle = useAnimatedStyle(() => ({
+    opacity: 0.18 + discoverPulse.value * 0.22,
+    transform: [{ scale: 1 + discoverPulse.value * 0.06 }],
+  }));
+
   const handlePress = () => {
+    setHasInteracted(true);
     onPress?.();
     if (label) {
       setShowLabel(true);
@@ -86,6 +126,12 @@ export function RoomHotspot({
 
   return (
     <View style={[styles.root, { left, top, width, height }]}>
+      {showDiscoverCue && (
+        <Animated.View
+          style={[styles.discoverGlow, discoverStyle]}
+          pointerEvents="none"
+        />
+      )}
       <TouchableOpacity
         style={StyleSheet.absoluteFill}
         onPress={handlePress}
@@ -106,6 +152,17 @@ const styles = StyleSheet.create({
   root: {
     position: 'absolute',
     zIndex: 10,
+  },
+  discoverGlow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.55)',
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   tooltip: {
     position: 'absolute',
