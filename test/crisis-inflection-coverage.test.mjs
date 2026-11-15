@@ -61,6 +61,10 @@ const CRISIS_PHRASES = [
   'I was assaulted last night',
   'she was assaulting me',
   'there was an assault',
+  "I've been hurting myself again",
+  'she was cutting myself at night',
+  'he is self-harming again',
+  'I am killing myself slowly',
 ];
 
 const BENIGN_PHRASES = [

@@ -50,7 +50,7 @@ export function parseRequest(argv) {
   return invocationId ? { mission, sha, invocationId } : { mission, sha };
 }
 
-export function safeEnvironment(env = process.env) {
+export function safeEnvironment() {
   // Child processes receive no GitHub, Cloudflare, Supabase, provider, or user secrets.
   return {
     PATH: '/.sprite/bin:/usr/local/bin:/usr/bin:/bin',

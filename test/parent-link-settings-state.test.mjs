@@ -44,7 +44,7 @@ test('the shared card separates loading, no-link, offline retry, and recorded st
     assert.match(card, new RegExp(`kind: '${state}'`));
   }
   for (const status of ['active', 'pending', 'revoked', 'expired']) {
-    assert.match(card, new RegExp(`link\.status === '${status}'`));
+    assert.match(card, new RegExp(`link\\.status === '${status}'`));
   }
   assert.match(card, /Retry status/);
   assert.match(card, /links\.length === 0/);
