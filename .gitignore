@@ -23,6 +23,10 @@ web-build/
 # ── Room production foreman local state ──────────────────────────────────
 .room-foreman/
 
+# ── Python (services/piper-tts) ───────────────────────────────────────────
+__pycache__/
+*.pyc
+
 # ── Browser test artifacts ────────────────────────────────────────────────
 playwright-report/
 test-results/
