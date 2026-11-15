@@ -71,6 +71,8 @@ COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # ── App ───────────────────────────────────────────────────────────────────────
+COPY auth_guard.py ./auth_guard.py
+COPY piper_runtime.py ./piper_runtime.py
 COPY server.py ./server.py
 
 EXPOSE 8080
