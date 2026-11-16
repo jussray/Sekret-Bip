@@ -1,3 +1,5 @@
+// Development-only legacy welcome visual and motion regression checks.
+// The live three-portal experience is covered by canon-universe-public-portal.spec.ts.
 import { expect, test } from '@playwright/test';
 
 type MotionSample = {
@@ -49,7 +51,7 @@ test('canonical teen front door enters as one scene, settles, and stays interact
   await page.setViewportSize({ width: 390, height: 844 });
   await installArrivalSampler(page);
 
-  await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'domcontentloaded' });
 
   const scene = page.getByTestId('web-welcome-scene-arrival');
   const hero = page.getByTestId('web-welcome-hero-teen');
@@ -113,7 +115,7 @@ test('reduced motion renders the canonical scene settled from the first sampled 
   await page.setViewportSize({ width: 390, height: 844 });
   await installArrivalSampler(page);
 
-  await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'domcontentloaded' });
 
   const scene = page.getByTestId('web-welcome-scene-arrival');
   await expect(scene).toBeVisible();
@@ -177,7 +179,7 @@ test('canonical teen front door reveals family artwork and switches to Bip Jr wi
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 390, height: 844 });
   await sampleAudienceMotion(page);
-  await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'domcontentloaded' });
 
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('web-welcome-scene-settled')).toHaveCount(1, { timeout: 10_000 });
@@ -223,7 +225,7 @@ test('canonical teen front door reveals family artwork and switches to Bip Jr wi
 test('reduced motion renders both audience scenes still with working family access', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'domcontentloaded' });
   const opacity = () => page.evaluate(() => ['web-welcome-copy-reveal', 'web-welcome-hero-reveal', 'web-welcome-world-cues'].map(id => {
     const node = document.querySelector('[data-testid="' + id + '"]');
     return node ? Number.parseFloat(getComputedStyle(node).opacity) : null;
@@ -250,7 +252,7 @@ test('cold Bip Jr artwork waits for image loading before hero and cues are revea
     await route.continue();
   });
 
-  await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'domcontentloaded' });
+  await page.goto('/?bipDevAudience=bip-jr&bipLegacyWelcome=1', { waitUntil: 'domcontentloaded' });
   const hero = page.getByTestId('web-welcome-hero-reveal');
   const cues = page.getByTestId('web-welcome-world-cues');
   await expect(hero).toBeAttached({ timeout: 30_000 });

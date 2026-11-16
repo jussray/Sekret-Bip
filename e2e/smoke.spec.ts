@@ -1,7 +1,9 @@
+// Development-only legacy welcome visual and motion regression checks.
+// The live three-portal experience is covered by canon-universe-public-portal.spec.ts.
 import { expect, test } from '@playwright/test';
 
 test('teen front door leads directly into age-bucket onboarding', async ({ page }) => {
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   const enter = page.getByTestId('web-welcome-enter');
   await expect(enter).toBeVisible({ timeout: 30_000 });
   await enter.click();
@@ -10,7 +12,7 @@ test('teen front door leads directly into age-bucket onboarding', async ({ page 
 });
 
 test('parent front door leads directly into parent onboarding', async ({ page }) => {
-  await page.goto('/?bipDevAudience=bip-jr');
+  await page.goto('/?bipDevAudience=bip-jr&bipLegacyWelcome=1');
   const enter = page.getByTestId('web-welcome-enter');
   await expect(enter).toBeVisible({ timeout: 30_000 });
   await expect(enter).toHaveAccessibleName('Bip Jr family welcome — continue to family setup');
@@ -21,7 +23,7 @@ test('parent front door leads directly into parent onboarding', async ({ page })
 });
 
 test('rollback front door exposes bounded working actions and canonical identity', async ({ page }) => {
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   await expect(page.getByTestId('web-welcome-shell')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible();
   await expect(page.getByText('Come on in.')).toBeVisible();
@@ -37,7 +39,7 @@ test('rollback front door exposes bounded working actions and canonical identity
 });
 
 test('returning Teen user can reach sign in after no-session restoration', async ({ page }) => {
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   const signIn = page.getByTestId('web-welcome-sign-in');
   await expect(signIn).toBeVisible({ timeout: 30_000 });
   await expect(signIn).toHaveAccessibleName("Sign in to your existing Se'kret Bip account");
@@ -47,7 +49,7 @@ test('returning Teen user can reach sign in after no-session restoration', async
 });
 
 test('returning Bip Jr user preserves the parent side when opening sign in', async ({ page }) => {
-  await page.goto('/?bipDevAudience=bip-jr');
+  await page.goto('/?bipDevAudience=bip-jr&bipLegacyWelcome=1');
   const signIn = page.getByTestId('web-welcome-sign-in');
   await expect(signIn).toBeVisible({ timeout: 30_000 });
   await signIn.click();
@@ -56,7 +58,7 @@ test('returning Bip Jr user preserves the parent side when opening sign in', asy
 });
 
 test('web welcome About control is keyboard accessible and reveals truthful scope', async ({ page }) => {
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   const about = page.getByTestId('web-welcome-about');
   await expect(about).toBeVisible({ timeout: 30_000 });
   await expect(about).toHaveAccessibleName("About Se'kret Bip");
@@ -69,7 +71,7 @@ test('web welcome About control is keyboard accessible and reveals truthful scop
 });
 
 test('web welcome Enter supports keyboard activation', async ({ page }) => {
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   const enter = page.getByTestId('web-welcome-enter');
   await expect(enter).toBeVisible({ timeout: 30_000 });
   await enter.focus();
@@ -79,7 +81,7 @@ test('web welcome Enter supports keyboard activation', async ({ page }) => {
 
 test('web welcome hero safe area keeps the primary action below teen artwork', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   const heroSafeArea = page.getByTestId('web-welcome-hero-safe-area');
   const enter = page.getByTestId('web-welcome-enter');
   await expect(heroSafeArea).toBeVisible({ timeout: 30_000 });
@@ -93,7 +95,7 @@ test('web welcome hero safe area keeps the primary action below teen artwork', a
 
 test('web welcome hero safe area keeps the primary action below Bip Jr artwork', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?bipDevAudience=bip-jr');
+  await page.goto('/?bipDevAudience=bip-jr&bipLegacyWelcome=1');
   const heroSafeArea = page.getByTestId('web-welcome-hero-safe-area');
   const enter = page.getByTestId('web-welcome-enter');
   await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible({ timeout: 30_000 });
@@ -106,7 +108,7 @@ test('web welcome hero safe area keeps the primary action below Bip Jr artwork',
 
 test('frontend entry renders at phone width without horizontal overflow', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   const enter = page.getByTestId('web-welcome-enter');
   await expect(enter).toBeVisible({ timeout: 30_000 });
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
@@ -120,7 +122,7 @@ test('frontend entry renders at phone width without horizontal overflow', async 
 
 test('frontend entry remains contained on a short narrow phone viewport', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   const shell = page.getByTestId('web-welcome-shell');
   await expect(shell).toBeVisible({ timeout: 30_000 });
   const hasHorizontalOverflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
@@ -134,7 +136,7 @@ test('frontend entry remains contained on a short narrow phone viewport', async 
 
 test('frontend entry remains contained at tablet width', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1024 });
-  await page.goto('/?bipDevAudience=bip-jr');
+  await page.goto('/?bipDevAudience=bip-jr&bipLegacyWelcome=1');
   const shell = page.getByTestId('web-welcome-shell');
   await expect(shell).toBeVisible({ timeout: 30_000 });
   const shellBox = await shell.boundingBox();
@@ -147,7 +149,7 @@ test('frontend entry remains contained at tablet width', async ({ page }) => {
 
 test('web welcome remains stable when reduced motion is requested', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/?bipDevAudience=teen');
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1');
   const shell = page.getByTestId('web-welcome-shell');
   await expect(shell).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible();
@@ -203,7 +205,7 @@ test('protected teen routes remain behind the account and verification boundary'
 });
 
 test('authorization evidence and secrets stay out of the public surface', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?bipLegacyWelcome=1');
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible({ timeout: 30_000 });
   const visibleText = await page.locator('body').innerText();
   for (const forbidden of [

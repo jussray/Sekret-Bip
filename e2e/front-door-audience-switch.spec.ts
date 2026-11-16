@@ -1,3 +1,5 @@
+// Development-only legacy welcome visual and motion regression checks.
+// The live three-portal experience is covered by canon-universe-public-portal.spec.ts.
 import { expect, test, type Page } from '@playwright/test';
 
 const VIEWPORTS = [
@@ -24,7 +26,7 @@ async function expectNoDocumentHorizontalOverflow(page: Page) {
 test('caveman visual teaches the doorway, stays contained, then clears for interaction', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'domcontentloaded' });
 
   const primer = page.getByTestId('web-welcome-caveman-visual');
   await expect(primer).toBeVisible({ timeout: 5_000 });
@@ -48,7 +50,7 @@ test('caveman visual teaches the doorway, stays contained, then clears for inter
 for (const viewport of VIEWPORTS) {
   test(`public front door switches one audience at a time on ${viewport.name}`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto('/?bipDevAudience=teen', { waitUntil: 'networkidle' });
+    await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'networkidle' });
 
     await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible();
     await expect(page.getByTestId('web-welcome-hero-bip-jr')).toHaveCount(0);

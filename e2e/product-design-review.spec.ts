@@ -1,3 +1,5 @@
+// Development-only legacy welcome visual and motion regression checks.
+// The live three-portal experience is covered by canon-universe-public-portal.spec.ts.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -11,14 +13,14 @@ const VIEWPORTS = [
 const VARIANTS = [
   {
     name: 'teen',
-    url: '/?bipDevAudience=teen',
+    url: '/?bipDevAudience=teen&bipLegacyWelcome=1',
     heroTestId: 'web-welcome-hero-teen',
     identityText: 'YOUR PEOPLE. YOUR PEACE.',
     enterName: "Se'kret Bip teen welcome — continue to age setup",
   },
   {
     name: 'bip-jr',
-    url: '/?bipDevAudience=bip-jr',
+    url: '/?bipDevAudience=bip-jr&bipLegacyWelcome=1',
     heroTestId: 'web-welcome-hero-bip-jr',
     identityText: 'YOUR FAMILY. YOUR SPACE.',
     enterName: 'Bip Jr family welcome — continue to family setup',
@@ -193,7 +195,7 @@ test('reduced motion is still from the first rendered hero frame', async ({ page
     window.requestAnimationFrame(capture);
   });
 
-  await page.goto('/?bipDevAudience=teen', { waitUntil: 'networkidle' });
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'networkidle' });
   await expect(page.getByTestId('web-welcome-hero-motion')).toBeVisible();
   await page.waitForTimeout(400);
 
@@ -217,7 +219,7 @@ test('reduced motion is still from the first rendered hero frame', async ({ page
 });
 
 test('Teen entry preserves the teen onboarding path', async ({ page }) => {
-  await page.goto('/?bipDevAudience=teen', { waitUntil: 'networkidle' });
+  await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'networkidle' });
   await page.getByTestId('web-welcome-enter').click();
   await expect(page).toHaveURL(/\/welcome(?:\?|$)/);
   await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 15_000 });
@@ -225,7 +227,7 @@ test('Teen entry preserves the teen onboarding path', async ({ page }) => {
 });
 
 test('Bip Jr entry preserves the parent onboarding path without a splash step', async ({ page }) => {
-  await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'networkidle' });
+  await page.goto('/?bipDevAudience=bip-jr&bipLegacyWelcome=1', { waitUntil: 'networkidle' });
   await page.getByTestId('web-welcome-enter').click();
   await expect(page).toHaveURL(/\/parent-welcome(?:\?|$)/);
   await expect(page.getByRole('button', { name: 'Create my Parent account' })).toBeVisible({ timeout: 15_000 });
@@ -347,7 +349,7 @@ test('Founder Visual Truth: Teen first-five-minute packet', async ({ page }, tes
 
   try {
     currentStage = '01-teen-welcome';
-    await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
+    await page.goto('/?bipDevAudience=teen&bipLegacyWelcome=1', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('web-welcome-shell')).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
     await expectNoDocumentHorizontalOverflow(page);
