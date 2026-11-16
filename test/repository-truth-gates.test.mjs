@@ -257,3 +257,79 @@ test('branch hygiene classifies prohibited duplicate naming without deleting ref
     else process.env.GITHUB_HEAD_REF = previousHeadRef;
   }
 });
+
+
+// Require exact job-level conditions. Substring matches allow unsafe expressions
+// such as "pull_request_target || true" to masquerade as safe skipped jobs.
+function continuityJobSkipContract(source, jobName) {
+  const marker = '\n  ' + jobName + ':\n';
+  const index = source.indexOf(marker);
+  assert.notEqual(index, -1, 'Missing continuity job: ' + jobName);
+  const rest = source.slice(index + marker.length);
+  const next = rest.search(/\n  [A-Za-z_][\w-]*:\s*\n/);
+  return next < 0 ? rest : rest.slice(0, next);
+}
+function continuityWorkflowSkipContract() {
+  return fs.readFileSync(path.join(repositoryRoot, '.github/workflows/pr-continuity.yml'), 'utf8');
+}
+function assertContinuityJobCondition(source, jobName, expectedCondition) {
+  const job = continuityJobSkipContract(source, jobName);
+  const conditions = job.split('\n').filter((line) => /^    if:/.test(line));
+  assert.deepEqual(conditions, ['    if: ' + expectedCondition], 'Unsafe or missing job-level if on ' + jobName);
+  return job;
+}
+test('CI-SKIP BIP01 PR audit remains on trusted base and exact PR head', () => {
+  const source = continuityWorkflowSkipContract();
+  const audit = assertContinuityJobCondition(source, 'exact-head-audit', "github.event_name == 'pull_request'");
+  assert.match(audit, /ref: \$\{\{ github\.event\.pull_request\.base\.sha \}\}/);
+  assert.match(audit, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(audit, /node scripts\/pr-continuity\.mjs audit/);
+});
+test('CI-SKIP BIP02 metadata is PR-target only, with trusted evaluator', () => {
+  const metadata = assertContinuityJobCondition(
+    continuityWorkflowSkipContract(), 'metadata-receipt', "github.event_name == 'pull_request_target'",
+  );
+  assert.match(metadata, /ref: \$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(metadata, /ref: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  assert.match(metadata, /^    permissions:\n      contents: read\n      pull-requests: write$/m);
+});
+test('CI-SKIP BIP03 rollover remains main-only explicit dispatch', () => {
+  const source = continuityWorkflowSkipContract();
+  const rollover = assertContinuityJobCondition(
+    source, 'rollover', "github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'",
+  );
+  assert.doesNotMatch(source, /\n\s{2}push:\s*\n/);
+  assert.match(rollover, /contents: write/);
+  assert.match(rollover, /node scripts\/pr-continuity\.mjs rollover/);
+});
+test('CI-SKIP BIP04 repository truth runs on exact PR head when continuity metadata skips', () => {
+  const source = fs.readFileSync(path.join(repositoryRoot, '.github/workflows/repository-truth-gate.yml'), 'utf8');
+  assert.match(source, /pull_request:\n\s+branches: \[main\]/);
+  assert.match(source, /EXPECTED_HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \|\| github\.sha \}\}/);
+  assert.match(source, /ref: \$\{\{ env\.EXPECTED_HEAD_SHA \}\}/);
+  assert.match(source, /node --test test\/repository-truth-gates\.test\.mjs/);
+});
+test('CI-SKIP BIP05 deny broadened metadata, rollover, or always-on execution', () => {
+  const source = continuityWorkflowSkipContract();
+  const original = "if: github.event_name == 'pull_request_target'";
+  for (const replacement of [
+    'if: always()',
+    original + ' || true',
+    original + " || github.event_name == 'pull_request'",
+    'if: >',
+  ]) {
+    const mutant = source.replace(original, replacement);
+    assert.notEqual(mutant, source);
+    assert.throws(
+      () => assertContinuityJobCondition(mutant, 'metadata-receipt', "github.event_name == 'pull_request_target'"),
+      /Unsafe or missing job-level if/,
+    );
+  }
+  const oldRollover = "if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'";
+  const mutant = source.replace(oldRollover, oldRollover + ' || true');
+  assert.notEqual(mutant, source);
+  assert.throws(
+    () => assertContinuityJobCondition(mutant, 'rollover', "github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'"),
+    /Unsafe or missing job-level if/,
+  );
+});
