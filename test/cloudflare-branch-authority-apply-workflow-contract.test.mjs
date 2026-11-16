@@ -40,6 +40,10 @@ test('founder repair mutates only canonical sekret-backend branch authority', ()
   assert.match(applyWorkflow, /alphaWorkerMutationPerformed: false/);
   assert.match(applyWorkflow, /pagesMutationPerformed: false/);
   assert.doesNotMatch(applyWorkflow, /method: 'DELETE'/);
+  assert.match(applyWorkflow, /acceptedProductionBuildCommands/);
+  assert.match(applyWorkflow, /npm test && npm run type-check && npm run lint/);
+  assert.match(applyWorkflow, /acceptedProductionBuildCommands\.has\(verifyTrigger\.buildCommand\)/);
+  assert.doesNotMatch(applyWorkflow, /const patch = \{[^\n]*build_command/);
   assert.equal(targets.separateWorkerAuthorities.bip.mutationPolicy, 'preserve-until-exact-provider-binding-proven');
 });
 
