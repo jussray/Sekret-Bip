@@ -11,11 +11,33 @@ test('AI search definition page is crawlable, extractable, and privacy-bounded',
   const robotsResponse = await request.get('/robots.txt');
   expect(robotsResponse.ok()).toBe(true);
   const robots = await robotsResponse.text();
+  expect(robots).toContain('User-agent: OAI-SearchBot');
+  expect(robots).toContain('User-agent: GPTBot');
+  expect(robots).toContain('User-agent: Claude-SearchBot');
+  expect(robots).toContain('User-agent: ClaudeBot');
+  expect(robots).toContain('User-agent: Google-Extended');
   expect(robots).toContain('Disallow: /');
   expect(robots).toContain('Allow: /what-is-sekret-bip/');
   expect(robots).toContain('Allow: /how-it-works/');
   expect(robots).toContain('Allow: /privacy-and-safety/');
+  expect(robots).toContain('Allow: /crawlers.json$');
   expect(robots).toContain('Sitemap: https://sekretbip.net/sitemap.xml');
+
+  const crawlerPolicyResponse = await request.get('/crawlers.json');
+  expect(crawlerPolicyResponse.ok()).toBe(true);
+  const crawlerPolicy = await crawlerPolicyResponse.json() as {
+    schema?: string;
+    policy?: Record<string, string>;
+    bots?: Record<string, string>;
+    attribution?: { requested?: boolean };
+  };
+  expect(crawlerPolicy.schema).toBe('juss/ai-crawler-contract@v1');
+  expect(crawlerPolicy.policy?.search_discovery).toBe('allow_bounded_public_paths');
+  expect(crawlerPolicy.policy?.model_training).toBe('deny');
+  expect(crawlerPolicy.policy?.write_or_action_authority).toBe('none');
+  expect(crawlerPolicy.bots?.['OAI-SearchBot']).toBe('allow_bounded_public_paths');
+  expect(crawlerPolicy.bots?.GPTBot).toBe('deny');
+  expect(crawlerPolicy.attribution?.requested).toBe(true);
 
   const sitemapResponse = await request.get('/sitemap.xml');
   expect(sitemapResponse.ok()).toBe(true);
