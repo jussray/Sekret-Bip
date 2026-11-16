@@ -48,8 +48,8 @@ test('production launch proof binds Pages and Worker to the same release', () =>
   assert.match(productionSmoke, /\.well-known\/sekret-release\.json/);
   assert.match(productionSmoke, /https:\/\/api\.sekretbip\.net\/health/);
   assert.match(productionSmoke, /releaseSha:\s*expectedReleaseSha/);
-  assert.match(productionSmoke, /YOUR PEOPLE\. YOUR PEACE\./);
-  assert.match(productionSmoke, /YOUR FAMILY\. YOUR SPACE\./);
+  assert.match(productionSmoke, /bip-universe-portal-teens/);
+  assert.match(productionSmoke, /bip-universe-portal-bip-jr/);
   assert.doesNotMatch(productionSmoke, /THE SOFTER ORIGINAL/);
   assert.doesNotMatch(productionSmoke, /toHaveText\('Suhana'\)/);
 });
