@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { AccountSide } from '@/features/identity/accountProfile';
 import { FRONT_DOOR_THEME } from '@/constants/frontDoorTheme';
 import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
+import { CanonUniverseWelcome } from './CanonUniverseWelcome';
 
 const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
@@ -61,7 +62,22 @@ function getInitialReducedMotionPreference(): boolean | null {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-export function WebWelcomeScreen({
+// Keep the prior Teen/Bip Jr rendering only for development rollback previews.
+export function WebWelcomeScreen(props: WebWelcomeScreenProps) {
+  const legacyPreview = __DEV__
+    && typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('bipLegacyWelcome') === '1';
+
+  return legacyPreview
+    ? <LegacyWebWelcomeScreen {...props} />
+    : <CanonUniverseWelcome
+        onEnter={props.onEnter}
+        showSignIn={props.showSignIn}
+        defaultSide={props.variant}
+      />;
+}
+
+function LegacyWebWelcomeScreen({
   onEnter,
   variant = 'teen',
   audience,
