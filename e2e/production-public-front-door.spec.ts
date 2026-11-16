@@ -29,7 +29,10 @@ test('anonymous public front door reaches Se’kret Bip without Cloudflare Acces
   expect(response, 'public front door must return a browser response').not.toBeNull();
   expect(response!.status(), 'public front door must not fail at transport').toBeLessThan(400);
 
-  await expect(page.getByTestId('web-welcome-enter')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('bip-universe-hero')).toBeVisible({ timeout: 30_000 });
+  for (const portal of ['teens', 'bip-jr', 'parents']) {
+    await expect(page.getByTestId(`bip-universe-portal-${portal}`)).toBeVisible();
+  }
 
   const finalUrl = new URL(page.url());
   expect(finalUrl.hostname).toBe('sekretbip.net');

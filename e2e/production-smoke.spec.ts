@@ -51,11 +51,11 @@ test('production exposes the exact expected Pages and Worker release commit', as
 
 test('production Teen front door renders and Enter reaches Teen onboarding', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?bipDevAudience=teen', { waitUntil: 'networkidle' });
+  await page.goto('/', { waitUntil: 'networkidle' });
 
-  await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
-  await expect(page.getByText('Come on in.', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('bip-universe-hero')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('bip-universe-portal-teens')).toBeVisible();
+  await expect(page.getByTestId('bip-universe-portal-parents')).toBeVisible();
   await expect(page.getByTestId('web-welcome-suhana')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
 
@@ -64,19 +64,19 @@ test('production Teen front door renders and Enter reaches Teen onboarding', asy
     contentType: 'image/png',
   });
 
-  await page.getByTestId('web-welcome-enter').click();
+  await page.getByTestId('bip-universe-portal-teens').click();
   await expect(page).toHaveURL(/\/welcome(?:\?|$)/);
   await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
 });
 
 test('production Bip Jr front door renders and Enter reaches parent onboarding', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'networkidle' });
+  await page.goto('/', { waitUntil: 'networkidle' });
 
-  await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText('YOUR FAMILY. YOUR SPACE.', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('bip-universe-hero')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('bip-universe-portal-bip-jr')).toBeVisible();
   await expect(
-    page.getByText('A calm family space for younger kids, with a grown-up beside them.', { exact: true }),
+    page.getByTestId('bip-universe-portal-parents'),
   ).toBeVisible();
   await expect(page.getByTestId('web-welcome-suhana')).toHaveCount(0);
   await expectNoHorizontalOverflow(page);
@@ -86,7 +86,7 @@ test('production Bip Jr front door renders and Enter reaches parent onboarding',
     contentType: 'image/png',
   });
 
-  await page.getByTestId('web-welcome-enter').click();
+  await page.getByTestId('bip-universe-portal-bip-jr').click();
   await expect(page).toHaveURL(/\/parent-welcome(?:\?|$)/);
   await expect(page.getByRole('button', { name: 'Create my Parent account' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'I already have an account' })).toBeVisible({ timeout: 30_000 });
@@ -101,7 +101,7 @@ test('unauthenticated visitor cannot reach a protected teen route from a blank s
 
   await page.goto('/comfort');
 
-  await expect(page.getByTestId('web-welcome-enter')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('bip-universe-portal-teens')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('Grounding Steps')).not.toBeVisible();
   await expect(page.getByText('Bridge')).toHaveCount(0);
   expect(consoleErrors).toEqual([]);

@@ -220,12 +220,12 @@ test('Access interception is promoted into the retained v5 blocker receipt evide
   assert.deepEqual(blocker.checkSummary, {missing: [], pending: [], failed: [], unsuccessful: []});
 });
 
-test('production Playwright verifies both public variants and their Enter paths', () => {
+test('production Playwright verifies three illustrated portals and existing safe routes', () => {
   assert.match(productionConfig, /testMatch/);
-  assert.match(productionSmoke, /web-welcome-hero-teen/);
-  assert.match(productionSmoke, /web-welcome-hero-bip-jr/);
-  assert.match(productionSmoke, /YOUR PEOPLE\. YOUR PEACE\./);
-  assert.match(productionSmoke, /YOUR FAMILY\. YOUR SPACE\./);
+  assert.match(productionSmoke, /bip-universe-hero/);
+  assert.match(productionSmoke, /bip-universe-portal-bip-jr/);
+  assert.match(productionSmoke, /bip-universe-portal-teens/);
+  assert.match(productionSmoke, /bip-universe-portal-parents/);
   assert.match(productionSmoke, /How old are you\?/);
   assert.match(productionSmoke, /parent-welcome/);
   assert.match(productionSmoke, /Create my Parent account/);

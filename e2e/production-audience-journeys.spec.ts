@@ -22,11 +22,11 @@ async function expectCleanPage(page: import('@playwright/test').Page, run: () =>
 test('production Teen journey reaches age-gated onboarding without a write', async ({ page }, testInfo) => {
   await expectCleanPage(page, async () => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?bipDevAudience=teen', { waitUntil: 'networkidle' });
-    await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
+    await page.goto('/', { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('bip-universe-hero')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('bip-universe-portal-teens')).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    await page.getByTestId('web-welcome-enter').click();
+    await page.getByTestId('bip-universe-portal-teens').click();
     await expect(page).toHaveURL(/\/welcome(?:\?|$)/);
     await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: /13\s*[–-]\s*15 Teen mode starts/i })).toBeVisible();
@@ -37,11 +37,11 @@ test('production Teen journey reaches age-gated onboarding without a write', asy
 test('production Bip Jr journey hands off to the parent-controlled entry without a write', async ({ page }, testInfo) => {
   await expectCleanPage(page, async () => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'networkidle' });
-    await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('YOUR FAMILY. YOUR SPACE.', { exact: true })).toBeVisible();
+    await page.goto('/', { waitUntil: 'networkidle' });
+    await expect(page.getByTestId('bip-universe-hero')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId('bip-universe-portal-bip-jr')).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    await page.getByTestId('web-welcome-enter').click();
+    await page.getByTestId('bip-universe-portal-bip-jr').click();
     await expect(page).toHaveURL(/\/parent-welcome(?:\?|$)/);
     await expect(page.getByRole('button', { name: 'Create my Parent account' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'I already have an account' })).toBeVisible({ timeout: 30_000 });
@@ -53,8 +53,8 @@ test('production Bip Jr journey hands off to the parent-controlled entry without
 test('production Parent journey reaches sign-in and keeps approvals protected', async ({ page }, testInfo) => {
   await expectCleanPage(page, async () => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/?bipDevAudience=bip-jr', { waitUntil: 'networkidle' });
-    await page.getByTestId('web-welcome-enter').click();
+    await page.goto('/', { waitUntil: 'networkidle' });
+    await page.getByTestId('bip-universe-portal-parents').click();
     await expect(page).toHaveURL(/\/parent-welcome(?:\?|$)/);
     await page.getByRole('button', { name: 'I already have an account' }).click();
     await expect(page).toHaveURL(/\/login(?:\?|$)/);
