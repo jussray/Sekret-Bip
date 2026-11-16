@@ -20,7 +20,15 @@ async function registerAndSync(): Promise<void> {
   if (!supabase) return;
 
   const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.user) return;
+  if (!session?.user || session.user.is_anonymous || !session.user.email_confirmed_at) return;
+
+  // Push registration is a protected account side effect. A cached token alone
+  // never grants it: recheck the same user's email status with Supabase Auth.
+  const { data: identity, error: identityError } = await supabase.auth.getUser();
+  if (
+    identityError || !identity.user || identity.user.id !== session.user.id
+    || identity.user.is_anonymous || !identity.user.email_confirmed_at
+  ) return;
 
   const registration = await registerForPushNotificationsAsync();
   if (registration.token) await syncExpoPushToken(registration.token);
@@ -41,7 +49,7 @@ export function NotificationBootstrap() {
 
     const supabase = getSupabase();
     const authSubscription = supabase?.auth.onAuthStateChange((event, session) => {
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user && !session.user.is_anonymous && session.user.email_confirmed_at) {
         void registerAndSync().catch((error) => {
           if (__DEV__) console.info('[notifications] auth sync failed', error);
         });
