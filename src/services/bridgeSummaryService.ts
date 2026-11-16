@@ -14,6 +14,7 @@ import { getSupabase } from '@/utils/supabase';
 
 const BASE_URL = ((process.env as Record<string, string | undefined>).EXPO_PUBLIC_BACKEND_URL ?? '').replace(/\/$/, '');
 const CONTROLLED_ALPHA_SOURCE_KINDS = new Set<BridgeShareSourceRef['kind']>(['journal', 'mood']);
+const BRIDGE_SUMMARY_REQUEST_TIMEOUT_MS = 15_000;
 
 export interface BridgeSharePreviewItem {
   kind: BridgeShareSourceRef['kind'];
@@ -49,6 +50,19 @@ interface BridgeSummaryRow {
 
 function unavailable<T>(): RelationshipResult<T> {
   return { ok: false, code: 'not_configured', message: 'Bridge Summaries are not available yet.' };
+}
+
+function serverError<T>(message = 'Bridge could not complete that action.'): RelationshipResult<T> {
+  return { ok: false, code: 'server_error', message, retryable: true };
+}
+
+function summaryUnavailable(): RelationshipResult<CreateBridgeShareRequestValue> {
+  return {
+    ok: false,
+    code: 'ai_unavailable',
+    message: 'The share was saved, but the summary is still being prepared.',
+    retryable: true,
+  };
 }
 
 export function buildBridgeSharePreview(
@@ -107,7 +121,7 @@ export async function createBridgeShareRequest(
     });
 
     if (error || typeof data !== 'string') {
-      return { ok: false, code: 'server_error', message: error?.message || 'Could not create the Bridge share.' };
+      return serverError('Could not create the Bridge share.');
     }
 
     if (!BASE_URL) {
@@ -119,24 +133,36 @@ export async function createBridgeShareRequest(
       };
     }
 
-    const headers = await backendAuthHeaders();
-    const response = await fetch(`${BASE_URL}/api/bridge/summary/generate`, {
-      method: 'POST',
-      headers: { ...headers, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId: data, idempotencyKey: input.idempotencyKey }),
-    });
+    let response: Response;
+    try {
+      const headers = await backendAuthHeaders();
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), BRIDGE_SUMMARY_REQUEST_TIMEOUT_MS);
+      try {
+        response = await fetch(`${BASE_URL}/api/bridge/summary/generate`, {
+          method: 'POST',
+          headers: { ...headers, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId: data, idempotencyKey: input.idempotencyKey }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    } catch {
+      return summaryUnavailable();
+    }
 
     if (!response.ok) {
       const failure = await response.json().catch(() => null) as { failureCode?: string } | null;
       if (failure?.failureCode === 'source_not_available' || failure?.failureCode === 'no_sources') {
         return { ok: false, code: 'invalid_input', message: 'That entry could not be found to share — try again in a moment.', retryable: true };
       }
-      return { ok: false, code: 'ai_unavailable', message: 'The share was saved, but the summary is still being prepared.', retryable: true };
+      return summaryUnavailable();
     }
 
     return { ok: true, value: { requestId: data, status: 'ready' } };
   } catch {
-    return { ok: false, code: 'server_error', message: 'Could not create the Bridge share.', retryable: true };
+    return serverError('Could not create the Bridge share.');
   }
 }
 
@@ -149,7 +175,7 @@ export async function revokeBridgeShareRequest(
   if (!sb) return unavailable();
 
   const { data, error } = await sb.rpc('revoke_bridge_share_request', { p_request_id: requestId });
-  if (error) return { ok: false, code: 'server_error', message: error.message || 'Could not revoke the share.' };
+  if (error) return serverError('Could not revoke the Bridge share.');
   return { ok: true, value: { revoked: data === true } };
 }
 
@@ -164,7 +190,7 @@ export async function fetchTeenBridgeShareHistory(
     .from('bridge_share_requests')
     .select('id,teen_user_id,parent_user_id,status,created_at,expires_at,revoked_at')
     .order('created_at', { ascending: false });
-  if (requestError) return { ok: false, code: 'server_error', message: requestError.message };
+  if (requestError) return serverError('Bridge share history could not be loaded.');
 
   const rows = (requests ?? []) as BridgeRequestRow[];
   if (rows.length === 0) return { ok: true, value: [] };
@@ -173,7 +199,7 @@ export async function fetchTeenBridgeShareHistory(
     .from('bridge_summaries')
     .select('id,request_id,themes,conversation_starters,limitations,generated_at,used_fallback')
     .in('request_id', rows.map((row) => row.id));
-  if (summaryError) return { ok: false, code: 'server_error', message: summaryError.message };
+  if (summaryError) return serverError('Bridge summaries could not be loaded.');
 
   const byRequest = new Map((summaries ?? []).map((row) => {
     const summary = row as BridgeSummaryRow;
@@ -226,7 +252,7 @@ export async function fetchBridgeShareStatusesForJournalEntries(
     .from('bridge_share_sources')
     .select('request_id,source_id')
     .eq('source_kind', 'journal');
-  if (sourceError) return { ok: false, code: 'server_error', message: sourceError.message };
+  if (sourceError) return serverError('Bridge share status could not be loaded.');
 
   const sourceRows = (sources ?? []) as Array<{ request_id: string; source_id: string }>;
   if (sourceRows.length === 0) return { ok: true, value: new Map() };
@@ -235,7 +261,7 @@ export async function fetchBridgeShareStatusesForJournalEntries(
     .from('bridge_share_requests')
     .select('id,status')
     .in('id', sourceRows.map((row) => row.request_id));
-  if (requestError) return { ok: false, code: 'server_error', message: requestError.message };
+  if (requestError) return serverError('Bridge share status could not be loaded.');
 
   const statusByRequest = new Map((requests ?? []).map((row) => {
     const request = row as { id: string; status: string };

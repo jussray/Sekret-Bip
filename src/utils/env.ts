@@ -4,8 +4,8 @@
  *
  * Rules:
  *   - Only EXPO_PUBLIC_* vars are allowed in client code.
- *   - OPENAI_API_KEY lives ONLY in the Cloudflare Worker.
- *   - service_role keys must NEVER appear here.
+ *   - Provider and privileged database secrets live only in server runtimes.
+ *   - Server-only identifiers and configured secret values must never reach the web bundle.
  *
  * Call validateEnv() once at app startup (app/_layout.tsx).
  */
@@ -62,7 +62,8 @@ const isDev = process.env.NODE_ENV === 'development';
  * Missing BACKEND_URL    → AI replies fall back to pre-written companion
  *                          replies (see fallbackReply() in ./api). Fine for
  *                          local dev; deploy the Worker before real launch.
- * Banned keys present    → security violation logged.
+ * Exported web artifact  → scanned fail-closed for server-only markers and
+ *                          configured secret values after Expo builds it.
  *
  * Note: missing-config cases use console.warn, not console.error — in Expo
  * web dev, console.error triggers a full-screen LogBox overlay that blocks
@@ -93,18 +94,9 @@ export function validateEnv(): void {
     );
   }
 
-  // ── Security: banned keys must never reach the client ────────────────────
-  const runtimeEnv = process.env as Record<string, string | undefined>;
-  const BANNED = ['OPENAI_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY', 'SERVICE_ROLE'];
-  for (const key of BANNED) {
-    if (runtimeEnv[key]) {
-      console.error(
-        `[Se'kret Bip] 🚨 SECURITY: "${key}" is present in client environment.\n` +
-        '   This key must NEVER be in Expo, Vercel, or client code.\n' +
-        '   Remove it immediately and rotate the secret.'
-      );
-    }
-  }
+  // Server-only identifiers are intentionally absent from client source. The
+  // post-export artifact audit is the authoritative fail-closed boundary for
+  // detecting server-only markers or configured secret values in the bundle.
 
   if (isDev && SUPABASE_URL && SUPABASE_ANON && BACKEND_URL) {
     console.log("[Se'kret Bip] ✅ All environment variables configured.");
