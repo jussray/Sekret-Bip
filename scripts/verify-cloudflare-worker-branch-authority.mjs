@@ -12,6 +12,7 @@ const evidencePath = clean(process.env.EVIDENCE_PATH) || 'artifacts/cloudflare-w
 const separateWorker = 'bip';
 const previousSeparateWorker = 'sekret';
 const productionWorker = 'sekret-backend';
+const acceptedProductionBuildCommands = new Set(['', 'npm test && npm run type-check && npm run lint']);
 const alphaWorker = 'sekret-backend-alpha';
 const pagesProject = 'sekret-bip';
 const terminal = new Set(['success', 'fail', 'skipped', 'cancelled', 'terminated']);
@@ -374,7 +375,7 @@ const verifiedMainOnly = activeTriggers.length === 1 &&
   JSON.stringify(includes) === JSON.stringify(['main']) &&
   excludes.length === 0 &&
   deployCommand === 'npm run deploy:api:production' &&
-  buildCommand === '' &&
+  acceptedProductionBuildCommands.has(buildCommand) &&
   activeNonMainBuilds.length === 0;
 const alphaTriggers = alphaTag ? await get(`/accounts/${accountId}/builds/workers/${alphaTag}/triggers`) : [];
 
