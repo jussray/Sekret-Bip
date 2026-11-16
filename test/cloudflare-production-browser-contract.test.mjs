@@ -37,7 +37,8 @@ test('public production browser proof is anonymous and fails on Cloudflare Acces
   assert.match(productionFrontDoor, /documentNavigations/);
   assert.match(productionFrontDoor, /cloudflareaccess\.com/);
   assert.match(productionFrontDoor, /\/cdn-cgi\/access\//);
-  assert.match(productionFrontDoor, /bip-universe-portal-teens/);
+  assert.match(productionFrontDoor, /bip-universe-portal-/);
+  assert.match(productionFrontDoor, /\['teens', 'bip-jr', 'parents'\]/);
   assert.match(productionFrontDoor, /https:\/\/sekretbip\.net\//);
   assert.match(productionFrontDoor, /hostname\)\.toBe\('sekretbip\.net'\)/);
   assert.doesNotMatch(productionFrontDoor, /app\.sekretbip\.net/);
