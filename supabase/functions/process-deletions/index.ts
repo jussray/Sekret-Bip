@@ -42,15 +42,28 @@ interface DeletionRow {
   data_deletion_requested_at: string;
 }
 
+// Constant-time string comparison — prevents timing side-channel (CWE-208).
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) {
+    diff |= aBytes[i] ^ bBytes[i];
+  }
+  return diff === 0;
+}
+
 Deno.serve(async (req: Request) => {
   // Only POST
   if (req.method !== 'POST') {
     return new Response('method not allowed', { status: 405 });
   }
 
-  // Shared secret guard
+  // Shared secret guard — constant-time to prevent timing side-channel
   const secret = req.headers.get('x-deletion-secret') ?? '';
-  if (!DELETION_SECRET || secret !== DELETION_SECRET) {
+  if (!DELETION_SECRET || !timingSafeEqual(secret, DELETION_SECRET)) {
     return new Response('unauthorized', { status: 401 });
   }
 
