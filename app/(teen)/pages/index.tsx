@@ -175,11 +175,11 @@ const COMPANION_UNLOCK_PTS: Record<CompanionId, number> = {
 };
 
 // ─── Avatar helpers ───────────────────────────────────────────────────────────
-const PAGES_COMPANION_POSES = {
+const PAGES_COMPANION_POSES: Record<string, Record<string, string>> = {
   raylene: { neutral: 'neutral', listening: 'listening', thinking: 'thinking', comforting: 'encouraging', happy: 'happy', concerned: 'encouraging', responding: 'writing' },
   rylane:  { neutral: 'neutral', listening: 'listening', thinking: 'thinking', comforting: 'calm',        happy: 'happy', concerned: 'encouraging', responding: 'writing' },
   night:   { neutral: 'neutral', listening: 'listening', thinking: 'thinking', comforting: 'comfort',     happy: 'happy', concerned: 'comfort',      responding: 'writing' },
-} as const;
+};
 
 function normalizeAvatar(value?: string): SekretCharacterId {
   if (value === 'sy' || value === 'rylane') return 'sy';
