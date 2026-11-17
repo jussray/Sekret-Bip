@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type TextInputInstance,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -37,9 +38,9 @@ export default function ParentOnboarding({
   const [passwordVerify, setPasswordVerify] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const emailRef = useRef<TextInput>(null);
-  const passwordRef = useRef<TextInput>(null);
-  const verifyRef = useRef<TextInput>(null);
+  const emailRef = useRef<TextInputInstance>(null);
+  const passwordRef = useRef<TextInputInstance>(null);
+  const verifyRef = useRef<TextInputInstance>(null);
   const underlineEmail = useRef(new Animated.Value(0)).current;
   const underlinePassword = useRef(new Animated.Value(0)).current;
   const underlineVerify = useRef(new Animated.Value(0)).current;

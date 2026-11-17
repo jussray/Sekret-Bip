@@ -96,6 +96,16 @@ Read `REPO_HEALTH_DUPLICATES.md` and run `node scripts/audit-branch-hygiene.mjs`
 6. Require the exact pull-request head to prove applicable unit, type, lint, browser, and retained-artifact gates.
 7. Report proven, inferred, blocked, and next owner.
 
+## Fix-on-Failure Default
+
+When a check, build, lint, test, or CI job fails and the fix is within Claude's own authority — code, configuration, or CI-definition changes that are safe and reversible — implement the fix directly instead of only reporting the failure and waiting to be asked. This is the default, not an exception.
+
+This does not expand authority:
+
+- It never substitutes for the Approval Gates below. Merging, publishing, deploying, rotating secrets, applying database migrations, and external communications still require explicit founder approval regardless of how confident the fix is.
+- It never justifies skipping, disabling, or quarantining a check to force it green.
+- A fix attempted without being able to see the actual failure content (blocked logs, inaccessible artifacts, no tool access) must be reported as blocked with evidence of what was tried — not guessed at repeatedly, and not left unreported.
+
 ## Governed Gap-to-Merge Workflow
 
 When the founder invokes `/gaps`, `/blueprint`, `/rent`, `/implement`, `/review`, `/merge`, `/cont`, or equivalent stacked language, load `.ai-skills/skills/gap-blueprint-implement-review.md` and execute its phases in order:

@@ -77,7 +77,7 @@ export default function TeenSekretRoute() {
 
   return (
     <View style={[s.root, { backgroundColor }]}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
 
       <View style={[StyleSheet.absoluteFill, { backgroundColor }]}>
         <LinearGradient

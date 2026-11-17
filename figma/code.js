@@ -1,23 +1,29 @@
 // =============================================================================
-// BIP VIBE SYSTEM — Figma Plugin  v1.1
+// BIP VIBE SYSTEM — Figma Plugin  v1.2
 // Creates 6 × 390×844 vibe frames + 2 verification screens (Manual Review, Suspended)
+// Viewing style: dark night-first per src/constants/designTokens.ts BIP_COLORS
+// (night #120D1F · deepPlum #24112F · indigo #2B2E59 · paperBeige #E7D8C4 ·
+//  moonGold #D5B56B · cloudBlue #98B7D3 · softBerry #9E4D64). Each vibe shares the
+// dark room chrome and carries a distinct accent.
 // Install: Figma → Plugins → Development → Import plugin from manifest…
 //          Select figma/manifest.json, then Run
 // =============================================================================
 
+// Dark night-first chrome shared by every vibe (BIP_COLORS). Each vibe differs
+// only by accent so the six read as one system in the night room.
 const VIBES = {
-  raylene: { key:"raylene", label:"Raylene's Room",    bg:"#FFF8EE", card:"#FFF1E6", cardAlt:"#FFE8D6", accentA:"#FFB289", accentB:"#FFD166", accentC:"#F4A0C8", textHigh:"#2C1A0E", textMid:"#7A5030", textLow:"#B08060", glowColor:"#FFB289", glowR:48, isDark:false },
-  rylane:  { key:"rylane",  label:"Rylane After Dark", bg:"#EFF6FA", card:"#E4EFF6", cardAlt:"#D6E8F3", accentA:"#7EC8E3", accentB:"#A8E6CF", accentC:"#FFB289", textHigh:"#0E2433", textMid:"#3A6070", textLow:"#7AACBA", glowColor:"#7EC8E3", glowR:52, isDark:false },
-  cloud:   { key:"cloud",   label:"Cloud Drift",       bg:"#F3FEFA", card:"#E8FAF4", cardAlt:"#D8F5EC", accentA:"#A8E6CF", accentB:"#7EC8E3", accentC:"#FFD166", textHigh:"#0E2E22", textMid:"#3A6A52", textLow:"#7ABAA2", glowColor:"#A8E6CF", glowR:44, isDark:false },
-  night:   { key:"night",   label:"Night Comfort",     bg:"#1E1A2E", card:"#2A2440", cardAlt:"#332D50", accentA:"#FFD166", accentB:"#FFB289", accentC:"#A8E6CF", textHigh:"#FFF8EE", textMid:"#C4B49A", textLow:"#7A6A52", glowColor:"#FFD166", glowR:56, isDark:true  },
-  rain:    { key:"rain",    label:"Window Rain",       bg:"#EEF4F9", card:"#E4EEF6", cardAlt:"#D6E6F2", accentA:"#7EC8E3", accentB:"#FFB289", accentC:"#A8E6CF", textHigh:"#0E2030", textMid:"#3A5A6E", textLow:"#6A9AAE", glowColor:"#7EC8E3", glowR:40, isDark:false },
-  sunset:  { key:"sunset",  label:"Sunset Exhale",     bg:"#FFF4E6", card:"#FFE8CC", cardAlt:"#FFD9B3", accentA:"#FFD166", accentB:"#FFB289", accentC:"#E07A9F", textHigh:"#2C1A0E", textMid:"#7A4A20", textLow:"#B07840", glowColor:"#FFD166", glowR:60, isDark:false },
+  raylene: { key:"raylene", label:"Raylene's Room",    bg:"#120D1F", card:"#24112F", cardAlt:"#2B2E59", accentA:"#D5B56B", accentB:"#9E4D64", accentC:"#E7D8C4", textHigh:"#F7F2F8", textMid:"#B8AEC0", textLow:"#7D7288", glowColor:"#D5B56B", glowR:48, isDark:true },
+  rylane:  { key:"rylane",  label:"Rylane After Dark", bg:"#120D1F", card:"#24112F", cardAlt:"#2B2E59", accentA:"#98B7D3", accentB:"#E7D8C4", accentC:"#D5B56B", textHigh:"#F7F2F8", textMid:"#B8AEC0", textLow:"#7D7288", glowColor:"#98B7D3", glowR:52, isDark:true },
+  cloud:   { key:"cloud",   label:"Cloud Drift",       bg:"#120D1F", card:"#24112F", cardAlt:"#2B2E59", accentA:"#E7D8C4", accentB:"#98B7D3", accentC:"#F7F2F8", textHigh:"#F7F2F8", textMid:"#B8AEC0", textLow:"#7D7288", glowColor:"#98B7D3", glowR:44, isDark:true },
+  night:   { key:"night",   label:"Night Comfort",     bg:"#120D1F", card:"#24112F", cardAlt:"#2B2E59", accentA:"#D5B56B", accentB:"#98B7D3", accentC:"#6A3D63", textHigh:"#F7F2F8", textMid:"#B8AEC0", textLow:"#7D7288", glowColor:"#D5B56B", glowR:56, isDark:true },
+  rain:    { key:"rain",    label:"Window Rain",       bg:"#120D1F", card:"#24112F", cardAlt:"#2B2E59", accentA:"#98B7D3", accentB:"#2B2E59", accentC:"#E7D8C4", textHigh:"#F7F2F8", textMid:"#B8AEC0", textLow:"#7D7288", glowColor:"#98B7D3", glowR:40, isDark:true },
+  sunset:  { key:"sunset",  label:"Sunset Exhale",     bg:"#120D1F", card:"#24112F", cardAlt:"#2B2E59", accentA:"#D5B56B", accentB:"#9E4D64", accentC:"#E7D8C4", textHigh:"#F7F2F8", textMid:"#B8AEC0", textLow:"#7D7288", glowColor:"#D5B56B", glowR:60, isDark:true },
 };
 
 const INV = {
-  privacy:  { bg:"#E8F5FA", border:"#7EC8E3", text:"#1A4A5C" },
-  verified: { bg:"#E8FAF4", text:"#0E2E22" },
-  parent:   { bg:"#FFFBE6", border:"#FFD166", text:"#2C1A0E" },
+  privacy:  { bg:"#1C2433", border:"#98B7D3", text:"#98B7D3" },
+  verified: { bg:"#241B2F", text:"#E7D8C4" },
+  parent:   { bg:"#2A2016", border:"#D5B56B", text:"#D5B56B" },
 };
 
 function h(hex) {
@@ -184,7 +190,7 @@ async function buildFrame(v, offsetX) {
 // Dark-first ("/ Night") screens for the two states the route guard redirects to:
 // MANUAL_REVIEW → /(safety)/manual-review and SUSPENDED → /(auth)/suspended.
 // Frame names match FIGMA_FRAME_SPECS in src/constants/figmaFrames.ts.
-const SAFETY = { bg:"#FFF3F3", text:"#8B1A3A", border:"#E07A9F" };
+const SAFETY = { bg:"#2A1620", text:"#E7D8C4", border:"#9E4D64" };
 const VERIFY = [
   {
     frameName:"Bip / Safety / Manual Review / Night", stateKey:"MANUAL_REVIEW",
