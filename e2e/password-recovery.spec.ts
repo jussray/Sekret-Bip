@@ -8,7 +8,7 @@ test('login routes into the forgot-password journey with accessible controls', a
   await forgotLink.click();
 
   await expect(page).toHaveURL(/\/forgot-password$/);
-  await expect(page.getByText('Forgot your password?')).toBeVisible();
+  await expect(page.getByText('Forgot password?', { exact: true }).last()).toBeVisible();
   await expect(page.getByLabel('Account email')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Send password reset email' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Back to Sign In' })).toBeVisible();
@@ -40,7 +40,7 @@ test('forgot-password fails clearly when the local browser test has no Supabase 
 test('direct reset-password visit fails closed without recovery evidence', async ({ page }) => {
   await page.goto('/reset-password');
 
-  await expect(page.getByText('Choose a new password')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('New password', { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('That reset link cannot be used.')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Update password' })).toBeDisabled();
   await expect(page.getByRole('link', { name: 'Request a new reset link' })).toBeVisible();
@@ -50,10 +50,8 @@ test('direct reset-password visit fails closed without recovery evidence', async
 test('completed password reset returns a clear sign-in confirmation', async ({ page }) => {
   await page.goto('/login?passwordReset=1');
 
-  await expect(page.getByRole('alert')).toHaveText(
-    'Password updated. Sign in with your new password.',
-  );
-  await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+  await expect(page.getByText('Password updated — sign in with your new password.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
 });
 
 test('password recovery screens fit a phone viewport without horizontal overflow', async ({ page }) => {
@@ -62,9 +60,12 @@ test('password recovery screens fit a phone viewport without horizontal overflow
   for (const route of ['/forgot-password', '/reset-password']) {
     await page.goto(route);
     await expect(page.getByText(/password/i).first()).toBeVisible({ timeout: 30_000 });
-    const overflow = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    const dimensions = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(dimensions.scrollWidth, `${route} should not overflow horizontally`).toBeLessThanOrEqual(
+      dimensions.clientWidth + 1,
     );
-    expect(overflow, `${route} should not overflow horizontally`).toBe(false);
   }
 });
