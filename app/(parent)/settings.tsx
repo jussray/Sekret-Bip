@@ -49,7 +49,7 @@ const SLEEP_OPTIONS: Array<{ label: string; value: SleepWindow | null }> = [
   { label: '11pm – 8am', value: { start: '23:00', end: '08:00' } },
 ];
 
-type RedeemStatus = 'idle' | 'ok' | 'not_found' | 'error';
+type RedeemStatus = 'idle' | 'pending' | 'not_found' | 'error';
 
 function themeLabel(key: keyof typeof THEME_PACKS): string {
   const label = (THEME_PACKS[key] as { label?: unknown }).label;
@@ -144,10 +144,10 @@ export default function SettingsScreen() {
     setIsRedeeming(true);
     const raw = await redeemParentLink(codeInput);
     setIsRedeeming(false);
-    const valid: RedeemStatus[] = ['idle', 'ok', 'not_found', 'error'];
+    const valid: RedeemStatus[] = ['idle', 'pending', 'not_found', 'error'];
     const result = valid.includes(raw as RedeemStatus) ? (raw as RedeemStatus) : 'error';
     setRedeemStatus(result);
-    if (result === 'ok') setLinkStatusVersion((value) => value + 1);
+    if (result === 'pending') setLinkStatusVersion((value) => value + 1);
   }, [codeInput]);
 
   return (
@@ -246,7 +246,8 @@ export default function SettingsScreen() {
         <TouchableOpacity style={styles.button} onPress={handleRedeemCode} disabled={isRedeeming}>
           <Text style={styles.buttonText}>{isRedeeming ? 'Connecting…' : 'Redeem code'}</Text>
         </TouchableOpacity>
-        {redeemStatus !== 'idle' && <Text style={[styles.hint, { color: cs.textSecond }]}>Status: {redeemStatus}</Text>}
+        {redeemStatus === 'pending' && <Text style={[styles.hint, { color: cs.textSecond }]}>Request sent. Teen approval is required before Bridge sharing.</Text>}
+        {redeemStatus !== 'idle' && redeemStatus !== 'pending' && <Text style={[styles.hint, { color: cs.textSecond }]}>Status: {redeemStatus}</Text>}
 
         <Text style={[styles.sectionTitle, { color: cs.section }]}>Danger zone</Text>
         <AccountDeletionControls />

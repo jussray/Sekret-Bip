@@ -5,6 +5,7 @@ const API = 'https://api.cloudflare.com/client/v4';
 const clean = (value) => String(value ?? '').trim();
 const accountId = clean(process.env.CLOUDFLARE_ACCOUNT_ID);
 const dedicatedTokenRaw = String(process.env.CLOUDFLARE_WORKERS_BUILDS_API_TOKEN ?? '');
+const fallbackTokenRaw = String(process.env.CLOUDFLARE_API_TOKEN ?? '');
 let token = '';
 let prefetchedScripts = null;
 const evidencePath = clean(process.env.EVIDENCE_PATH) || 'artifacts/cloudflare-worker-branch-authority.json';
@@ -26,7 +27,10 @@ const receipt = {
   status: 'started',
   failure: null,
   credential: {
-    configuredSources: [dedicatedTokenRaw ? 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN' : null].filter(Boolean),
+    configuredSources: [
+      dedicatedTokenRaw ? 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN' : null,
+      fallbackTokenRaw ? 'CLOUDFLARE_API_TOKEN' : null,
+    ].filter(Boolean),
     selectedSource: null,
     selectedShape: null,
     attempts: [],
@@ -245,30 +249,45 @@ async function probeWorkersRead(rawValue, source) {
 }
 
 async function selectCredential() {
-  if (!dedicatedTokenRaw) {
-    fail('configuration-missing', 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN is required.', {
-      field: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN',
+  const candidates = [
+    { source: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', raw: dedicatedTokenRaw },
+    { source: 'CLOUDFLARE_API_TOKEN', raw: fallbackTokenRaw },
+  ].filter((candidate) => candidate.raw);
+
+  if (candidates.length === 0) {
+    fail('configuration-missing', 'A Cloudflare user API token is required for read-only Workers Builds authority verification.', {
+      fields: ['CLOUDFLARE_WORKERS_BUILDS_API_TOKEN', 'CLOUDFLARE_API_TOKEN'],
     });
   }
 
-  const result = await probeWorkersRead(dedicatedTokenRaw, 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN');
-  if (!result.ok) {
-    fail(result.code || 'token-selection-failed', result.message || 'The dedicated Workers Builds API token cannot read the Workers scripts collection.', {
-      credentialSource: 'CLOUDFLARE_WORKERS_BUILDS_API_TOKEN',
-      tokenShape: result.shape || null,
-      providerStatus: result.providerStatus ?? null,
-      providerCode: result.providerCode ?? null,
-      tokenStatus: result.tokenStatus ?? null,
-    });
+  let lastResult = null;
+  for (const candidate of candidates) {
+    const result = await probeWorkersRead(candidate.raw, candidate.source);
+    lastResult = result;
+    if (!result.ok) continue;
+
+    token = result.token;
+    prefetchedScripts = result.scripts;
+    receipt.credential.selectedSource = result.source;
+    receipt.credential.selectedShape = result.shape;
+    receipt.failure = null;
+    receipt.status = 'started';
+    writeReceipt();
+    return;
   }
 
-  token = result.token;
-  prefetchedScripts = result.scripts;
-  receipt.credential.selectedSource = result.source;
-  receipt.credential.selectedShape = result.shape;
-  receipt.failure = null;
-  receipt.status = 'started';
-  writeReceipt();
+  fail(
+    lastResult?.code || 'token-selection-failed',
+    lastResult?.message || 'No configured Cloudflare token can read the Workers scripts collection.',
+    {
+      credentialSources: candidates.map((candidate) => candidate.source),
+      credentialSource: candidates.at(-1)?.source || null,
+      tokenShape: lastResult?.shape || null,
+      providerStatus: lastResult?.providerStatus ?? null,
+      providerCode: lastResult?.providerCode ?? null,
+      tokenStatus: lastResult?.tokenStatus ?? null,
+    },
+  );
 }
 
 async function get(providerPath) {

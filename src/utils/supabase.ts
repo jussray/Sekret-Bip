@@ -104,6 +104,9 @@ export const TABLES = {
   bipEvents:           'bip_events',
   // ── Point transaction ledger (20260627) ──────────────────────────────────────
   pointTransactions:   'point_transactions',
+  // ── Compliance tables (20260724_compliance_foundation.sql) ──────────────
+  userProfiles:        'user_profiles',
+  consentLog:          'consent_log',
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

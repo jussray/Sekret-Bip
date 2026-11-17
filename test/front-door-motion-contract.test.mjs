@@ -65,3 +65,41 @@ test('reduced motion fails safe before decorative or arrival motion starts', () 
   assert.match(arrival, /setArrivalState\('reduced'\)/);
   assert.match(arrival, /styles\.primerReduced/);
 });
+
+test('Teen and Bip Jr artwork reveal in sequence without replacing character art or running reduced motion', () => {
+  for (const marker of [
+    'web-welcome-copy-reveal',
+    'web-welcome-hero-reveal',
+    'web-welcome-world-cues',
+    'Animated.stagger(',
+    'activeAudience, audienceCopyReveal, audienceHeroReveal, audienceCuesReveal, motionEnabled',
+    'values.forEach(value => value.setValue(1))',
+    "const BIP_JR_HERO = require('../assets/images/parent-space-splash.png')",
+    "const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg')",
+  ]) {
+    assert.ok(screen.includes(marker), `Missing original-art or reduced-motion guarantee: ${marker}`);
+  }
+  assert.ok(contract.includes('audienceRevealDurationMs: 640'));
+  assert.ok(contract.includes('audienceRevealStaggerMs: 130'));
+  assert.ok(contract.includes('audienceRevealTranslateY: [12, 0]'));
+  assert.ok(contract.includes('audienceHeroScale: [0.985, 1]'));
+});
+
+test('welcome changes reset the reveal before paint and never expose empty slow-loading artwork', () => {
+  assert.match(screen, /useLayoutEffect\(\(\) => \{/);
+  assert.match(screen, /values\.forEach\(value => value\.setValue\(0\)\)/);
+  assert.match(screen, /key=\{activeAudience\}/);
+  assert.match(screen, /onLoadEnd=\{\(\) => setHeroLoadedFor\(activeAudience\)\}/);
+  assert.match(screen, /heroLoadedFor !== activeAudience/);
+  assert.match(screen, /setHeroLoadedFor\(null\)/);
+  assert.match(screen, /Animated\.sequence\(\[/);
+  assert.match(screen, /Animated\.stagger\(/);
+});
+
+test('Teen cues retain their quieter rest opacity with motion and reduced motion', () => {
+  assert.match(screen, /TEEN_CUE_REST_OPACITY = 0\.62/);
+  assert.match(screen, /opacity: TEEN_CUE_REST_OPACITY/);
+  assert.match(screen, /outputRange: \[0, restOpacity\]/);
+  assert.match(screen, /: restOpacity,/);
+  assert.match(screen, /audienceRevealStyle\(audienceCuesReveal, isBipJr \? 1 : TEEN_CUE_REST_OPACITY\)/);
+});

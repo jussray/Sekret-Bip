@@ -48,3 +48,29 @@ test('Cloudflare credential preflight reports shape and provider status without 
   assert.match(workflow, /READ_PROBE source=\$\{candidate\.source\}/);
   assert.doesNotMatch(workflow, /console\.log\([^\n]*(?:candidate\.raw|normalized\.token|CF_APP_DOMAIN_TOKEN|CF_ACCESS_TOKEN|CF_API_TOKEN|CF_BUILD_TOKEN)/);
 });
+
+test('credential preflight reads the same Production-scoped slots as the failing audit jobs', () => {
+  assert.match(workflow, /jobs:[\s\S]*?verify-token:[\s\S]*?environment: Production/);
+  assert.match(workflow, /CF_PAGES_READ_TOKEN: \$\{\{ secrets\.CLOUDFLARE_PAGES_READ_API_TOKEN \}\}/);
+  assert.match(workflow, /CF_APP_BINDING_READ_TOKEN: \$\{\{ secrets\.CLOUDFLARE_APP_BINDING_READ_API_TOKEN \}\}/);
+  assert.match(workflow, /source: 'CLOUDFLARE_PAGES_READ_API_TOKEN'/);
+  assert.match(workflow, /source: 'CLOUDFLARE_APP_BINDING_READ_API_TOKEN'/);
+  assert.match(workflow, /CLOUDFLARE_SCOPED_AUDIT_CREDENTIALS_MISSING/);
+  assert.match(workflow, /CLOUDFLARE_SCOPED_AUDIT_CREDENTIALS_UNVERIFIED/);
+  assert.doesNotMatch(workflow, /console\.log\([^\n]*(?:candidate\.raw|normalized\.token|CF_PAGES_READ_TOKEN|CF_APP_BINDING_READ_TOKEN)/);
+});
+
+test('PR contract checking cannot read Production credentials', () => {
+  assert.match(workflow, /pull_request:[\s\S]*?paths:/);
+  assert.match(workflow, /contract:[\s\S]*?if: github\.event_name == 'pull_request'/);
+  assert.match(workflow, /verify-token:[\s\S]*?if: github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow, /node --test test\/cloudflare-user-token-preflight-contract\.test\.mjs/);
+});
+
+test('Cloudflare preflight does not forward provider message bodies into CI logs', () => {
+  assert.doesNotMatch(workflow, /entry\?\.message/);
+  assert.match(workflow, /entry\?\.code/);
+  assert.doesNotMatch(workflow, /provider=\$\{(?:verify|result)\.body/);
+  assert.doesNotMatch(workflow, /console\.(?:log|error)\([^\n]*\$\{(?:verify|result)\.body/);
+  assert.match(workflow, /provider=\$\{summarize\((?:verify|result)\.body,/);
+});

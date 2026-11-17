@@ -1,5 +1,13 @@
 # Claude Operating Contract — Sekret-Bip
 
+## Mandatory Sauce Guard — founder-owned canonical skill
+
+Every contributor, AI agent (ChatGPT, Claude, Codex, Perplexity, and later assistants), reviewer, automation, or delegated writer touching this repository must follow the founder-owned `sauce-guard` skill **before any outward-facing communication** drawn from internal product work. Canonical source: `jussray/founder-control-room/.agents/skills/sauce-guard/SKILL.md`. Use the current canonical skill; this is a reference, not a replacement implementation or an approval to publish.
+
+Enforce: evidence before claims; classify each material claim CURRENT / HISTORICAL / STALE / SUPERSEDED / UNKNOWN; remove raw diffs, provider payloads, proprietary prompts/architecture, credentials, private teen/parent/customer content, and unapproved metrics; obtain **Current You**'s exact-copy approval; have FCR revalidate at publication; require provider readback for publication claims. Missing or inaccessible skill / absent approval means HOLD, never publish or share externally.
+
+**Separate machine-enforced log safety:** public posts and CI/job logs are different egress channels. Use the repository `scripts/audit-sauce-guard-logging.mjs` changed-line gate and fixed-event-code logs for any auth, account deletion, payment, teen, parent, safety, or provider interaction. Never log untrusted error messages, tokens, raw response bodies, identifiers, prompts, messages, or request payloads. A green log gate is not proof that Sauce Guard reviewed a public communication. Do not edit or bypass these rules to silence a scanner; resolve and review the finding.
+
 This file governs Claude (claude.ai, Claude Code, MCP-connected sessions) when working in `jussray/Sekret-Bip`.
 
 ## 5W1H — Required Before Every Nontrivial Action
@@ -87,6 +95,16 @@ Read `REPO_HEALTH_DUPLICATES.md` and run `node scripts/audit-branch-hygiene.mjs`
 5. Implement within the confirmed repository role.
 6. Require the exact pull-request head to prove applicable unit, type, lint, browser, and retained-artifact gates.
 7. Report proven, inferred, blocked, and next owner.
+
+## Fix-on-Failure Default
+
+When a check, build, lint, test, or CI job fails and the fix is within Claude's own authority — code, configuration, or CI-definition changes that are safe and reversible — implement the fix directly instead of only reporting the failure and waiting to be asked. This is the default, not an exception.
+
+This does not expand authority:
+
+- It never substitutes for the Approval Gates below. Merging, publishing, deploying, rotating secrets, applying database migrations, and external communications still require explicit founder approval regardless of how confident the fix is.
+- It never justifies skipping, disabling, or quarantining a check to force it green.
+- A fix attempted without being able to see the actual failure content (blocked logs, inaccessible artifacts, no tool access) must be reported as blocked with evidence of what was tried — not guessed at repeatedly, and not left unreported.
 
 ## Governed Gap-to-Merge Workflow
 
