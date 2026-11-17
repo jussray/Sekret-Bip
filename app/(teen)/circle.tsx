@@ -5,7 +5,7 @@ import { useAppContext } from '@/context/AppContext';
 import { BipCrewScreen } from '@screens/BipCrewScreen';
 import { THEME_PACKS } from '@/constants/theme';
 import { routeForSide } from '@/shared/routes';
-import AnonymousCircle from '../(main)/circle';
+import CircleScreen from '@screens/CircleScreen';
 
 type Tab = 'circle' | 'crew';
 
@@ -37,7 +37,7 @@ export default function TeenCircleRoute() {
 
       <View style={s.content}>
         {tab === 'circle' ? (
-          <AnonymousCircle />
+          <CircleScreen />
         ) : (
           <BipCrewScreen
             t={t}
