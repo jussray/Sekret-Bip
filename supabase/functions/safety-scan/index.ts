@@ -140,7 +140,7 @@ function validateSource(source: unknown): EligibleSource | null {
 // currently-linked parent has been found; parent visibility itself is
 // computed dynamically by RLS (see 20260808222500_reconcile_safety_alert_
 // runtime_schema.sql), not stored on the row. No content leaves this
-// function — push wiring is still a TODO.
+// function — push delivery is not wired up yet.
 async function notifyParentIfLinked(
   supabase:     ReturnType<typeof createClient>,
   teen_user_id: string,
@@ -162,8 +162,8 @@ async function notifyParentIfLinked(
     .update({ parent_notified_at: new Date().toISOString() })
     .eq('id', alert_id);
 
-  // TODO: wire to Expo push token lookup + expo-server-sdk when push ships.
-  // Payload shape when ready:
+  // Push delivery (Expo token lookup + expo-server-sdk) is not wired yet.
+  // Planned payload once it ships:
   //   { to: <parent_expo_token>, title: 'Wellness Check',
   //     body: 'Someone you care about may need support',
   //     data: { alert_id, severity } }   ← NO content, NO source text
