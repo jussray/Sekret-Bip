@@ -253,7 +253,11 @@ export function CalmScreen({
 
         <Text style={[styles.sectionTitle, { color: '#fff' }]}>More Breathing Exercises</Text>
         {MORE_BREATHING.map(item => (
-          <View key={item.label} style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}>
+          <TouchableOpacity
+            key={item.label}
+            style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}
+            onPress={() => Alert.alert('Coming soon', `${item.label} will be available in an upcoming update.`)}
+          >
             <Image source={CLOUD_HEADPHONES} style={styles.listRowIcon} resizeMode="contain" />
             <View style={{ flex: 1 }}>
               <Text style={[styles.listRowTitle, { color: '#fff' }]}>{item.label}</Text>
@@ -261,13 +265,17 @@ export function CalmScreen({
             </View>
             <Text style={[styles.listRowDur, { color: t.soft }]}>{item.duration}</Text>
             <Text style={{ color: t.soft }}>›</Text>
-          </View>
+          </TouchableOpacity>
         ))}
 
         <Text style={[styles.sectionTitle, { color: '#fff' }]}>Calm Playlist ✦</Text>
         <Text style={[styles.sectionSub, { color: t.soft }]}>music + sounds to relax</Text>
         {CALM_PLAYLIST.map(item => (
-          <View key={item.label} style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}>
+          <TouchableOpacity
+            key={item.label}
+            style={[styles.listRow, { backgroundColor: t.card, borderColor: t.accent }]}
+            onPress={() => Alert.alert('Coming soon', `${item.label} audio will be available in an upcoming update.`)}
+          >
             <Text style={styles.playlistEmoji}>{item.emoji}</Text>
             <View style={{ flex: 1 }}>
               <Text style={[styles.listRowTitle, { color: '#fff' }]}>{item.label}</Text>
@@ -275,7 +283,7 @@ export function CalmScreen({
             </View>
             <Text style={[styles.listRowDur, { color: t.soft }]}>{item.duration}</Text>
             <Text style={{ color: t.soft }}>›</Text>
-          </View>
+          </TouchableOpacity>
         ))}
 
         <View style={[styles.reminderCard, { backgroundColor: t.card, borderColor: t.accent }]}>
@@ -477,13 +485,17 @@ export function CalmScreen({
         <Text style={[styles.sectionSub, { color: t.soft }]}>we picked these just for your vibe</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.picksScroll}>
           {CALM_PICKS.map(pick => (
-            <View key={pick.label} style={[styles.pickCard, { backgroundColor: t.card, borderColor: t.accent }]}>
+            <TouchableOpacity
+              key={pick.label}
+              style={[styles.pickCard, { backgroundColor: t.card, borderColor: t.accent }]}
+              onPress={() => Alert.alert('Coming soon', `${pick.label.replace('\n', ' ')} will be available in an upcoming update.`)}
+            >
               <View style={styles.pickPlayCircle}>
                 <Text style={styles.pickPlayIcon}>▶</Text>
               </View>
               <Text style={[styles.pickLabel, { color: '#fff' }]}>{pick.label}</Text>
               <Text style={[styles.pickDur, { color: t.soft }]}>{pick.duration}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </ScrollView>
 
