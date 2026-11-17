@@ -12,6 +12,34 @@ const auth = fs.readFileSync(new URL('../worker/auth.ts', import.meta.url), 'utf
 const index = fs.readFileSync(new URL('../worker/index.ts', import.meta.url), 'utf8');
 const voiceEntry = fs.readFileSync(new URL('../worker/voice-entry.ts', import.meta.url), 'utf8');
 
+test('front-door limiter accepts only explicit boolean outcomes', async () => {
+  // Execute the real limiter body without loading unrelated voice providers.
+  const start = voiceEntry.indexOf('async function enforceRateLimit(');
+  const end = voiceEntry.indexOf('\nfunction withoutRateLimiter', start);
+  assert.ok(start >= 0 && end > start);
+  const functionSource = voiceEntry.slice(start, end).trim();
+  const bodyStart = functionSource.indexOf('): Promise<Response | null> {');
+  assert.ok(bodyStart > 0);
+  const body = functionSource.slice(bodyStart + '): Promise<Response | null> {'.length, -1);
+  const enforce = new Function('json', 'protectionUnavailable',
+    'return async function(request, env, principal, cors) {' + body + '}')(
+    (body, status, headers) => Response.json(body, { status, headers }),
+    (headers) => Response.json({ error: 'request protection temporarily unavailable', retryable: true },
+      { status: 503, headers: { ...headers, 'Retry-After': '30' } }),
+  );
+  const request = new Request('https://local.invalid/api/sekret/reply', { method: 'POST' });
+  for (const outcome of [{ success: 'true' }, { success: 1 }, {}, null]) {
+    const result = await enforce(request, { SEKRET_RATE_LIMITER: { limit: async () => outcome } },
+      { kind: 'user', userId: 'synthetic-user' }, {});
+    assert.equal(result?.status, 503);
+    assert.equal(result.headers.get('Retry-After'), '30');
+  }
+  assert.equal(await enforce(request, { SEKRET_RATE_LIMITER: { limit: async () => ({ success: true }) } },
+    { kind: 'user', userId: 'synthetic-user' }, {}), null);
+  assert.equal((await enforce(request, { SEKRET_RATE_LIMITER: { limit: async () => ({ success: false }) } },
+    { kind: 'user', userId: 'synthetic-user' }, {})).status, 429);
+});
+
 const bearerLine = auth.split('\n').find((line) => line.includes('Bearer') && line.includes('exec'));
 assert.ok(bearerLine, 'extractBearer must use a Bearer regex');
 const rawRegex = bearerLine.replace(/^.*=\s*/, '').replace(/\.exec.*$/, '').trim();
@@ -174,4 +202,15 @@ test('authoritative API responses carry baseline transport and framing protectio
   assert.ok(/'Referrer-Policy': 'no-referrer'/.test(voiceEntry));
   assert.ok(/frame-ancestors 'none'/.test(voiceEntry));
   assert.ok(/withSecurityHeaders\(response, cors\)/.test(voiceEntry), 'delegated responses are wrapped at the authoritative front door');
+});
+
+test('crisis resources survive limiter outages and the no-key reply path', () => {
+  const outageBody = voiceEntry.slice(voiceEntry.indexOf('function protectionUnavailable('));
+  assert.ok(/crisis_resources:[\s\S]*988[\s\S]*741741[\s\S]*911/.test(outageBody.slice(0, 600)),
+    'the retryable 503 must carry 988, 741741 and 911 so a limiter outage never hides crisis help');
+  const noKeyAt = index.indexOf("console.error('[sekret/reply] OPENAI_API_KEY is not configured, serving fallback');");
+  const crisisAt = index.lastIndexOf('CRISIS_RE.test(userText)', noKeyAt);
+  assert.ok(crisisAt > 0 && noKeyAt > crisisAt, 'the no-key canned reply must run the crisis check first');
+  assert.ok(/export const CRISIS_RE/.test(fs.readFileSync(new URL('../worker/sekret-reply.ts', import.meta.url), 'utf8')),
+    'the crisis pattern is shared, not duplicated, so the two paths cannot drift');
 });

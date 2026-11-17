@@ -15,8 +15,8 @@ test('voice runtime migration creates the four telemetry tables with RLS', async
     'voice_events',
     'voice_latency_metrics',
   ]) {
-    assert.match(migration, new RegExp(`create table if not exists public\.${table}`));
-    assert.match(migration, new RegExp(`alter table public\.${table} enable row level security`));
+    assert.match(migration, new RegExp(`create table if not exists public\\.${table}`));
+    assert.match(migration, new RegExp(`alter table public\\.${table} enable row level security`));
   }
 
   assert.match(migration, /voice_sessions_user_started_idx/);
@@ -38,11 +38,11 @@ test('voice telemetry is server-written and owner-readable with top-level owner 
   ]) {
     assert.match(
       migration,
-      new RegExp(`revoke all on table public\.${table} from public, anon, authenticated`),
+      new RegExp(`revoke all on table public\\.${table} from public, anon, authenticated`),
     );
     assert.match(
       migration,
-      new RegExp(`grant select, insert, update, delete on table public\.${table} to service_role`),
+      new RegExp(`grant select, insert, update, delete on table public\\.${table} to service_role`),
     );
   }
 

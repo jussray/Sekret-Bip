@@ -13,6 +13,19 @@ on:
       - 'scripts/**'
       - 'supabase/**'
       - '.github/workflows/cookie-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.security/cookies.json'
+      - 'scripts/verify-cookie-contract.mjs'
+      - 'test/cookie-contract-verifier.test.mjs'
+      - 'app/**'
+      - 'src/**'
+      - 'utils/**'
+      - 'worker/**'
+      - 'scripts/**'
+      - 'supabase/**'
+      - '.github/workflows/cookie-contract.yml'
   workflow_dispatch:
 
 permissions:

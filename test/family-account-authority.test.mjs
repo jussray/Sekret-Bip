@@ -140,7 +140,7 @@ test('Circle pseudonymity and Bridge teen control remain separate from account i
 test('verification read failure remains fail-closed without impersonating logout', () => {
   assert.match(
     verificationContext,
-    /const permanentSession = Boolean\(session && !session\.user\.is_anonymous\);[\s\S]*setSession\(session\);[\s\S]*setAuthenticated\(permanentSession\);[\s\S]*setSnapshot\(INITIAL_VERIFICATION_SNAPSHOT\);/,
+    /const permanentSession = Boolean\(session && !session\.user\.is_anonymous && session\.user\.email_confirmed_at\);[\s\S]*setSession\(permanentSession \? session : null\);[\s\S]*setAuthenticated\(permanentSession\);[\s\S]*setSnapshot\(INITIAL_VERIFICATION_SNAPSHOT\);/,
   );
 
   const realtimeLoadStart = verificationContext.indexOf('void loadVerificationForSession(session)');

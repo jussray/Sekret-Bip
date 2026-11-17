@@ -33,6 +33,52 @@ supabase secrets set ACCOUNT_DELETION_PROCESS_SECRET='<generated-secret>'
 
 The scheduled GitHub workflow also requires repository or production-environment secrets with the same three names.
 
+## 2026-10-24 production incident — schema profile mismatch
+
+The scheduled job received `PGRST205` for `api.account_deletion_requests`, although
+the canonical migration creates `public.account_deletion_requests`. The sweeper
+now explicitly sends `Accept-Profile: public` when listing expired requests.
+This fixes selection when the API exposes public but defaults to api; it does
+**not** install a missing migration, change schema grants, or trigger a sweep.
+
+Before re-enabling/dispatching the deletion workflow, have the production
+database owner verify **read-only** that the exact intended project has the
+canonical table, that `public` is included in Data API exposed schemas, and
+that an administrative GET using `Accept-Profile: public` works. `PGRST205`
+means the relation is absent from the selected schema cache; `PGRST106`
+means the requested schema is not exposed. Both remain fail-closed.
+Do not create an `api` duplicate or grant teen data access to anon to quiet the job.
+If migration parity or API schema exposure is missing, treat it as a separate
+reviewed production operation. Never execute a deletion sweep as a diagnostic.
+
+## 2026-10-27 confirmation and non-destructive recovery proof
+
+The scheduled sweep on 2026-10-27 received HTTP 406 from
+`/rest/v1/account_deletion_requests` in the intended Supabase project,
+even with `Accept-Profile: public`. The production database does contain
+`public.account_deletion_requests`; the `api` schema has no relations
+or functions. These observations support an exposed-schema mismatch, but
+do not establish the current Data API dashboard configuration or authorize
+a configuration change.
+
+**Do not add `public` to the exposed Data API schema list without a
+separately approved privacy/security review.** Recheck client grants,
+row-level security, invoker views, privileged RPC execution permissions,
+and `anon`/authenticated cross-user denial before and after any proposal.
+Never create an `api` copy of the deletion queue as a shortcut. Restoring
+the Data API is a founder-gated production configuration action, not an
+implicit consequence of this script change.
+
+A **manual** Account Deletion Sweep dispatch now defaults to
+`check_only=true`. It performs an authenticated, read-only GET of the
+expired pending queue, logs fixed event codes only, and does not call
+`account-delete`. A scheduled run retains its existing processing path.
+For a manual check, keep the checkbox enabled and require the successful
+`SAUCE_GUARD_DELETE_QUEUE_READ_OK` event before considering any
+controlled end-to-end deletion proof. A green read-only check is **not**
+proof that account deletion works end-to-end. Manual processing with the
+checkbox disabled must remain a separately approved destructive action.
+
 ## Verification gates
 
 Do not mark the technical lane complete until all gates are evidenced:

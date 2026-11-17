@@ -30,6 +30,7 @@ on:
       - 'test/production-release-observation.test.mjs'
       - 'test/supabase-target-identity.test.mjs'
       - 'test/supabase-production-schema-witness.test.mjs'
+      - 'test/supabase-social-rls-runtime-witness.test.mjs'
       - 'test/supabase-verifier-legacy-receipts.test.mjs'
       - 'test/supabase-production-blocker-evidence.test.mjs'
       - 'test/supabase-production-migration-workflow.test.mjs'
@@ -93,6 +94,7 @@ jobs:
           test/production-release-observation.test.mjs
           test/supabase-target-identity.test.mjs
           test/supabase-production-schema-witness.test.mjs
+          test/supabase-social-rls-runtime-witness.test.mjs
           test/supabase-verifier-legacy-receipts.test.mjs
           test/supabase-production-blocker-evidence.test.mjs
           test/supabase-production-migration-workflow.test.mjs

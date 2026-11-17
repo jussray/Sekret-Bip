@@ -47,7 +47,7 @@ test('accepts canonical GitHub Pages project with main production and canonical 
   assert.equal(verdict.observed.name, 'sekret-bip');
   assert.equal(verdict.observed.repoOwner, 'jussray');
   assert.equal(verdict.observed.repoName, 'Sekret-Bip');
-  assert.ok(verdict.observed.domains.includes('app.sekretbip.net'));
+  assert.equal(verdict.observed.domains.some((domain) => domain === 'app.sekretbip.net'), true);
   assert.equal(verdict.observed.productionBranch, 'main');
   assert.equal(verdict.observed.productionDeploymentsEnabled, true);
   assert.equal(verdict.observed.previewDeploymentSetting, 'all');
@@ -75,6 +75,21 @@ test('rejects a Pages project missing the canonical app domain', () => {
   }));
   assert.equal(verdict.verified, false);
   assert.ok(verdict.failures.includes('canonical-domain:app.sekretbip.net:missing'));
+});
+
+test('rejects lookalike canonical hostnames, URL prefixes, and query fragments', () => {
+  for (const lookalike of [
+    'app.sekretbip.net.attacker.invalid',
+    'app.sekretbip.net/extra',
+    'https://app.sekretbip.net',
+    'app.sekretbip.net?to=attacker.invalid',
+  ]) {
+    const verdict = evaluatePagesBranchAuthority(project({
+      domains: [lookalike, 'sekret-bip.pages.dev'],
+    }));
+    assert.equal(verdict.verified, false, lookalike);
+    assert.ok(verdict.failures.includes('canonical-domain:app.sekretbip.net:missing'));
+  }
 });
 
 test('rejects a non-main Pages production branch', () => {

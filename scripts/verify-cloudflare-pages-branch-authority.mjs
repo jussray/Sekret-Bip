@@ -62,7 +62,8 @@ export function evaluatePagesBranchAuthority(
   if (observed.sourceType !== 'github') failures.push(`source-type:${observed.sourceType || 'missing'}`);
   if (observed.repoOwner !== expectedRepoOwner) failures.push(`repo-owner:${observed.repoOwner || 'missing'}`);
   if (observed.repoName !== expectedRepoName) failures.push(`repo-name:${observed.repoName || 'missing'}`);
-  if (!observed.domains.includes(expectedCanonicalDomain)) failures.push(`canonical-domain:${expectedCanonicalDomain}:missing`);
+  // Accept the canonical configured hostname only as a complete domain value.
+  if (!observed.domains.some((domain) => domain === expectedCanonicalDomain)) failures.push(`canonical-domain:${expectedCanonicalDomain}:missing`);
   if (observed.productionBranch !== expectedBranch) failures.push(`production-branch:${observed.productionBranch || 'missing'}`);
   if (observed.productionDeploymentsEnabled !== true) failures.push(`production-deployments-enabled:${String(observed.productionDeploymentsEnabled)}`);
   if (!VALID_PREVIEW_SETTINGS.has(observed.previewDeploymentSetting)) failures.push(`preview-deployment-setting:${observed.previewDeploymentSetting || 'missing'}`);

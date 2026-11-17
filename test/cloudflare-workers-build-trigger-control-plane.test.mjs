@@ -376,11 +376,13 @@ test('preserves a verified production-trigger repair when the separate build req
       apply: true,
       fetchImpl,
     }),
-    /temporary build service error/,
+    /CLOUDFLARE_PROVIDER_REQUEST_FAILED status=unknown codes=1000/,
   );
 
   const evidence = JSON.parse(fs.readFileSync(evidencePath, 'utf8'));
   assert.equal(evidence.status, 'trigger-verified-build-request-failed');
+  assert.doesNotMatch(JSON.stringify(evidence), /temporary build service error/);
+
   assert.equal(evidence.applied, true);
   assert.equal(evidence.triggerVerified, true);
   assert.equal(evidence.verified, false);

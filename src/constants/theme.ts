@@ -93,6 +93,8 @@ export type RoomPhase = 'day' | 'evening' | 'night';
 const VALID_VIBE_KEYS: VibeKey[] = ['soft', 'rylane', 'cloud', 'night'];
 
 export function normalizeVibeKey(raw: string | undefined): VibeKey {
+  if (raw === 'suhana' || raw === 'raylene') return 'soft';
+  if (raw === 'sy') return 'rylane';
   return VALID_VIBE_KEYS.includes(raw as VibeKey) ? (raw as VibeKey) : 'soft';
 }
 
