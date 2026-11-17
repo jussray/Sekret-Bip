@@ -255,7 +255,7 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (alertError || !alert) {
-    console.error('[safety-scan] public-source alert insert failed');
+    console.error('SAFETY_SCAN_ALERT_INSERT_FAILED');
     return new Response('db error', { status: 500 });
   }
 
@@ -272,9 +272,7 @@ Deno.serve(async (req: Request) => {
     // Payload shape when ready:
     //   { to: <parent_expo_token>, title, body: summary,
     //     data: { alert_id: alert.id, severity } }   ← NO source content
-    console.log(
-      `[safety-scan] parent notify queued alert_id=${String(alert.id)} severity=${severity}`,
-    );
+    console.log('SAFETY_SCAN_PARENT_NOTIFY_QUEUED');
   }
 
   return new Response(JSON.stringify({ flagged: true, severity, alert_id: alert.id }), {
