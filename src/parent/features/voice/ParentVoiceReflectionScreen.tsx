@@ -13,6 +13,7 @@ import {
   StyleSheet, Animated, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncVoiceReflection } from '@/utils/sync';
 
 const TOP = Platform.OS === 'ios' ? 56 : 36;
 const STORAGE_KEY = 'parent_voice_reflections';
@@ -141,6 +142,7 @@ export function ParentVoiceReflectionScreen({ setScreen, BottomNav }: ParentVoic
     setDraft('');
     setSaved(true);
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated)).catch(() => {});
+    syncVoiceReflection(entry);
     savedAnim.setValue(1);
     Animated.timing(savedAnim, { toValue: 0, duration: 2000, delay: 800, useNativeDriver: true }).start();
     setTimeout(() => setSaved(false), 3000);

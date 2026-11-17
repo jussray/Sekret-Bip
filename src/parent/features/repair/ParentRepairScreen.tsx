@@ -11,6 +11,7 @@ import {
   StyleSheet, Animated, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncRepairWin } from '@/utils/sync';
 
 const TOP = Platform.OS === 'ios' ? 56 : 36;
 
@@ -134,6 +135,7 @@ export function ParentRepairScreen({ setScreen, BottomNav }: ParentRepairScreenP
     setWins(updated);
     setWinDraft('');
     await AsyncStorage.setItem(STORAGE_KEY_WINS, JSON.stringify(updated)).catch(() => {});
+    syncRepairWin(entry);
   }
 
   const recentWins = wins.slice(0, 5);

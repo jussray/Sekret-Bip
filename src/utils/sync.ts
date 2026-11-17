@@ -850,6 +850,18 @@ export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]
   }
 }
 
+export function syncRepairWin(entry: { id: number; text: string; date: string; ritual?: string }): void {
+  void safeUpsert(TABLES.parentRepairWins, {
+    id: entry.id, text: entry.text, date: entry.date, ritual: entry.ritual ?? null,
+  });
+}
+
+export function syncVoiceReflection(entry: { id: number; prompt: string; text: string; date: string; lens: string }): void {
+  void safeUpsert(TABLES.parentVoiceReflections, {
+    id: entry.id, prompt: entry.prompt, text: entry.text, date: entry.date, lens: entry.lens,
+  });
+}
+
 /** Parent sends a warm note to their linked teen. */
 export async function sendParentNote(teenId: string, content: string): Promise<boolean> {
   const sb = getSupabase();

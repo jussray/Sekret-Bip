@@ -71,6 +71,9 @@ export const TABLES = {
   bridgeSignals:       'bridge_signals',
   parentNotes:         'parent_notes',
   circleReplies:       'circle_replies',
+  // ── Parent repair + voice reflection (20261117 migration) ───────────────
+  parentRepairWins:       'parent_repair_wins',
+  parentVoiceReflections: 'parent_voice_reflections',
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];
