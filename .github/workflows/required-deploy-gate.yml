@@ -38,6 +38,49 @@ jobs:
           printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
+      - name: Verify exported kernel receipt invariants and bind proof fingerprint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s systems/skills/local-runtime-kernel/scripts -p 'test_check_receipt.py' -v
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          root = Path("systems/skills/local-runtime-kernel/scripts")
+          names = ["check_receipt.py", "test_check_receipt.py"]
+          hashes = {name: hashlib.sha256((root / name).read_bytes()).hexdigest() for name in names}
+          subject = {"repository": os.environ["GITHUB_REPOSITORY"], "head": os.environ["EXPECTED_HEAD_SHA"], "file_sha256": hashes}
+          fingerprint = hashlib.sha256(json.dumps(subject, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+          receipt = {
+              "contract": "juss/readonly-proof-cookie@v1",
+              "source_subject": subject,
+              "fingerprint": "sha256:" + fingerprint,
+              "proof_cookie": "sekret-bip-kernel:" + fingerprint[:24],
+              "check": "python-unittest-10-cases-completed",
+              "browser_cookie": False,
+              "device_fingerprint": False,
+              "action_authority": False,
+              "merge_authority": False,
+              "deploy_authority": False,
+              "provider_or_live_app_verified": False
+          }
+          dest = Path("artifacts/required-deploy/kernel-evidence.json")
+          dest.parent.mkdir(parents=True, exist_ok=True)
+          dest.write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+          print("kernel source fingerprint:", receipt["fingerprint"])
+          print("proof cookie is evidence-only, not browser tracking or action authority")
+          PY
+
+      - name: Upload read-only kernel proof receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: sekret-kernel-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/required-deploy/kernel-evidence.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Set up Node 24 for repository and Worker proof
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
