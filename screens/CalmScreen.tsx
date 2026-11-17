@@ -78,7 +78,7 @@ const CALM_TOOLS = [
   { emoji: '💜', label: 'Breathe\nwith me', sub: '1–5 min',         action: 'breathe' },
   { emoji: '🌿', label: 'Ground\nYourself',  sub: '3–7 min',         action: 'mindReset' },
   { emoji: '📝', label: 'Release\nIt Out',   sub: 'write + let go',       action: 'pages' },
-  { emoji: '🌙', label: 'Sleep\nBetter',     sub: 'stories + sounds',     action: null },
+  { emoji: '🌙', label: 'Sleep\nBetter',     sub: 'stories + sounds',     action: 'sleep' },
   { emoji: '🚨', label: 'SOS\nCalm Now',     sub: '30 sec reset',         action: 'comfort' },
 ];
 
@@ -440,6 +440,10 @@ export function CalmScreen({
                   if (tool.action === 'breathe') {
                     if (onOpenBreathe) { onOpenBreathe(); return; }
                     setShowBreathe(true); return;
+                  }
+                  if (tool.action === 'sleep') {
+                    Alert.alert('Sleep Better 🌙', 'Sleep stories and sounds are coming soon. 💜');
+                    return;
                   }
                   if (tool.action) setScreen(tool.action);
                 }}
