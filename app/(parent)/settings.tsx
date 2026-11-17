@@ -14,6 +14,7 @@ import {
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppContext } from '@/context/AppContext';
+import { getSupabase } from '@/utils/supabase';
 import { THEME_PACKS } from '@constants/theme';
 import {
   requestNotificationPermissions,
@@ -85,6 +86,47 @@ export default function SettingsScreen() {
       await cancelDailyReminder();
       setNotificationsEnabled(false);
     }
+  }
+
+  function handleDeleteAccount() {
+    Alert.alert(
+      'Delete your account?',
+      'This permanently deletes your account and all your data — notes, posts, voice bips, and your profile. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, delete everything',
+          style: 'destructive',
+          onPress: () =>
+            Alert.alert(
+              'Are you sure?',
+              'Your account will be permanently removed. There is no way to recover it.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete Account',
+                  style: 'destructive',
+                  onPress: async () => {
+                    const sb = getSupabase();
+                    if (!sb) { Alert.alert('Error', 'Not signed in.'); return; }
+                    const { data, error: fnErr } = await sb.functions.invoke('delete-account', {
+                      method: 'POST',
+                    });
+                    if (fnErr || data?.error) {
+                      Alert.alert('Error', 'Could not delete account. Please try again.');
+                      return;
+                    }
+                    await sb.auth.signOut();
+                    await AsyncStorage.clear();
+                    resetApp();
+                    router.replace('/(auth)/login' as any);
+                  },
+                },
+              ],
+            ),
+        },
+      ],
+    );
   }
 
   function handleDeleteData() {
@@ -209,6 +251,9 @@ export default function SettingsScreen() {
         <Text style={styles.sectionTitle}>Danger zone</Text>
         <TouchableOpacity style={[styles.button, styles.danger]} onPress={handleDeleteData}>
           <Text style={styles.buttonText}>Delete local data</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.danger]} onPress={handleDeleteAccount}>
+          <Text style={styles.buttonText}>Delete My Account</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
