@@ -1,4 +1,4 @@
-import worker from './sekret-reply';
+import worker, { CRISIS_RE, crisisReply } from './sekret-reply';
 import { synthesizeWithPiper, type PiperTtsEnv, type PiperCharacterId } from './piper-tts';
 import { authenticate, type AuthEnv, type Principal } from './auth';
 import { handleBridgeSummaryGenerate } from './bridge-summary';
@@ -260,8 +260,8 @@ async function enforceRateLimit(
   try {
     const { success } = await limiter.limit({ key });
     if (!success) return json({ error: 'rate limit exceeded' }, 429, cors);
-  } catch (error) {
-    console.error('[rate-limit]', error);
+  } catch {
+    console.error('SEKRET_RATE_LIMIT_UNAVAILABLE');
   }
   return null;
 }
@@ -303,8 +303,8 @@ async function handleStyledVoice(
           styleDecision: 'allow',
         }, 200, cors);
       }
-    } catch (error) {
-      console.error('[sekret/voice:piper]', error);
+    } catch {
+      console.error('SEKRET_PIPER_SYNTHESIS_FAILED');
       if (!env.OPENAI_API_KEY) return json({ error: 'piper tts failed' }, 502, cors);
     }
   }
@@ -403,6 +403,10 @@ export default {
       if (!userText) return json({ error: 'userText is required' }, 400, cors);
 
       if (!env.OPENAI_API_KEY) {
+        // Degraded path: crisis text must never receive a canned greeting.
+        if (CRISIS_RE.test(userText)) {
+          return json(crisisReply(prepared.style.actorId === 'suhana' ? 'raylene' : prepared.style.actorId === 'sy' ? 'rylane' : prepared.style.actorId, false), 200, cors);
+        }
         const options = CHARACTER_FALLBACKS[prepared.style.actorId];
         const start = stableHash(`${prepared.style.actorId}:${userText.toLowerCase()}`) % options.length;
         console.error('[sekret/reply] OPENAI_API_KEY is not configured, serving fallback');

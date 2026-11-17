@@ -2,6 +2,22 @@
 
 <!-- One sentence. Be specific — "Adds memory consent gate to Raylene onboarding" not "Updates memory" -->
 
+### Scope
+
+<!-- Describe exactly which components and behaviors change. -->
+
+### Verification
+
+<!-- List exact test commands and their observed outcomes, including unverified gates. -->
+
+### Evidence
+
+<!-- Link exact source commits, CI jobs, review findings, or independently inspectable receipts. -->
+
+### Limits
+
+<!-- State remaining unverified claims, rollout restrictions, and known blockers. -->
+
 ## Which invariants does this touch?
 
 - [ ] Safety — teen-facing flows, AI output, content filtering
@@ -25,6 +41,6 @@
 
 <!-- Required for any UI change. Drag and drop here. -->
 
-## Rollback plan (if needed)
+### Rollback
 
 <!-- How do we undo this if it breaks production? -->

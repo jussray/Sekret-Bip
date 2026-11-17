@@ -33,6 +33,7 @@ export function logHttpStatusClass(status) {
     case 401: console.error('SAUCE_GUARD_DELETE_HTTP_401'); return;
     case 403: console.error('SAUCE_GUARD_DELETE_HTTP_403'); return;
     case 404: console.error('SAUCE_GUARD_DELETE_HTTP_404'); return;
+    case 406: console.error('SAUCE_GUARD_DELETE_HTTP_406'); return;
     case 409: console.error('SAUCE_GUARD_DELETE_HTTP_409'); return;
     case 500: console.error('SAUCE_GUARD_DELETE_HTTP_500'); return;
     default: console.error('SAUCE_GUARD_DELETE_HTTP_OTHER');
@@ -80,8 +81,8 @@ export async function fetchExpiredPendingRequests({
   return rows.map((row) => row.id);
 }
 
-async function processRequest(requestId) {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/account-delete`, {
+async function processRequest(requestId, fetchImpl = fetch) {
+  const response = await fetchImpl(`${SUPABASE_URL}/functions/v1/account-delete`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -94,18 +95,21 @@ async function processRequest(requestId) {
   return { ok: response.ok, status: response.status };
 }
 
-async function main() {
-  if (!SUPABASE_URL) fail('missing SUPABASE_URL');
-  if (!SERVICE_ROLE_KEY) fail('missing SUPABASE_SECRET_KEY (legacy SUPABASE_SERVICE_ROLE_KEY accepted during migration)');
-  if (!PROCESS_SECRET) fail('missing ACCOUNT_DELETION_PROCESS_SECRET');
-  const requestIds = await fetchExpiredPendingRequests();
+// Read-only mode proves the production Data API can list the queue without ever
+// invoking the destructive account-delete processor. Do not emit request IDs.
+export async function runDeletionSweep({ fetchImpl = fetch, checkOnly = false } = {}) {
+  const requestIds = await fetchExpiredPendingRequests({ fetchImpl });
   console.log('SAUCE_GUARD_DELETE_QUEUE_SCANNED');
+  if (checkOnly) {
+    console.log('SAUCE_GUARD_DELETE_QUEUE_READ_OK');
+    return { mode: 'check-only', queueReadable: true };
+  }
 
   const results = [];
   for (const requestId of requestIds) {
     // Sequential on purpose: each call deletes an Auth user and storage
     // objects, and there is no reason to parallelize destructive admin work.
-    const result = await processRequest(requestId);
+    const result = await processRequest(requestId, fetchImpl);
     results.push(result);
     // Do not put account request IDs or provider response bodies into public CI logs.
     if (result.ok) {
@@ -118,9 +122,18 @@ async function main() {
 
   const failures = results.filter((result) => !result.ok);
   if (failures.length > 0) {
-    fail(`${failures.length} of ${results.length} deletion request(s) failed; see log above.`);
+    throw new Error('sweep_failed');
   }
   console.log('SAUCE_GUARD_DELETE_SWEEP_COMPLETE');
+  return { mode: 'process', failures: 0 };
+}
+
+async function main() {
+  const checkOnly = process.env.SWEEP_CHECK_ONLY === 'true';
+  if (!SUPABASE_URL) fail('missing SUPABASE_URL');
+  if (!SERVICE_ROLE_KEY) fail('missing SUPABASE_SECRET_KEY (legacy SUPABASE_SERVICE_ROLE_KEY accepted during migration)');
+  if (!checkOnly && !PROCESS_SECRET) fail('missing ACCOUNT_DELETION_PROCESS_SECRET');
+  await runDeletionSweep({ checkOnly });
 }
 
 // Node 24 entry-point guard: importing this helper for tests must never run a sweep.

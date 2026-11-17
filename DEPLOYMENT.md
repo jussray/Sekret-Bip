@@ -84,7 +84,7 @@ The canonical Pages project is `sekret-bip`. The repository build contract emits
 
 The repository-owned Pages build contract is durable:
 
-- Node runtime: `.node-version` must resolve to `22.16.0`;
+- Node runtime: `.node-version` and `.nvmrc` must both resolve to `24.22.1`;
 - build command: `npm run build:web`;
 - output directory: `dist`.
 
