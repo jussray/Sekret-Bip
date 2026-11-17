@@ -128,3 +128,18 @@ A room build cannot merge when any of these fail:
 ## Security boundary
 
 The foreman uses persistent local browser profiles only to preserve user-approved login sessions. Those profiles and evidence runs are ignored by Git. The script does not automate authentication, approvals, purchases, publishing, destructive edits, or merge actions. Official APIs/connectors remain preferred; Playwright fills browser-workflow gaps and captures proof.
+
+## Historical run-report.json recovery
+
+Older reports written with a literal backslash-n suffix are invalid JSON. New reports use a real newline. Existing reports are never rewritten automatically.
+
+Inspect one known run ID (read-only), then explicitly apply only if the report is identified as repairable:
+
+```bash
+node scripts/room-report-recovery.mjs --run-id 2026-11-04T23-32-04-000Z
+node scripts/room-report-recovery.mjs --run-id 2026-11-04T23-32-04-000Z --apply
+```
+
+Replace the example ID with the actual run ID. Only an exact literal `\n` suffix that yields valid JSON with the matching run ID and a results array is eligible. `--apply` creates `run-report.json.legacy.bak` exclusively before changing the report. If backup creation fails or the file has other corruption, no repair is applied. Never bulk-rewrite historical evidence; inspect and authorize each report individually.
+
+Run `node --test test/room-production-contract.test.mjs` to verify isolated plan-mode output and recovery behavior.
