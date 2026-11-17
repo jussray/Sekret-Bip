@@ -34,17 +34,14 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "profile_select_own" ON user_profiles;
 CREATE POLICY "profile_select_own"
   ON user_profiles FOR SELECT
   USING (auth.uid() = id);
 
-DROP POLICY IF EXISTS "profile_insert_own" ON user_profiles;
 CREATE POLICY "profile_insert_own"
   ON user_profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
-DROP POLICY IF EXISTS "profile_update_own" ON user_profiles;
 CREATE POLICY "profile_update_own"
   ON user_profiles FOR UPDATE
   USING (auth.uid() = id)
@@ -84,12 +81,10 @@ CREATE TABLE IF NOT EXISTS consent_log (
 
 ALTER TABLE consent_log ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "consent_log_select_own" ON consent_log;
 CREATE POLICY "consent_log_select_own"
   ON consent_log FOR SELECT
   USING (auth.uid() = user_id);
 
-DROP POLICY IF EXISTS "consent_log_insert_own" ON consent_log;
 CREATE POLICY "consent_log_insert_own"
   ON consent_log FOR INSERT
   WITH CHECK (auth.uid() = user_id);

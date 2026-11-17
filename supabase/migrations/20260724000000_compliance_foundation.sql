@@ -46,19 +46,6 @@ CREATE TABLE IF NOT EXISTS user_profiles (
 -- Only the owning user can read or update their profile
 ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "profile_select_own"
-  ON user_profiles FOR SELECT
-  USING (auth.uid() = id);
-
-CREATE POLICY "profile_insert_own"
-  ON user_profiles FOR INSERT
-  WITH CHECK (auth.uid() = id);
-
-CREATE POLICY "profile_update_own"
-  ON user_profiles FOR UPDATE
-  USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
-
 -- Auto-update updated_at
 CREATE OR REPLACE FUNCTION touch_user_profile_updated_at()
 RETURNS TRIGGER
@@ -72,9 +59,6 @@ BEGIN
 END;
 $$;
 
-CREATE TRIGGER user_profiles_updated_at
-  BEFORE UPDATE ON user_profiles
-  FOR EACH ROW EXECUTE FUNCTION touch_user_profile_updated_at();
 
 
 -- ── consent_log ──────────────────────────────────────────────────────────────
@@ -106,17 +90,6 @@ CREATE TABLE IF NOT EXISTS consent_log (
 
 ALTER TABLE consent_log ENABLE ROW LEVEL SECURITY;
 
--- Users can read their own consent history
-CREATE POLICY "consent_log_select_own"
-  ON consent_log FOR SELECT
-  USING (auth.uid() = user_id);
-
--- Users can insert their own consent events (client-side)
-CREATE POLICY "consent_log_insert_own"
-  ON consent_log FOR INSERT
-  WITH CHECK (auth.uid() = user_id);
-
--- No UPDATE or DELETE — append-only by policy
 
 
 -- ── RPC: request_account_deletion ────────────────────────────────────────────
