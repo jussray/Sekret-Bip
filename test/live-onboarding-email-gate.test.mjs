@@ -25,6 +25,7 @@ test('live onboarding email smoke separates always-run readiness from explicit l
   assert.match(source, /shouldRunReadiness/);
   assert.match(source, /test\.skip\(!shouldRunReadiness/);
   assert.match(source, /test\.skip\(!shouldRunSignup/);
+  assert.match(source, /test\.skip\(!shouldRunUnverified/);
   assert.match(source, /test\.skip\(!shouldRunSignIn/);
   assert.match(source, /test\.skip\(!shouldRunInvite/);
   assert.match(workflow, /pull_request:/);
@@ -45,6 +46,39 @@ test('live onboarding email smoke separates always-run readiness from explicit l
   assert.doesNotMatch(workflow, /wrangler deploy|deploy:web:production|deploy:api:production/);
 });
 
+test('confirmation checkpoint does not claim verified email delivery', () => {
+  const source = readText(signupSourcePath);
+  const start = source.indexOf('function showConfirmationSuccess');
+  const end = source.indexOf('function showUnconfirmedSignupOutcome', start);
+  assert.ok(start >= 0 && end > start);
+  const prompt = source.slice(start, end);
+  assert.match(prompt, /This screen cannot verify delivery/);
+  assert.doesNotMatch(prompt, /We sent a confirmation link/);
+});
+
+test('confirmation screen can request one provider-owned resend without duplicating signup', () => {
+  const source = readText(signupSourcePath);
+  const start = source.indexOf('async function handleResendConfirmation()');
+  const end = source.indexOf('function showUnconfirmedSignupOutcome', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = source.slice(start, end);
+  assert.match(handler, /if \(!success \|\| resendAttemptRef\.current \|\| resendLoading\) return;/);
+  assert.match(handler, /resendAttemptRef\.current = true;/);
+  assert.match(handler, /setResendAttempted\(true\)/);
+  assert.match(handler, /console\.warn\('SIGNUP_CONFIRMATION_RESEND_FAILED'\)/);
+  assert.doesNotMatch(handler, /console\.warn\(.*(?:resendError|error\.message)/);
+
+  assert.match(handler, /await sb\.auth\.resend\(\{/);
+  assert.match(handler, /type: 'signup'/);
+  assert.match(handler, /email: email\.trim\(\)/);
+  assert.match(handler, /emailRedirectTo: buildEmailConfirmationRedirectUrl\(preferredSide\)/);
+  assert.doesNotMatch(handler, /auth\.signUp\(|updateUser\(|setSuccess\(true\)/);
+  assert.match(source, /accessibilityLabel="Resend confirmation link"/);
+  assert.match(source, /disabled=\{resendAttempted \|\| resendLoading\}/);
+  assert.match(source, /Request accepted\. A link may arrive/);
+  assert.doesNotMatch(handler, /Email sent successfully|Another email was sent/);
+});
+
 test('opaque 504 signup responses enter the existing ambiguous recovery path', () => {
   const source = readText(signupSourcePath);
 
@@ -53,7 +87,11 @@ test('opaque 504 signup responses enter the existing ambiguous recovery path', (
   assert.match(source, /const status = authErrorStatus\(error\);\s*return status !== null && status >= 400;/);
   assert.match(source, /options: \{ emailRedirectTo: redirectTo, data: metadata \}/);
   assert.match(source, /if \(isAmbiguousSignupError\(authErr\)\) \{[\s\S]*recoverAmbiguousSignup\(sb, e, p, metadata, redirectTo, authErr\)/);
-  assert.match(source, /The account server received your signup request, but confirmation is delayed/);
+  assert.doesNotMatch(source, /The account server received your signup request, but confirmation is delayed/);
+  assert.match(source, /function showUnconfirmedSignupOutcome\(\)/);
+  assert.match(source, /We cannot confirm that your account was created or that a confirmation email was sent/);
+  assert.match(source, /if \(initialSignupReachedAuth\) \{\s*showUnconfirmedSignupOutcome\(\);\s*return true;/);
+  assert.equal((source.match(/showUnconfirmedSignupOutcome\(\);/g) ?? []).length, 3);
 });
 
 test('server-reached ambiguous signup never resubmits signUp', () => {
@@ -122,6 +160,20 @@ test('live onboarding email smoke proves returning-user authentication with boun
   assert.match(source, /authenticated_returning_user/);
   assert.match(source, /expect\(signedIn,[\s\S]*Returning teen sign-in never completed/);
   assert.match(source, /not\.toHaveURL\(\/\\\/login/);
+});
+
+test('returning-user Playwright proof requires welcome email provider acceptance', () => {
+  const source = readText(specPath);
+  const workflow = readText(workflowPath);
+
+  assert.match(source, /send-welcome-email/);
+  assert.match(source, /welcome-email-response/);
+  assert.match(source, /await expect\.poll\(\(\) => welcomeResponses\.length/);
+  assert.match(source, /latestWelcome\?\.status\)\.toBe\(200\)/);
+  assert.match(source, /\['sent', 'already_sent'\]/);
+  assert.match(workflow, /src\/services\/auth\/welcomeEmail\.ts/);
+  assert.match(workflow, /supabase\/functions\/send-welcome-email\/\*\*/);
+  assert.match(workflow, /test\/welcome-email-contract\.test\.mjs/);
 });
 
 test('live signup proof uses one dedicated exact-target Playwright config for signup and family authority proof', () => {
@@ -193,6 +245,7 @@ test('live signup proof mailbox is disposable, non-personal, single-pass decoded
   const readinessStep = workflow.indexOf('Prove exact-preview browser readiness without account write');
   const mailboxStep = workflow.indexOf('Prepare disposable guest identity and mailbox');
   const signupStep = workflow.indexOf('Create disposable account through exact preview UI');
+  const unverifiedStep = workflow.indexOf('Prove unverified signup cannot sign in');
   const confirmStep = workflow.indexOf('Confirm disposable signup email');
   const signInStep = workflow.indexOf('Prove returning-user sign in');
   const familyStep = workflow.indexOf('Prove exact-preview family authority boundaries');
@@ -202,7 +255,8 @@ test('live signup proof mailbox is disposable, non-personal, single-pass decoded
       && previewStep < readinessStep
       && readinessStep < mailboxStep
       && mailboxStep < signupStep
-      && signupStep < confirmStep
+      && signupStep < unverifiedStep
+      && unverifiedStep < confirmStep
       && confirmStep < signInStep
       && signInStep < familyStep
       && familyStep < cleanupStep,
@@ -274,4 +328,22 @@ test('live onboarding email smoke proves provider acceptance, not just code gene
   assert.match(source, /\.email\?\.status\)\.toBe\('sent'\)/);
   assert.match(source, /\.email\?\.error_code \?\? null\)\.toBeNull\(\)/);
   assert.doesNotMatch(source, /code created, but email did not send[\s\S]*latestInvite\?\.status\)\.toBeLessThan\(500\)/);
+});
+
+test('negative auth proof is account-write gated and requires provider email_not_confirmed before confirmation', () => {
+  const source = readText(specPath);
+  const workflow = readText(workflowPath);
+
+  assert.match(source, /phase === 'unverified'/);
+  assert.match(source, /response\.status\(\)[\s\S]*toBeGreaterThanOrEqual\(400\)/);
+  assert.match(source, /email_not_confirmed/);
+  assert.match(source, /url\.pathname === '\/auth\/v1\/token'/);
+  assert.match(source, /server_rejected_unconfirmed_email/);
+  const start = workflow.indexOf('      - name: Prove unverified signup cannot sign in');
+  const end = workflow.indexOf('\n      - name:', start + 1);
+  const step = workflow.slice(start, end);
+  assert.ok(start >= 0 && end > start);
+  assert.match(step, /if: steps\.opt_in\.outputs\.enabled == 'true'/);
+  assert.match(step, /LIVE_ONBOARDING_PHASE: unverified/);
+  assert.doesNotMatch(step, /SUPABASE_SERVICE_ROLE_KEY|sb_secret_|service_role/);
 });

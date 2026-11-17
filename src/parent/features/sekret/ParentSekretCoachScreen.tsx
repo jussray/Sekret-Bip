@@ -6,7 +6,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, TextInput,
+  View, Text, TouchableOpacity, ScrollView, type ScrollViewInstance, TextInput,
   StyleSheet, Animated, Platform, Image, KeyboardAvoidingView,
   ActivityIndicator,
 } from 'react-native';
@@ -261,7 +261,7 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
 
   const cloudBreath = useRef(new Animated.Value(0)).current;
   const fadeIn      = useRef(new Animated.Value(0)).current;
-  const scrollRef   = useRef<ScrollView>(null);
+  const scrollRef   = useRef<ScrollViewInstance>(null);
 
   useEffect(() => {
     Animated.timing(fadeIn, { toValue: 1, duration: 600, useNativeDriver: true }).start();

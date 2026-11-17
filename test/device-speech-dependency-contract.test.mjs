@@ -6,19 +6,19 @@ const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
 const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
 const deviceSpeech = fs.readFileSync('utils/deviceSpeech.ts', 'utf8');
 
-test('native device speech dependency is installed and locked for Expo SDK 56', () => {
-  assert.equal(pkg.dependencies?.['expo-speech'], '~56.0.3');
-  assert.equal(lock.packages?.['']?.dependencies?.['expo-speech'], '~56.0.3');
+test('native device speech dependency is installed and locked for Expo SDK 58', () => {
+  assert.equal(pkg.dependencies?.['expo-speech'], '~58.0.4');
+  assert.equal(lock.packages?.['']?.dependencies?.['expo-speech'], '~58.0.4');
 
   const locked = lock.packages?.['node_modules/expo-speech'];
-  assert.equal(locked?.version, '56.0.3');
+  assert.equal(locked?.version, '58.0.4');
   assert.equal(
     locked?.resolved,
-    'https://registry.npmjs.org/expo-speech/-/expo-speech-56.0.3.tgz',
+    'https://registry.npmjs.org/expo-speech/-/expo-speech-58.0.4.tgz',
   );
   assert.equal(
     locked?.integrity,
-    'sha512-NkO7RX+BgJCALrjL/6C9AsyenkmJD9EBDIKAQmSN6BLrcXxwZnyQ9TSo/ZTSDSY9Y28aStXHfEBQogt2qUrP9w==',
+    'sha512-AOwi6VkWfLh4OVUlK1bpvMqTgXHVMqcb+sqBu+mHfiCp4DZpsdDC7JGJEterXz7jdF9qPFwqwrtIarA2EaDHuQ==',
   );
 });
 
