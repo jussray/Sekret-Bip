@@ -61,6 +61,7 @@ export interface CompanionReplyData {
   suggestedComfortTool: string | null;
   replySource: CompanionReplySource;
   traceId?: string;
+  questionBudget?: number;
 }
 
 export type VoiceProvider =
