@@ -33,6 +33,7 @@ import {
 import { useRouter } from 'expo-router';
 import {
   acknowledgeAlert,
+  TIER_META,
   type SafetyAction,
   type SafetyExperience,
 } from '@/features/safety/safetyCoordinator';
@@ -41,12 +42,6 @@ interface Props {
   experience: SafetyExperience | null;
   onDismiss: () => void;
 }
-
-const TIER_META = {
-  emotional_support:  { label: '💜 here with you', color: '#c4b5fd' },
-  concerning_pattern: { label: '💛 checking in', color: '#fbbf24' },
-  immediate_danger:   { label: '🚨 right here', color: '#f87171' },
-};
 
 const FALSE_PARENT_NOTIFICATION_CLAIM = 'Your parent has been quietly notified.';
 const VOLUNTARY_SUPPORT_REPLACEMENT = 'If you want someone you trust to know, Bridge can help you reach them.';
