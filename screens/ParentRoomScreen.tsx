@@ -35,13 +35,13 @@ type PanelSize = { width: number; height: number };
 // ─── Overlay: dark vignette top + bottom, clear in the middle ─────────────────
 const OVERLAY: Record<ParentRoomStyle, [string, string, string, string]> = {
   mom: ['rgba(30,8,58,0.68)', 'rgba(20,4,40,0.06)', 'rgba(20,4,40,0.04)', 'rgba(12,2,30,0.82)'],
-  dad: ['rgba(4,7,22,0.70)',  'rgba(2,5,14,0.06)',  'rgba(2,5,14,0.04)',  'rgba(2,4,12,0.84)'],
+  dad: ['rgba(12,4,30,0.72)',  'rgba(8,3,22,0.06)',  'rgba(8,3,22,0.04)',  'rgba(6,2,18,0.88)'],
 };
 
 // ─── Color tokens per room style ──────────────────────────────────────────────
 const T: Record<ParentRoomStyle, { accent: string; soft: string; sub: string }> = {
-  mom: { accent: '#c088d4', soft: '#f5eeff', sub: '#c8a8e8' },
-  dad: { accent: '#5a9ad8', soft: '#d8eeff', sub: '#88b4d8' },
+  mom: { accent: '#c060e0', soft: '#f5eeff', sub: '#c084fc' },
+  dad: { accent: '#8b5cf6', soft: '#ede9fe', sub: '#a78bfa' },
 };
 
 // ─── 4 moods only — no homework ──────────────────────────────────────────────

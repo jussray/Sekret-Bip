@@ -120,6 +120,8 @@ interface AppContextValue {
 
   teenGender: 'girl' | 'boy' | 'other' | null;
   resetApp: () => void;
+  colorScheme: 'light' | 'dark';
+  setColorScheme: (s: 'light' | 'dark') => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -143,6 +145,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [homeMessageIndex, setHomeMessageIndex] = useState(0);
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [teenGender, setTeenGender] = useState<'girl' | 'boy' | 'other' | null>(null);
+  const [colorScheme, setColorSchemeRaw] = useState<'light' | 'dark'>('dark');
   const breatheAnim = useRef(new Animated.Value(1)).current;
   const { session } = useVerificationContext();
   const authenticatedUserId = session && !session.user.is_anonymous ? session.user.id : null;
@@ -165,6 +168,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // State reset is intentionally account-transition driven. The individual
     // setters are stable React state controls and must not retrigger this gate.
   }, [authenticatedUserId]);
+
+  useEffect(() => {
+    AsyncStorage.getItem('bip_color_scheme').then(raw => {
+      if (raw === 'light' || raw === 'dark') setColorSchemeRaw(raw);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem('teen_profile_data').then(raw => {
@@ -343,6 +352,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     });
   }
 
+  function setColorScheme(s: 'light' | 'dark') {
+    setColorSchemeRaw(s);
+    AsyncStorage.setItem('bip_color_scheme', s).catch(() => {});
+  }
+
   function resetApp() {
     state.resetAllState();
     setJournalText('');
@@ -424,6 +438,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     completeParentOracleSession,
     teenGender,
     resetApp,
+    colorScheme,
+    setColorScheme,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

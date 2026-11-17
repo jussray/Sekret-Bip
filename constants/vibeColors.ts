@@ -538,3 +538,31 @@ export function getDesignToolTokenTable(): DesignToolTokenRow[] {
     };
   });
 }
+
+// ─── App-wide surface tokens for light / dark mode ───────────────────────────
+export const BIP_SURFACE = {
+  dark: {
+    root:        '#0d0518',
+    card:        'rgba(30,10,50,0.88)',
+    cardBorder:  'rgba(196,181,253,0.15)',
+    row:         'rgba(255,255,255,0.08)',
+    textPrimary: '#f0eaf8',
+    textSecond:  '#c4b5fd',
+    textMuted:   '#9d8ec8',
+    accent:      '#a78bfa',
+    section:     '#c4b5fd',
+    inputBorder: '#6d5aa5',
+  },
+  light: {
+    root:        '#faf5ff',
+    card:        'rgba(255,255,255,0.96)',
+    cardBorder:  'rgba(139,92,246,0.15)',
+    row:         'rgba(139,92,246,0.07)',
+    textPrimary: '#1a0a2e',
+    textSecond:  '#6d28d9',
+    textMuted:   '#8b5cf6',
+    accent:      '#7c3aed',
+    section:     '#7c3aed',
+    inputBorder: '#c4b5fd',
+  },
+} as const;
