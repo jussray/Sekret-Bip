@@ -26,7 +26,7 @@ test.describe('canonical Comfort and Cloud routes', () => {
     await expect(page.getByText('Let it all out. No filter, no judgment.', { exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
-    await page.getByRole('button', { name: 'Back' }).click();
+    await page.getByRole('button', { name: 'Back', exact: true }).click();
     await expect(page).toHaveURL(/\/calm(?:\?.*)?$/);
   });
 

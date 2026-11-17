@@ -7,11 +7,15 @@ on:
       - Quality Gate
       - Type Check
       - Implementation Evidence
+      - Founder Shield
       - Playwright Smoke and Guardrails
       - Production Smoke
       - Live Signup Proof
       - Controlled Account Cloud Comfort Proof
       - Owned Bip Signup Proof
+      - Verify Cloudflare Native Deployment
+      - Audit Cloudflare Zone Access Coverage
+      - Reconcile app.sekretbip.net Frontend Ownership
     types: [completed]
 
 permissions:

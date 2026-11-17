@@ -10,14 +10,15 @@ test('client uses eight character invite codes', async () => {
   assert.match(source, /normalizeParentInviteCode/);
 });
 
-test('client validates the complete active RPC relationship before exposing the teen id', async () => {
+test('client validates the pending RPC request without activating linked access', async () => {
   const source = await read('src/utils/parentLink.ts');
   assert.match(source, /validateRedeemedParentLink/);
   assert.match(source, /link_id/);
   assert.match(source, /teen_user_id/);
   assert.match(source, /parent_user_id !== expectedParentId/);
-  assert.match(source, /status !== 'active'/);
-  assert.match(source, /result\.value\.teenUserId/);
+  assert.match(source, /status !== 'pending'/);
+  assert.match(source, /return null;/);
+  assert.doesNotMatch(source, /return result\.ok \? result\.value\.teenUserId : null/);
 });
 
 test('parent onboarding matches the live contract', async () => {

@@ -88,7 +88,7 @@ jobs:
           for attempt in 1 2 3 4 5; do
             log_file="$(mktemp)"
             set +e
-            supabase start -x "$excluded_services" 2>&1 | tee "$log_file"
+            env -u SUPABASE_INTERNAL_IMAGE_REGISTRY supabase start -x "$excluded_services" 2>&1 | tee "$log_file"
             status=${PIPESTATUS[0]}
             set -e
 
@@ -113,13 +113,28 @@ jobs:
             sleep "$((attempt * 30))"
           done
 
+      - name: Resolve ephemeral local database URL
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Read the local stack's connection string from the Supabase CLI at
+          # runtime instead of hardcoding the CLI's public default password.
+          # The value only ever addresses the throwaway 127.0.0.1 stack this
+          # job started; masking keeps it out of logs.
+          db_url="$(supabase status -o env | grep -E '^DB_URL=' | head -n1 | cut -d= -f2- | tr -d '"')"
+          if [[ -z "$db_url" ]]; then
+            echo 'Could not resolve DB_URL from `supabase status -o env`.' >&2
+            exit 1
+          fi
+          echo "::add-mask::$db_url"
+          echo "SUPABASE_DB_URL=$db_url" >> "$GITHUB_ENV"
+
       - name: Prove L3 memory owner and anonymous denial
         shell: bash
         run: |
           set -euo pipefail
           command -v psql >/dev/null
-          PGPASSWORD=postgres psql \
-            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+          psql "$SUPABASE_DB_URL" \
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/agent_memories_l3_phase1.sql
 
@@ -128,8 +143,7 @@ jobs:
         run: |
           set -euo pipefail
           command -v psql >/dev/null
-          PGPASSWORD=postgres psql \
-            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+          psql "$SUPABASE_DB_URL" \
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/family_account_authority_phase1.sql
 
@@ -138,8 +152,7 @@ jobs:
         run: |
           set -euo pipefail
           command -v psql >/dev/null
-          PGPASSWORD=postgres psql \
-            'postgresql://postgres:postgres@127.0.0.1:54322/postgres' \
+          psql "$SUPABASE_DB_URL" \
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/parent_link_receiver_authority_phase1.sql
 

@@ -118,7 +118,7 @@ test('does not promote ordinary same-host HTML into a Cloudflare Access claim', 
   assert.equal(probe.classification, 'invalid-json');
 });
 
-test('treats an opaque forbidden response as an HTTP error without reading its body', async () => {
+test('treats an opaque forbidden response with no challenge/Access markers as a plain HTTP error', async () => {
   const forbidden = await probeJsonEndpoint('https://app.sekretbip.net/.well-known/sekret-release.json', {
     fetchImpl: async () =>
       mockResponse({
@@ -128,7 +128,65 @@ test('treats an opaque forbidden response as an HTTP error without reading its b
   });
 
   assert.equal(forbidden.accessBlockPage, false);
+  assert.equal(forbidden.challengeBlockPage, false);
   assert.equal(forbidden.classification, 'http-error');
+});
+
+test('classifies a non-2xx Cloudflare WAF/bot-challenge page distinctly from an Access block', async () => {
+  const challengeHtml =
+    '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body>' +
+    '<div id="cf-wrapper">Checking your browser before accessing api.sekretbip.net.</div>' +
+    '<script>var a=document.getElementById("_cf_chl_opt");</script>' +
+    '<div class="cdn-cgi/challenge-platform/h/g/orchestrate/chl_page"></div>' +
+    '</body></html>';
+  const probe = await probeJsonEndpoint('https://api.sekretbip.net/health', {
+    fetchImpl: async () =>
+      mockResponse({
+        status: 403,
+        url: 'https://api.sekretbip.net/health',
+        redirected: false,
+        headers: {'content-type': 'text/html; charset=UTF-8'},
+        body: challengeHtml,
+        json: new SyntaxError('not JSON'),
+      }),
+  });
+
+  assert.equal(probe.accessBlockPage, false);
+  assert.equal(probe.challengeBlockPage, true);
+  assert.equal(probe.classification, 'cloudflare-challenge-intercepted');
+});
+
+test('collects challenge blocking only for positively identified challenge surfaces', async () => {
+  const challengeHtml = '<html><head><title>Just a moment...</title></head><body>cloudflare _cf_chl_opt</body></html>';
+  const fetchImpl = async (url) => {
+    const target = new URL(String(url));
+    if (target.hostname === 'api.sekretbip.net') {
+      return mockResponse({
+        status: 503,
+        url: 'https://api.sekretbip.net/health',
+        headers: {'content-type': 'text/html'},
+        body: challengeHtml,
+        json: new SyntaxError('not JSON'),
+      });
+    }
+    return mockResponse({
+      status: 200,
+      url: 'https://app.sekretbip.net/.well-known/sekret-release.json',
+      json: {commitSha: 'b'.repeat(40)},
+    });
+  };
+
+  const evidence = await collectProductionReleaseEndpointEvidence({
+    expectedSha: 'b'.repeat(40),
+    fetchImpl,
+  });
+
+  assert.equal(evidence.version, 3);
+  assert.equal(evidence.status, 'cloudflare-challenge-intercepted');
+  assert.deepEqual(evidence.blockedByChallenge, ['backend']);
+  assert.deepEqual(evidence.blockedByAccess, []);
+  assert.equal(evidence.backend.classification, 'cloudflare-challenge-intercepted');
+  assert.equal(evidence.frontend.classification, 'ok');
 });
 
 test('collects Access blocking only for positively identified redirect surfaces', async () => {

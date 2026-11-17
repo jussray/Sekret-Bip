@@ -92,6 +92,19 @@ test('authorized founder login routes before public consent and onboarding gates
   assert.match(bootstrap, /requiredConsentsComplete: false/);
 });
 
+test('restored founder session reaches private founder interface before public consent', () => {
+  const bootstrappedRoute = index.indexOf('setPostAuthNextRoute(result.nextRoute)');
+  const founderCheck = index.indexOf("if (postAuthNextRoute === '/(dev)/control-room')");
+  const consentCheck = index.indexOf('if (!requiredConsentsComplete)');
+  assert.ok(bootstrappedRoute > -1, 'root must retain the authorized bootstrap destination');
+  assert.ok(founderCheck > bootstrappedRoute, 'root must consume the server-verified founder destination');
+  assert.ok(consentCheck > founderCheck, 'founder routing must precede public onboarding consent');
+  assert.match(index, /setPostAuthNextRoute\(null\)/, 'a new bootstrap must clear old routing authority');
+  assert.match(index, /router\.replace\('\/\(dev\)\/control-room' as never\)/);
+  assert.match(index, /if \(accountProfile\.accountSide === 'parent'\)/);
+  assert.match(index, /verificationState === 'VERIFIED_TEEN'/);
+});
+
 test('founder routing distinguishes lookup failure from a verified non-founder', () => {
   assert.match(bootstrap, /getCurrentFounderProfileForRouting/);
   assert.doesNotMatch(bootstrap, /const founderProfile = await getCurrentFounderProfile\(\)/);
