@@ -128,12 +128,14 @@ export function VoiceBipScreen({
   const [recorded,         setRecorded]          = useState(false);
   const [sekretReply,      setSekretReply]       = useState('');
   const [replyAudioUri,    setReplyAudioUri]     = useState('');
+  const [replyVoiceMeta,   setReplyVoiceMeta]    = useState<{ voiceSource: string; aiGenerated: boolean } | null>(null);
   const [isVoiceLoading,   setIsVoiceLoading]    = useState(false);
   const [isThinking,       setIsThinking]        = useState(false);
   const [recordingTime,    setRecordingTime]     = useState(0);
   const [selectedBipType,  setSelectedBipType]   = useState<string | null>(null);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const soundRef     = useRef<Audio.Sound | null>(null);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -357,7 +359,10 @@ export function VoiceBipScreen({
     setSekretReply(reply);
     setIsVoiceLoading(true);
     const audio = await fetchSekretVoice({ reply, characterId: avatarKey });
-    if (audio) setReplyAudioUri(`data:${audio.contentType};base64,${audio.audioBase64}`);
+    if (audio) {
+      setReplyAudioUri(`data:${audio.contentType};base64,${audio.audioBase64}`);
+      setReplyVoiceMeta({ voiceSource: audio.voiceSource, aiGenerated: audio.aiGenerated });
+    }
     setIsVoiceLoading(false);
     setIsThinking(false);
     presence.markResponseReady();
@@ -371,13 +376,22 @@ export function VoiceBipScreen({
       waveLoop.current?.stop();
       if (timerRef.current) clearInterval(timerRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => null);
+      soundRef.current?.unloadAsync().catch(() => null);
     };
   }, []);
 
 
   const playReplyAudio = async () => {
     if (!replyAudioUri) return;
+    await soundRef.current?.unloadAsync();
     const { sound } = await Audio.Sound.createAsync({ uri: replyAudioUri });
+    soundRef.current = sound;
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded && status.didJustFinish) {
+        sound.unloadAsync();
+        soundRef.current = null;
+      }
+    });
     await sound.playAsync();
   };
 

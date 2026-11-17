@@ -31,6 +31,8 @@ export interface SekretVoiceResponse {
   audioBase64: string;
   contentType: string;
   characterId: SekretCharacterId;
+  voiceSource: string;
+  aiGenerated: boolean;
 }
 
 function normalizeCharacter(value?: string): SekretCharacterId {
@@ -170,7 +172,13 @@ export async function fetchSekretVoice(input: {
     if (!res.ok) throw new Error(`voice api error ${res.status}`);
     const data = await res.json() as Partial<SekretVoiceResponse>;
     if (!data.audioBase64 || !data.contentType) return null;
-    return { audioBase64: data.audioBase64, contentType: data.contentType, characterId: normalizeCharacter(data.characterId) };
+    return {
+      audioBase64: data.audioBase64,
+      contentType: data.contentType,
+      characterId: normalizeCharacter(data.characterId),
+      voiceSource: typeof data.voiceSource === 'string' ? data.voiceSource : 'fallback',
+      aiGenerated: Boolean(data.aiGenerated),
+    };
   } catch {
     return null;
   }
