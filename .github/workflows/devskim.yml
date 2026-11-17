@@ -27,6 +27,12 @@ jobs:
 
       - name: Run DevSkim scanner
         uses: microsoft/DevSkim-Action@734c6ed89671b1c7a5211ed334c79db261e3f221 # v1
+        with:
+          # .agents/skills/** is vendored third-party content (npx skills add
+          # cloudflare/skills) — not ours to patch, and re-fetched verbatim on
+          # every update, so a suppression here is the durable fix rather than
+          # editing lines that would just reappear.
+          ignore-globs: ".agents/skills/**"
 
       - name: Upload DevSkim scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
