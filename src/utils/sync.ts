@@ -975,6 +975,26 @@ export async function fetchParentEngagement(): Promise<ParentEngagement | null> 
   }
 }
 
+// ── Growth milestones ─────────────────────────────────────────────────────────
+
+/** Record one track completion. Safe no-op when Supabase isn't configured. */
+export async function syncGrowthMilestone(trackKey: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  try {
+    const { error } = await sb.from(TABLES.growthMilestones).insert({
+      user_id:      uid,
+      track_key:    trackKey,
+      completed_at: new Date().toISOString(),
+    });
+    if (error) console.warn('[sync] syncGrowthMilestone failed:', error.message);
+  } catch (e) {
+    if (__DEV__) console.warn('[sync] syncGrowthMilestone failed', e);
+  }
+}
+
 /** Parent subscribes to new bridge signals from their teen via Realtime. */
 export async function subscribeToBridgeSignals(
   teenId:  string,

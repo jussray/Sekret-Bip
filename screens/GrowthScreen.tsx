@@ -159,7 +159,7 @@ interface GrowthScreenProps {
   selectedSekret:  string;
   setScreen:       (s: string) => void;
   BottomNav:       React.ReactNode;
-  onMilestone?:    () => void;
+  onMilestone?:    (trackKey: string) => void;
   streakDays?:     number;
 }
 
@@ -218,7 +218,7 @@ export function GrowthScreen({
 
   const markComplete = (key: TrackKey) => {
     setCompleted(prev => ({ ...prev, [key]: true }));
-    onMilestone?.();
+    onMilestone?.(key);
   };
 
   const heroTitle = isRylane ? 'Growth 🪱' : 'Growth 🌱';

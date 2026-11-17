@@ -4,6 +4,7 @@ import { useAppContext } from '@/context/AppContext';
 import { THEME_PACKS } from '@constants/theme';
 import { GrowthScreen } from '@screens/GrowthScreen';
 import { routeForSide } from '@/shared/routes';
+import { syncGrowthMilestone } from '@/utils/sync';
 
 export default function GrowthRoute() {
   const { theme, mood, selectedSekret } = useAppContext();
@@ -14,7 +15,7 @@ export default function GrowthRoute() {
       mood={mood}
       selectedSekret={selectedSekret}
       setScreen={(screen: string) => router.push(routeForSide('teen', screen) as any)}
-      onMilestone={() => {}}
+      onMilestone={(key) => { void syncGrowthMilestone(key); }}
       BottomNav={null}
     />
   );
