@@ -25,7 +25,7 @@ const fnBody = fnMatch[1]
   .replace(/: CharacterId \| null/g, '')
   .replace(/: string/g, '');
 
-const normalizeCharacter = new Function('value', fnBody); // eslint-disable-line no-new-func
+const normalizeCharacter = new Function('value', fnBody);  
 
 // ─── normalizeCharacter behavioral tests ─────────────────────────────────────
 test('normalizeCharacter returns raylene for "raylene"', () => {

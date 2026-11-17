@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "repository": "jussray/Sekret-Bip",
+  "defaultPolicy": "deny-undeclared",
+  "scanRoots": ["app", "src", "utils", "worker", "scripts", "supabase"],
+  "allowedCookieWriters": [],
+  "cookies": [],
+  "nonCookieState": [
+    {
+      "name": "supabase-auth-session-native",
+      "mechanism": "Expo SecureStore",
+      "purpose": "Persist the signed-in user's Supabase access and refresh tokens on iOS and Android.",
+      "sensitive": true
+    },
+    {
+      "name": "supabase-auth-session-web",
+      "mechanism": "React Native AsyncStorage web adapter",
+      "purpose": "Persist the browser SPA session where no trusted SSR/backend cookie owner exists.",
+      "sensitive": true
+    }
+  ],
+  "externalCookieProviders": [],
+  "prohibited": [
+    "document.cookie authentication",
+    "tracking, advertising, or cross-site profiling cookies",
+    "copying Founder Control Room cookies or credentials",
+    "putting journals, voice, media, safety, parent-visibility, or health content in cookies"
+  ]
+}

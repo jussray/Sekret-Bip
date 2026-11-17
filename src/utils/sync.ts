@@ -6,14 +6,18 @@
 // errors thrown. This lets us ship the UI now and add credentials later.
 //
 // Auth model: each row is scoped to auth.uid() via RLS. If there's no
-// signed-in user yet, writes are silently skipped (kept locally only).
-// ensureAnonymousSession() is called from useAppEffects on mount.
+// permanent signed-in account yet, writes are silently skipped (kept
+// locally only). No anonymous session is ever created here — account
+// authentication is permanent-account only, and anonymous participation
+// lives in Circle (public identity), never in sign-in.
 //
 // IMPORTANT: never throw. The user's local experience must never break
 // because the cloud is down. Errors are logged and swallowed.
 
 import { getSupabase, TABLES } from './supabase';
+import { getCurrentSessionUserId } from '@/services/session';
 import { loadState } from './storage';
+import { emitEvent } from '@/features/activity/events';
 import type {
   JournalEntry, MoodEntry, CirclePost, ParentCirclePost, VoiceNote,
   ComfortSession, CrewMember, CrewCheckIn,
@@ -26,19 +30,59 @@ import type {
   ParentCirclePost as CircleParentPost,
 } from '../../types/circle';
 
+
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+type SyncRow = Record<string, JsonValue | undefined>;
+type ReactionCounts = Record<string, number>;
+const EMPTY_PARENT_REACTIONS: ReactionCounts = {
+  beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0,
+};
+function compactReactions(reactions: Record<string, number | undefined> | undefined): ReactionCounts {
+  if (!reactions) return {};
+  return Object.fromEntries(
+    Object.entries(reactions).filter((entry): entry is [string, number] => typeof entry[1] === 'number'),
+  );
+}
+type SupabaseErrorLike = { message?: string; code?: string };
+type SupabaseDataResult<T> = { data: T | null; error: SupabaseErrorLike | null };
+type ParentCirclePostRow = {
+  id: number; text: string; date: string; time: string;
+  reactions: ReactionCounts | null; circle_tag: string | null;
+};
+type PublicCirclePostRow = {
+  id: string | number; text: string; post_mood: string | null; media_kind: string | null;
+  reactions: ReactionCounts | null; created_at: string;
+};
+type SharedCirclePostRow = PublicCirclePostRow & { user_id: string };
+type CircleProfileRow = { user_id: string; nickname: string; avatar_emoji: string };
+type RoomMemoryRow = {
+  character: string; last_visit: string | null; last_hotspot: string | null;
+  last_summon: string | null; visit_count: number | null;
+};
+type MoodHistoryRow = Pick<MoodEntry, 'id' | 'mood' | 'date' | 'time'>;
+type JournalEntryRow = Pick<JournalEntry, 'id' | 'text' | 'mood' | 'date' | 'time'> & { sekret_reply: string | null };
+type CirclePostRow = Pick<CirclePost, 'id' | 'text' | 'date' | 'time' | 'reactions'> & { circle_tag: string | null; post_mood: string | null; media_kind: string | null };
+type VoiceNoteRow = Pick<VoiceNote, 'id' | 'title' | 'date' | 'time' | 'duration'>;
+type ComfortSessionRow = Pick<ComfortSession, 'id' | 'type' | 'date' | 'time'> & { mood: string | null };
+type CrewMemberRow = Pick<CrewMember, 'id' | 'name' | 'emoji' | 'commitment' | 'cadence'> & {
+  invite_code: string | null | undefined; added_at: string | null;
+};
+type CrewCheckInRow = {
+  id: number; member_id: string | number; note: string | undefined;
+  mood: string | null; date: string; time: string;
+};
+
 // ── Internal helpers ──────────────────────────────────────────────
 async function currentUserId(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
   try {
-    const { data } = await sb.auth.getUser();
-    return data?.user?.id ?? null;
+    return await getCurrentSessionUserId();
   } catch {
     return null;
   }
 }
 
-async function safeUpsert(table: string, payload: any | any[]): Promise<void> {
+async function safeUpsert(table: string, payload: SyncRow | SyncRow[]): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
   const uid = await currentUserId();
@@ -48,10 +92,10 @@ async function safeUpsert(table: string, payload: any | any[]): Promise<void> {
     const withUser = rows.map(r => ({ ...r, user_id: uid }));
     const { error } = await sb.from(table).upsert(withUser, { onConflict: 'id,user_id' });
     if (error) {
-      console.warn('[sync] safeUpsert failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SAFEUPSERT_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] upsert ${table} failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_UPSERT_FAILED');
   }
 }
 
@@ -63,34 +107,16 @@ async function safeDelete(table: string, id: number | string): Promise<void> {
   try {
     const { error } = await sb.from(table).delete().match({ id, user_id: uid });
     if (error) {
-      console.warn('[sync] safeDelete failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SAFEDELETE_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] delete ${table} failed`, e);
-  }
-}
-
-// ── Anonymous sign-in ────────────────────────────────────────────
-export async function ensureAnonymousSession(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  try {
-    const { data } = await sb.auth.getUser();
-    if (data?.user?.id) return data.user.id;
-    const { data: signed, error } = await sb.auth.signInAnonymously();
-    if (error) {
-      if (__DEV__) console.warn('[sync] anon sign-in failed', error);
-      return null;
-    }
-    return signed?.user?.id ?? null;
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] ensureAnonymousSession threw', e);
-    return null;
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_DELETE_FAILED');
   }
 }
 
 // ── Mood ───────────────────────────────────────────────────────────
 export function syncMood(entry: MoodEntry): void {
+  emitEvent('mood_logged', { mood: entry.mood });
   void safeUpsert(TABLES.moodHistory, {
     id:   entry.id,
     mood: entry.mood,
@@ -101,6 +127,10 @@ export function syncMood(entry: MoodEntry): void {
 
 // ── Journal ─────────────────────────────────────────────────────────
 export function syncJournal(entry: JournalEntry): void {
+  emitEvent('journal_saved', {
+    mood:      entry.mood,
+    wordCount: entry.text ? entry.text.trim().split(/\s+/).filter(Boolean).length : 0,
+  });
   void safeUpsert(TABLES.journalEntries, {
     id:           entry.id,
     text:         entry.text,
@@ -118,7 +148,7 @@ export function syncCirclePost(post: CirclePost): void {
     text:       post.text,
     date:       post.date,
     time:       post.time,
-    reactions:  post.reactions,
+    reactions:  compactReactions(post.reactions),
     circle_tag: post.circleTag ?? null,
     post_mood:  post.postMood  ?? null,
     media_kind: post.mediaKind ?? null,
@@ -131,7 +161,7 @@ export function syncParentCirclePost(post: ParentCirclePost): void {
     text:       post.text,
     date:       post.date,
     time:       post.time,
-    reactions:  post.reactions,
+    reactions:  compactReactions(post.reactions),
     circle_tag: post.circleTag ?? null,
   });
 }
@@ -152,16 +182,16 @@ export async function loadParentCircleFeed(
       .order('id', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []).map((r: any) => ({
+    return (data ?? []).map((r: ParentCirclePostRow) => ({
       id:        r.id,
       text:      r.text,
       date:      r.date,
       time:      r.time,
-      reactions: r.reactions ?? { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
+      reactions: r.reactions ?? EMPTY_PARENT_REACTIONS,
       circleTag: r.circle_tag ?? undefined,
     })) as ParentCirclePost[];
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadParentCircleFeed failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPARENTCIRCLEFEED_FAILED');
     return [];
   }
 }
@@ -181,7 +211,7 @@ export async function loadCircleFeed(
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data ?? []).map((r: any) => ({
+      return (data ?? []).map((r: PublicCirclePostRow) => ({
         id: r.id, text: r.text, post_mood: r.post_mood ?? null,
         media_kind: r.media_kind ?? null, reactions: r.reactions ?? {},
         created_at: r.created_at,
@@ -197,17 +227,17 @@ export async function loadCircleFeed(
       if (error) throw error;
       const rows = posts ?? [];
       let profileMap: Record<string, { nickname: string; avatar_emoji: string }> = {};
-      const userIds = [...new Set(rows.map((r: any) => r.user_id as string))];
+      const userIds = [...new Set(rows.map((r: SharedCirclePostRow) => r.user_id))];
       if (userIds.length > 0) {
         const { data: profiles } = await sb
           .from(TABLES.circleProfiles)
           .select('user_id, nickname, avatar_emoji')
           .in('user_id', userIds);
         profileMap = Object.fromEntries(
-          (profiles ?? []).map((p: any) => [p.user_id, { nickname: p.nickname, avatar_emoji: p.avatar_emoji }]),
+          (profiles ?? []).map((p: CircleProfileRow) => [p.user_id, { nickname: p.nickname, avatar_emoji: p.avatar_emoji }]),
         );
       }
-      return rows.map((r: any) => ({
+      return rows.map((r: SharedCirclePostRow) => ({
         id: r.id, user_id: r.user_id,
         nickname:     profileMap[r.user_id]?.nickname     ?? 'Anonymous',
         avatar_emoji: profileMap[r.user_id]?.avatar_emoji ?? '🌙',
@@ -223,19 +253,19 @@ export async function loadCircleFeed(
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data ?? []).map((r: any) => ({
+      return (data ?? []).map((r: Pick<ParentCirclePostRow, 'id' | 'text' | 'reactions' | 'circle_tag'> & { created_at: string }) => ({
         id:               r.id,
         user_id:          '',
         text:             r.text,
-        reactions:        r.reactions ?? { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
+        reactions:        r.reactions ?? EMPTY_PARENT_REACTIONS,
         circle_tag:       r.circle_tag ?? null,
         created_at:       r.created_at,
         identity_revealed: false,
       })) as CircleParentPost[];
     }
     return null;
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] loadCircleFeed(${tab}) failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADCIRCLEFEED_FAILED');
     return null;
   }
 }
@@ -248,6 +278,7 @@ export async function syncCircleReaction(
 ): Promise<void> {
   const postType = reaction != null ? tabOrReaction : 'public';
   const emoji    = reaction ?? tabOrReaction;
+  emitEvent('circle_reaction', { reactionKey: emoji });
   const sb = getSupabase();
   if (!sb) return;
   const uid = await currentUserId();
@@ -260,10 +291,10 @@ export async function syncCircleReaction(
         { onConflict: 'post_id,post_type,user_id', ignoreDuplicates: true },
       );
     if (error) {
-      console.warn('[sync] syncCircleReaction failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCCIRCLEREACTION_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncCircleReaction failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCCIRCLEREACTION_FAILED');
   }
 }
 
@@ -273,6 +304,7 @@ export async function writeCirclePost(
   text: string,
   opts: { postMood?: string; circleTag?: string; mediaKind?: string; revealIdentity?: boolean } = {},
 ): Promise<void> {
+  emitEvent('circle_post');
   const sb = getSupabase();
   if (!sb) return;
   const uid = await currentUserId();
@@ -298,15 +330,16 @@ export async function writeCirclePost(
       created_at: new Date().toISOString(),
     });
     if (error) {
-      console.warn('[sync] writeCirclePost failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_WRITECIRCLEPOST_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] writeCirclePost(${tab}) failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_WRITECIRCLEPOST_FAILED');
   }
 }
 
 // ── Voice ─────────────────────────────────────────────────────────────
 export function syncVoiceNote(note: VoiceNote): void {
+  emitEvent('voice_completed', { durationSecs: note.duration ? Number(note.duration) : undefined });
   void safeUpsert(TABLES.voiceNotes, {
     id: note.id, title: note.title, date: note.date,
     time: note.time, duration: note.duration,
@@ -315,6 +348,7 @@ export function syncVoiceNote(note: VoiceNote): void {
 
 // ── Comfort sessions ─────────────────────────────────────────────────────
 export function syncComfortSession(session: ComfortSession): void {
+  emitEvent(session.type === 'breathe' ? 'breathe_completed' : 'comfort_completed');
   void safeUpsert(TABLES.comfortSessions, {
     id: session.id, type: session.type,
     mood: session.mood ?? null, date: session.date, time: session.time,
@@ -335,6 +369,7 @@ export function deleteCrewMember(id: number | string): void {
 }
 
 export function syncCrewCheckIn(c: CrewCheckIn): void {
+  emitEvent('crew_checkin');
   void safeUpsert(TABLES.crewCheckIns, {
     id: c.id, member_id: c.memberId, note: c.note,
     mood: c.mood ?? null, date: c.date, time: c.time,
@@ -364,10 +399,10 @@ export async function syncRoomMemory(rm: {
       { onConflict: 'user_id' },
     );
     if (error) {
-      console.warn('[sync] syncRoomMemory failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCROOMMEMORY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncRoomMemory failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCROOMMEMORY_FAILED');
   }
 }
 
@@ -382,10 +417,10 @@ export async function snapshotPoints(total: number): Promise<void> {
       user_id: uid, total, captured_at: new Date().toISOString(),
     });
     if (error) {
-      console.warn('[sync] snapshotPoints failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SNAPSHOTPOINTS_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] snapshotPoints failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SNAPSHOTPOINTS_FAILED');
   }
 }
 
@@ -403,10 +438,10 @@ export async function syncPeriodDay(day: string, note?: string): Promise<void> {
       { onConflict: 'user_id,day' },
     );
     if (error) {
-      console.warn('[sync] syncPeriodDay failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCPERIODDAY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncPeriodDay failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCPERIODDAY_FAILED');
   }
 }
 
@@ -419,10 +454,10 @@ export async function deletePeriodDay(day: string): Promise<void> {
   try {
     const { error } = await sb.from(TABLES.periodDays).delete().match({ user_id: uid, day });
     if (error) {
-      console.warn('[sync] deletePeriodDay failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_DELETEPERIODDAY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] deletePeriodDay failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_DELETEPERIODDAY_FAILED');
   }
 }
 
@@ -439,9 +474,9 @@ export async function loadPeriodDays(): Promise<string[]> {
       .eq('user_id', uid)
       .order('day', { ascending: true });
     if (error) throw error;
-    return (data ?? []).map((r: any) => r.day as string);
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadPeriodDays failed', e);
+    return (data ?? []).map((r: { day: string }) => r.day);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPERIODDAYS_FAILED');
     return [];
   }
 }
@@ -469,10 +504,10 @@ export async function syncOracleSession(
       { onConflict: 'user_id,personality_id' },
     );
     if (error) {
-      console.warn('[sync] syncOracleSession failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCORACLESESSION_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncOracleSession failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCORACLESESSION_FAILED');
   }
 }
 
@@ -493,11 +528,11 @@ export async function loadOracleSession(
     if (error) throw error;
     if (!data) return null;
     return {
-      memory:       (data.memory as Record<string, unknown>) ?? {},
-      sessionCount: (data.session_count as number) ?? 0,
+      memory:       (data.memory) ?? {},
+      sessionCount: (data.session_count) ?? 0,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadOracleSession failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADORACLESESSION_FAILED');
     return null;
   }
 }
@@ -544,10 +579,10 @@ export async function syncTeenActivitySummary(): Promise<void> {
       { onConflict: 'user_id' },
     );
     if (error) {
-      console.warn('[sync] syncTeenActivitySummary failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCTEENACTIVITYSUMMARY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncTeenActivitySummary failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCTEENACTIVITYSUMMARY_FAILED');
   }
 }
 
@@ -573,12 +608,12 @@ export async function fetchTeenActivitySummary(
     if (error) throw error;
     if (!data) return null;
     return {
-      streak_days:   data.streak_days   as number,
-      session_count: data.session_count as number,
-      points_tier:   data.points_tier   as string,
+      streak_days:   data.streak_days,
+      session_count: data.session_count,
+      points_tier:   data.points_tier,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchTeenActivitySummary failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_FETCHTEENACTIVITYSUMMARY_FAILED');
     return null;
   }
 }
@@ -620,21 +655,21 @@ export async function pullAll(): Promise<{
       sb.from(TABLES.roomMemory).select('character, last_visit, last_hotspot, last_summon, visit_count').eq('user_id', uid).maybeSingle(),
     ]);
 
-    function settled<T>(res: PromiseSettledResult<{ data: T | null; error: any }>): T | null {
+    function settled<T>(res: PromiseSettledResult<SupabaseDataResult<T>>): T | null {
       if (res.status === 'rejected') return null;
-      if (res.value.error) { console.warn('[sync] pullAll partial error:', res.value.error.message); return null; }
+      if (res.value.error) { console.warn('SEKRET_SYNC_PULLALL_PARTIAL_ERROR'); return null; }
       return res.value.data;
     }
 
-    const moods       = settled<any[]>(moodRes as any)         ?? [];
-    const journals    = settled<any[]>(journalRes as any)      ?? [];
-    const circles     = settled<any[]>(circleRes as any)       ?? [];
-    const voices      = settled<any[]>(voiceRes as any)        ?? [];
-    const comforts    = settled<any[]>(comfortRes as any)      ?? [];
-    const crewMs      = settled<any[]>(crewMemberRes as any)   ?? [];
-    const crewCIs     = settled<any[]>(crewCheckInRes as any)  ?? [];
-    const parentPosts = settled<any[]>(parentCircleRes as any) ?? [];
-    const room        = settled<any>(roomRes as any);
+    const moods       = settled<MoodHistoryRow[]>(moodRes as PromiseSettledResult<SupabaseDataResult<MoodHistoryRow[]>>)         ?? [];
+    const journals    = settled<JournalEntryRow[]>(journalRes as PromiseSettledResult<SupabaseDataResult<JournalEntryRow[]>>)      ?? [];
+    const circles     = settled<CirclePostRow[]>(circleRes as PromiseSettledResult<SupabaseDataResult<CirclePostRow[]>>)       ?? [];
+    const voices      = settled<VoiceNoteRow[]>(voiceRes as PromiseSettledResult<SupabaseDataResult<VoiceNoteRow[]>>)        ?? [];
+    const comforts    = settled<ComfortSessionRow[]>(comfortRes as PromiseSettledResult<SupabaseDataResult<ComfortSessionRow[]>>)      ?? [];
+    const crewMs      = settled<CrewMemberRow[]>(crewMemberRes as PromiseSettledResult<SupabaseDataResult<CrewMemberRow[]>>)   ?? [];
+    const crewCIs     = settled<CrewCheckInRow[]>(crewCheckInRes as PromiseSettledResult<SupabaseDataResult<CrewCheckInRow[]>>)  ?? [];
+    const parentPosts = settled<ParentCirclePostRow[]>(parentCircleRes as PromiseSettledResult<SupabaseDataResult<ParentCirclePostRow[]>>) ?? [];
+    const room        = settled<RoomMemoryRow>(roomRes as PromiseSettledResult<SupabaseDataResult<RoomMemoryRow>>);
 
     return {
       moodHistory: moods.map(r => ({ id: r.id, mood: r.mood, date: r.date, time: r.time })) as MoodEntry[],
@@ -647,8 +682,8 @@ export async function pullAll(): Promise<{
       parentCirclePosts: parentPosts.map(r => ({ id: r.id, text: r.text, date: r.date, time: r.time, reactions: r.reactions ?? {}, circleTag: r.circle_tag ?? undefined })) as ParentCirclePost[],
       roomMemory: room ? { character: room.character, lastVisit: room.last_visit ?? '', lastHotspot: room.last_hotspot ?? '', lastSummon: room.last_summon ?? '', visitCount: room.visit_count ?? 0 } : null,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] pullAll failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_PULLALL_FAILED');
     return null;
   }
 }

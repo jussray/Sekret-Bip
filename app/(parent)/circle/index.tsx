@@ -3,11 +3,12 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { BipCrewScreen } from '@screens/BipCrewScreen';
+import { MessagesScreen } from '@screens/MessagesScreen';
 import { THEME_PACKS } from '@/constants/theme';
 import { routeForSide } from '@/shared/routes';
-import ParentCircle from '../../(main)/parent-circle';
+import ParentCircle from './feed';
 
-type Tab = 'circle' | 'crew';
+type Tab = 'circle' | 'crew' | 'messages';
 
 export default function ParentCircleRoute() {
   const {
@@ -18,8 +19,8 @@ export default function ParentCircleRoute() {
   const t = THEME_PACKS[theme] ?? THEME_PACKS.neon;
   const [tab, setTab] = useState<Tab>('circle');
 
-  // Map parent room style to the companion voice used by BipCrewScreen
   const companion = parentRoomStyle === 'dad' ? 'rylane' : 'raylene';
+  const goTo = (screen: string) => router.push(routeForSide('parent', screen) as any);
 
   return (
     <View style={s.root}>
@@ -37,17 +38,23 @@ export default function ParentCircleRoute() {
           <Text style={[s.tabText, tab === 'crew' && s.tabTextActive]}>🌿 Crew</Text>
         </TouchableOpacity>
         <TouchableOpacity
+          style={[s.tab, tab === 'messages' && s.tabActive]}
+          onPress={() => setTab('messages')}
+        >
+          <Text style={[s.tabText, tab === 'messages' && s.tabTextActive]}>💜 Messages</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
           style={s.weatherBtn}
           onPress={() => router.push('/(parent)/circle/weather' as any)}
         >
-          <Text style={s.weatherBtnText}>🌤️ Weather</Text>
+          <Text style={s.weatherBtnText}>🌤️</Text>
         </TouchableOpacity>
       </View>
 
       <View style={s.content}>
         {tab === 'circle' ? (
           <ParentCircle />
-        ) : (
+        ) : tab === 'crew' ? (
           <BipCrewScreen
             t={t}
             mood={parentMood}
@@ -56,7 +63,13 @@ export default function ParentCircleRoute() {
             setCrewMembers={setParentCrewMembers}
             crewCheckIns={parentCrewCheckIns}
             setCrewCheckIns={setParentCrewCheckIns}
-            setScreen={(screen: string) => router.push(routeForSide('parent', screen) as any)}
+            setScreen={goTo}
+            BottomNav={null}
+          />
+        ) : (
+          <MessagesScreen
+            side="parent"
+            setScreen={goTo}
             BottomNav={null}
           />
         )}

@@ -7,7 +7,7 @@
  * Key mapping:
  *   'soft'   → Star (legacy key kept for AsyncStorage backwards compat)
  *   'raylene'→ Star (internal key kept for data/API backwards compat)
- *   'rylane' → Rylane
+ *   'rylane' → Sy
  *   'cloud'  → Cloud Se'kret
  *   'night'  → Night Se'kret
  */
@@ -35,7 +35,7 @@ export const SEKRET_PROFILES: Record<string, SekretProfile> = {
     greeting: 'friend... 😭 okay, what happened?',
   },
   rylane: {
-    name: 'Rylane',
+    name: 'Sy',
     emoji: '⚡',
     title: 'Loyal Bro',
     vibe: 'Quiet loyalty. Keeps it real. Never talks down.',

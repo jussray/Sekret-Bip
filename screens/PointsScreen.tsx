@@ -7,8 +7,8 @@
 // journal, voice, calm, comfort, circle, crew check-ins). No backend needed.
 //
 // Voice:
-//   • Rylane: "the reps stack. respect."
-//   • Raylene: "soft points 💜 you earned every single one."
+//   • Sy: "the reps stack. respect."
+//   • Suhana: "soft points 💜 you earned every single one."
 //
 // Tiers are emotional, not competitive:
 //   • cloud just forming   (0–49)
@@ -20,6 +20,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { snapshotPoints } from '@/utils/sync';
 import { fetchPointsHistory, syncTeenActivitySummary, type PointsHistoryEntry } from '@/utils/pointsCompat';
+import { usePoints, TIERS, tierFor, type Tier } from '@/features/activity/ledger';
 import {
   Text, TouchableOpacity, ScrollView, View,
   ImageBackground, Animated, Easing, StyleSheet, Platform,
@@ -41,35 +42,14 @@ function timeOfDay(): TimeOfDay {
   return 'night';
 }
 
-// ── Point values (small, soft, not addictive) ────────────────────────────────
+// ── Point values (small, soft, not addictive) ─── kept for prop-based fallback ─
 const PT_MOOD     = 2;
 const PT_JOURNAL  = 5;
 const PT_VOICE    = 5;
 const PT_CIRCLE   = 4;
-const PT_COMFORT  = 3;  // per session log
-const PT_CREW     = 6;  // crew check-in = bigger, accountability is hard
-const PT_STREAK   = 3;  // per day of current streak
-
-interface Tier {
-  key: string;
-  label: string;
-  min: number;
-  max: number; // exclusive
-  emoji: string;
-  color: string;
-}
-const TIERS: Tier[] = [
-  { key: 't0', label: 'cloud just forming', min: 0,    max: 50,   emoji: '🌫️', color: '#c4b5fd' },
-  { key: 't1', label: 'cloud is here',      min: 50,   max: 150,  emoji: '☁️',     color: '#7dd3fc' },
-  { key: 't2', label: 'soft sky',           min: 150,  max: 350,  emoji: '🌤️', color: '#f5b8cf' },
-  { key: 't3', label: 'full moon energy',   min: 350,  max: 750,  emoji: '🌙',        color: '#fbbf24' },
-  { key: 't4', label: 'whole night sky',    min: 750,  max: 9999999, emoji: '✨',     color: '#e879a3' },
-];
-
-function tierFor(pts: number): Tier {
-  for (const t of TIERS) if (pts >= t.min && pts < t.max) return t;
-  return TIERS[0];
-}
+const PT_COMFORT  = 3;
+const PT_CREW     = 6;
+const PT_STREAK   = 3;
 
 // ── Props ────────────────────────────────────────────────────────────────────
 interface Props {
@@ -101,8 +81,16 @@ export function PointsScreen({
   const softAccent = isRylane ? '#b6dcff' : '#f5b8cf';
   const cardBg = isRylane ? 'rgba(10,20,40,0.82)' : 'rgba(40,15,40,0.82)';
 
-  // ── Compute points ─────────────────────────────────────────────────────────
+  const ledger = usePoints();
+
+  // ── Compute points — ledger wins when loaded, props used as offline fallback ─
   const breakdown = useMemo(() => {
+    if (ledger.isLoaded) {
+      return {
+        total: ledger.total,
+        rows: ledger.breakdown.map(r => ({ key: r.key, label: r.label, each: r.each, count: r.count, pts: r.pts, emoji: r.emoji })),
+      };
+    }
     const moodPts    = (moodHistory?.length    || 0) * PT_MOOD;
     const journalPts = (journalEntries?.length || 0) * PT_JOURNAL;
     const voicePts   = (voiceNotes?.length     || 0) * PT_VOICE;
@@ -120,10 +108,10 @@ export function PointsScreen({
         { key: 'circle',  label: 'circle drops',     each: PT_CIRCLE,  count: circlePosts?.length    || 0, pts: circlePts,  emoji: '🌫️' },
         { key: 'comfort', label: 'comfort sessions', each: PT_COMFORT, count: comfortSessions?.length|| 0, pts: comfortPts, emoji: '🤍' },
         { key: 'crew',    label: 'crew check-ins',   each: PT_CREW,    count: crewCheckIns?.length   || 0, pts: crewPts,    emoji: '🤝' },
-        { key: 'streak',  label: 'streak days',      each: PT_STREAK,  count: Math.max(0, streakDays),       pts: streakPts,  emoji: '🌙' },
+        { key: 'streak',  label: 'streak days',      each: PT_STREAK,  count: Math.max(0, streakDays),     pts: streakPts,  emoji: '🌙' },
       ],
     };
-  }, [moodHistory, journalEntries, voiceNotes, circlePosts, comfortSessions, crewCheckIns, streakDays]);
+  }, [ledger, moodHistory, journalEntries, voiceNotes, circlePosts, comfortSessions, crewCheckIns, streakDays]);
 
   const [pointsHistory, setPointsHistory] = useState<PointsHistoryEntry[]>([]);
 
@@ -145,7 +133,7 @@ export function PointsScreen({
     void syncTeenActivitySummary();
   }, [breakdown.total]);
 
-  const tier = tierFor(breakdown.total);
+  const tier: Tier = ledger.isLoaded ? ledger.tier : tierFor(breakdown.total);
   const tierIdx = TIERS.findIndex(t2 => t2.key === tier.key);
   const nextTier = TIERS[tierIdx + 1];
   const progress = nextTier

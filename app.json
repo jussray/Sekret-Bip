@@ -14,10 +14,6 @@
     "updates": {
       "enabled": false
     },
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#160028"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.sekretbip.app"
@@ -34,7 +30,9 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-notifications"
+      "expo-notifications",
+      "expo-font",
+      "expo-status-bar"
     ]
   }
 }

@@ -10,26 +10,35 @@ const parentFiles = [
   'screens/SettingsScreen.tsx',
 ];
 
+function readOptional(file) {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
 for (const file of parentFiles) {
-  if (!fs.existsSync(file)) continue;
-  let text = fs.readFileSync(file, 'utf8');
-  text = text.replace(/from ['"]@\/utils\/sync['"]/g, "from '@/utils/parentBridgeCompat'");
-  fs.writeFileSync(file, text);
+  const current = readOptional(file);
+  if (current === null) continue;
+  const updated = current.replace(/from ['"]@\/utils\/sync['"]/g, "from '@/utils/parentBridgeCompat'");
+  fs.writeFileSync(file, updated);
 }
 
 const pointsFile = 'screens/PointsScreen.tsx';
-if (fs.existsSync(pointsFile)) {
-  let text = fs.readFileSync(pointsFile, 'utf8');
-  text = text.replace(
+const pointsSource = readOptional(pointsFile);
+if (pointsSource !== null) {
+  const updated = pointsSource.replace(
     /import \{ snapshotPoints, fetchPointsHistory, syncTeenActivitySummary, type PointsHistoryEntry \} from ['"]@\/utils\/sync['"];?/,
     "import { snapshotPoints } from '@/utils/sync';\nimport { fetchPointsHistory, syncTeenActivitySummary, type PointsHistoryEntry } from '@/utils/pointsCompat';",
   );
-  fs.writeFileSync(pointsFile, text);
+  fs.writeFileSync(pointsFile, updated);
 }
 
 const appSettings = 'app/(main)/settings.tsx';
-if (fs.existsSync(appSettings)) {
-  let text = fs.readFileSync(appSettings, 'utf8');
-  text = text.replace(/from ['"]@\/utils\/sync['"]/g, "from '@/utils/parentBridgeCompat'");
-  fs.writeFileSync(appSettings, text);
+const settingsSource = readOptional(appSettings);
+if (settingsSource !== null) {
+  const updated = settingsSource.replace(/from ['"]@\/utils\/sync['"]/g, "from '@/utils/parentBridgeCompat'");
+  fs.writeFileSync(appSettings, updated);
 }

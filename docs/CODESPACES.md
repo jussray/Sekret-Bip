@@ -1,63 +1,78 @@
 # Codespaces Setup
 
-This project runs in GitHub Codespaces with zero local setup required.
+Last reviewed: 2026-07-13
 
-## Quick Start
+This project runs in GitHub Codespaces with minimal local setup.
 
-1. Click **Open in GitHub Codespaces** in the README (or open [https://codespaces.new/jussray/Bip?quickstart=1](https://codespaces.new/jussray/Bip?quickstart=1)).
-2. Wait ~1 minute — the devcontainer auto-installs dependencies and seeds `.env.local`.
-3. Start the dev server:
+## Quick start
+
+1. Open `https://codespaces.new/jussray/Sekret-Bip?quickstart=1`.
+2. Wait for the devcontainer to install dependencies and seed `.env.local` from `.env.example`.
+3. Hydrate Git LFS assets:
+
+   ```bash
+   git lfs pull
+   ```
+
+4. Start the web development server:
+
    ```bash
    npx expo start --web -c
    ```
-4. Port 8081 opens automatically in the browser preview.
+
+5. Open the forwarded Expo web port when Codespaces offers it.
 
 ## Git LFS in Codespaces
 
-All room background PNGs (`assets/images/bg-*.png`) and companion art are stored in **Git LFS**. The devcontainer pre-installs `git-lfs`, but you must explicitly pull the binary files after cloning:
+Room backgrounds and companion artwork are stored in Git LFS. The devcontainer installs `git-lfs`, but binary hydration must still be verified after cloning.
 
 ```bash
 git lfs pull
-```
-
-**Always run `git lfs pull` before:**
-- Copying any `bg-*.png` to `assets/images/archive/`
-- Running `npm run verify:room-archives`
-- Starting Phase 2 room compositing work
-
-### Confirm LFS hydration
-
-```bash
 ls -lh assets/images/bg-raylene-room-day.png
 ```
 
-- ✅ `2.7M` — LFS hydrated. Safe to proceed.
-- ❌ `134B` — LFS pointer only. Run `git lfs pull` and wait for it to finish.
+A normal multi-megabyte file is hydrated. A tiny text-sized file is an LFS pointer and must not be copied, archived, or used for visual validation.
 
-## Pre-push Checks
+Always hydrate LFS before:
 
-Run this before every push:
+- running `npm run verify:room-archives`;
+- editing or copying room backgrounds;
+- validating Expo web bundles that include large image assets;
+- comparing production artwork.
+
+## Environment variables
+
+The devcontainer seeds `.env.local` from `.env.example`. Add only local development values.
+
+```text
+EXPO_PUBLIC_SUPABASE_URL=
+EXPO_PUBLIC_SUPABASE_ANON_KEY=
+EXPO_PUBLIC_BACKEND_URL=
+```
+
+Never commit `.env.local`. Never place service-role credentials, AI provider keys, Cloudflare deployment credentials, or server-only shared secrets in Expo public variables.
+
+## Validation
+
+Run before pushing:
 
 ```bash
 npm run verify:prepush
 ```
 
-This runs in order:
-1. `audit:runtime-assets` — confirms all image keys in `constants/theme.ts` resolve to real files
-2. `type-check` — TypeScript compile check (no emit)
-3. `lint` — ESLint across the codebase
-4. `verify:bundle` — Expo web export (confirms the app builds)
-5. `verify:room-archives` — confirms all 28 room archive backups are real MB-sized PNGs matching live SHAs
+The repository also uses Playwright and implementation-evidence checks in GitHub Actions. A local build passing does not replace exact-head CI.
 
-If any step fails, fix it before pushing.
+Useful focused commands:
 
-## Environment Variables
-
-The devcontainer seeds `.env.local` from `.env.example`. Fill in Supabase keys when wiring Phase 2:
-
-```
-EXPO_PUBLIC_SUPABASE_URL=
-EXPO_PUBLIC_SUPABASE_ANON_KEY=
+```bash
+npm run type-check
+npm test
+npm run lint
+npm run verify:bundle
+npm run test:e2e
+npm run verify:room-archives
 ```
 
-Never commit `.env.local`. Never put a `service_role` key on the device.
+## Production boundary
+
+Codespaces is a development environment, not production evidence. Production deployment and exact-release verification are documented in `DEPLOYMENT.md`.

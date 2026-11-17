@@ -5,6 +5,13 @@
  * Import via: import type { JournalEntry } from '@/types';
  */
 
+export * from './identity';
+export * from './verification';
+export * from './safety';
+export * from './doorbell';
+export * from './notifications';
+export * from './companions';
+
 export interface JournalEntry {
   id: number;
   text: string;
@@ -17,6 +24,7 @@ export interface JournalEntry {
   imageUri?: string;
   mediaType?: 'photo' | 'video';
   sekretReply?: string;
+  sekretAvatarState?: string;
   locked?: boolean;
   pinned?: boolean;
   activeTab?: string;

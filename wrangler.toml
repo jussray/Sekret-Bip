@@ -1,50 +1,131 @@
-# wrangler.toml
-# Replaces wrangler.jsonc — TOML avoids JSON comment-parsing failures in CF builds.
-#
-# ── Secrets (NEVER commit values — run `wrangler secret put <NAME>`) ────────
-#   wrangler secret put OPENAI_API_KEY
-#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-#   wrangler secret put SAFETY_SCAN_SECRET
-#
-# ── Local development ──────────────────────────────────────────────────
-#   Copy .dev.vars.example → .dev.vars and fill in real values.
-#   .dev.vars is gitignored and is used by `wrangler dev` automatically.
-#
-# ── Deploy ──────────────────────────────────────────────────────────
-#   wrangler secret put OPENAI_API_KEY
-#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
-#   wrangler secret put SAFETY_SCAN_SECRET
-#   wrangler deploy
-
-name               = "bip"
-main               = "worker/index.ts"
+name = "sekret-backend"
+main = "worker/voice-entry.ts"
 compatibility_date = "2026-06-13"
 compatibility_flags = ["nodejs_compat"]
+logpush = true
+workers_dev = false
+
+[build]
+command = "node scripts/write-worker-release-identity.mjs"
 
 [observability]
 enabled = true
+head_sampling_rate = 1
 
-# ── Non-secret config vars (safe to commit) ──────────────────────────────
-# Secrets (OPENAI_API_KEY, SUPABASE_SERVICE_ROLE_KEY, SAFETY_SCAN_SECRET)
-# must be set via `wrangler secret put` — never in this file.
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = true
+
+[version_metadata]
+binding = "CF_VERSION_METADATA"
+
+# Cloudflare Workers AI binding used by the routed voice runtime.
+[ai]
+binding = "AI"
+
+# Non-secret model vars — safe to commit.
+# To rotate a model: edit here and run `wrangler deploy --name sekret-backend`.
+# Secrets (OPENAI_API_KEY, ANTHROPIC_API_KEY, MODEL_API_KEY, ELEVENLABS_API_KEY,
+# SUPABASE_SERVICE_ROLE_KEY, and BIP_AI_OPERATOR_KEY) must use `wrangler secret put`,
+# never this file.
 [vars]
-# OpenAI model names — rotate without code changes by updating this file.
-OPENAI_CHAT_MODEL      = "gpt-4o-mini"
-OPENAI_TTS_MODEL       = "gpt-4o-mini-tts"
-OPENAI_STT_MODEL       = "whisper-1"
+SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
+OPENAI_CHAT_MODEL = "gpt-4o"
+OPENAI_TTS_MODEL  = "gpt-4o-mini-tts"
+OPENAI_STT_MODEL  = "whisper-1"
+BIP_OPENAI_MODEL = "gpt-5.6-sol"
+BIP_ANTHROPIC_MODEL = "claude-sonnet-5"
+BIP_MUSE_MODEL = "muse-spark-1.3"
 
-# Supabase — public/non-secret values only.
-# SUPABASE_SERVICE_ROLE_KEY must be set via `wrangler secret put`.
-SUPABASE_URL           = "https://your-project-id.supabase.co"
-SUPABASE_ANON_KEY      = "your-public-anon-key"
+# Founder emergency brake is intentionally NOT committed with an engaged value.
+# Runtime authority is FOUNDER_OPERATION_KILL_SWITCH, supplied only through
+# trusted operator/provider configuration. Supported targets are documented in
+# shared/founder-operation-kill-switch.js. Absence or "off" means allow.
+# Examples: all | scope:companion | op:sekret:reply | scope:bridge
+# Optional FOUNDER_OPERATION_KILL_SWITCH_REASON must be a non-secret reason code.
 
-# Audio upload limit in bytes (base64 decoded size cap).
-# 512 KB ≈ ~30s of compressed voice at typical Expo AudioRecording settings.
-AUDIO_MAX_BYTES        = "524288"
+# Firebase App Check starts disabled. Moving this to `observe` or `enforce`
+# requires FIREBASE_PROJECT_NUMBER and FIREBASE_APP_IDS to be configured on
+# the Worker. FIREBASE_APP_IDS is a comma-separated allowlist of Firebase App
+# IDs for the supported clients; legacy FIREBASE_WEB_APP_ID remains accepted
+# during rollout. Exact-runtime evidence is required for every intended cohort.
+# `off` is the one-variable rollback to the pre-App-Check request path.
+FIREBASE_APPCHECK_MODE = "off"
 
-# Routes block commented out for beta — using auto-assigned *.workers.dev URL.
-# Un-comment and set EXPO_PUBLIC_BACKEND_URL to your custom domain once live.
-#
-# [[routes]]
-# pattern   = "api.bipapp.com/api/sekret/reply"
-# zone_name = "bipapp.com"
+# `legacy` delegates voice requests to the previous Piper/OpenAI path.
+# `cloudflare-only` uses Aura for every voice request.
+# `hybrid` uses Aura by default and ElevenLabs only when precise timing is requested.
+VOICE_PROVIDER_MODE = "hybrid"
+
+# Bridge summary rollout control (worker/bridge-summary.ts). This fails closed:
+# unset, blank, or "disabled" blocks generation. Switch to a reviewed cohort
+# only for a time-bounded live proof after Cloudflare deployment credentials
+# have been verified.
+BRIDGE_SUMMARIES_ROLLOUT = "disabled"
+
+# ── CPU time limit ────────────────────────────────────────────────────
+# Do not commit `[limits] cpu_ms` in the default Worker config.
+# Cloudflare rejects CPU limits on Free-plan deploys, so the repo default
+# must stay free-plan safe for PR previews and documentation-only changes.
+# Paid production CPU limits can be restored only through an approved
+# paid-plan release lane after Founder Control Room records that gate.
+
+# ── Production routing authority ──────────────────────────────────────
+# api.sekretbip.net remains the canonical production Worker hostname, but
+# its Custom Domain is provider-managed rather than re-provisioned on every
+# Workers Build. Keep route/routes absent here and workers_dev=false so a
+# normal `wrangler deploy` updates the Worker script without requiring the
+# build token to mutate Custom Domain DNS/certificate records.
+# Production verification must still prove https://api.sekretbip.net/health.
+
+# ── Rate limiting binding ─────────────────────────────────────────────
+# 60 requests per 10-second window per user/IP key.
+# Current first-class Wrangler Rate Limiting binding syntax.
+# Binding name must match Env interface: SEKRET_RATE_LIMITER
+[[ratelimits]]
+name = "SEKRET_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 10 }
+
+# ── Preview builds (`npx wrangler preview`) ───────────────────────────
+# Workers Builds runs `npx wrangler preview` to publish a per-branch
+# Preview URL for each PR. Recent Wrangler releases REQUIRE a `previews`
+# block to exist or the preview build fails before it can create a URL
+# (this is what broke every PR's "Workers Builds: sekret-backend" check).
+# Previews do NOT inherit production settings, so the non-secret vars and
+# managed bindings the Worker needs at runtime are mirrored here. Secrets
+# (OPENAI_API_KEY, ANTHROPIC_API_KEY, SEKRET_CLIENT_TOKEN, …) are applied
+# to Previews separately via `wrangler secret` and are never committed.
+# This block only affects Preview deploys; production `wrangler deploy`
+# ignores it.
+[previews]
+
+[previews.vars]
+SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
+OPENAI_CHAT_MODEL = "gpt-4o"
+OPENAI_TTS_MODEL  = "gpt-4o-mini-tts"
+OPENAI_STT_MODEL  = "whisper-1"
+BIP_OPENAI_MODEL = "gpt-5.6-sol"
+BIP_ANTHROPIC_MODEL = "claude-sonnet-5"
+BIP_MUSE_MODEL = "muse-spark-1.3"
+FIREBASE_APPCHECK_MODE = "off"
+VOICE_PROVIDER_MODE = "hybrid"
+BRIDGE_SUMMARIES_ROLLOUT = "disabled"
+
+[previews.ai]
+binding = "AI"
+
+[previews.version_metadata]
+binding = "CF_VERSION_METADATA"
+
+[[previews.ratelimits]]
+name = "SEKRET_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 10 }

@@ -1,235 +1,174 @@
-import React, { useState, useCallback } from 'react';
+/**
+ * app/(main)/settings.tsx
+ *
+ * App settings — theme, notifications, account, about.
+ *
+ * Fixes:
+ * - THEME_PACKS import corrected to @constants/theme (consistent with all
+ *   other screens).
+ * - setTheme from context is now called when the user taps a theme row.
+ * - notificationsEnabled persisted in AppContext instead of ephemeral useState.
+ * - Back chevron added so the screen is dismissible without the tab bar.
+ */
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
   SafeAreaView,
   Switch,
   Alert,
-  Clipboard,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAppContext } from '@/context/AppContext';
 import { THEME_PACKS } from '@constants/theme';
-import {
-  requestNotificationPermissions,
-  scheduleDailyReminder,
-  cancelDailyReminder,
-} from '@/utils/notifications';
-import { createParentLink, redeemParentLink } from '@/utils/parentBridgeCompat';
-import { useSleepGuard, type SleepWindow } from '../../hooks/useSleepGuard';
+import { getSupabase } from '@/utils/supabase';
+import { AccountDeletionControls } from '@/components/settings/AccountDeletionControls';
 
 const THEME_ORDER = Object.keys(THEME_PACKS) as (keyof typeof THEME_PACKS)[];
 
-const COMPANIONS = [
-  { key: 'soft',   name: 'Raylene', emoji: '💜', title: 'Big Sis', tagline: 'warm · protective · emotionally real' },
-  { key: 'rylane', name: 'Rylane',  emoji: '⚡', title: 'Loyal Bro', tagline: 'street smart · down to earth · no cap' },
-];
-
-const SEKRET_MODES = [
-  { key: 'soft',     emoji: '🌙', label: 'Soft' },
-  { key: 'realTalk', emoji: '🧠', label: 'Real Talk' },
-  { key: 'distract', emoji: '😂', label: 'Distract' },
-  { key: 'listen',   emoji: '☁️', label: 'Just Listen' },
-  { key: 'push',     emoji: '🔥', label: 'Push Me' },
-];
-
-const SLEEP_OPTIONS: Array<{ label: string; value: SleepWindow | null }> = [
-  { label: 'Off',         value: null },
-  { label: '10pm – 7am',  value: { start: '22:00', end: '07:00' } },
-  { label: '11pm – 8am',  value: { start: '23:00', end: '08:00' } },
-];
-
-type RedeemStatus = 'idle' | 'ok' | 'not_found' | 'error';
-
-function themeLabel(key: keyof typeof THEME_PACKS): string {
-  const label = (THEME_PACKS[key] as { label?: unknown }).label;
-  return typeof label === 'string' ? label : String(key);
-}
-
 export default function SettingsScreen() {
   const {
-    theme, setTheme,
-    userSide, setUserSide,
-    selectedSekret, setSelectedSekret,
-    sekretMode, setSekretMode,
-    notificationsEnabled, setNotificationsEnabled,
-    resetApp,
+    theme,
+    setTheme,
+    notificationsEnabled,
+    setNotificationsEnabled,
   } = useAppContext();
 
-  const { sleepWindow, setSleepWindow } = useSleepGuard();
+  const [exportPending, setExportPending] = useState(false);
 
-  const [inviteCode,   setInviteCode]   = useState('');
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [codeInput,    setCodeInput]    = useState('');
-  const [isRedeeming,  setIsRedeeming]  = useState(false);
-  const [redeemStatus, setRedeemStatus] = useState<RedeemStatus>('idle');
-
-  async function handleNotificationToggle(enabled: boolean) {
-    if (enabled) {
-      const granted = await requestNotificationPermissions();
-      if (granted) {
-        await scheduleDailyReminder();
-        setNotificationsEnabled(true);
-      } else {
-        Alert.alert(
-          'Notifications blocked',
-          "To get daily check-in reminders, enable notifications for Se'kret Bip in your phone settings.",
-        );
-      }
-    } else {
-      await cancelDailyReminder();
-      setNotificationsEnabled(false);
+  async function handleExportData() {
+    setExportPending(true);
+    try {
+      const sb = getSupabase();
+      if (!sb) throw new Error('Account export service unavailable');
+      const { error } = await sb.rpc('request_data_export');
+      if (error) throw error;
+      Alert.alert(
+        'Export requested',
+        'Your export request was submitted. Check your account email for updates.'
+      );
+    } catch {
+      Alert.alert('Error', 'Could not submit export request. Please try again.');
+      return false;
+    } finally {
+      setExportPending(false);
     }
   }
 
-  function handleDeleteData() {
-    Alert.alert(
-      'Delete your data?',
-      'This clears everything saved on this device — journal entries, moods, voice bips, and settings. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            await AsyncStorage.clear();
-            resetApp();
-            router.replace('/(onboarding)/welcome' as any);
-          },
-        },
-      ],
-    );
-  }
-
-  const handleGenerateCode = useCallback(async () => {
-    setIsGenerating(true);
-    const code = await createParentLink();
-    setIsGenerating(false);
-    if (code) {
-      setInviteCode(code);
-    } else {
-      Alert.alert('Not signed in', 'Sign in to your account first, then generate a link code.');
-    }
-  }, []);
-
-  const handleCopyCode = useCallback(() => {
-    if (!inviteCode) return;
-    Clipboard.setString(inviteCode);
-    Alert.alert('Copied!', `Share this code with your parent:\n\n${inviteCode}\n\nIt expires in 48 hours.`);
-  }, [inviteCode]);
-
-  const handleRedeemCode = useCallback(async () => {
-    if (!codeInput.trim()) return;
-    setIsRedeeming(true);
-    const raw = await redeemParentLink(codeInput);
-    setIsRedeeming(false);
-    const VALID: RedeemStatus[] = ['idle', 'ok', 'not_found', 'error'];
-    const result = VALID.includes(raw as RedeemStatus) ? (raw as RedeemStatus) : 'error';
-    setRedeemStatus(result);
-  }, [codeInput]);
+  const currentTheme = THEME_PACKS[theme] ?? THEME_PACKS.neon;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Settings</Text>
-        <Text style={styles.sectionTitle}>Side</Text>
+    <SafeAreaView style={styles.safe}>
+      {/* Header with back button */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <Text style={styles.backText}>\u2190</Text>
+        </TouchableOpacity>
+        <Text style={styles.heading}>Settings \u2699\uFE0F</Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        {/* ── Theme ── */}
+        <Text style={styles.sectionLabel}>Theme</Text>
+        <Text style={styles.sectionHint}>Tap a theme to switch</Text>
+        {THEME_ORDER.map(key => {
+          const t = THEME_PACKS[key];
+          const active = key === theme;
+          return (
+            <TouchableOpacity
+              key={key}
+              style={[styles.themeRow, active && styles.themeRowActive]}
+              onPress={() => setTheme(key)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.themeEmoji}>{t.emoji}</Text>
+              <View style={styles.themeBody}>
+                <Text style={[styles.themeName, active && { color: '#D946EF' }]}>
+                  {t.name}
+                </Text>
+                {active && <Text style={styles.themeActive}>Current</Text>}
+              </View>
+              {active && <Text style={styles.themeTick}>\u2713</Text>}
+            </TouchableOpacity>
+          );
+        })}
+
+        {/* ── Notifications ── */}
+        <Text style={styles.sectionLabel}>Notifications</Text>
         <View style={styles.row}>
-          <Text style={styles.label}>Teen side</Text>
-          <Switch value={userSide === 'teen'} onValueChange={(v) => setUserSide(v ? 'teen' : 'parent')} />
+          <Text style={styles.rowLabel}>Daily check-in reminder</Text>
+          <Switch
+            value={notificationsEnabled ?? true}
+            onValueChange={v => setNotificationsEnabled?.(v)}
+            trackColor={{ true: '#D946EF', false: '#333' }}
+            thumbColor="#fff"
+          />
         </View>
 
-        <Text style={styles.sectionTitle}>Theme</Text>
-        {THEME_ORDER.map((key) => (
-          <TouchableOpacity key={String(key)} style={styles.option} onPress={() => setTheme(key)}>
-            <Text style={styles.optionText}>{themeLabel(key)}</Text>
-            {theme === key && <Text style={styles.check}>✓</Text>}
-          </TouchableOpacity>
-        ))}
-
-        <Text style={styles.sectionTitle}>Companion</Text>
-        {COMPANIONS.map((c) => (
-          <TouchableOpacity key={c.key} style={styles.option} onPress={() => setSelectedSekret(c.key)}>
-            <Text style={styles.optionText}>{c.emoji} {c.name} — {c.title}</Text>
-            {selectedSekret === c.key && <Text style={styles.check}>✓</Text>}
-          </TouchableOpacity>
-        ))}
-
-        <Text style={styles.sectionTitle}>Se'kret mode</Text>
-        {SEKRET_MODES.map((m) => (
-          <TouchableOpacity key={m.key} style={styles.option} onPress={() => setSekretMode(m.key)}>
-            <Text style={styles.optionText}>{m.emoji} {m.label}</Text>
-            {sekretMode === m.key && <Text style={styles.check}>✓</Text>}
-          </TouchableOpacity>
-        ))}
-
-        <Text style={styles.sectionTitle}>Notifications</Text>
-        <View style={styles.row}>
-          <Text style={styles.label}>Daily reminder</Text>
-          <Switch value={notificationsEnabled} onValueChange={handleNotificationToggle} />
-        </View>
-
-        <Text style={styles.sectionTitle}>Sleep guard</Text>
-        {SLEEP_OPTIONS.map((opt) => (
-          <TouchableOpacity key={opt.label} style={styles.option} onPress={() => setSleepWindow(opt.value)}>
-            <Text style={styles.optionText}>{opt.label}</Text>
-            {JSON.stringify(sleepWindow) === JSON.stringify(opt.value) && <Text style={styles.check}>✓</Text>}
-          </TouchableOpacity>
-        ))}
-
-        <Text style={styles.sectionTitle}>Parent link</Text>
-        <TouchableOpacity style={styles.button} onPress={handleGenerateCode} disabled={isGenerating}>
-          <Text style={styles.buttonText}>{isGenerating ? 'Generating…' : 'Generate parent code'}</Text>
+        {/* ── Account ── */}
+        <Text style={styles.sectionLabel}>Account</Text>
+        <TouchableOpacity style={styles.row}>
+          <Text style={styles.rowLabel}>Sign in / Create account</Text>
+          <Text style={styles.rowArrow}>\u203a</Text>
         </TouchableOpacity>
-        {!!inviteCode && (
-          <TouchableOpacity style={styles.codeBox} onPress={handleCopyCode}>
-            <Text style={styles.codeText}>{inviteCode}</Text>
-            <Text style={styles.hint}>tap to copy</Text>
-          </TouchableOpacity>
-        )}
-        <TextInput
-          style={styles.input}
-          value={codeInput}
-          onChangeText={setCodeInput}
-          placeholder="Enter teen code"
-          placeholderTextColor="#999"
-          autoCapitalize="characters"
-        />
-        <TouchableOpacity style={styles.button} onPress={handleRedeemCode} disabled={isRedeeming}>
-          <Text style={styles.buttonText}>{isRedeeming ? 'Connecting…' : 'Redeem code'}</Text>
+        <TouchableOpacity style={styles.row}>
+          <Text style={styles.rowLabel}>Privacy settings</Text>
+          <Text style={styles.rowArrow}>\u203a</Text>
         </TouchableOpacity>
-        {redeemStatus !== 'idle' && (
-          <Text style={styles.hint}>Status: {redeemStatus}</Text>
-        )}
+        <TouchableOpacity
+          style={styles.row}
+          onPress={handleExportData}
+          disabled={exportPending}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.rowLabel}>Download my data</Text>
+          {exportPending
+            ? <ActivityIndicator size="small" color="#888" />
+            : <Text style={styles.rowArrow}>\u203a</Text>
+          }
+        </TouchableOpacity>
+        <AccountDeletionControls />
 
-        <Text style={styles.sectionTitle}>Danger zone</Text>
-        <TouchableOpacity style={[styles.button, styles.danger]} onPress={handleDeleteData}>
-          <Text style={styles.buttonText}>Delete local data</Text>
-        </TouchableOpacity>
+        {/* ── About ── */}
+        <Text style={styles.sectionLabel}>About</Text>
+        {["What is Se'kret Bip?", "Community guidelines", "Crisis resources"].map(item => (
+          <TouchableOpacity key={item} style={styles.row}>
+            <Text style={styles.rowLabel}>{item}</Text>
+            <Text style={styles.rowArrow}>\u203a</Text>
+          </TouchableOpacity>
+        ))}
+
+        <Text style={styles.version}>Se'kret Bip \u2022 v1.0.0-beta</Text>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#130b24' },
-  content: { padding: 20, paddingBottom: 80 },
-  title: { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 20 },
-  sectionTitle: { color: '#c4b5fd', fontWeight: '800', fontSize: 16, marginTop: 18, marginBottom: 8 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 8 },
-  label: { color: '#fff', fontWeight: '700' },
-  option: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.08)', marginBottom: 8 },
-  optionText: { color: '#fff', flex: 1 },
-  check: { color: '#a78bfa', fontWeight: '900', fontSize: 18 },
-  button: { padding: 14, borderRadius: 16, backgroundColor: '#a78bfa', alignItems: 'center', marginBottom: 10 },
-  danger: { backgroundColor: '#ef4444' },
-  buttonText: { color: '#1e1236', fontWeight: '800' },
-  codeBox: { padding: 16, borderRadius: 16, borderWidth: 1, borderColor: '#a78bfa', alignItems: 'center', marginBottom: 10 },
-  codeText: { color: '#fff', fontSize: 24, fontWeight: '900', letterSpacing: 3 },
-  hint: { color: '#c4b5fd', textAlign: 'center', marginBottom: 10 },
-  input: { color: '#fff', borderWidth: 1, borderColor: '#6d5aa5', borderRadius: 14, padding: 12, marginBottom: 10 },
+  safe:          { flex: 1, backgroundColor: '#0d0d0d' },
+  header:        { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingTop: 56, paddingBottom: 8 },
+  backBtn:       { marginRight: 14 },
+  backText:      { color: '#888', fontSize: 22 },
+  heading:       { color: '#fff', fontSize: 22, fontWeight: '800' },
+  content:       { padding: 20, paddingTop: 12, paddingBottom: 60 },
+  sectionLabel:  { color: '#555', fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4, marginTop: 24 },
+  sectionHint:   { color: '#444', fontSize: 12, marginBottom: 10 },
+  themeRow:      { flexDirection: 'row', alignItems: 'center', backgroundColor: '#111827', borderRadius: 14, padding: 14, marginBottom: 8, borderWidth: 1, borderColor: 'transparent' },
+  themeRowActive:{ borderColor: '#D946EF40' },
+  themeEmoji:    { fontSize: 26, marginRight: 14 },
+  themeBody:     { flex: 1 },
+  themeName:     { color: '#D1D5DB', fontSize: 15, fontWeight: '600' },
+  themeActive:   { color: '#D946EF', fontSize: 11, marginTop: 2 },
+  themeTick:     { color: '#D946EF', fontSize: 18, fontWeight: '700' },
+  row:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#111827', borderRadius: 14, padding: 16, marginBottom: 8 },
+  rowLabel:       { color: '#D1D5DB', fontSize: 15 },
+  rowArrow:       { color: '#555', fontSize: 20 },
+  rowDanger:      { borderWidth: 1, borderColor: 'rgba(248,113,113,0.25)' },
+  rowLabelDanger: { color: '#f87171' },
+  version:        { color: '#333', fontSize: 12, textAlign: 'center', marginTop: 40 },
 });

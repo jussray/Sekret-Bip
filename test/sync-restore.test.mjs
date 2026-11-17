@@ -28,7 +28,7 @@ const tableEntries = Object.fromEntries(
 // ─── Reconstruct deriveTier for behavioral tests ─────────────────────────────
 const deriveTierMatch = syncSrc.match(/function deriveTier\(sessionCount: number\): string \{([\s\S]*?)\n\}/);
 assert.ok(deriveTierMatch, 'deriveTier must be defined in sync.ts');
-const deriveTier = new Function('sessionCount', deriveTierMatch[1].replace(/: number/g, '')); // eslint-disable-line no-new-func
+const deriveTier = new Function('sessionCount', deriveTierMatch[1].replace(/: number/g, ''));  
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // STORAGE KEYS
@@ -146,7 +146,7 @@ test('safeUpsert catches all exceptions (never throws to caller)', () => {
 test('safeDelete matches on both id AND user_id (cannot delete another user\'s row)', () => {
   const fn = syncSrc.slice(
     syncSrc.indexOf('async function safeDelete'),
-    syncSrc.indexOf('// ── Anonymous sign-in'),
+    syncSrc.indexOf('// ── Mood'),
   );
   assert.match(fn, /\.match\(\{ id, user_id: uid \}\)/);
 });
@@ -154,7 +154,7 @@ test('safeDelete matches on both id AND user_id (cannot delete another user\'s r
 test('safeDelete catches all exceptions (never throws to caller)', () => {
   const fn = syncSrc.slice(
     syncSrc.indexOf('async function safeDelete'),
-    syncSrc.indexOf('// ── Anonymous sign-in'),
+    syncSrc.indexOf('// ── Mood'),
   );
   assert.match(fn, /catch.*console\.warn/s);
   assert.doesNotMatch(fn, /throw /);
@@ -418,27 +418,27 @@ test('TABLES has a teen activity summary entry', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// ANONYMOUS SESSION
+// AUTH / ANONYMITY SEPARATION (founder canon, 2026-10-30)
+// Anonymous participation lives in Circle; it is never a sign-in path.
+// The sync layer must not be able to create an anonymous session.
 // ═══════════════════════════════════════════════════════════════════════════════
 
-test('ensureAnonymousSession returns null when Supabase is not configured', () => {
-  const fn = syncSrc.slice(syncSrc.indexOf('export async function ensureAnonymousSession'));
-  assert.match(fn, /if \(!sb\) return null/);
+test('sync layer exposes no anonymous session bootstrap', () => {
+  assert.doesNotMatch(syncSrc, /ensureAnonymousSession/);
+  assert.doesNotMatch(syncSrc, /startAnonymousSession/);
+  assert.doesNotMatch(syncSrc, /signInAnonymously/);
 });
 
-test('ensureAnonymousSession reuses existing session if one exists', () => {
-  const fn = syncSrc.slice(syncSrc.indexOf('export async function ensureAnonymousSession'));
-  // Must check for an existing user before calling signInAnonymously.
-  const existingCheckIdx   = fn.indexOf('data?.user?.id');
-  const anonSignInIdx      = fn.indexOf('signInAnonymously');
-  assert.ok(existingCheckIdx > 0,           'Must check for existing session');
-  assert.ok(anonSignInIdx    > 0,           'Must call signInAnonymously as fallback');
-  assert.ok(existingCheckIdx < anonSignInIdx, 'Existing session check must come before signInAnonymously');
+test('session service never creates an anonymous session', () => {
+  const sessionSrc = fs.readFileSync(new URL('../src/services/session.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(sessionSrc, /signInAnonymously/);
+  assert.doesNotMatch(sessionSrc, /ensureAnonymousSession/);
 });
 
-test('ensureAnonymousSession catches errors and returns null (never throws)', () => {
-  const fn = syncSrc.slice(syncSrc.indexOf('export async function ensureAnonymousSession'));
-  assert.match(fn, /catch.*return null/s);
+test('session service resolves only permanent accounts', () => {
+  const sessionSrc = fs.readFileSync(new URL('../src/services/session.ts', import.meta.url), 'utf8');
+  const fn = sessionSrc.slice(sessionSrc.indexOf('export async function getCurrentSessionUserId'));
+  assert.match(fn, /user\.is_anonymous\) return null/);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
