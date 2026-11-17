@@ -32,6 +32,7 @@ import { FURNISH_CATALOG, type FurnishCategory } from '../constants/furnishingCa
 import { BareRoomRenderer } from '../components/rooms/BareRoomRenderer';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import { getCompanionRuntime } from '@/config/companionRuntimeRegistry';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 const { width, height } = Dimensions.get('window');
 
@@ -762,6 +763,7 @@ export function UserRoomScreen({
   const companionScale = useRef(new Animated.Value(0.94)).current;
   const hintAnim       = useRef(new Animated.Value(0)).current;
   const [hintSpot, setHintSpot] = useState<string | null>(null);
+  const reduceMotion   = useReducedMotion();
 
   useEffect(() => {
     Animated.timing(fadeAnim, { toValue: 1, duration: 900, useNativeDriver: true }).start();
@@ -789,18 +791,37 @@ export function UserRoomScreen({
     ]));
     breathLoop.start();
 
-    const guide = setTimeout(() => {
-      setHintSpot('pages');
-      setTimeout(() => setHintSpot(null), 1800);
-    }, 700);
-
     return () => {
-      clearTimeout(guide);
       glowLoop.stop();
       pulseLoop.stop();
       breathLoop.stop();
     };
   }, []);
+
+  // One-time, sequential "what is this" tour: reveal each hotspot's existing
+  // tap-hint label (same isHinted/hintAnim/tapHint path used for a single
+  // hotspot before) once per room mount, so a first-time user learns every
+  // meaningful hotspot's purpose, not just one. Skipped entirely under
+  // reduced motion; does not add any new visual element or touch idle
+  // hotspot styling (pulse rings keep whatever rooms already gave them).
+  useEffect(() => {
+    if (reduceMotion || hotspots.length === 0) return;
+
+    const revealMs = 1400;
+    const gapMs = 260;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let cursor = 700;
+
+    for (const spot of hotspots) {
+      const showAt = cursor;
+      const hideAt = showAt + revealMs;
+      timers.push(setTimeout(() => setHintSpot(spot.id), showAt));
+      timers.push(setTimeout(() => setHintSpot(null), hideAt));
+      cursor = hideAt + gapMs;
+    }
+
+    return () => timers.forEach(clearTimeout);
+  }, [reduceMotion, hotspots]);
 
   useEffect(() => {
     Animated.timing(hintAnim, {
