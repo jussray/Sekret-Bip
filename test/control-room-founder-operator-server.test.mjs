@@ -94,7 +94,7 @@ test('Founder Operator persistence is fixed-path, versioned, and server-attested
   const port = await getPort();
   const server = spawn(process.execPath, ['scripts/control-room-server.mjs'], {
     cwd: temp,
-    env: { ...process.env, CONTROL_ROOM_LOCAL_PORT: String(port), CONTROL_ROOM_LOCAL_TOKEN: token },
+    env: { ...process.env, CONTROL_ROOM_LOCAL_PORT: String(port), CONTROL_ROOM_WEB_PORT: '8081', CONTROL_ROOM_LOCAL_TOKEN: token },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   t.after(() => {
@@ -102,6 +102,19 @@ test('Founder Operator persistence is fixed-path, versioned, and server-attested
     fs.rmSync(temp, { recursive: true, force: true });
   });
   await waitForHealth(port, server);
+
+  const approved = await fetch(`http://127.0.0.1:${port}/health`, {
+    headers: { Origin: 'http://localhost:8081', Authorization: `Bearer ${token}` },
+  });
+  assert.equal(approved.status, 200);
+  assert.equal(approved.headers.get('access-control-allow-origin'), 'http://localhost:8081');
+  for (const untrustedOrigin of ['http://localhost:9999', 'http://localhost.attacker.example:8081', 'https://localhost:8081']) {
+    const rejected = await fetch(`http://127.0.0.1:${port}/health`, {
+      headers: { Origin: untrustedOrigin, Authorization: `Bearer ${token}` },
+    });
+    assert.equal(rejected.status, 403, `untrusted browser origin must fail: ${untrustedOrigin}`);
+    assert.equal(rejected.headers.get('access-control-allow-origin'), null);
+  }
 
   const planOnly = buildPlan();
   const first = await post(port, '/founder-operator/plans', planOnly);
@@ -140,4 +153,8 @@ test('Founder Operator persistence is fixed-path, versioned, and server-attested
   const credential = await post(port, '/founder-operator/plans', { ...planOnly, mission: 'Use ghp_123456789012345678901234567890123456 safely.' });
   assert.equal(credential.response.status, 400);
   assert.equal(credential.body.error, 'credential_shaped_content_rejected');
+
+  const escaped = await post(port, '/founder-operator/plans', { ...planOnly, id: '../escape' });
+  assert.equal(escaped.response.status, 400);
+  assert.equal(escaped.body.error, 'invalid_plan_id');
 });

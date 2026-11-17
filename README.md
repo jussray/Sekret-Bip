@@ -13,6 +13,12 @@ Copyright © 2024–2026 Juss Ray. All rights reserved. Proprietary software; se
 
 ## What the product is trying to protect
 
+The public Worker front door treats malformed rate-limiter results as a retryable
+503 protection outage. Only an explicit boolean success permits continuation;
+an explicit denial returns 429. Limiter exceptions emit a fixed event code
+without the raw exception payload. Deployment and real-account behavior require
+their own current evidence.
+
 Se’kret Bip is designed around a simple principle: connection should not require giving up privacy.
 
 - Private reflections stay private unless the product explicitly says otherwise.

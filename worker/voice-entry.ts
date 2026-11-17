@@ -1,3 +1,9 @@
+import {
+  emitReciprocalTelemetry,
+  observeFetchRequest,
+  reciprocalContainmentEnabled,
+  syntheticFetchResponse,
+} from '../security/reciprocal-ingress.mjs';
 import observedWorker from './observed-index';
 import emailRouter from './email-router';
 import { WORKER_RELEASE_SHA } from './release-identity.generated';
@@ -41,6 +47,8 @@ interface Env extends AuthEnv, VoiceProviderEnv, FirebaseAppCheckEnv {
   CF_VERSION_METADATA?: WorkerVersionMetadata;
   FOUNDER_OPERATION_KILL_SWITCH?: string;
   FOUNDER_OPERATION_KILL_SWITCH_REASON?: string;
+  RECIPROCAL_DEFENSE_MODE?: 'off' | 'observe' | 'contain';
+  RECIPROCAL_DEFENSE_SECRET?: string;
 }
 
 const DEFAULT_ALLOWED_ORIGINS = [
@@ -166,7 +174,12 @@ function requiresPreciseLipSync(body: Record<string, unknown>): boolean {
 
 function protectionUnavailable(cors: Record<string, string>): Response {
   return json(
-    { error: 'request protection temporarily unavailable', retryable: true },
+    {
+      error: 'request protection temporarily unavailable',
+      retryable: true,
+      // A limiter outage must never leave a teen with no crisis resource.
+      crisis_resources: 'If you might hurt yourself or someone is hurting you, call or text 988, text HOME to 741741, or call 911 if it is immediate.',
+    },
     503,
     { ...cors, 'Retry-After': '30' },
   );
@@ -248,10 +261,12 @@ async function enforceRateLimit(
   const ip = request.headers.get('CF-Connecting-IP') ?? 'unknown';
   const key = principal.kind === 'user' ? `user:${principal.userId}` : `ip:${ip}`;
   try {
-    const { success } = await env.SEKRET_RATE_LIMITER.limit({ key });
+    const outcome = await env.SEKRET_RATE_LIMITER.limit({ key });
+    if (!outcome || typeof outcome.success !== 'boolean') return protectionUnavailable(cors);
+    const { success } = outcome;
     return success ? null : json({ error: 'rate limit exceeded', retryable: true }, 429, cors);
-  } catch (error) {
-    console.error('[voice-entry:rate-limit]', error);
+  } catch {
+    console.error('SEKRET_RATE_LIMIT_UNAVAILABLE');
     return protectionUnavailable(cors);
   }
 }
@@ -360,13 +375,8 @@ async function handleVoice(
       questionBudget: style.maxQuestions,
       styleDecision: 'allow',
     }, 200, cors);
-  } catch (error) {
-    console.error('[voice-entry:synthesis]', {
-      actorId,
-      provider: route.provider,
-      fallbackProvider: route.fallbackProvider,
-      error: error instanceof Error ? error.message : 'unknown',
-    });
+  } catch {
+    console.error('SEKRET_VOICE_SYNTHESIS_FAILED');
     return json({
       error: 'voice synthesis unavailable',
       characterId: route.canonicalCharacterId,
@@ -389,6 +399,17 @@ export default {
     if (blocked) return blocked;
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
 
+    // Default-off, synthetic-only containment. Preserve canonical Worker routing.
+    if (env.RECIPROCAL_DEFENSE_MODE === 'observe' || env.RECIPROCAL_DEFENSE_MODE === 'contain') {
+      const defense = await observeFetchRequest(request, env, 'sekret-backend');
+      emitReciprocalTelemetry(defense, ctx);
+      if (reciprocalContainmentEnabled(env)) {
+        const synthetic = syntheticFetchResponse(defense);
+        if (synthetic) return synthetic;
+      }
+    }
+
+
     const path = new URL(request.url).pathname;
     if (request.method === 'GET' && path === '/health') {
       const response = await observedWorker.fetch(request, env as never, ctx);
@@ -400,10 +421,8 @@ export default {
           releaseSha: WORKER_RELEASE_SHA,
           version: workerVersionEvidence(env),
         }, response.status, cors);
-      } catch (error) {
-        console.error('[voice-entry:health]', {
-          error: error instanceof Error ? error.message : 'invalid delegated health response',
-        });
+      } catch {
+        console.error('SEKRET_DELEGATED_HEALTH_INVALID');
         return json({
           ok: false,
           worker: 'sekret-backend',

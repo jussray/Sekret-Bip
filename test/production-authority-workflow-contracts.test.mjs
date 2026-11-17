@@ -209,3 +209,20 @@ test('Pages deploy hook is manual-only, exact-current-main, and cannot masquerad
   assert.ok(hookSecret > exactMainGuard);
   assert.ok(hookCall > hookSecret);
 });
+
+test('runtime-contract-health has a founder-gated exact-main deploy path without changing JWT verification', () => {
+  const content = workflow('deploy-supabase-function.yml');
+  const choices = content.split('function_name:')[1]?.split('confirm_project:')[0] ?? '';
+  assert.ok(choices.includes('          - runtime-contract-health'));
+
+  const deployStep = content.slice(content.indexOf('- name: Deploy selected function'));
+  assert.ok(
+    deployStep.includes(
+      'if [ "${{ inputs.function_name }}" = "account-delete" ] || [ "${{ inputs.function_name }}" = "runtime-contract-health" ]; then',
+    ),
+    'the existing unauthenticated runtime health endpoint must retain --no-verify-jwt',
+  );
+  assert.match(deployStep, /--no-verify-jwt/);
+  assert.ok(content.includes('environment: production'));
+  assert.ok(content.includes('test "$EXPECTED_HEAD_SHA" = "$current_main"'));
+});
