@@ -13,6 +13,7 @@ export default function Bippin2Route() {
       t={t}
       mood={mood}
       selectedSekret={selectedSekret}
+      side="teen"
       setScreen={(screen: string) => router.push(routeForSide('teen', screen) as any)}
       BottomNav={null}
     />
