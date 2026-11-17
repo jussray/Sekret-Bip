@@ -14,7 +14,7 @@ import {
   type CrewRelationship,
 } from '@/services/crewRelationshipRepository';
 import { syncCrewMember, deleteCrewMember } from '@/utils/sync';
-import type { SyncStatus } from '../components/SyncBadge';
+import { SyncBadge, type SyncStatus } from '../components/SyncBadge';
 
 interface Props {
   t: Record<string, any>;
@@ -44,6 +44,7 @@ export function BipCrewScreen({
   setCrewCheckIns,
   BottomNav,
   withSyncWrap,
+  syncStatus,
 }: Props) {
   const [relationships, setRelationships] = useState<CrewRelationship[]>([]);
   const [showInvite, setShowInvite] = useState(false);
@@ -117,6 +118,7 @@ export function BipCrewScreen({
 
   return (
     <View style={styles.root}>
+      <SyncBadge status={syncStatus ?? 'idle'} />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.kicker}>PRIVATE CONNECTIONS</Text>
         <Text style={styles.title}>Bip Crew</Text>

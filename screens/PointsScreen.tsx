@@ -171,6 +171,13 @@ export function PointsScreen({
           <Text style={[st.eyebrow, { color: softAccent }]}>Bip Points</Text>
           <Text style={st.title}>{isRylane ? 'the reps stack.' : 'soft points 💜'}</Text>
           <Text style={st.sub}>{isRylane ? 'quiet proof you kept showing up.' : 'you earned these by coming back to yourself.'}</Text>
+          {streakDays > 0 && (
+            <View style={[st.streakPill, { backgroundColor: accent + '22', borderColor: accent + '55' }]}>
+              <Text style={[st.streakText, { color: accent }]}>
+                {streakDays === 1 ? '🌙 1 day in a row' : `🔥 ${streakDays} day streak`}
+              </Text>
+            </View>
+          )}
         </Animated.View>
 
         <Animated.View style={[st.hero, { borderColor: glow, backgroundColor: cardBg, transform: [{ scale: breathScale }] }]}>
@@ -246,4 +253,6 @@ const st = StyleSheet.create({
   rowPts: { fontSize: 18, fontWeight: '900' },
   back: { borderWidth: 1, borderRadius: 18, padding: 14, alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.25)' },
   backText: { color: 'rgba(255,255,255,0.82)', fontSize: 13, fontWeight: '800' },
+  streakPill: { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginTop: 10 },
+  streakText: { fontSize: 12, fontWeight: '900' },
 });
