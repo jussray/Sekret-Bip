@@ -337,6 +337,176 @@ export async function writeCirclePost(
   }
 }
 
+// ── Parent Community (V2, RPC-only) ──────────────────────────────────────────
+// Distinct from the legacy "Parent Circle" table above: this talks to the
+// `parent_community` circle_kind exclusively through the five SECURITY
+// DEFINER RPCs main ships (supabase/migrations/20261025025500_...). Raw
+// `circles`/`posts`/`post_reactions`/`post_comments`/`reported_posts` rows for
+// this kind are blocked from authenticated clients by restrictive RLS, so
+// there is no safeUpsert/safeDelete path here - every call is a `.rpc()`.
+// Every RPC enforces authentication_required / permanent_account_required /
+// verified_guardian_required server-side; callers should prefer checking
+// isGuardianVerified(verificationState) first so the UI can gate proactively
+// instead of surfacing a server rejection after the fact.
+export type ParentCommunityPost = {
+  id: string;
+  text: string;
+  circleTag?: string;
+  createdAt: string;
+  reactions: ReactionCounts;
+  quietRepliesCount: number;
+};
+
+export type ParentCommunityErrorCode =
+  | 'authentication_required'
+  | 'permanent_account_required'
+  | 'verified_guardian_required'
+  | 'invalid_parent_community_post'
+  | 'invalid_parent_community_tag'
+  | 'invalid_parent_community_reaction'
+  | 'invalid_parent_community_reply'
+  | 'parent_community_post_not_found'
+  | 'parent_community_circle_unavailable'
+  | 'unknown';
+
+export type ParentCommunityResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; code: ParentCommunityErrorCode };
+
+const PARENT_COMMUNITY_ERROR_CODES: ParentCommunityErrorCode[] = [
+  'authentication_required',
+  'permanent_account_required',
+  'verified_guardian_required',
+  'invalid_parent_community_post',
+  'invalid_parent_community_tag',
+  'invalid_parent_community_reaction',
+  'invalid_parent_community_reply',
+  'parent_community_post_not_found',
+  'parent_community_circle_unavailable',
+];
+
+function classifyParentCommunityError(error: SupabaseErrorLike | null): ParentCommunityErrorCode {
+  const message = error?.message ?? '';
+  return PARENT_COMMUNITY_ERROR_CODES.find(code => message.includes(code)) ?? 'unknown';
+}
+
+type ParentCommunityFeedRow = {
+  post_id: string;
+  post_text: string;
+  circle_tag: string | null;
+  created_at: string;
+  reaction_counts: ReactionCounts | null;
+  quiet_reply_count: number | string | null;
+};
+
+function mapParentCommunityRow(row: ParentCommunityFeedRow): ParentCommunityPost {
+  return {
+    id: row.post_id,
+    text: row.post_text,
+    circleTag: row.circle_tag ?? undefined,
+    createdAt: row.created_at,
+    reactions: row.reaction_counts ?? EMPTY_PARENT_REACTIONS,
+    quietRepliesCount: Number(row.quiet_reply_count ?? 0),
+  };
+}
+
+export async function loadParentCommunityFeed(
+  limit = 50,
+): Promise<ParentCommunityResult<ParentCommunityPost[]>> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, code: 'unknown' };
+  try {
+    const { data, error }: SupabaseDataResult<ParentCommunityFeedRow[]> = await sb.rpc(
+      'get_parent_community_feed',
+      { p_limit: limit },
+    );
+    if (error) return { ok: false, code: classifyParentCommunityError(error) };
+    return { ok: true, data: (data ?? []).map(mapParentCommunityRow) };
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPARENTCOMMUNITYFEED_FAILED');
+    return { ok: false, code: 'unknown' };
+  }
+}
+
+export async function createParentCommunityPost(
+  text: string,
+  circleTag?: string,
+): Promise<ParentCommunityResult<ParentCommunityPost>> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, code: 'unknown' };
+  try {
+    const { data, error }: SupabaseDataResult<ParentCommunityFeedRow[]> = await sb.rpc(
+      'create_parent_community_post',
+      { p_text: text, p_circle_tag: circleTag ?? null },
+    );
+    if (error) return { ok: false, code: classifyParentCommunityError(error) };
+    const row = Array.isArray(data) ? data[0] : undefined;
+    if (!row) return { ok: false, code: 'unknown' };
+    return { ok: true, data: mapParentCommunityRow(row) };
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_CREATEPARENTCOMMUNITYPOST_FAILED');
+    return { ok: false, code: 'unknown' };
+  }
+}
+
+export async function reactToParentCommunityPost(
+  postId: string,
+  reaction: string,
+): Promise<ParentCommunityResult<ReactionCounts>> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, code: 'unknown' };
+  try {
+    const { data, error }: SupabaseDataResult<ReactionCounts> = await sb.rpc(
+      'react_to_parent_community_post',
+      { p_post_id: postId, p_reaction: reaction },
+    );
+    if (error) return { ok: false, code: classifyParentCommunityError(error) };
+    return { ok: true, data: data ?? EMPTY_PARENT_REACTIONS };
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_REACTTOPARENTCOMMUNITYPOST_FAILED');
+    return { ok: false, code: 'unknown' };
+  }
+}
+
+export async function replyToParentCommunityPost(
+  postId: string,
+  body: string,
+): Promise<ParentCommunityResult<number>> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, code: 'unknown' };
+  try {
+    const { data, error }: SupabaseDataResult<number> = await sb.rpc(
+      'reply_to_parent_community_post',
+      { p_post_id: postId, p_body: body },
+    );
+    if (error) return { ok: false, code: classifyParentCommunityError(error) };
+    return { ok: true, data: Number(data ?? 0) };
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_REPLYTOPARENTCOMMUNITYPOST_FAILED');
+    return { ok: false, code: 'unknown' };
+  }
+}
+
+export async function reportParentCommunityPost(
+  postId: string,
+  reason?: string,
+): Promise<ParentCommunityResult<true>> {
+  const sb = getSupabase();
+  if (!sb) return { ok: false, code: 'unknown' };
+  try {
+    const { data, error }: SupabaseDataResult<boolean> = await sb.rpc(
+      'report_parent_community_post',
+      { p_post_id: postId, p_reason: reason ?? null },
+    );
+    if (error) return { ok: false, code: classifyParentCommunityError(error) };
+    if (!data) return { ok: false, code: 'unknown' };
+    return { ok: true, data: true };
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_REPORTPARENTCOMMUNITYPOST_FAILED');
+    return { ok: false, code: 'unknown' };
+  }
+}
+
 // ── Voice ─────────────────────────────────────────────────────────────
 export function syncVoiceNote(note: VoiceNote): void {
   emitEvent('voice_completed', { durationSecs: note.duration ? Number(note.duration) : undefined });

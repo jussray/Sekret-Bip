@@ -114,7 +114,9 @@ export type ScreenKey =
   | 'discover';
 
 export interface ParentCirclePost {
-  id: number;
+  // number for locally-created optimistic posts (Date.now()), string for
+  // posts loaded from the Parent Community RPCs (uuid post ids).
+  id: number | string;
   text: string;
   date: string;
   time: string;

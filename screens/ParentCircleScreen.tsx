@@ -45,11 +45,18 @@ type ParentCircleScreenProps = {
   parentCirclePosts: ParentCirclePost[];
   parentCirclePostText: string;
   setParentCirclePostText: (text: string) => void;
-  saveParentCirclePost: (extra?: Partial<ParentCirclePost>) => void;
+  // A falsy resolved/returned value means the post was NOT saved (e.g. the
+  // backend rejected it) - the composer keeps the draft text instead of
+  // clearing it, so failure is never shown as success.
+  saveParentCirclePost: (extra?: Partial<ParentCirclePost>) => void | boolean | Promise<void | boolean>;
   reactToParentPost: (id: string | number, type: string) => void;
   setScreen: (screen: string) => void;
   BottomNav: React.ReactNode;
   onPostPress?: (id: string | number) => void;
+  // When provided, a real quiet-reply/report backend exists (Parent Community
+  // RPCs) and these take priority over the screen's own local-only fallbacks.
+  onReplySubmit?: (postId: string, body: string) => void;
+  onReportPost?: (id: string | number) => void;
 };
 
 const PARENT_REACTIONS = [
@@ -160,6 +167,8 @@ export function ParentCircleScreen({
   setScreen,
   BottomNav,
   onPostPress,
+  onReplySubmit,
+  onReportPost,
 }: ParentCircleScreenProps) {
   const [selectedType, setSelectedType] = useState(PARENT_POST_TYPES[0].id);
   const [selectedTag, setSelectedTag]   = useState('');
@@ -183,6 +192,10 @@ export function ParentCircleScreen({
           style: 'destructive',
           onPress: () => {
             setReportedIds(prev => new Set(prev).add(String(postId)));
+            if (onReportPost) {
+              onReportPost(postId);
+              return;
+            }
             const numericId = Number(postId);
             if (Number.isFinite(numericId)) void reportPost(numericId, 'parent');
           },
@@ -237,15 +250,16 @@ export function ParentCircleScreen({
       return;
     }
     setIsSubmitting(true);
-    saveParentCirclePost({
+    const result = await saveParentCirclePost({
       text:      parentCirclePostText,
       circleTag: selectedTag || undefined,
     });
+    setIsSubmitting(false);
+    if (result === false) return; // failed - keep the draft so they can retry
     setParentCirclePostText('');
     setSelectedTag('');
     setCrisisFlag(false);
     setConfirmedPost(false);
-    setIsSubmitting(false);
     await triggerHaptic(Haptics.ImpactFeedbackStyle.Medium);
   };
 
@@ -516,7 +530,14 @@ export function ParentCircleScreen({
               />
               <TouchableOpacity
                 style={styles.sendBtn}
-                onPress={() => { setSelectedQuietReply(''); setActiveReplyPostId(null); }}
+                onPress={() => {
+                  const body = selectedQuietReply.trim();
+                  if (body && activeReplyPostId && onReplySubmit) {
+                    onReplySubmit(activeReplyPostId, body);
+                  }
+                  setSelectedQuietReply('');
+                  setActiveReplyPostId(null);
+                }}
               >
                 <Text style={styles.sendBtnText}>send quietly</Text>
               </TouchableOpacity>
