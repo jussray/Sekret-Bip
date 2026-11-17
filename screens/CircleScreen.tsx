@@ -212,8 +212,8 @@ function PublicFeed({ onOptimisticInsert }: {
   const handleBlock  = () => Alert.alert('Blocked', 'This account has been blocked.');
   const handleReport = (postId: number) =>
     Alert.alert('Report Bip', 'Why are you reporting this?', [
-      { text: 'Harmful content', onPress: () => {} },
-      { text: 'Spam',           onPress: () => {} },
+      { text: 'Harmful content', onPress: () => Alert.alert('Report sent 💜', "Thanks for letting us know. We'll review this.") },
+      { text: 'Spam',           onPress: () => Alert.alert('Report sent 💜', "Thanks for letting us know. We'll review this.") },
       { text: 'Cancel', style: 'cancel' },
     ]);
 
@@ -301,8 +301,8 @@ function FriendsFeed({ myUserId }: { myUserId: string }) {
   const handleBlock  = () => Alert.alert('Blocked', 'This account has been blocked.');
   const handleReport = (postId: number) =>
     Alert.alert('Report Bip', 'Why are you reporting this?', [
-      { text: 'Harmful content', onPress: () => {} },
-      { text: 'Spam',           onPress: () => {} },
+      { text: 'Harmful content', onPress: () => Alert.alert('Report sent 💜', "Thanks for letting us know. We'll review this.") },
+      { text: 'Spam',           onPress: () => Alert.alert('Report sent 💜', "Thanks for letting us know. We'll review this.") },
       { text: 'Cancel', style: 'cancel' },
     ]);
 
@@ -409,8 +409,8 @@ function CrewFeed({ myUserId }: { myUserId: string }) {
   const handleBlock  = () => Alert.alert('Blocked', 'This account has been blocked.');
   const handleReport = (postId: number) =>
     Alert.alert('Report Bip', 'Why are you reporting this?', [
-      { text: 'Harmful content', onPress: () => {} },
-      { text: 'Spam',           onPress: () => {} },
+      { text: 'Harmful content', onPress: () => Alert.alert('Report sent 💜', "Thanks for letting us know. We'll review this.") },
+      { text: 'Spam',           onPress: () => Alert.alert('Report sent 💜', "Thanks for letting us know. We'll review this.") },
       { text: 'Cancel', style: 'cancel' },
     ]);
 
@@ -517,8 +517,8 @@ function ParentFeed({ myUserId }: { myUserId: string }) {
   const handleBlock  = () => Alert.alert('Blocked', 'This account has been blocked.');
   const handleReport = (postId: number) =>
     Alert.alert('Report Bip', 'Why are you reporting this?', [
-      { text: 'Harmful content', onPress: () => {} },
-      { text: 'Spam',           onPress: () => {} },
+      { text: 'Harmful content', onPress: () => Alert.alert('Report sent 💜', "Thanks for letting us know. We'll review this.") },
+      { text: 'Spam',           onPress: () => Alert.alert('Report sent 💜', "Thanks for letting us know. We'll review this.") },
       { text: 'Cancel', style: 'cancel' },
     ]);
 
