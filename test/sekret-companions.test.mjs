@@ -5,13 +5,13 @@ import fs from 'node:fs';
 const api = fs.readFileSync(new URL('../src/utils/api.ts', import.meta.url), 'utf8');
 const worker = fs.readFileSync(new URL('../worker/sekret-reply.ts', import.meta.url), 'utf8');
 const curriculum = fs.readFileSync(new URL('../worker/companion-curriculum.ts', import.meta.url), 'utf8');
-const voiceRoute = fs.readFileSync(new URL('../app/(main)/voicebip.tsx', import.meta.url), 'utf8');
+const voiceRoute = fs.readFileSync(new URL('../app/(teen)/voicebip.tsx', import.meta.url), 'utf8');
 const onboarding = fs.readFileSync(new URL('../app/(onboarding)/reflection.tsx', import.meta.url), 'utf8');
 
 for (const id of ['raylene', 'rylane', 'cloud', 'night', 'sekret']) {
   test(`client and worker recognize ${id}`, () => {
-    assert.match(api, new RegExp(`['\"]${id}['\"]`));
-    assert.match(worker, new RegExp(`['\"]${id}['\"]`));
+    assert.match(api, new RegExp(`['"]${id}['"]`));
+    assert.match(worker, new RegExp(`['"]${id}['"]`));
     assert.match(curriculum, new RegExp(`(?:^|\\s)${id}:`));
   });
 }

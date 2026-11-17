@@ -1,5 +1,3 @@
-import { Redirect } from 'expo-router';
+import S2TellBridgeScreen from '@/features/bridge/S2TellBridgeScreen';
 
-export default function S2TellAlias() {
-  return <Redirect href="/(teen)/bridge?compose=true" />;
-}
+export default S2TellBridgeScreen;

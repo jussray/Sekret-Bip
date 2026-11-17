@@ -2,140 +2,105 @@
 
 > Living document. Update when boundaries change.
 
-## Directory Structure (Current — post Step 3)
+## Active application structure
 
-```
-bip/
-├── app/                          ← Expo Router file-based routing ONLY
-│   ├── _layout.tsx               ← Root layout + AppProvider
-│   ├── index.tsx                 ← Redirect → /(main)/home
-│   ├── (auth)/
-│   │   ├── _layout.tsx
-│   │   ├── login.tsx             ← placeholder
-│   │   └── signup.tsx            ← placeholder
-│   ├── (main)/
-│   │   ├── _layout.tsx           ← Tabs: Home/Pages/Calm/Circle/Se'kret
-│   │   ├── home.tsx              ← real HomeScreen + router shim
-│   │   ├── pages.tsx             ← real JournalScreen + router shim
-│   │   ├── calm.tsx              ← real CalmScreen + router shim
-│   │   ├── sekret.tsx            ← personality picker → chat/[id]
-│   │   ├── circle.tsx            ← placeholder (Step 4)
-│   │   ├── bridge.tsx            ← placeholder (Step 4)
-│   │   ├── discover.tsx          ← placeholder (Step 4)
-│   │   ├── profile.tsx           ← placeholder (Step 4)
-│   │   ├── settings.tsx          ← placeholder (Step 4)
-│   │   └── chat/
-│   │       ├── index.tsx         ← chat hub
-│   │       └── [personalityId].tsx ← raylene/rylane/cloud/night/oracle
-│   └── (modals)/
-│       └── _layout.tsx
-│
-├── src/                          ← ALL non-routing source code (canonical)
-│   ├── components/
-│   │   ├── layout/
-│   │   │   └── BottomNav.tsx     ← router-native, no setScreen prop
-│   │   ├── ai/                   ← Step 4: OracleDiscoveryPanel etc.
-│   │   ├── chat/                 ← Step 4: BipEmptyState etc.
-│   │   ├── safety/               ← Step 4: AgeGate, SleepGate etc.
-│   │   └── shared/               ← Step 4: SafeAsset, SyncBadge etc.
-│   ├── context/
-│   │   └── AppContext.tsx        ← theme, mood, breatheAnim, journal state
-│   ├── hooks/
-│   │   └── useSekretState.ts     ← AsyncStorage persistence
-│   ├── services/
-│   │   ├── ai/                   ← Step 4: per-personality AI calls
-│   │   └── worker/               ← Cloudflare Worker helpers
-│   ├── store/                    ← Step 4: Zustand stores (if needed)
-│   ├── types/
-│   │   └── index.ts              ← JournalEntry, MoodEntry, Theme, PersonalityId…
-│   ├── constants/
-│   │   └── theme.ts              ← THEME_PACKS, MOODS, HOME_MESSAGES…
-│   └── utils/
-│       ├── storage.ts            ← AsyncStorage helpers
-│       └── api.ts                ← fetchSekretReply (→ src/services/ai in Step 4)
-│
-├── screens/                      ← LEGACY — retire in Step 5
-│   ├── HomeScreen.tsx            ← still uses setScreen prop (shim satisfies it)
-│   ├── JournalScreen.tsx
-│   └── CalmScreen.tsx
-│
-├── hooks/            ← LEGACY SHIMS — re-export from src/hooks
-├── utils/            ← LEGACY SHIMS — re-export from src/utils
-├── types/            ← LEGACY SHIMS — re-export from src/types
-├── constants/        ← LEGACY SHIMS — re-export from src/constants
-├── components/       ← LEGACY SHIMS — re-export from src/components
-│
-├── supabase/         ← Migrations + Edge Functions
-├── worker/           ← Cloudflare Worker source
-├── assets/
-├── docs/
-├── scripts/
-├── app.json
-├── tsconfig.json
-├── package.json
-├── babel.config.js
-├── metro.config.js
-├── wrangler.jsonc
-└── .env.example
+Se'kret Bip uses Expo Router with separate teen and parent route groups.
+
+```text
+app/
+├── _layout.tsx
+├── (auth)/
+├── (teen)/
+│   ├── _layout.tsx
+│   ├── room.tsx
+│   ├── pages/
+│   ├── circle/
+│   ├── bridge.tsx
+│   ├── sekret.tsx
+│   ├── voicebip.tsx
+│   └── ...
+└── (parent)/
+    ├── _layout.tsx
+    ├── room.tsx
+    ├── pages.tsx
+    ├── circle/
+    ├── bridge.tsx
+    ├── sekret.tsx
+    ├── voicebip.tsx
+    └── ...
 ```
 
-## Import Alias Convention
+Route files should stay thin. Reusable logic belongs under `src/`.
 
-| Alias | Points to | Status |
-|-------|-----------|--------|
-| `@/*` | `src/*` | ✅ Canonical — use for ALL new code |
-| `@hooks/*` | `src/hooks/*` | ⚠️ Legacy — migrate to `@/hooks` |
-| `@utils/*` | `src/utils/*` | ⚠️ Legacy — migrate to `@/utils` |
-| `@components/*` | `src/components/*` | ⚠️ Legacy — migrate to `@/components/*` |
-| `@constants/*` | `src/constants/*` | ⚠️ Legacy — migrate to `@/constants` |
-| `@types/*` | `src/types/*` | ⚠️ Legacy — migrate to `@/types` |
-| `@screens/*` | `screens/*` | 🔴 Retire in Step 5 |
+## Source boundaries
 
-## Navigation Model (Active)
+```text
+src/
+├── components/        shared UI and safety components
+├── context/           application context
+├── features/          domain feature logic
+├── hooks/             reusable hooks
+├── parent/            parent-side exports and modules
+├── services/          AI, auth, verification, safety, sync, audit
+├── types/             canonical domain types
+└── utils/             shared utilities
 
-```tsx
-import { router } from 'expo-router';
-
-router.push('/(main)/home');
-router.push('/(main)/pages');
-router.push('/(main)/calm');
-router.push('/(main)/circle');
-router.push('/(main)/sekret');
-router.push('/(main)/chat/raylene');
-router.push('/(main)/settings');
-router.push('/(main)/discover');
+screens/               compatibility screen implementations still used by routes
+worker/                Cloudflare Worker source
+supabase/              migrations and Edge Functions
 ```
 
-## State Architecture
+New business logic should not be added directly to route files or legacy compatibility wrappers.
 
-```
-AppProvider (app/_layout.tsx)
-  └── useSekretState()          ← AsyncStorage persistence
-       theme, mood, userSide, selectedSekret,
-       entries, moodHistory, circlePosts
-  └── local state in provider
-       journalText, homeMessageIndex, breatheAnim
-  └── useAppContext()            ← consumed by all tab screens
-```
+## State model
 
-## Deployment Boundaries
+- AsyncStorage provides local-first persistence.
+- Supabase sync is best-effort and account-scoped.
+- Local writes must remain usable when the network is unavailable.
+- Private data must be cleared on sign-out where required by account policy.
 
-| Layer | Platform | Responsibility |
-|-------|----------|----------------|
-| Frontend | Vercel | `expo export -p web` |
-| Mobile | Expo Go / EAS | React Native bundle |
-| Backend | Cloudflare Workers | AI relay, Supabase proxy |
-| Database | Supabase | PostgreSQL + Auth + RLS |
+## Backend boundaries
 
-`OPENAI_API_KEY` lives ONLY in Cloudflare Worker secrets.
+| Layer | Responsibility |
+|---|---|
+| Expo client | UI, local persistence, authenticated requests |
+| Cloudflare Worker | AI/voice relay, auth-aware APIs, metadata-only telemetry |
+| Supabase Auth | account identity and sessions |
+| Supabase Postgres | durable data, RLS, RPCs, audit and relationship state |
+| Supabase Storage | private user-owned media |
+| Supabase Edge Functions | selected safety and server-side workflows |
 
-## Migration Checklist
+The client must never contain service-role credentials or provider secret keys.
 
-| Step | Description | Status |
-|------|-------------|--------|
-| 1 | Component domain barrel files | ✅ Done |
-| 2a | `src/` skeleton + `app/` route groups | ✅ Done |
-| 2b | Replace string router with `router.push()` | ✅ Done |
-| **3** | **Move physical files into `src/`** | ✅ Done |
-| 4 | Wire `src/services/ai/` per-personality + fill placeholder screens | 🔜 Next |
-| 5 | Retire `screens/`, `hooks/`, `utils/`, `types/`, `constants/` legacy dirs | 🔜 After 4 |
+## Privacy model
+
+- Teen and parent route separation is a UX boundary, not authorization.
+- Authorization is enforced by verified identity, services, RLS, RPC permissions, and storage policies.
+- Bridge contains only intentionally shared teen-parent content.
+- Circle is separate from Bridge.
+- Parent surfaces must not read teen journals, private companion chats, private voice notes, or private character memory.
+
+## Companion intelligence
+
+Current enforced maturity is L2: short-term history and approved context are passed into stateless turns.
+
+L3/L4 features such as durable semantic memory, persistent goals, scheduled reflection, and inter-companion coordination are proposals only and must not be represented as demo-ready implementation until the required migrations, services, privacy controls, and tests exist. See `AGENT_L4_ARCHITECTURE.md`.
+
+## Deployment boundaries
+
+| Layer | Platform |
+|---|---|
+| Web | Cloudflare-first direction |
+| Mobile | Expo / EAS |
+| API and AI relay | Cloudflare Workers |
+| Database and auth | Supabase |
+
+Remaining Vercel compatibility code should be treated as transitional until intentionally removed.
+
+## Current cleanup priorities
+
+1. Finish the parent experience and Parent Bridge UI.
+2. Retire stale route and screen compatibility layers carefully.
+3. Keep Supabase migrations replayable from an empty database.
+4. Validate RLS, storage, founder/admin, and parent-link boundaries.
+5. Add durable character memory only after privacy boundaries are complete and tested.

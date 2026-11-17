@@ -380,3 +380,27 @@ export function summarizeSekretMemory(memory: SekretMemory): MemorySummary {
     winningStreak,
   };
 }
+
+/**
+ * Bump the daily streak counter. Idempotent: calling multiple times on the
+ * same day is a no-op. Call this on any meaningful user activity.
+ */
+export async function bumpStreak(): Promise<void> {
+  try {
+    const mem = await loadSekretMemory();
+    const today     = new Date().toISOString().slice(0, 10);
+    const lastDate  = mem.streaks.lastUpdated?.slice(0, 10) ?? '';
+    if (lastDate === today) return;
+    const yesterday = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
+    const next      = lastDate === yesterday ? mem.streaks.current + 1 : 1;
+    const longest   = Math.max(mem.streaks.longest, next);
+    const now       = new Date().toISOString();
+    await saveSekretMemory({
+      ...mem,
+      streaks:     { current: next, longest, lastUpdated: now },
+      lastUpdated: now,
+    });
+  } catch {
+    // never surface — streak is a soft feature
+  }
+}

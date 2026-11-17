@@ -1,0 +1,37 @@
+{
+  "id": "voice-runtime-foundation",
+  "name": "Privacy-safe shared voice runtime telemetry foundation",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/460",
+  "acceptanceCriteria": [
+    "Ordered migrations define voice_sessions, voice_turns, voice_events, and voice_latency_metrics with RLS enabled and restrict event error codes to a finite internal vocabulary.",
+    "Telemetry writes are server-owned; permanent authenticated owners may read their own metadata and delete a top-level session tree.",
+    "Anon has no table or sequence privileges, anonymous-authenticated sessions fail closed, and cross-user access is denied.",
+    "Raw audio, transcript text, prompts, replies, private message content, human-readable client correlation identifiers, and free-form error messages are absent from the schema.",
+    "Client reconnect or idempotency correlation uses an opaque UUID.",
+    "Event payloads accept only an explicit allowlist of primitive operational keys with bounded types, enums, patterns, numeric ranges, and approved internal error codes; unknown keys, nested values, and arbitrary strings fail closed.",
+    "The payload validator is not executable by public, anon, or authenticated roles.",
+    "No voice Storage bucket exists until uploader, retention, deletion, isolation, MIME, size, and rollback contracts are approved together.",
+    "Static contracts and a rollback-contained live authorization probe exist before production migration approval."
+  ],
+  "contractPaths": [
+    "docs/VOICE_RUNTIME_FOUNDATION.md",
+    "supabase/migrations/20260717034535_create_voice_runtime_foundation.sql",
+    "supabase/migrations/20260718034600_restrict_voice_error_code_vocabulary.sql"
+  ],
+  "testPaths": [
+    "test/voice-runtime-foundation.test.mjs",
+    "supabase/probes/voice_runtime_foundation.sql",
+    "test/implementation-ledger.test.mjs"
+  ],
+  "verification": {
+    "state": "partial",
+    "evidence": "https://github.com/jussray/Sekret-Bip/issues/460",
+    "blocker": "Run exact-head repository gates, apply both migrations only under separate founder approval, then execute rollback-contained owner/cross-user/anonymous/payload-allowlist/error-code-vocabulary/opaque-ID/cascade proof and Supabase advisors before promotion."
+  },
+  "rollout": {
+    "state": "disabled",
+    "control": "No client or server runtime consumes these tables in Phase 1. Any future relay must map provider or client failures to the approved internal error-code vocabulary before insertion."
+  },
+  "rollback": "Revert the repository migrations before application. After any approved live application, use a separately reviewed rollback migration only after confirming no runtime consumer or retained evidence depends on the tables."
+}

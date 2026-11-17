@@ -22,15 +22,23 @@ const LIVE_DIR    = path.resolve(__dirname, '..', 'assets', 'images');
 const ARCHIVE_DIR = path.resolve(LIVE_DIR, 'archive');
 const MIN_SIZE    = 1024 * 1024; // 1 MB
 
-function isLfsPointer(filepath) {
-  const stat = fs.statSync(filepath);
-  if (stat.size > 512) return false;
+function readSnapshot(filepath) {
   try {
-    const head = fs.readFileSync(filepath, 'utf8').slice(0, 64);
-    return head.startsWith('version https://git-lfs');
-  } catch {
-    return false;
+    const bytes = fs.readFileSync(filepath);
+    return {
+      exists: true,
+      size: bytes.length,
+      lfsPointer: bytes.length <= 512
+        && bytes.toString('utf8', 0, Math.min(bytes.length, 64)).startsWith('version https://git-lfs'),
+    };
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { exists: false, size: 0, lfsPointer: false };
+    throw error;
   }
+}
+
+function isLfsPointer(filepath) {
+  return readSnapshot(filepath).lfsPointer;
 }
 
 function formatBytes(n) {
@@ -81,10 +89,11 @@ for (const filename of liveFiles) {
   const livePath    = path.join(LIVE_DIR, filename);
   const archivePath = path.join(ARCHIVE_DIR, filename);
   const liveSize    = fs.statSync(livePath).size;
+  const archiveState = readSnapshot(archivePath);
 
-  const needsRepair = !fs.existsSync(archivePath)
-    || isLfsPointer(archivePath)
-    || fs.statSync(archivePath).size < MIN_SIZE;
+  const needsRepair = !archiveState.exists
+    || archiveState.lfsPointer
+    || archiveState.size < MIN_SIZE;
 
   if (!needsRepair) {
     alreadyOk++;

@@ -14,9 +14,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const TOP = Platform.OS === 'ios' ? 56 : 36;
 
-const STORAGE_KEY_GOAL      = 'parent_repair_weekgoal';
-const STORAGE_KEY_WINS      = 'parent_repair_wins';
-const STORAGE_KEY_STREAK    = 'parent_repair_streak_date';
+const STORAGE_KEY_GOAL   = 'parent_repair_weekgoal';
+const STORAGE_KEY_WINS   = 'parent_repair_wins';
+const STORAGE_KEY_STREAK = 'parent_repair_streak_date';
 
 // ── Ritual suggestions — small daily acts ────────────────────────────────────
 const RITUALS = [
@@ -28,6 +28,13 @@ const RITUALS = [
   { icon: '😂', label: 'Laughed together about something' },
   { icon: '✋', label: 'Gave a hug or shoulder squeeze' },
   { icon: '💬', label: 'Listened for 5 minutes without problem-solving' },
+  { icon: '✉️', label: 'Sent a text with no ask, just love' },
+  { icon: '🚗', label: 'Drove somewhere together, just talking' },
+  { icon: '👏', label: 'Acknowledged something they did right' },
+  { icon: '🙏', label: 'Apologized for something specific' },
+  { icon: '🛋️', label: 'Watched something they liked without judging it' },
+  { icon: '❓', label: 'Asked a question I actually didn\'t know the answer to' },
+  { icon: '💤', label: 'Let them sleep in without comment' },
 ];
 
 // ── Weekly goals ─────────────────────────────────────────────────────────────
@@ -39,15 +46,30 @@ const GOAL_SUGGESTIONS = [
   "Find one thing to genuinely compliment",
   "Apologize for something from last week",
   "Say 'I love you' out loud every day",
+  "Greet them first every time they walk in — no questions",
+  "Let them lead at least one conversation this week",
+  "Notice something they're proud of and say it out loud",
+  "Text them something funny or warm with no follow-up",
+  "Ask about their friends by name — show you remember",
+  "Give one piece of unsolicited encouragement (not tied to performance)",
+  "Let something slide that isn't a safety issue",
+  "Check in on yourself — you can't connect if you're running on empty",
 ];
 
 // ── Repair phrases ────────────────────────────────────────────────────────────
 const REPAIR_PHRASES = [
-  { label: 'Own it',       text: '"I was too harsh. I am sorry."' },
-  { label: 'Reset',        text: '"Can we start this conversation over?"' },
-  { label: 'Affirm',       text: '"I love you even when we disagree."' },
-  { label: 'Reach out',    text: '"I have been thinking about you."' },
-  { label: 'No conditions',text: '"Nothing you did changes how I feel about you."' },
+  { label: 'Own it',        text: '"I was too harsh. I am sorry."' },
+  { label: 'Reset',         text: '"Can we start this conversation over?"' },
+  { label: 'Affirm',        text: '"I love you even when we disagree."' },
+  { label: 'Reach out',     text: '"I have been thinking about you."' },
+  { label: 'No conditions', text: '"Nothing you did changes how I feel about you."' },
+  { label: 'Soften',        text: '"I think I came in too hard. That wasn\'t fair to you."' },
+  { label: 'Be specific',   text: '"I should not have said that the way I did. I\'m sorry."' },
+  { label: 'No lecture',    text: '"I promise this isn\'t a lecture. I just want us to be okay."' },
+  { label: 'Stay open',     text: '"You don\'t have to forgive me right now. I\'ll still be here."' },
+  { label: 'Just check in', text: '"Hey. Are we okay? Can we be okay?"' },
+  { label: 'Reconnect',     text: '"I miss you. Not the version of us that\'s arguing. Just... us."' },
+  { label: 'Give space',    text: '"I know you need space. I\'m giving it. I\'m not going anywhere."' },
 ];
 
 interface WinEntry { id: number; text: string; date: string; ritual?: string }
@@ -95,7 +117,6 @@ export function ParentRepairScreen({ setScreen, BottomNav }: ParentRepairScreenP
     setWeekGoal(goalDraft.trim());
     setEditingGoal(false);
     await AsyncStorage.setItem(STORAGE_KEY_GOAL, goalDraft.trim()).catch(() => {});
-    // Reset streak when setting a new goal
     await AsyncStorage.setItem(STORAGE_KEY_STREAK, String(Date.now())).catch(() => {});
     setStreak(7);
   }
@@ -237,7 +258,7 @@ export function ParentRepairScreen({ setScreen, BottomNav }: ParentRepairScreenP
           <Text style={s.phraseLabel}>{REPAIR_PHRASES[phraseIdx].label}</Text>
           <Text style={s.phraseText}>{REPAIR_PHRASES[phraseIdx].text}</Text>
           <TouchableOpacity style={s.phraseNext} onPress={() => setPhraseIdx(i => (i + 1) % REPAIR_PHRASES.length)}>
-            <Text style={s.phraseNextText}>Next phrase</Text>
+            <Text style={s.phraseNextText}>Next phrase ({phraseIdx + 1}/{REPAIR_PHRASES.length})</Text>
           </TouchableOpacity>
         </View>
 
@@ -290,10 +311,10 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#334155', borderRadius: 10,
     padding: 12, marginBottom: 10, minHeight: 60,
   },
-  suggRow:   { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  suggText:  { color: '#94A3B8', fontSize: 13, flex: 1, fontStyle: 'italic' },
-  useBtn:    { color: '#c084fc', fontSize: 12, fontWeight: '700' },
-  saveBtn:   { backgroundColor: 'rgba(192,132,252,0.18)', borderWidth: 1, borderColor: '#c084fc', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
+  suggRow:  { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
+  suggText: { color: '#94A3B8', fontSize: 13, flex: 1, fontStyle: 'italic' },
+  useBtn:   { color: '#c084fc', fontSize: 12, fontWeight: '700' },
+  saveBtn:  { backgroundColor: 'rgba(192,132,252,0.18)', borderWidth: 1, borderColor: '#c084fc', borderRadius: 12, paddingVertical: 10, alignItems: 'center' },
   saveBtnText: { color: '#e9d5ff', fontSize: 14, fontWeight: '700' },
 
   heading:    { color: '#fff', fontSize: 16, fontWeight: '700', marginHorizontal: 20, marginTop: 20, marginBottom: 4 },
@@ -315,8 +336,8 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#334155', borderRadius: 12,
     paddingHorizontal: 12, paddingVertical: 10,
   },
-  logBtn:      { backgroundColor: 'rgba(192,132,252,0.18)', borderWidth: 1, borderColor: '#c084fc', borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
-  logBtnText:  { color: '#e9d5ff', fontSize: 13, fontWeight: '700' },
+  logBtn:     { backgroundColor: 'rgba(192,132,252,0.18)', borderWidth: 1, borderColor: '#c084fc', borderRadius: 12, paddingHorizontal: 16, justifyContent: 'center' },
+  logBtnText: { color: '#e9d5ff', fontSize: 13, fontWeight: '700' },
 
   winRow:  { flexDirection: 'row', gap: 10, marginHorizontal: 20, marginBottom: 8 },
   winDot:  { color: '#c084fc', fontSize: 16, lineHeight: 22 },
@@ -345,6 +366,6 @@ const s = StyleSheet.create({
   calmLinkText:  { color: '#e9d5ff', fontSize: 14, fontWeight: '600', flex: 1 },
   calmLinkArrow: { color: '#64748B', fontSize: 18 },
 
-  primaryBtn:  { alignItems: 'center', paddingVertical: 6 },
-  ghostBtnText:{ color: '#64748B', fontSize: 12 },
+  primaryBtn:   { alignItems: 'center', paddingVertical: 6 },
+  ghostBtnText: { color: '#64748B', fontSize: 12 },
 });

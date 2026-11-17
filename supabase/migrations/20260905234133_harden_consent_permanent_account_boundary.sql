@@ -1,0 +1,2 @@
+-- Production receipt marker for canonical migration 20260827060000.
+-- Re-applied idempotently after current consent-state verification; no further schema changes.

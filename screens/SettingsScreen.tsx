@@ -12,6 +12,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { IMAGES } from '../constants/theme';
 import type { SleepWindow } from '../hooks/useSleepGuard';
 import { createParentLink, redeemParentLink } from '@/utils/sync';
+import { reportProblem } from '@/services/userReports';
 
 const { width: W } = Dimensions.get('window');
 
@@ -22,12 +23,12 @@ const VIBE_CONFIG: Record<string, {
   previewBg: any; glow: string; gtop: string; gbot: string;
 }> = {
   raylene: {
-    name: "Raylene's Room",  tagline: 'lavender · fairy lights · cozy bedroom',
+    name: "Suhana's Room",  tagline: 'lavender · fairy lights · cozy bedroom',
     emoji: '💜', previewBg: IMAGES.bgRayleneRoomEvening,
     glow: '#e879f9', gtop: 'rgba(80,0,80,0.55)',  gbot: 'rgba(20,0,45,0.90)',
   },
   rylane: {
-    name: "Rylane's Space",  tagline: 'midnight blue · city lights · chill night',
+    name: "Sy's Space",  tagline: 'midnight blue · city lights · chill night',
     emoji: '⚡', previewBg: IMAGES.bgRylaneRoomNight,
     glow: '#4DA3FF', gtop: 'rgba(0,20,70,0.55)',  gbot: 'rgba(0,8,30,0.90)',
   },
@@ -59,12 +60,12 @@ const SEKRET_PROFILES: Record<string, {
   name: string; emoji: string; title: string; tagline: string; avatar: any; accent: string;
 }> = {
   soft:   {
-    name: 'Raylene', emoji: '💜', title: 'Big Sis',
+    name: 'Suhana', emoji: '💜', title: 'Big Sis',
     tagline: 'warm, protective, emotionally real',
     avatar: IMAGES.rayleneNeutral, accent: '#e879f9',
   },
   rylane: {
-    name: 'Rylane',  emoji: '⚡', title: 'Loyal Bro',
+    name: 'Sy',  emoji: '⚡', title: 'Loyal Bro',
     tagline: 'street smart, down to earth, no cap',
     avatar: IMAGES.rylaneNeutral, accent: '#4DA3FF',
   },
@@ -116,8 +117,12 @@ export function SettingsScreen({
   const [inviteCode,    setInviteCode]    = useState('');
   const [isGenerating,  setIsGenerating]  = useState(false);
   const [codeInput,     setCodeInput]     = useState('');
-  const [redeemStatus,  setRedeemStatus]  = useState<'idle' | 'ok' | 'not_found' | 'error'>('idle');
+  const [redeemStatus,  setRedeemStatus]  = useState<'idle' | 'pending' | 'not_found' | 'error'>('idle');
   const [isRedeeming,   setIsRedeeming]   = useState(false);
+
+  const [reportNote,    setReportNote]    = useState('');
+  const [reportStatus,  setReportStatus]  = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [reportMessage, setReportMessage] = useState('');
 
   const handleGenerateCode = useCallback(async () => {
     setIsGenerating(true);
@@ -139,8 +144,22 @@ export function SettingsScreen({
     const result = await redeemParentLink(codeInput.trim());
     setIsRedeeming(false);
     setRedeemStatus(result);
-    if (result === 'ok') setCodeInput('');
+    if (result === 'pending') setCodeInput('');
   }, [codeInput]);
+
+  const handleSubmitReport = useCallback(async () => {
+    if (!reportNote.trim() || reportStatus === 'sending') return;
+    setReportStatus('sending');
+    const result = await reportProblem(reportNote, 'Settings');
+    if (result.reported) {
+      setReportStatus('sent');
+      setReportMessage(result.message === 'already reported' ? "You've already flagged this — thank you." : 'Thanks — this was sent to the team.');
+      setReportNote('');
+    } else {
+      setReportStatus('error');
+      setReportMessage(result.message || 'Something went wrong — try again in a moment.');
+    }
+  }, [reportNote, reportStatus]);
 
   const handleClearLocalData = () => {
     Alert.alert(
@@ -201,9 +220,8 @@ export function SettingsScreen({
         <View style={[styles.heroWrap, { borderColor: glow + '70' }]}>
           <ImageBackground
             source={vibe.previewBg}
-            style={styles.heroBg}
+            style={[styles.heroBg, { borderRadius: 22 }]}
             resizeMode="cover"
-            borderRadius={22}
           >
             <LinearGradient
               colors={[vibe.gtop, vibe.gbot] as any}
@@ -241,9 +259,8 @@ export function SettingsScreen({
               >
                 <ImageBackground
                   source={cfg.previewBg}
-                  style={styles.vibeCardBg}
+                  style={[styles.vibeCardBg, { borderRadius: 16 }]}
                   resizeMode="cover"
-                  borderRadius={16}
                 >
                   <LinearGradient
                     colors={[cfg.gtop, cfg.gbot] as any}
@@ -435,6 +452,39 @@ export function SettingsScreen({
           </TouchableOpacity>
         </View>
 
+        {/* ── REPORT A PROBLEM ── */}
+        <Text style={styles.sectionLabel}>Report a Problem</Text>
+        <View style={glass({ gap: 10 })}>
+          <Text style={styles.privacyText}>
+            Something feel broken or off? Tell us what happened — it goes straight to the team, private and just from you.
+          </Text>
+          <TextInput
+            style={[styles.noteInput, { borderColor: glow + '66', color: '#fff' }]}
+            placeholder="what happened?"
+            placeholderTextColor="#7c6899"
+            multiline
+            numberOfLines={3}
+            maxLength={240}
+            value={reportNote}
+            onChangeText={v => { setReportNote(v); if (reportStatus !== 'sending') setReportStatus('idle'); }}
+          />
+          {reportStatus === 'sent' && (
+            <Text style={[styles.privacyText, { color: '#34d399' }]}>✓ {reportMessage}</Text>
+          )}
+          {reportStatus === 'error' && (
+            <Text style={[styles.privacyText, { color: '#f87171' }]}>{reportMessage}</Text>
+          )}
+          <TouchableOpacity
+            onPress={handleSubmitReport}
+            disabled={reportStatus === 'sending' || !reportNote.trim()}
+            style={[styles.sideBtn, { borderColor: glow + '88', backgroundColor: glow + '20', opacity: reportNote.trim() ? 1 : 0.5 }]}
+          >
+            <Text style={[styles.sideBtnLabel, { color: glow }]}>
+              {reportStatus === 'sending' ? 'sending…' : '📨 send report'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {/* ── PARENT LINK (teen side) ── */}
         {userSide === 'teen' && (
           <>
@@ -473,15 +523,15 @@ export function SettingsScreen({
               </Text>
               <TextInput
                 style={[styles.codeInput, { borderColor: glow + '66', color: '#fff' }]}
-                placeholder="enter 6-letter code"
+                placeholder="enter 8-character code"
                 placeholderTextColor="#7c6899"
                 autoCapitalize="characters"
-                maxLength={6}
+                maxLength={8}
                 value={codeInput}
                 onChangeText={v => { setCodeInput(v); setRedeemStatus('idle'); }}
               />
-              {redeemStatus === 'ok' && (
-                <Text style={[styles.privacyText, { color: '#34d399' }]}>✓ Linked! You're now connected.</Text>
+              {redeemStatus === 'pending' && (
+                <Text style={[styles.privacyText, { color: '#34d399' }]}>Request sent. The teen must approve before Bridge access starts.</Text>
               )}
               {redeemStatus === 'not_found' && (
                 <Text style={[styles.privacyText, { color: '#f87171' }]}>Code not found or already used — check with your teen.</Text>
@@ -583,6 +633,7 @@ const styles = StyleSheet.create({
   codeText:     { fontSize: 32, fontWeight: '900', letterSpacing: 6 },
   codeCopyHint: { fontSize: 11, marginTop: 4, fontWeight: '600' },
   codeInput:    { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 20, fontWeight: '700', letterSpacing: 4, textAlign: 'center', backgroundColor: 'rgba(20,10,40,0.5)' },
+  noteInput:    { borderWidth: 1, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12, fontSize: 14, lineHeight: 19, textAlign: 'left', textAlignVertical: 'top', minHeight: 72, backgroundColor: 'rgba(20,10,40,0.5)' },
 
   // Done
   doneBtn:     { marginTop: 8, marginBottom: 4, paddingVertical: 16, borderRadius: 24, borderWidth: 1.5, alignItems: 'center', shadowOpacity: 0.4, shadowRadius: 16, shadowOffset: { width: 0, height: 0 }, elevation: 6 },

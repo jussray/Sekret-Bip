@@ -1,0 +1,72 @@
+PROPRIETARY SOFTWARE LICENSE
+
+Copyright © 2024–2026 Juss Ray. All rights reserved.
+
+This software, its source code, documentation, assets, and all associated
+files (collectively, the "Software") are the exclusive proprietary property
+of Juss Ray and are protected by copyright law and international copyright
+treaties.
+
+NO PERMISSION IS GRANTED — express, implied, or otherwise — to any person
+obtaining a copy of this Software to:
+
+  • use, execute, or run the Software;
+  • copy, reproduce, or duplicate the Software or any portion of it;
+  • modify, adapt, translate, or create derivative works based on the Software;
+  • merge the Software into another work;
+  • publish, display, or make the Software available to the public;
+  • distribute, sublicense, sell, rent, lease, lend, or otherwise transfer
+    the Software or any rights in it;
+  • reverse-engineer, decompile, disassemble, or otherwise attempt to derive
+    the source code from a compiled or distributed form of the Software;
+  • use the Software, or any part of it, to train, fine-tune, or otherwise
+    develop machine-learning or artificial-intelligence models;
+  • include the Software in any dataset, benchmark, evaluation corpus, or
+    data-collection pipeline;
+  • scrape, crawl, extract, or otherwise harvest the Software for the purpose
+    of replication or model development; or
+  • create competing or derivative products based on the Software
+
+without the prior express written permission of Juss Ray.
+
+Any use not explicitly authorized in writing by the copyright owner is
+prohibited and may constitute infringement of copyright or other rights.
+
+LEGAL REALITY NOTICE
+Copyright protects the specific expression in this Software — source code,
+documentation, artwork, and other authored content. It does not automatically
+protect underlying product ideas, workflows, or general functionality.
+Trademark, trade-secret practices, access controls, contracts, and patents
+may protect additional dimensions of the intellectual property contained
+herein.
+
+THIRD-PARTY COMPONENTS
+Third-party libraries and components remain governed by their respective
+licenses and notices. This proprietary license applies only to first-party
+source code and content authored by Juss Ray and does not replace or restrict
+rights granted by third-party licensors. Consult the dependency manifests,
+lockfiles, upstream package metadata, and THIRD_PARTY_NOTICES.md for applicable
+third-party terms and release obligations.
+
+EVALUATION, DUE DILIGENCE, AND INVESTMENT ACCESS
+Access to this repository, a branch, build, demonstration, presentation, or
+other review material does not grant any ownership interest, commercialization
+right, or implied license. Any evaluation or due-diligence access is limited
+to the written scope provided by Juss Ray, non-transferable, revocable, and
+subject to applicable confidentiality obligations. Access or discussion does
+not create a partnership, joint venture, fiduciary relationship, or obligation
+to complete a transaction.
+
+Any narrow hosted-use permission expressly stated in
+INVESTMENT_EVALUATION_NOTICE.md is an exception only for the owner-authorized
+hosted interface and does not grant source-code, redistribution, replication,
+or derivative-product rights.
+
+DISCLAIMER
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED. IN NO EVENT SHALL THE COPYRIGHT OWNER BE LIABLE FOR ANY CLAIM,
+DAMAGES, OR OTHER LIABILITY ARISING FROM, OUT OF, OR IN CONNECTION WITH THE
+SOFTWARE OR THE USE OF IT.
+
+For licensing, partnership, or investment inquiries, contact Juss Ray through
+the GitHub account associated with this repository.

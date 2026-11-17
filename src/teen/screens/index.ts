@@ -1,4 +1,3 @@
-export { HomeScreen }    from '@screens/HomeScreen';
 export { PagesScreen }   from '@screens/PagesScreen';
 export { CalmScreen }    from '@screens/CalmScreen';
 export { VoiceBipScreen } from '@screens/VoiceBipScreen';

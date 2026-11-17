@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-13",
+  "project": {
+    "name": "Se'kret Bip",
+    "ref": "tbsevonvegdnlyjgplmm",
+    "status": "ACTIVE_HEALTHY"
+  },
+  "migration": {
+    "version": "20260713074443",
+    "name": "harden_guardian_verification_submission",
+    "repositoryPath": "supabase/migrations/20260713074443_harden_guardian_verification_submission.sql",
+    "applied": true,
+    "verified": true,
+    "repositoryAndLiveMigrationParity": true
+  },
+  "defectProof": {
+    "completedParentWithoutCircleWasAcceptedBeforeFix": true,
+    "resultingStateBeforeFix": "PENDING_GUARDIAN_REVIEW",
+    "guardianCircleRowsBeforeFix": 0,
+    "transactionOutcome": "rolled_back",
+    "productionDataRetained": false
+  },
+  "boundary": {
+    "function": "public.submit_guardian_verification()",
+    "classification": "intentional_authenticated_self_scoped_rpc",
+    "securityDefiner": true,
+    "fixedSearchPath": true,
+    "anonExecute": false,
+    "authenticatedExecute": true,
+    "requiresPermanentSession": true,
+    "requiresCompletedParentProfile": true,
+    "requiresGuardianCircleIdentity": true,
+    "deniesSuspendedGuardian": true,
+    "verifiedGuardianIdempotent": true,
+    "createsParentLink": false,
+    "readsTeenData": false
+  },
+  "preDeployProof": {
+    "transactionOutcome": "rolled_back",
+    "passedChecks": 9,
+    "failedChecks": 0,
+    "syntheticUsersRetained": 0,
+    "applicationRowsRetained": 0
+  },
+  "postDeployProof": {
+    "transactionOutcome": "rolled_back",
+    "validGuardianAccepted": true,
+    "missingGuardianIdentityDenied": true,
+    "selfScopePreserved": true,
+    "anonExecute": false,
+    "authenticatedExecute": true,
+    "syntheticUsersRetained": 0
+  },
+  "source": {
+    "pullRequest": 381,
+    "mergeCommit": "2237f739a95dd335fb758e89dae34d367ef38ef6"
+  }
+}

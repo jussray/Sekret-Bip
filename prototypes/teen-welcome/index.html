@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#080414" />
+    <meta name="description" content="Interactive Se'kret Bip teen welcome prototype." />
+    <title>Se'kret Bip — Teen Welcome</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="welcome-shell">
+      <div class="ambient ambient-one" aria-hidden="true"></div>
+      <div class="ambient ambient-two" aria-hidden="true"></div>
+      <div class="star-field" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+
+      <section class="phone-stage" aria-label="Se'kret Bip welcome prototype">
+        <header class="top-bar">
+          <button class="soft-icon" type="button" aria-label="About Se'kret Bip" data-panel="more">i</button>
+          <div class="wordmark" aria-label="Se'kret Bip"><span class="wordmark-mark">♡</span><span>SE’KRET BIP</span></div>
+          <button class="soft-icon sound-button" type="button" aria-label="Turn welcome sound on" aria-pressed="false" data-sound><span aria-hidden="true">♪</span></button>
+        </header>
+
+        <div class="main-view" aria-live="polite">
+          <section class="screen home-view" data-screen="home">
+            <div class="welcome-copy">
+              <p class="eyebrow">YOUR PEOPLE. YOUR PEACE.</p>
+              <h1>Come on in.<span aria-hidden="true">✦</span></h1>
+              <p>A safe little world where teens and parents can stay close—without losing their own space.</p>
+            </div>
+
+            <div class="character-scene" aria-label="Night, Suhana, Sy, Cloud, and their parents together">
+              <div class="moon-glow" aria-hidden="true"></div>
+              <div class="scene-ring ring-one" aria-hidden="true"></div>
+              <div class="scene-ring ring-two" aria-hidden="true"></div>
+              <span class="moon-doodle" aria-hidden="true">☾</span>
+              <span class="heart-doodle" aria-hidden="true">♡</span>
+              <img class="character-art family-hero" src="./assets/sekret-bip-teen-family-v1.jpg" alt="Night on the left, Suhana centered, and Sy on the right with their parents above and Cloud in front wearing headphones" />
+              <span class="spark spark-one" aria-hidden="true">✦</span><span class="spark spark-two" aria-hidden="true">✧</span>
+            </div>
+
+            <div class="character-caption" aria-label="Night, Suhana, and Sy"><span>Night</span><i aria-hidden="true">·</i><span>Suhana</span><i aria-hidden="true">·</i><span>Sy</span></div>
+
+            <p class="hand-note"><span aria-hidden="true">☁</span> stay awhile. you’re safe here.</p>
+            <button class="enter-button" type="button" data-panel="enter"><span>Enter</span><span class="heart-badge" aria-hidden="true">♡</span></button>
+            <p class="privacy-note"><span aria-hidden="true">◉</span> Built for trust. Made for real families.</p>
+          </section>
+
+          <section class="screen panel-view" data-screen="enter" hidden>
+            <button class="back-button" type="button" data-panel="home" aria-label="Back to welcome">←</button>
+            <div class="panel-symbol" aria-hidden="true">♡</div>
+            <p class="eyebrow">STEP INTO YOUR SPACE</p>
+            <h2>Who’s entering today?</h2>
+            <p class="panel-intro">Choose a side for this prototype. Nothing is saved yet.</p>
+            <div class="role-grid">
+              <button type="button" data-role="teen"><span class="role-icon teen-role" aria-hidden="true">✦</span><strong>Teen</strong><small>My space, my pace</small></button>
+              <button type="button" data-role="parent"><span class="role-icon parent-role" aria-hidden="true">♡</span><strong>Parent</strong><small>Stay close, stay trusted</small></button>
+            </div>
+            <button class="text-link" type="button" data-panel="home">Not ready yet? Go back</button>
+          </section>
+
+          <section class="screen panel-view concept-view" data-screen="concept" hidden>
+            <button class="back-button" type="button" data-panel="home" aria-label="Back to welcome">←</button>
+            <div class="panel-symbol" data-concept-symbol aria-hidden="true">♧</div>
+            <p class="eyebrow" data-concept-eyebrow>Our circle</p>
+            <h2 data-concept-title>Everybody has a place here.</h2>
+            <p class="panel-intro" data-concept-body>A shared view for staying close, checking in, and making room for what matters.</p>
+            <div class="coming-card"><span class="pulse-dot" aria-hidden="true"></span><div><strong>Concept destination</strong><p>This tap state is ready for the next Se’kret Bip screen to be connected.</p></div></div>
+            <button class="bip-jr-link" type="button" data-panel="bip-jr"><span class="bip-jr-link-mark" aria-hidden="true">☁</span><span><strong>Bip Jr</strong><small>The softer original, kept as its own world.</small></span><span aria-hidden="true">→</span></button>
+            <button class="enter-button compact" type="button" data-panel="home">Return home <span>♡</span></button>
+          </section>
+
+          <section class="screen panel-view bip-jr-view" data-screen="bip-jr" hidden>
+            <button class="back-button" type="button" data-panel="more" aria-label="Back to more">←</button>
+            <p class="eyebrow">THE SOFTER ORIGINAL</p>
+            <h2>Bip Jr</h2>
+            <p class="panel-intro">A separate, younger welcome world—kept intact while the main Se’kret Bip experience grows with teens.</p>
+            <div class="bip-jr-art-wrap"><img src="./assets/sekret-bip-family.jpg" alt="The original softer Se’kret Bip family welcome concept" /><span aria-hidden="true">♡</span></div>
+            <button class="enter-button compact" type="button" data-panel="home">Go to teen welcome <span>✦</span></button>
+          </section>
+
+          <section class="screen panel-view prototype-success" data-screen="success" hidden>
+            <button class="back-button" type="button" data-panel="enter" aria-label="Back to role choice">←</button>
+            <div class="success-orbit" aria-hidden="true"><span>♥</span></div>
+            <p class="eyebrow">WELCOME IN</p>
+            <h2 data-success-title>Your space is ready.</h2>
+            <p data-success-body>This is where the next part of the teen experience would begin.</p>
+            <button class="enter-button compact" type="button" data-panel="enter">Try the other view <span>→</span></button>
+          </section>
+        </div>
+
+        <nav class="bottom-nav" aria-label="Primary navigation">
+          <button class="active" type="button" data-panel="home" aria-current="page"><span class="nav-icon" aria-hidden="true">⌂</span><span>Home</span></button>
+          <button type="button" data-panel="family"><span class="nav-icon" aria-hidden="true">♧</span><span>Family</span></button>
+          <button class="center-action" type="button" data-panel="enter"><span class="nav-icon" aria-hidden="true">♥</span><span>Enter</span></button>
+          <button type="button" data-panel="moments"><span class="nav-icon" aria-hidden="true">✦</span><span>Moments</span></button>
+          <button type="button" data-panel="more"><span class="nav-icon" aria-hidden="true">•••</span><span>More</span></button>
+        </nav>
+      </section>
+    </main>
+    <script src="./app.js"></script>
+  </body>
+</html>

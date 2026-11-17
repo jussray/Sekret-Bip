@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "resend": {
+      "url": "https://mcp.resend.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${RESEND_API_KEY}"
+      }
+    }
+  },
+  "notes": [
+    "Repo-safe example only. Do not commit a real re_ key.",
+    "Use this for founder/operator agent access to Resend, not for the app runtime.",
+    "Production onboarding invite email sends from Supabase Edge Function secrets."
+  ]
+}

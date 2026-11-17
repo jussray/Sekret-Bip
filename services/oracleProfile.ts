@@ -1,4 +1,3 @@
-// @ts-nocheck
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type {
   OracleDimensionEntry,
@@ -241,6 +240,7 @@ export async function saveOracleRecord(record: OracleRecord): Promise<void> {
 
   // 2. Cloud sync — best-effort.
   try {
+    if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -282,6 +282,7 @@ export async function markSessionComplete(
   sessionQuestionIds: string[],
 ): Promise<void> {
   try {
+    if (!supabase) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -399,6 +400,7 @@ export function processAnswer(
 
   const turn: OracleTurn = {
     questionId: question.id,
+    question: question.text,
     answer: answer.trim().slice(0, 500),
     dimension: dim,
     axis: question.axis,
