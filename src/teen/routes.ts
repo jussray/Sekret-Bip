@@ -23,6 +23,8 @@ export const TEEN_ROUTES = {
   companionChat:   '/(teen)/companion-chat',
   userRoom:        '/(teen)/user-room',
   bippin2:         '/(teen)/bippin2',
+  manhood:         '/(teen)/bippin2/manhood',
+  womanhood:       '/(teen)/bippin2/womanhood',
   growth:          '/(teen)/growth',
   mindReset:       '/(teen)/mind-body-reset?mode=mindReset',
   bodyReset:       '/(teen)/mind-body-reset?mode=bodyReset',

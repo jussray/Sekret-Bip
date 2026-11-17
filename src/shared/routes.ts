@@ -103,6 +103,8 @@ export function routeForSide(side: 'teen' | 'parent' | null | undefined, key: st
     rewards: TEEN_ROUTES.points,
     vibeLab: TEEN_ROUTES.room,
     bippin2: TEEN_ROUTES.bippin2,
+    manhood: TEEN_ROUTES.manhood,
+    womanhood: TEEN_ROUTES.womanhood,
     growth: TEEN_ROUTES.growth,
     mindReset: TEEN_ROUTES.mindReset,
     bodyReset: TEEN_ROUTES.bodyReset,
