@@ -129,6 +129,49 @@ function isMissingRelationError(error: { code?: string; message?: string } | nul
   return error.code === 'PGRST205' || message.includes('could not find the table');
 }
 
+// parent_links.parent_user_id is ON DELETE SET NULL (not CASCADE), by design:
+// a teen's link history must survive their parent's account deletion. But
+// nothing else nulls out status/is_active, so without this step a deleted
+// parent's link row would be left looking "active" to the teen forever,
+// with parent_user_id now null. Mirror the exact terminal state the
+// revoke_parent_link RPC already uses (see
+// supabase/migrations/20261108014000_require_teen_parent_link_confirmation.sql)
+// so teen-side UI sees a real "revoked" link, not a zombie "active" one.
+async function revokeParentLinksForDeletedParent(admin: SupabaseClient, userId: string): Promise<void> {
+  const { data: links, error: lookupError } = await admin
+    .from('parent_links')
+    .select('id,teen_user_id')
+    .eq('parent_user_id', userId)
+    .eq('is_active', true);
+
+  if (lookupError) throw new Error(`parent_link_lookup_failed:${lookupError.message}`);
+  if (!links || links.length === 0) return;
+
+  const linkIds = links.map((link) => link.id as string);
+  const teenUserIds = [...new Set(links.map((link) => link.teen_user_id as string))];
+
+  const { error: revokeError } = await admin
+    .from('parent_links')
+    .update({
+      status: 'revoked',
+      is_active: false,
+      invite_code: null,
+      expires_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .in('id', linkIds);
+  if (revokeError) throw new Error(`parent_link_revoke_failed:${revokeError.message}`);
+
+  const { error: verificationError } = await admin
+    .from('account_verification')
+    .update({
+      parent_link_state: 'revoked',
+      verification_updated_at: new Date().toISOString(),
+    })
+    .in('user_id', teenUserIds);
+  if (verificationError) throw new Error(`parent_link_verification_update_failed:${verificationError.message}`);
+}
+
 async function clearDeletionBlockers(admin: SupabaseClient, userId: string): Promise<void> {
   const blockers = [
     { table: 'control_room_issue_history', column: 'changed_by' },
@@ -284,6 +327,11 @@ Deno.serve(async (req: Request) => {
       .delete()
       .eq('member_user_id', userId);
     if (crewError) throw new Error('crew_member_cleanup_failed');
+
+    // parent_links.parent_user_id is also SET NULL, not CASCADE — revoke any
+    // links where this account is the parent so a teen never sees a stale
+    // "active" link to a parent whose account no longer exists.
+    await revokeParentLinksForDeletedParent(admin, userId);
 
     await prepareReceipt(admin, requestId, await sha256(userId), cleanup);
     receiptPrepared = true;
