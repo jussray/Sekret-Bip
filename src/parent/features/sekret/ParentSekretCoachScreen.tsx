@@ -13,6 +13,8 @@ import {
 import { IMAGES } from '@constants/theme';
 import { sendMessage, makeUserMessage, makeAssistantMessage } from '@/parent/services';
 import type { ChatMessage } from '@/parent/services';
+import { useAppContext } from '@/context/AppContext';
+import { buildOracleContext } from '@/services/oracleDiscovery';
 
 const TOP = Platform.OS === 'ios' ? 56 : 36;
 
@@ -252,6 +254,8 @@ interface ParentSekretCoachScreenProps {
 }
 
 export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: ParentSekretCoachScreenProps) {
+  const { parentOracleProfile } = useAppContext();
+
   const [wisdomLine] = useState(() => {
     const moodPool = parentMood ? MOOD_WISDOM[parentMood] : null;
     return moodPool ? pick(moodPool) : pick(WISDOM);
@@ -291,6 +295,7 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
     setChatLoading(true);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     try {
+      const oracleContext = buildOracleContext(parentOracleProfile, 'parent');
       const reply = await sendMessage(
         'parentCoach',
         text,
@@ -299,6 +304,7 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
           history: chatMessages,
           mood: parentMood,
           surface: 'parentCoach',
+          ...(oracleContext.length > 0 ? { oracleContext } : {}),
         },
       );
       setChatMessages(prev => [...prev, makeAssistantMessage(reply)]);
@@ -308,7 +314,7 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
       setChatLoading(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     }
-  }, [chatInput, chatLoading, chatMessages, parentMood]);
+  }, [chatInput, chatLoading, chatMessages, parentMood, parentOracleProfile]);
 
   const suggestedModuleId = parentMood ? MOOD_MODULE[parentMood] : null;
   const sortedModules = suggestedModuleId
