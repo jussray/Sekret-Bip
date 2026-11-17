@@ -12,31 +12,13 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import { fetchParentEngagement, ParentEngagement } from '@/utils/sync';
+import type { MoodEntry, JournalEntry, VoiceNote, ComfortSession } from '@/types';
 
-// ─── Teen static insight data (real data would come from local storage / sync) ─
-const MOOD_HISTORY = [
-  { label: 'calm',      emoji: '😌', count: 8  },
-  { label: 'happy',     emoji: '😊', count: 6  },
-  { label: 'tired',     emoji: '😴', count: 5  },
-  { label: 'okay',      emoji: '🤍', count: 4  },
-  { label: 'emotional', emoji: '🥺', count: 3  },
-  { label: 'stressed',  emoji: '🤯', count: 2  },
-];
-const TEEN_GROWTH_AREAS = [
-  { emoji: '🧠', label: 'Mindset',     visited: true  },
-  { emoji: '🕊️', label: 'Confidence',  visited: true  },
-  { emoji: '🌙', label: 'Calm',        visited: true  },
-  { emoji: '📝', label: 'Journalling', visited: false },
-  { emoji: '🩸', label: 'Womanhood',   visited: false },
-  { emoji: '🪱', label: 'Manhood',     visited: false },
-];
-
-const TEEN_STATS = [
-  { label: 'journal entries', value: 14,   emoji: '📝' },
-  { label: 'mood check-ins',  value: 28,   emoji: '🌡️' },
-  { label: 'calm sessions',   value: 7,    emoji: '🌙' },
-  { label: 'day streak',      value: 12,   emoji: '🔥' },
-];
+const MOOD_EMOJI: Record<string, string> = {
+  happy: '😊', calm: '😌', tired: '😴', okay: '🤍',
+  emotional: '🥺', stressed: '🤯', sad: '😔', angry: '😤',
+  excited: '✨', anxious: '😰', numb: '🫥',
+};
 
 // ─── Parent milestone list (same as Bippin2Screen parent view) ─────────────────
 const PARENT_MILESTONES: Array<{
@@ -68,9 +50,46 @@ interface InsightsScreenProps {
   mood?: string;
   setScreen: (screen: string) => void;
   BottomNav: React.ReactNode;
+  moodHistory?: MoodEntry[];
+  entries?: JournalEntry[];
+  voiceNotes?: VoiceNote[];
+  comfortSessions?: ComfortSession[];
+  streakDays?: number;
 }
 
-export function InsightsScreen({ side, mood, setScreen, BottomNav }: InsightsScreenProps) {
+export function InsightsScreen({
+  side, mood, setScreen, BottomNav,
+  moodHistory, entries, voiceNotes, comfortSessions, streakDays,
+}: InsightsScreenProps) {
+  const moodLog = useMemo(() => {
+    if (!moodHistory?.length) return [];
+    const counts: Record<string, number> = {};
+    for (const e of moodHistory) {
+      const key = e.mood.toLowerCase();
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return Object.entries(counts)
+      .map(([label, count]) => ({ label, emoji: MOOD_EMOJI[label] ?? '💜', count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+  }, [moodHistory]);
+
+  const teenStats = useMemo(() => [
+    { label: 'journal entries', value: entries?.length ?? 0,         emoji: '📝' },
+    { label: 'mood check-ins',  value: moodHistory?.length ?? 0,     emoji: '🌡️' },
+    { label: 'calm sessions',   value: comfortSessions?.length ?? 0, emoji: '🌙' },
+    { label: 'day streak',      value: streakDays ?? 0,              emoji: '🔥' },
+  ], [entries, moodHistory, comfortSessions, streakDays]);
+
+  const growthAreas = useMemo(() => [
+    { emoji: '🧠', label: 'Mindset',     visited: (entries?.length ?? 0) > 0 },
+    { emoji: '🕊️', label: 'Confidence',  visited: (voiceNotes?.length ?? 0) > 0 },
+    { emoji: '🌙', label: 'Calm',        visited: (comfortSessions?.length ?? 0) > 0 },
+    { emoji: '📝', label: 'Journalling', visited: (entries?.length ?? 0) > 2 },
+    { emoji: '🩸', label: 'Womanhood',   visited: false },
+    { emoji: '🪱', label: 'Manhood',     visited: false },
+  ], [entries, voiceNotes, comfortSessions]);
+
   const [engagement, setEngagement] = useState<ParentEngagement>({
     notesSent: 0, tipsRead: 0, daysActive: 0, bridgeUsed: false,
   });
@@ -130,8 +149,8 @@ export function InsightsScreen({ side, mood, setScreen, BottomNav }: InsightsScr
 
   // ── Teen view ──────────────────────────────────────────────────────────────
   if (side === 'teen') {
-    const topMood = MOOD_HISTORY[0];
-    const totalMoods = MOOD_HISTORY.reduce((s, m) => s + m.count, 0);
+    const topMood = moodLog[0];
+    const totalMoods = moodLog.reduce((s, m) => s + m.count, 0);
 
     return (
       <View style={st.root}>
@@ -148,7 +167,7 @@ export function InsightsScreen({ side, mood, setScreen, BottomNav }: InsightsScr
 
           {/* Stat pills */}
           <Animated.View style={[slide(fade1), st.statsGrid]}>
-            {TEEN_STATS.map(s => (
+            {teenStats.map(s => (
               <View key={s.label} style={[st.statPill, { borderColor: accent + '55' }]}>
                 <Text style={st.statEmoji}>{s.emoji}</Text>
                 <Animated.Text style={[st.statNum, { color: accent, transform: [{ scale: breathScale }] }]}>
@@ -161,15 +180,18 @@ export function InsightsScreen({ side, mood, setScreen, BottomNav }: InsightsScr
 
           {/* Mood breakdown */}
           <Animated.View style={[slide(fade2), st.card, { borderColor: accent + '44' }]}>
-            <Text style={[st.cardTitle, { color: accent }]}>mood log {topMood.emoji}</Text>
+            <Text style={[st.cardTitle, { color: accent }]}>mood log {topMood?.emoji ?? '🌡️'}</Text>
             <Text style={[st.cardSub, { color: soft + 'aa' }]}>{totalMoods} check-ins logged</Text>
-            {MOOD_HISTORY.map(m => (
+            {moodLog.length === 0 && (
+              <Text style={[st.cardSub, { color: soft + '66', fontStyle: 'italic' }]}>no moods logged yet — check in from home</Text>
+            )}
+            {moodLog.map(m => (
               <View key={m.label} style={st.moodRow}>
                 <Text style={st.moodEmoji}>{m.emoji}</Text>
                 <Text style={[st.moodLabel, { color: soft }]}>{m.label}</Text>
                 <View style={st.moodBarOuter}>
                   <View style={[st.moodBarInner, {
-                    width: `${(m.count / MOOD_HISTORY[0].count) * 100}%` as any,
+                    width: `${(m.count / (moodLog[0]?.count || 1)) * 100}%` as any,
                     backgroundColor: accent,
                   }]} />
                 </View>
@@ -182,7 +204,7 @@ export function InsightsScreen({ side, mood, setScreen, BottomNav }: InsightsScr
           <Animated.View style={[slide(fade2), st.card, { borderColor: accent + '44' }]}>
             <Text style={[st.cardTitle, { color: accent }]}>growth areas visited</Text>
             <View style={st.areaGrid}>
-              {TEEN_GROWTH_AREAS.map(a => (
+              {growthAreas.map(a => (
                 <View key={a.label} style={[st.areaChip, {
                   borderColor: a.visited ? accent + '88' : soft + '22',
                   opacity: a.visited ? 1 : 0.4,
@@ -197,7 +219,7 @@ export function InsightsScreen({ side, mood, setScreen, BottomNav }: InsightsScr
           {/* Streak note */}
           <Animated.View style={[slide(fade2), st.streakCard, { borderColor: accent + '55', transform: [{ scale: breathScale }] }]}>
             <Text style={{ fontSize: 32, textAlign: 'center', marginBottom: 6 }}>🔥</Text>
-            <Text style={[st.streakNum, { color: accent }]}>12-day streak</Text>
+            <Text style={[st.streakNum, { color: accent }]}>{streakDays ?? 0}-day streak</Text>
             <Text style={[st.streakSub, { color: soft }]}>you keep showing up. that's everything.</Text>
           </Animated.View>
 
