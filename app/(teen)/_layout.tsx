@@ -77,6 +77,7 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
         <Tabs.Screen name="circle/weather" options={{ href: null }} />
         <Tabs.Screen name="resources" options={{ href: null }} />
         <Tabs.Screen name="quiet" options={{ href: null }} />
+        <Tabs.Screen name="meaning" options={{ href: null }} />
       </Tabs>
       {!quietActive && <SideSafeBackButton side="teen" />}
       {!quietActive && <GlobalMoodButton />}

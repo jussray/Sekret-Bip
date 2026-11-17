@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 test('profile separates account identity from Circle identity', () => {
   const profile = read('app/(teen)/profile.tsx');
@@ -51,10 +52,18 @@ test('profile memories point back to owning spaces instead of exposing private c
     '/(teen)/calm',
     '/(teen)/room',
   ]) {
-    assert.match(profile, new RegExp(route.replace(/[()]/g, '\\$&')));
+    assert.match(profile, new RegExp(escapeRegExp(route)));
   }
   assert.match(profile, /Pages protects the full story/);
   assert.match(profile, /Profile only remembers/);
+});
+
+test('static route assertions escape regex metacharacters and backslashes', () => {
+  const route = '/(teen)/a.b\\\\c';
+  const pattern = new RegExp(escapeRegExp(route));
+  assert.match(`prefix:${route}`, pattern);
+  assert.doesNotMatch('prefix:/(teen)/aXb\\\\c', pattern);
+  assert.doesNotMatch('prefix:/(teen)/a.bXc', pattern);
 });
 
 test('parent profile mirrors durable identity, Circle identity, and support memories', () => {
