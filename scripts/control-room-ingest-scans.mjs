@@ -180,5 +180,6 @@ fs.mkdirSync(reportDir, { recursive: true });
 fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
 console.log(JSON.stringify(report, null, 2));
 
+const reportOnly = process.env.CONTROL_ROOM_REPORT_ONLY === 'true';
 if (ingestionErrors.length > 0) process.exitCode = 1;
-else if (runs.some((run) => run.exit_code !== 0)) process.exitCode = 1;
+else if (!reportOnly && runs.some((run) => run.exit_code !== 0)) process.exitCode = 1;
