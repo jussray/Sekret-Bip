@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- 20260724_compliance_foundation.sql
+-- 20260724000000_compliance_foundation.sql
 --
 -- COPPA / HIPAA-equivalent / AB 2089 / BIPA compliance foundation.
 -- Adds:
