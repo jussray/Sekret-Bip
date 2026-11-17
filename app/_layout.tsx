@@ -42,7 +42,6 @@ function RouteBoundary() {
 
     const { data: { subscription } } = sb.auth.onAuthStateChange((event, session) => {
       if (session || event !== 'SIGNED_OUT') return;
-
       void (async () => {
         try {
           await clearPrivateAccountCache();

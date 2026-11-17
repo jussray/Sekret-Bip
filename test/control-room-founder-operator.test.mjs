@@ -54,7 +54,7 @@ test('history and reports preserve evidence without exposing a delete path', () 
   assert.match(server, /founderOperatorReportDir/);
   assert.match(server, /founder-operator\/plans/);
   assert.match(server, /for \(let version = 1; version <= 10_000; version \+= 1\)/);
-  assert.match(server, /fs\.writeFileSync\(candidate, content, \{ flag: 'wx' \}\)/);
+  assert.match(server, /fs\.writeFileSync\(candidate, content, \{ flag: 'wx', mode: 0o600 \}\)/);
   assert.match(server, /-v\$\{version\}/);
   assert.match(server, /const reportDir = ensureSafeFounderOperatorReportDir\(\)/);
   assert.match(server, /const latestPath = path\.join\(reportDir, 'latest\.json'\)/);

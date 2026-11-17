@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
+import { cloudflareRequestFailure, safeCloudflareErrorReason } from './cloudflare-provider-error.mjs';
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 const EVIDENCE_PATH = 'artifacts/cloudflare-email-routing-evidence.json';
@@ -44,13 +45,7 @@ export function buildWorkerRule(alias, config = configFromEnv({})) {
   };
 }
 
-function errorText(payload, fallback) {
-  const messages = payload?.errors?.map((error) => {
-    const code = error?.code === undefined ? '' : `code=${error.code} `;
-    return `${code}${error?.message || ''}`.trim();
-  }).filter(Boolean);
-  return messages?.length ? messages.join('; ') : fallback;
-}
+
 
 async function cfRequest(config, path, options = {}) {
   const response = await fetch(`${API_BASE}${path}`, {
@@ -64,9 +59,7 @@ async function cfRequest(config, path, options = {}) {
 
   const payload = await response.json().catch(() => null);
   if (!response.ok || payload?.success === false) {
-    throw new Error(
-      `Cloudflare ${options.method || 'GET'} ${path} failed: ${errorText(payload, response.statusText)}`,
-    );
+    throw cloudflareRequestFailure(payload, response.status);
   }
   return payload;
 }
@@ -89,7 +82,7 @@ async function verifyToken(config) {
       }
       attempts.push(`${path}: status=${status || 'unknown'}`);
     } catch (error) {
-      attempts.push(error instanceof Error ? error.message : String(error));
+      attempts.push(safeCloudflareErrorReason(error));
     }
   }
 
@@ -105,7 +98,7 @@ async function verifyToken(config) {
     }
     attempts.push(`zone-access: ${config.zoneName} was not returned`);
   } catch (error) {
-    attempts.push(error instanceof Error ? error.message : String(error));
+    attempts.push(safeCloudflareErrorReason(error));
   }
 
   throw new Error(`CLOUDFLARE_API_TOKEN_INVALID_OR_UNSCOPED: ${attempts.join(' | ')}`);
@@ -266,33 +259,44 @@ function assertCatchAllSafe(catchAll) {
   console.log('CATCH_ALL_SAFE enabled=false');
 }
 
-async function writeEvidence({ config, phase, dns, destination, rules, catchAll }) {
-  await mkdir('artifacts', { recursive: true });
-  const evidence = {
+export function buildSafeEmailRoutingReceipt({
+  config, phase, dns, destination, rules = [], catchAll, now = () => new Date(),
+}) {
+  return {
     schemaVersion: 1,
     phase,
-    generatedAt: new Date().toISOString(),
+    generatedAt: now().toISOString(),
     zone: config.zoneName,
     worker: config.workerName,
     destination: destination
-      ? { email: destination.email, verified: destination.verified || null }
+      ? { configured: true, verified: destination.verified === true }
       : null,
     routingDns: dns
-      ? { enabled: dns.enabled ?? null, status: dns.status ?? null, name: dns.name || config.zoneName }
+      ? { enabled: dns.enabled === true, ready: dns.status === 'ready' }
       : null,
-    catchAll: catchAll
-      ? { enabled: catchAll.enabled ?? null, actions: catchAll.actions || [], matchers: catchAll.matchers || [] }
-      : null,
-    rules: rules.map((rule) => ({
-      id: rule?.id || null,
-      name: rule?.name || null,
-      enabled: rule?.enabled ?? null,
-      matchers: rule?.matchers || [],
-      actions: rule?.actions || [],
-    })),
+    // Cloudflare routing matchers/actions may contain arbitrary destination
+    // emails or provider-created values. Persist only supported alias labels
+    // and boolean proof, never raw provider records or unrelated addresses.
+    catchAll: catchAll ? { enabled: catchAll.enabled === true } : null,
+    rules: rules.map((rule) => {
+      const recipient = String(recipientForRule(rule) || '').toLowerCase();
+      const supportedAlias = EMAIL_ALIASES.find((alias) =>
+        recipient === `${alias}@${config.zoneName}`.toLowerCase(),
+      );
+      return {
+        alias: supportedAlias ?? null,
+        enabled: rule?.enabled === true,
+        canonicalWorker: workerForRule(rule) === config.workerName,
+      };
+    }),
   };
+}
+
+async function writeEvidence(args) {
+  await mkdir('artifacts', { recursive: true });
+  const evidence = buildSafeEmailRoutingReceipt(args);
   await writeFile(EVIDENCE_PATH, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
-  console.log(`EVIDENCE_WRITTEN phase=${phase} path=${EVIDENCE_PATH}`);
+  console.log('CLOUDFLARE_EMAIL_ROUTING_EVIDENCE_WRITTEN');
 }
 
 async function ensureWorkerRules(config) {
@@ -429,8 +433,8 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
 
 const invokedDirectly = process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
 if (invokedDirectly) {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : error);
+  main().catch(() => {
+    console.error('CLOUDFLARE_EMAIL_ROUTING_RECONCILIATION_FAILED');
     process.exitCode = 1;
   });
 }
