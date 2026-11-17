@@ -1,0 +1,44 @@
+name: Control Room Manifest
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate manifest contract
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const raw = fs.readFileSync('control-room.manifest.json', 'utf8');
+          const manifest = JSON.parse(raw);
+          const roles = new Set(['portfolio-control-plane','product-control-room','runtime-control-room','product-workbench','commerce-surface','demo-non-authoritative']);
+          const statuses = new Set(['planned','integrated','verified','released','blocked','at-risk','demo']);
+          const risks = new Set(['low','medium','high','critical']);
+          if (manifest.schemaVersion !== '1.0') throw new Error('schemaVersion must be 1.0');
+          if (!/^[^/]+\/[^/]+$/.test(manifest.repository)) throw new Error('repository must be owner/name');
+          if (manifest.portfolioHub !== 'jussray/founder-control-room') throw new Error('unexpected portfolioHub');
+          if (!roles.has(manifest.role)) throw new Error('invalid role');
+          if (manifest.controlRoom?.privateContentAllowed !== false) throw new Error('private content must be denied');
+          if (!statuses.has(manifest.evidence?.status)) throw new Error('invalid evidence status');
+          if (!/^[a-f0-9]{40}$/.test(manifest.evidence?.commit ?? '')) throw new Error('invalid evidence commit');
+          if (!risks.has(manifest.risk?.level)) throw new Error('invalid risk level');
+          if (!Array.isArray(manifest.risk?.blockers)) throw new Error('blockers must be an array');
+          if (!manifest.nextGate) throw new Error('nextGate is required');
+          if (/(service[_-]?role[_-]?key|api[_-]?key|secret\s*[:=]|sk-[a-z0-9_-]{10,})/i.test(raw)) throw new Error('manifest appears to contain a secret');
+          console.log(`validated ${manifest.repository} as ${manifest.role}`);
+          NODE

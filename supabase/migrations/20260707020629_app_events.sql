@@ -1,0 +1,2 @@
+-- Production receipt marker for live migration 20260707020629.
+-- Already applied to the linked Supabase project; no schema changes.

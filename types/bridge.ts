@@ -9,4 +9,4 @@ export type {
   VoiceNote,
   MoodEntry,
   BridgePayload,
-} from './index';
+} from '@/types';

@@ -1,5 +1,5 @@
 // screens/WomanhoodScreen.tsx
-// Se'kret Bip — Bippin 2: Womanhood Dashboard (Raylene-led)
+// Se'kret Bip — Bippin 2: Womanhood Dashboard (Suhana-led)
 // Layout matches the Womanhood mockup:
 //   Hero → Greeting + Streak → Quick Access Grid →
 //   First Period + Comfort Tip cards → Mood Check-In →
@@ -11,7 +11,16 @@ import {
   ImageBackground, StyleSheet, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { IMAGES } from '../constants/theme';
+import { getRoomBg, type TimeOfDay } from '../constants/theme';
+import { glowForMood } from '../constants/moodGlow';
+
+function timeOfDay(): TimeOfDay {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 11) return 'morning';
+  if (h >= 11 && h < 17) return 'day';
+  if (h >= 17 && h < 21) return 'evening';
+  return 'night';
+}
 
 interface WomanhoodScreenProps {
   t:              Record<string, any>;
@@ -22,15 +31,7 @@ interface WomanhoodScreenProps {
   streakDays?:    number;
 }
 
-function glowFor(mood?: string) {
-  const m = (mood || '').toLowerCase();
-  if (m.includes('happy'))  return '#fbbf24';
-  if (m.includes('sad') || m.includes('anx')) return '#7dd3fc';
-  if (m.includes('angry') || m.includes('over') || m.includes('stress')) return '#f472b6';
-  if (m.includes('tired'))  return '#6d28d9';
-  if (m.includes('calm'))   return '#c4b5fd';
-  return '#e879a3';
-}
+const glowFor = (mood?: string) => glowForMood(mood, '#e879a3');
 
 function timeGreeting() {
   const h = new Date().getHours();
@@ -45,7 +46,7 @@ const QUICK_ACCESS = [
   { emoji: '🌙', label: 'cycle\nwellness',       target: 'periodCalendar' },
   { emoji: '💜', label: 'mood + body\ncheck-in',  target: null },
   { emoji: '🫂', label: 'comfort\nmode',          target: 'calm' },
-  { emoji: '💬', label: "ask\nse'kret",           target: 'sekret' },
+  { emoji: '💬', label: "ask\nse\'kret",           target: 'sekret' },
   { emoji: '📔', label: 'private\njournal',       target: 'pages' },
 ];
 
@@ -71,6 +72,8 @@ export function WomanhoodScreen({
 }: WomanhoodScreenProps) {
   const glow = useMemo(() => glowFor(mood), [mood]);
   const greeting = timeGreeting();
+  const time = useMemo(() => timeOfDay(), []);
+  const bgSource = useMemo(() => getRoomBg('raylene', time), [time]);
   const [checkedMood, setCheckedMood] = useState<string | null>(null);
   const [expandedPeriod, setExpandedPeriod] = useState(false);
 
@@ -81,7 +84,7 @@ export function WomanhoodScreen({
   return (
     <View style={styles.root}>
       <ImageBackground
-        source={IMAGES.rayleneVoiceNight}
+        source={bgSource}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
       />
@@ -104,7 +107,7 @@ export function WomanhoodScreen({
         {/* ── GREETING + STREAK ── */}
         <View style={styles.row}>
           <View style={[cardHalf, { flex: 1.6 }]}>
-            <Text style={styles.greetLabel}>{greeting}, Raylene 💜</Text>
+            <Text style={styles.greetLabel}>{greeting}, Suhana 💜</Text>
             <Text style={styles.greetBody}>
               Your body is changing.{"\n"}
               That's not something{"\n"}to fear or hide.

@@ -15,6 +15,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
+import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { fetchSekretReply } from '../utils/api';
@@ -190,6 +191,7 @@ export function S2TellScreen({
 
   return (
     <View style={[styles.root, { backgroundColor: t.background }]}>
+      <AmbientWeatherOverlay />
       <LinearGradient
         colors={[t.background, t.card + 'cc', t.background]}
         style={StyleSheet.absoluteFill}

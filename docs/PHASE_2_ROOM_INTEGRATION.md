@@ -1,49 +1,87 @@
-# Phase 2 — Room Integration Gate
+# Phase 2 Room Integration
 
-Phase 2 (per the [README roadmap](../README.md#roadmap)) moves Room state —
-and eventually Room art — onto Supabase. This doc covers the specific gate
-for any Phase 2 work that touches room background art
-(`assets/images/bg-*.png`) or the room-selection logic in
-`constants/theme.ts`.
+This document defines the gate checklist, composite specification, and rollback procedure for the Se'kret Bip room integration pass — the process of painting each Se'kret character into their room backgrounds so the scene reads as one complete illustration.
 
-## The gate
+## The Gate — Do Not Begin Until All Pass
 
-**Do not start Phase 2 room integration work until `npm run
-verify:room-archives` passes.**
+Run this before touching any room PNG:
 
-That command checks that every live room background has a real, verified
-backup under `assets/images/archive/`. See
-[`ASSET_BACKUP_RULES.md`](./ASSET_BACKUP_RULES.md) for exactly what "real"
-means. If it fails, it prints `DO NOT START PHASE 2` — that line is not
-decorative, it's the actual instruction.
+```bash
+npm run verify:room-archives
+```
 
-## Why room art specifically is gated
+All 28 checks must print `✅`. If any print `❌`, fix the archive before proceeding.
 
-Other Phase 2 surfaces (journal entries, mood history, circle posts) are
-rows in a database — if a migration goes wrong, the data is still in
-AsyncStorage as a fallback. Room backgrounds are binary assets with no
-equivalent fallback path once they're touched: if a PNG gets overwritten,
-resized, or corrupted mid-integration and there's no verified backup, the
-art is gone.
+### Full gate checklist
 
-## Checklist before touching room art in Phase 2 work
+- [ ] `npm run verify:room-archives` — all 28 archive SHAs match live SHAs, all files > 1 MB
+- [ ] `npm run audit:runtime-assets` — all IMAGES keys resolve
+- [ ] `npm run type-check` — zero TypeScript errors
+- [ ] `npm run lint` — zero ESLint errors
+- [ ] `git lfs pull` has been run and all `bg-*.png` are MB-sized on disk
 
-1. `npm run verify:room-archives` passes.
-2. `npm run audit:runtime-assets` passes (no reference/mockup art has
-   leaked into the runtime image map — see
-   [`ROOM_ART_GUIDE.md`](./ROOM_ART_GUIDE.md)).
-3. The change is scoped to room integration only — don't bundle in
-   unrelated Supabase wiring for journal/mood/circle in the same change.
-4. After the change, re-run `npm run verify:room-archives` — if you touched
-   any `bg-*.png`, its archive copy needs to be refreshed too (see
-   [`ASSET_BACKUP_RULES.md`](./ASSET_BACKUP_RULES.md)) or the script will
-   correctly start failing again.
-5. `npm run verify:prepush` passes before you push.
+## Composite Specification
 
-## Current status
+### What to do
 
-As of this doc, `npm run verify:room-archives` **fails** — most archive
-entries are placeholder text files (a GitHub raw URL, not the actual PNG
-bytes), and several rooms (`bg-mom-room-*`, `bg-dad-room-*`) have no archive
-entry at all. Phase 2 room integration work should not begin until real
-backups are in place and the script passes clean.
+1. Use the existing room background as the master canvas.
+2. Pull the appropriate existing character reference art from `assets/images/`.
+3. Composite the character directly into the room.
+4. Match: room lighting, color temperature, shadows, perspective, scale, ambient light.
+5. Add: contact shadows, floor shadows, bed/chair seating shadows, subtle room light spill, environmental color reflection.
+6. Blend character edges so they appear painted into the scene rather than layered above it.
+7. Character should feel physically present in the room.
+
+### What not to do
+
+- Do NOT create new artwork.
+- Do NOT redesign characters.
+- Do NOT create floating avatars.
+- Do NOT place PNGs on top of backgrounds as overlays.
+- Do NOT change room layout.
+- Do NOT change character identity.
+- Do NOT change filenames.
+
+### Lighting rules by variant
+
+| Variant | Lighting spec |
+|---|---|
+| `day` / `midday` / `afternoon` | Match sunlight direction. Warm light hits character naturally. |
+| `evening` | Golden hour warmth. Long low shadows. |
+| `night` / `deep-night` | Soft purple/blue ambient. Subtle window glow if present. |
+| `rain` | Cooler reflected light from window. Slight atmospheric softness. |
+
+## Output Requirements
+
+- Filename: unchanged (same as input)
+- Dimensions: identical to original (verified by `verify:room-archives`)
+- Format: PNG
+- Minimum size: the composite must be at least as large as the original
+- Final result: one complete illustration where the Se'kret lives inside the room
+
+## Commit Procedure
+
+After completing composites for a Se'kret:
+
+1. Run `npm run verify:room-archives` — confirm archive still matches pre-composite originals.
+2. Place finished composites in `assets/images/` using the exact original filenames.
+3. Run `npm run audit:runtime-assets` — confirm no broken image keys.
+4. Run `npm run verify:bundle` — confirm the app still builds.
+5. Commit with message format:
+   ```
+   art: integrate {sekret} into room backgrounds ({variant} variants)
+   ```
+6. Push. The `verify:prepush` hook will re-run all checks.
+
+## Rollback
+
+If a composite needs to be reverted:
+
+```bash
+cp assets/images/archive/bg-{sekret}-room-{variant}.png assets/images/bg-{sekret}-room-{variant}.png
+git add assets/images/bg-{sekret}-room-{variant}.png
+git commit -m "revert: restore original bg-{sekret}-room-{variant}.png from archive"
+git push origin main
+```
+
+The archive is the single source of truth for pre-composite originals. It must not be modified after the gate passes.

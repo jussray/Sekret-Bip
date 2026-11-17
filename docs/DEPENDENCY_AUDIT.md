@@ -1,40 +1,49 @@
-# Dependency Audit — policy and enforcement
+# Se'kret Bip — Historical Dependency Audit
 
-This is the live policy doc. For the historical branch-by-branch audit that
-established these pins, see [`DEPENDENCY_AUDIT.md`](../DEPENDENCY_AUDIT.md)
-at the repo root.
+> **Historical snapshot generated 2026-06-08 against the former `jussray/Bip` repository and several pre-consolidation branches.** It is preserved as an audit trail, not current dependency guidance.
 
-## Policy
+## What this audit found at the time
 
-- The repo targets **Expo SDK 51** (`expo ~51.0.28`). Any `expo` or `expo-*`
-  range that implies a different SDK major is a bug, not a feature — fix the
-  version instead of installing it.
-- `react-native`, `react-native-gesture-handler`,
-  `react-native-safe-area-context`, `react-native-screens`, and
-  `babel-preset-expo` must stay on the versions `expo install` resolves for
-  SDK 51. Don't hand-bump these independently.
-- Run `npx expo install --check` after any dependency change and resolve
-  every mismatch it reports before committing.
-- New dependencies are added with `npx expo install <package>` when an Expo
-  module exists for it, and `npm install --legacy-peer-deps <package>`
-  otherwise. The `--legacy-peer-deps` flag is required for every install in
-  this repo — see [`CODESPACES.md`](./CODESPACES.md).
+The original review identified:
 
-## Enforcement
+1. unresolved conflict markers in a historical `package.json`;
+2. major-version mismatches across five branches;
+3. disagreement about the Expo SDK target;
+4. branch subsets that would have dropped required dependencies if merged carelessly.
 
-These rules are backed by commands, not just review:
+Those findings describe the repository state on 2026-06-08. They must not be repeated as current defects without checking the present `jussray/Sekret-Bip` `main` branch and exact lockfile.
 
-```bash
-npm run type-check   # tsc --noEmit — catches type-level breakage from a bad bump
-npm run lint          # eslint . — catches import/usage breakage
-npm run verify:bundle  # expo export --platform web --clear — catches resolution/version conflicts that only show up at bundle time
-```
+## Current dependency source of truth
 
-All three (plus the asset checks below) run together via:
+Use the current files:
+
+- `package.json`
+- `package-lock.json`
+- `.github/workflows/ci.yml`
+- `.github/workflows/type-check.yml`
+- `.github/workflows/pre-push-checks.yml`
+
+Validate with:
 
 ```bash
+npm ci
+npm run type-check
+npm test
+npm run lint
+npm run verify:bundle
 npm run verify:prepush
 ```
 
-Run `verify:prepush` before every push. If it fails, the dependency change
-is not safe to ship — fix the pin, don't bypass the script.
+GitHub Actions on the exact PR head is the authoritative repository check. A historical branch comparison is not release evidence.
+
+## Historical severity summary
+
+| Status at audit time | Count |
+|---|---:|
+| major mismatch | 5 |
+| minor mismatch | 3 |
+| patch/range mismatch | 6 |
+| only in one branch | 8 |
+| consistent | 7 |
+
+The original detailed matrix is intentionally not treated as a current upgrade plan. New dependency changes require a fresh audit against current `main`, Expo compatibility, native build constraints, and the full test matrix.

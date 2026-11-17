@@ -1,0 +1,20 @@
+name = "sekret-backend-alpha"
+main = "worker/observed-index.ts"
+compatibility_date = "2026-06-13"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+# Controlled-alpha runtime. Secrets must be provisioned through `wrangler secret put`
+# against this Worker and must never be committed.
+[vars]
+SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
+OPENAI_CHAT_MODEL = "gpt-4o"
+OPENAI_TTS_MODEL = "gpt-4o-mini-tts"
+OPENAI_STT_MODEL = "whisper-1"
+
+# Fail closed in committed configuration. Before an approved alpha deployment,
+# provision BRIDGE_SUMMARIES_ROLLOUT as a comma-separated allowlist of the exact
+# controlled teen account IDs. Never commit that cohort or set this to "enabled".
+BRIDGE_SUMMARIES_ROLLOUT = "disabled"

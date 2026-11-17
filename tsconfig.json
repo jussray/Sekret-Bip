@@ -2,14 +2,25 @@
   "extends": "expo/tsconfig.base",
   "compilerOptions": {
     "strict": true,
+    "noImplicitAny": false,
+    "jsx": "react-jsx",
+    "module": "ESNext",
     "moduleResolution": "bundler",
+    "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
-      "@hooks/*":      ["./hooks/*"],
-      "@utils/*":      ["./utils/*"],
-      "@components/*": ["./components/*"],
-      "@constants/*":  ["./constants/*"],
-      "@screens/*":    ["./screens/*"],
-      "@types/*":      ["./types/*"]
+      "@/*": ["./src/*"],
+      "@hooks/*": ["./src/hooks/*"],
+      "@utils/*": ["./src/utils/*"],
+      "@components/*": ["./src/components/*"],
+      "@constants/theme": ["./src/constants/theme.ts"],
+      "@constants/*": ["./src/constants/*", "./constants/*"],
+      "@screens/*": ["./screens/*"],
+      "@types/*": ["./src/types/*"]
     }
-  }
+  },
+  "exclude": [
+    "supabase/functions/**",
+    "tools/zapier/**"
+  ]
 }

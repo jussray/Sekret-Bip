@@ -1,6 +1,6 @@
 // screens/PeriodCalendarScreen.tsx
-// Se'kret Bip — Cycle Calendar (cycle layer of Womanhood, Raylene-led)
-// Private. On-device only. No data leaves the phone.
+// Se'kret Bip — Cycle Calendar (cycle layer of Womanhood, Suhana-led)
+// Account-synced cycle data; not shown in Parent Pages.
 //
 // Phase 1 polish: time-of-day backdrop (raylene window), mood glow,
 // staggered entrance, breath loop, today highlight, sticky note, body-positive copy.
@@ -19,6 +19,7 @@ import {
   Easing,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { syncPeriodDay, deletePeriodDay, loadPeriodDays } from '@/utils/sync';
 import { LinearGradient } from 'expo-linear-gradient';
 import { IMAGES, getRoomBg, TimeOfDay } from '../constants/theme';
 
@@ -68,7 +69,7 @@ export function PeriodCalendarScreen({
   const [lastPeriodStart, setLastPeriodStart] = useState<string | null>(null);
 
   const time = useMemo(() => getTimeOfDay(), []);
-  // Raylene-led screen, but backdrop respects the chosen companion's room
+  // Suhana-led screen, but backdrop respects the chosen companion's room
   const charKey: 'raylene' | 'rylane' = selectedSekret === 'rylane' ? 'rylane' : 'raylene';
   const bg   = useMemo(() => getRoomBg(charKey, time), [charKey, time]);
   const glow = useMemo(() => moodGlow(mood), [mood]);
@@ -81,6 +82,7 @@ export function PeriodCalendarScreen({
   const breath = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Load local data first (instant)
     AsyncStorage.getItem('periodDays').then(v => {
       try {
         if (v) setMarkedDays(JSON.parse(v));
@@ -91,6 +93,18 @@ export function PeriodCalendarScreen({
     AsyncStorage.getItem('lastPeriodStart').then(v => {
       if (v) setLastPeriodStart(v);
     });
+    // Merge cloud days (additive — non-destructive)
+    loadPeriodDays().then(cloudDays => {
+      if (!cloudDays.length) return;
+      setMarkedDays(prev => {
+        const merged = { ...prev };
+        cloudDays.forEach(isoDay => {
+          const [y, m, d] = isoDay.split('-').map(Number);
+          merged[`${y}-${m}-${d}`] = 'period';
+        });
+        return merged;
+      });
+    }).catch(() => {/* offline — local data is fine */});
   }, []);
 
   useEffect(() => {
@@ -135,13 +149,16 @@ export function PeriodCalendarScreen({
   });
 
   const toggleDay = (day: number) => {
-    const key  = `${currentYear}-${currentMonth + 1}-${day}`;
-    const next = { ...markedDays };
+    const key    = `${currentYear}-${currentMonth + 1}-${day}`;
+    const isoDay = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const next   = { ...markedDays };
 
     if (next[key]) {
       delete next[key];
+      void deletePeriodDay(isoDay);   // cloud remove
     } else {
       next[key] = 'period';
+      void syncPeriodDay(isoDay);     // cloud upsert
       if (!lastPeriodStart) {
         setLastPeriodStart(key);
         save(next, key);
@@ -204,7 +221,7 @@ export function PeriodCalendarScreen({
           </TouchableOpacity>
 
           <Text style={styles.logo}>cycle calendar 🩸</Text>
-          <Text style={styles.subtitle}>track your cycle, quietly. only you see this.</Text>
+          <Text style={styles.subtitle}>track your cycle, quietly. not shown in Parent Pages.</Text>
 
           <Animated.View
             style={[
@@ -213,7 +230,7 @@ export function PeriodCalendarScreen({
               { transform: [{ scale: breathScale }], opacity: breathOpacity },
             ]}
           >
-            <Text style={[styles.energyText, { color: glow }]}>💜 private · on-device</Text>
+            <Text style={[styles.energyText, { color: glow }]}>💜 private · account synced</Text>
           </Animated.View>
 
           <View style={styles.cloudWrap}>
@@ -330,13 +347,13 @@ export function PeriodCalendarScreen({
         <Animated.View style={cardStyle(card4)}>
           <View style={styles.stickyNote}>
             <Text style={styles.stickyText}>
-              “your body isn’t a problem to solve. it’s yours. you know it best.” — raylene
+              "your body isn't a problem to solve. it's yours. you know it best." — suhana
             </Text>
           </View>
 
           <View style={[styles.card, { backgroundColor: 'rgba(30,18,55,0.7)', borderColor: glow + '66' }]}>
             <Text style={styles.privacyNote}>
-              tap any day to mark it 🩸 · your data stays on this device. nothing leaves. 🔒
+              tap any day to mark it 🩸 · cycle days sync to your account so they can follow you between devices. they aren't shown in Parent Pages. 🔒
             </Text>
           </View>
 
@@ -350,42 +367,37 @@ export function PeriodCalendarScreen({
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#0e0820' },
-  container:      { flexGrow: 1, padding: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
-  logo:           { fontSize: 28, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 6, letterSpacing: 0.3 },
-  subtitle:       { fontSize: 14, color: '#cbb6f7', textAlign: 'center', marginBottom: 14, fontStyle: 'italic' },
-  energyBadge:    { alignSelf: 'center', borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, marginBottom: 14 },
-  energyText:     { fontSize: 13, fontWeight: '600' },
-
-  cloudWrap: { alignItems: 'center', marginBottom: 12 },
-  cloudArt: { width: 60, height: 60, marginBottom: 6 },
-
-  card:           { padding: 18, borderRadius: 20, marginBottom: 14, borderWidth: 1, shadowOpacity: 0.35, shadowRadius: 14 },
-  backBtn:        { marginBottom: 12 },
-  backText:       { color: '#cbb6f7', fontSize: 14 },
-  monthNav:       { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  navArrow:       { fontSize: 26, fontWeight: 'bold' },
-  monthName:      { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-  dayHeaders:     { flexDirection: 'row', marginBottom: 8 },
-  dayHeader:      { flex: 1, textAlign: 'center', color: '#cbb6f7', fontSize: 12, fontWeight: 'bold' },
-  grid:           { flexDirection: 'row', flexWrap: 'wrap' },
-  cell:           { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
-  dayCircle:      { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  dayText:        { fontSize: 14 },
-
-  legendRow:      { flexDirection: 'row', justifyContent: 'center', gap: 18, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)' },
-  legendItem:     { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  legendDot:      { width: 12, height: 12, borderRadius: 6 },
-  legendText:     { color: '#cbb6f7', fontSize: 11 },
-
-  softLabel:      { fontSize: 13, marginBottom: 4 },
-  predictionDate: { color: '#fff', fontSize: 22, fontWeight: 'bold' },
-  predictionSub:  { color: '#cbb6f7', fontSize: 12, marginTop: 4 },
-  tipsTitle:      { color: '#fff', fontWeight: 'bold', fontSize: 16, marginBottom: 10 },
-  tip:            { color: '#e9defc', fontSize: 14, marginBottom: 6, lineHeight: 21 },
-  privacyNote:    { fontSize: 13, fontStyle: 'italic', textAlign: 'center', color: '#cbb6f7', lineHeight: 19 },
-  artworkMedium:  { width: 180, height: 180, marginBottom: 12, borderRadius: 16 },
-
-  stickyNote: { backgroundColor: '#fff8e7', borderColor: '#7c3aed', borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, padding: 12, marginBottom: 14, transform: [{ rotate: '-2deg' }] },
-  stickyText: { color: '#3a2461', fontSize: 13, fontStyle: 'italic', textAlign: 'center', lineHeight: 19 },
+  root:          { flex: 1, backgroundColor: '#0d0820' },
+  container:     { padding: 20, paddingTop: Platform.OS === 'ios' ? 60 : 36, paddingBottom: 60 },
+  backBtn:       { marginBottom: 8, alignSelf: 'flex-start' },
+  backText:      { color: '#c4b5fd', fontSize: 14 },
+  logo:          { fontSize: 26, fontWeight: '900', color: '#e9defc', textAlign: 'center', marginBottom: 4 },
+  subtitle:      { fontSize: 13, color: '#9d8ec7', textAlign: 'center', marginBottom: 16 },
+  energyBadge:   { alignSelf: 'center', borderWidth: 1.5, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 5, marginBottom: 12, shadowOffset: { width: 0, height: 0 } },
+  energyText:    { fontSize: 12, fontWeight: '700' },
+  cloudWrap:     { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end', marginBottom: 20, gap: 8 },
+  cloudArt:      { width: 60, height: 60 },
+  artworkMedium: { width: 100, height: 100 },
+  card:          { borderRadius: 18, padding: 18, marginBottom: 16, borderWidth: 1.5, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6 },
+  monthNav:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  navArrow:      { fontSize: 28, fontWeight: '300', paddingHorizontal: 8 },
+  monthName:     { color: '#e9defc', fontSize: 16, fontWeight: '700' },
+  dayHeaders:    { flexDirection: 'row', marginBottom: 4 },
+  dayHeader:     { flex: 1, textAlign: 'center', color: '#9d8ec7', fontSize: 11, fontWeight: '600' },
+  grid:          { flexDirection: 'row', flexWrap: 'wrap' },
+  cell:          { width: '14.28%', aspectRatio: 1, justifyContent: 'center', alignItems: 'center', padding: 2 },
+  dayCircle:     { width: '80%', aspectRatio: 1, borderRadius: 999, justifyContent: 'center', alignItems: 'center' },
+  dayText:       { fontSize: 13, fontWeight: '500' },
+  legendRow:     { flexDirection: 'row', justifyContent: 'center', gap: 20, marginTop: 10 },
+  legendItem:    { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendDot:     { width: 12, height: 12, borderRadius: 6 },
+  legendText:    { color: '#9d8ec7', fontSize: 11 },
+  softLabel:     { fontSize: 11, fontWeight: '600', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 1 },
+  predictionDate: { color: '#e9defc', fontSize: 20, fontWeight: '800', marginBottom: 4 },
+  predictionSub: { color: '#9d8ec7', fontSize: 11 },
+  tipsTitle:     { color: '#e9defc', fontSize: 15, fontWeight: '700', marginBottom: 10 },
+  tip:           { color: '#c4b5fd', fontSize: 13, lineHeight: 22 },
+  stickyNote:    { backgroundColor: 'rgba(232,121,163,0.12)', borderRadius: 14, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: '#e879a344' },
+  stickyText:    { color: '#f0c0d8', fontSize: 13, fontStyle: 'italic', lineHeight: 20, textAlign: 'center' },
+  privacyNote:   { color: '#7c6a9e', fontSize: 12, textAlign: 'center', lineHeight: 18 },
 });

@@ -1,0 +1,58 @@
+{
+  "night": {
+    "$metadata": {
+      "vibeKey": "night",
+      "displayName": "Night Comfort",
+      "atmosphere": "night-comfort",
+      "character": "night",
+      "isAtmosphereOnly": false,
+      "isDarkSurface": true,
+      "$note": "Only preset with dark bg. textHigh is inverted (light on dark). Safety/Privacy surfaces remain invariant and are NOT overridden."
+    },
+    "color": {
+      "bg":          { "value": "#1E1A2E", "type": "color" },
+      "card":        { "value": "#2A2440", "type": "color" },
+      "cardAlt":     { "value": "#332D50", "type": "color" },
+      "accentA":     { "value": "#FFD166", "type": "color", "$description": "sunGold — buttons, focus rings" },
+      "accentB":     { "value": "#FFB289", "type": "color", "$description": "warmPeach — secondary accents" },
+      "accentC":     { "value": "#A8E6CF", "type": "color", "$description": "softMint — tertiary accents" },
+      "textHigh":    { "value": "#FFF8EE", "type": "color", "$description": "INVERTED — light text on dark bg" },
+      "textMid":     { "value": "#C4B49A", "type": "color" },
+      "textLow":     { "value": "#7A6A52", "type": "color" },
+      "divider":     { "value": "rgba(255,248,238,0.08)", "type": "color" },
+      "glowColor":   { "value": "#FFD166", "type": "color" },
+      "glowRadius":  { "value": "56", "type": "other" },
+      "selectorRing": { "value": "#FFD166", "type": "color" }
+    },
+    "overlay": {
+      "base":    { "value": "rgba(30,26,46,0.78)",   "type": "color" },
+      "accent":  { "value": "rgba(255,178,137,0.08)", "type": "color" },
+      "primary": { "value": "rgba(255,209,102,0.05)", "type": "color" }
+    },
+    "input": {
+      "bg":          { "value": "{night.color.card}",    "type": "color" },
+      "border":      { "value": "{night.color.divider}",  "type": "color" },
+      "borderFocus": { "value": "{night.color.accentA}",  "type": "color" },
+      "radius":      { "value": "{global.radius.md}",    "type": "borderRadius" }
+    },
+    "button": {
+      "primaryBg":    { "value": "{night.color.accentA}",  "type": "color" },
+      "primaryText":  { "value": "#1E1A2E",                "type": "color" },
+      "secondaryBg":  { "value": "{night.color.card}",     "type": "color" },
+      "secondaryText": { "value": "{night.color.textHigh}", "type": "color" },
+      "secondaryBorder": { "value": "{night.color.accentA}", "type": "color" },
+      "radius":       { "value": "{global.radius.pill}", "type": "borderRadius" }
+    },
+    "badge": {
+      "bg":     { "value": "{night.color.cardAlt}",  "type": "color" },
+      "text":   { "value": "{night.color.textHigh}", "type": "color" },
+      "radius": { "value": "{global.radius.pill}", "type": "borderRadius" }
+    },
+    "card": {
+      "bg":          { "value": "{night.color.card}",   "type": "color" },
+      "border":      { "value": "{night.color.divider}", "type": "color" },
+      "borderWidth": { "value": "1", "type": "borderWidth" },
+      "radius":      { "value": "{global.radius.card}", "type": "borderRadius" }
+    }
+  }
+}

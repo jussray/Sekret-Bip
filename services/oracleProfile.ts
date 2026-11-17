@@ -11,6 +11,7 @@ import type {
   StrategyAxis,
   StrategyAxisEntry,
 } from '../types/oracle';
+import { supabase } from '@/utils/supabase';
 
 const STORAGE_KEY: Record<OracleMode, string> = {
   teen: 'oracle_profile_teen',
@@ -224,10 +225,85 @@ export async function loadOracleRecord(mode: OracleMode): Promise<OracleRecord> 
   }
 }
 
+/**
+ * saveOracleRecord
+ * 1. Always writes to AsyncStorage (authoritative local cache, instant).
+ * 2. Best-effort upserts the full record snapshot to Supabase `oracle_records`
+ *    (keyed on user_id + mode). Errors are swallowed — local state is always
+ *    the source of truth for the UI.
+ */
 export async function saveOracleRecord(record: OracleRecord): Promise<void> {
+  // 1. Local write — always succeeds even offline.
   try {
     await AsyncStorage.setItem(STORAGE_KEY[record.mode], JSON.stringify(record));
   } catch {}
+
+  // 2. Cloud sync — best-effort.
+  try {
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const dimensionSummary: Record<string, number> = {};
+    for (const [dim, entry] of Object.entries(record.profile) as [ProfileDimension, OracleDimensionEntry][]) {
+      dimensionSummary[dim] = entry.signals.length;
+    }
+
+    await supabase.from('oracle_records').upsert(
+      {
+        user_id:           user.id,
+        mode:              record.mode,
+        session_count:     record.sessionCount,
+        total_turns:       record.totalTurns,
+        last_session:      record.lastSession || null,
+        dimension_summary: dimensionSummary,
+        profile_snapshot:  JSON.stringify(record),
+        updated_at:        new Date().toISOString(),
+      },
+      { onConflict: 'user_id,mode' },
+    );
+  } catch {
+    // Network failure — local write above already persisted the record.
+  }
+}
+
+/**
+ * markSessionComplete
+ * Called at the end of each oracle session to write an immutable row to
+ * `oracle_session_log`. AsyncStorage is already up to date via saveOracleRecord;
+ * this adds a permanent per-session audit trail for analytics and cross-device
+ * restore.
+ *
+ * NOTE: table is oracle_session_log (not oracle_sessions) to avoid conflict
+ * with the companion-memory upsert table created in 0003_oracle_parentlinks.
+ */
+export async function markSessionComplete(
+  record: OracleRecord,
+  sessionQuestionIds: string[],
+): Promise<void> {
+  try {
+    if (!supabase) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const dimensionSummary: Record<string, number> = {};
+    for (const [dim, entry] of Object.entries(record.profile) as [ProfileDimension, OracleDimensionEntry][]) {
+      dimensionSummary[dim] = entry.signals.length;
+    }
+
+    await supabase.from('oracle_session_log').insert({
+      user_id:           user.id,
+      mode:              record.mode,
+      session_index:     record.sessionCount,
+      total_turns:       record.totalTurns,
+      question_ids:      sessionQuestionIds,
+      dimension_summary: dimensionSummary,
+      profile_snapshot:  JSON.stringify(record),
+      completed_at:      new Date().toISOString(),
+    });
+  } catch {
+    // Best-effort — session row is analytics only, not load-path critical.
+  }
 }
 
 // ─── Question Selection ───────────────────────────────────────────────────────
@@ -290,120 +366,57 @@ export function processAnswer(
 ): OracleRecord {
   if (!answer.trim()) return record;
 
-  const updated: OracleRecord = JSON.parse(JSON.stringify(record));
-  const now = new Date().toISOString();
+  const dim = question.dimension as ProfileDimension;
+  const existing: OracleDimensionEntry = record.profile[dim] ?? {
+    dimension: dim,
+    signals: [],
+    softState: 'emerging',
+    lastUpdated: '',
+  };
+
+  const newSignals = extractDimensionSignals(dim, answer);
+  const merged = [...existing.signals, ...newSignals].slice(-20);
+  const updated: OracleDimensionEntry = {
+    ...existing,
+    signals: merged,
+    softState: computeSoftState({ ...existing, signals: merged }),
+    lastUpdated: new Date().toISOString(),
+  };
+
+  const strategyLeans = extractStrategyLeans(answer);
+  const newStrategy = { ...record.strategy };
+  if (question.axis) {
+    const lean = strategyLeans[question.axis];
+    if (lean) {
+      const prev = newStrategy[question.axis] ?? { axis: question.axis, leanA: 0, leanB: 0, confidence: 0 };
+      newStrategy[question.axis] = {
+        ...prev,
+        leanA: Math.min(1, prev.leanA + lean.leanA),
+        leanB: Math.min(1, prev.leanB + lean.leanB),
+        confidence: Math.min(1, (prev.confidence ?? 0) + 0.2),
+      };
+    }
+  }
 
   const turn: OracleTurn = {
     questionId: question.id,
     question: question.text,
-    answer: answer.trim(),
-    dimension: question.dimension,
-    timestamp: now,
+    answer: answer.trim().slice(0, 500),
+    dimension: dim,
+    axis: question.axis,
+    timestamp: new Date().toISOString(),
   };
-  updated.history = [...updated.history, turn].slice(-20);
-  updated.totalTurns += 1;
 
-  const dim = question.dimension;
-  const existing: OracleDimensionEntry = updated.profile[dim] || {
-    signals: [], state: 'emerging', lastUpdated: now,
-  };
-  const newSignals = extractDimensionSignals(dim, answer);
-  existing.signals = [...existing.signals, ...newSignals].slice(-12);
-  existing.state = computeSoftState(existing);
-  existing.lastUpdated = now;
-  updated.profile[dim] = existing;
-
-  const leans = extractStrategyLeans(answer);
-
-  if (question.axis) {
-    const axisLean = leans[question.axis];
-    if (axisLean) {
-      const axisEntry: StrategyAxisEntry = updated.strategy[question.axis] || {
-        leanA: 0.5, leanB: 0.5, observations: 0, lastUpdated: now,
-      };
-      axisEntry.leanA = Math.min(1, axisEntry.leanA + axisLean.leanA);
-      axisEntry.leanB = Math.min(1, axisEntry.leanB + axisLean.leanB);
-      axisEntry.observations += 1;
-      axisEntry.lastUpdated = now;
-      updated.strategy[question.axis] = axisEntry;
-    }
-  } else {
-    for (const [axis, lean] of Object.entries(leans) as [StrategyAxis, { leanA: number; leanB: number }][]) {
-      const axisEntry = updated.strategy[axis];
-      if (!axisEntry) continue;
-      axisEntry.leanA = Math.min(1, axisEntry.leanA + lean.leanA * 0.1);
-      axisEntry.leanB = Math.min(1, axisEntry.leanB + lean.leanB * 0.1);
-    }
-  }
-
-  updated.signals = extractOracleSignals(updated);
-  return updated;
-}
-
-export function markSessionComplete(record: OracleRecord): OracleRecord {
   return {
     ...record,
-    sessionCount: record.sessionCount + 1,
+    profile: { ...record.profile, [dim]: updated },
+    strategy: newStrategy,
+    totalTurns: record.totalTurns + 1,
     lastSession: new Date().toISOString(),
+    history: [...record.history, turn],
   };
 }
 
-// ─── Oracle → Se'kret Signals ─────────────────────────────────────────────────
-
-const AXIS_POLE_LABELS: Record<StrategyAxis, [string, string]> = {
-  planning: ['tends to plan ahead', 'goes with the flow'],
-  conflict: ['avoids conflict', 'addresses things directly'],
-  processing: ['processes internally', 'acts first, then reflects'],
-  risk: ['plays it careful', 'takes bold moves'],
-  expression: ['keeps things private', 'needs to express'],
-  work: ['works best alone', 'thrives collaboratively'],
-  response: ['reacts quickly', 'pauses before responding'],
-  vision: ['dreams big', 'builds step by step'],
-};
-
-export function extractOracleSignals(record: OracleRecord): OracleSignals {
-  let strategyLead: StrategyAxis | undefined;
-  let strategyPole: 'A' | 'B' | undefined;
-  let maxObs = 0;
-  for (const [axis, entry] of Object.entries(record.strategy) as [StrategyAxis, StrategyAxisEntry][]) {
-    if (entry.observations > maxObs) {
-      maxObs = entry.observations;
-      strategyLead = axis;
-      strategyPole = entry.leanA >= entry.leanB ? 'A' : 'B';
-    }
-  }
-
-  let dominantDimension: ProfileDimension | undefined;
-  let maxSignals = 0;
-  for (const [dim, entry] of Object.entries(record.profile) as [ProfileDimension, OracleDimensionEntry][]) {
-    if (entry.signals.length > maxSignals) {
-      maxSignals = entry.signals.length;
-      dominantDimension = dim;
-    }
-  }
-
-  const dimensionState = dominantDimension ? record.profile[dominantDimension]?.state : undefined;
-
-  let personalityNote: string | undefined;
-  if (strategyLead && strategyPole) {
-    personalityNote = AXIS_POLE_LABELS[strategyLead][strategyPole === 'A' ? 0 : 1];
-  }
-
-  let growthEdge: string | undefined;
-  for (const [, entry] of Object.entries(record.profile) as [ProfileDimension, OracleDimensionEntry][]) {
-    if (entry.state === 'needsAttention') {
-      growthEdge = 'navigating something hard right now';
-      break;
-    }
-  }
-  if (!growthEdge) {
-    for (const [dim, entry] of Object.entries(record.profile) as [ProfileDimension, OracleDimensionEntry][]) {
-      if (entry.state === 'strong') {
-        growthEdge = `showing up in ${dim}`;
-        break;
-      }
-    }
-  }
-
-  return { strategyLead, strategyPole, dominantDimension, dimensionState, personalityNote, growthEdge };
+export function extractOracleSignals(record: OracleRecord | null | undefined): OracleSignals {
+  return record?.signals ?? {};
 }

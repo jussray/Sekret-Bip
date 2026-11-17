@@ -1,5 +1,5 @@
 // screens/ManhoodScreen.tsx
-// Se'kret Bip — Bippin 2: Manhood Dashboard (Rylane-led)
+// Se'kret Bip — Bippin 2: Manhood Dashboard (Sy-led)
 // Layout matches the Manhood mockup:
 //   Hero → Greeting + Streak → Quick Access Grid →
 //   Energy + Sleep cards → Quick Tip → Mood Check-In →
@@ -11,7 +11,16 @@ import {
   ImageBackground, StyleSheet, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { IMAGES } from '../constants/theme';
+import { getRoomBg, type TimeOfDay } from '../constants/theme';
+import { glowForMood } from '../constants/moodGlow';
+
+function timeOfDay(): TimeOfDay {
+  const h = new Date().getHours();
+  if (h >= 5  && h < 11) return 'morning';
+  if (h >= 11 && h < 17) return 'day';
+  if (h >= 17 && h < 21) return 'evening';
+  return 'night';
+}
 
 interface ManhoodScreenProps {
   t:              Record<string, any>;
@@ -22,15 +31,7 @@ interface ManhoodScreenProps {
   streakDays?:    number;
 }
 
-function glowFor(mood?: string) {
-  const m = (mood || '').toLowerCase();
-  if (m.includes('happy'))  return '#fbbf24';
-  if (m.includes('sad') || m.includes('anx')) return '#7dd3fc';
-  if (m.includes('angry') || m.includes('over') || m.includes('stress')) return '#f472b6';
-  if (m.includes('tired'))  return '#6d28d9';
-  if (m.includes('calm'))   return '#c4b5fd';
-  return '#4DA3FF';
-}
+const glowFor = (mood?: string) => glowForMood(mood, '#4DA3FF');
 
 function timeGreeting() {
   const h = new Date().getHours();
@@ -78,6 +79,8 @@ export function ManhoodScreen({
 }: ManhoodScreenProps) {
   const glow = useMemo(() => glowFor(mood), [mood]);
   const greeting = timeGreeting();
+  const time = useMemo(() => timeOfDay(), []);
+  const bgSource = useMemo(() => getRoomBg('rylane', time), [time]);
   const [checkedMood, setCheckedMood] = useState<string | null>(null);
   const [tipIdx] = useState(() => Math.floor(Math.random() * TIPS.length));
 
@@ -88,7 +91,7 @@ export function ManhoodScreen({
   return (
     <View style={styles.root}>
       <ImageBackground
-        source={IMAGES.rylaneVoiceNight}
+        source={bgSource}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
       />
@@ -111,7 +114,7 @@ export function ManhoodScreen({
         {/* ── GREETING + STREAK ── */}
         <View style={styles.row}>
           <View style={[cardHalf, { flex: 1.6 }]}>
-            <Text style={styles.greetLabel}>{greeting}, Rylane ⚡</Text>
+            <Text style={styles.greetLabel}>{greeting}, Sy ⚡</Text>
             <Text style={styles.greetBody}>
               Keep building the best{"\n"}version of you.{"\n"}You've got this.
             </Text>

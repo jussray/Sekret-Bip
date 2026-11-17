@@ -8,8 +8,8 @@
 // and end with a char-aware sticky note.
 //
 // Voice:
-//   • Rylane (blue): "respect, look at the reps fr · lock in continues"
-//   • Raylene (pink/purple): "we see you 💜 · look how far you've come"
+//   • Sy (blue): "respect, look at the reps fr · lock in continues"
+//   • Suhana (pink/purple): "we see you 💜 · look how far you've come"
 //
 // Same polish patterns as the rest of the app: time-of-day backdrop, mood
 // glow, gradient hero overlay, stagger entrance, breath-loop on the streak
@@ -22,19 +22,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getRoomBg, TimeOfDay } from '../constants/theme';
-import type { MoodEntry, JournalEntry, VoiceNote, CirclePost } from '../types/index';
+import { glowForMood as glowFor } from '../constants/moodGlow';
+import type { MoodEntry, JournalEntry, VoiceNote, CirclePost } from '@/types';
 
 // ── Glow palette ─────────────────────────────────────────────────────────────
-function glowFor(mood?: string): string {
-  const m = (mood || '').toLowerCase();
-  if (m.includes('happy'))       return '#fbbf24';
-  if (m.includes('sad') || m.includes('anx'))    return '#7dd3fc';
-  if (m.includes('angry') || m.includes('over') || m.includes('stress')) return '#f472b6';
-  if (m.includes('tired'))       return '#6d28d9';
-  if (m.includes('calm'))        return '#c4b5fd';
-  return '#c4b5fd';
-}
-
 function timeOfDay(): TimeOfDay {
   const h = new Date().getHours();
   if (h >= 5  && h < 11) return 'morning';
@@ -188,15 +179,15 @@ export function HistoryScreen({
   // ── Copy ───────────────────────────────────────────────────────────────────
   const heroTitle = isRylane
     ? 'respect — look at the reps'
-    : 'look how far you’ve come \u{1F49C}';
+    : "look how far you've come \u{1F49C}";
 
   const heroSub = isRylane
     ? 'lock in continues. quietly. day by day.'
-    : 'soft proof that you’re actually doing better.';
+    : "soft proof that you're actually doing better.";
 
   const streakCopy =
     streakDays <= 0
-      ? (isRylane ? 'fresh start. let’s build it.' : 'today counts. that’s a start \u{1F49C}')
+      ? (isRylane ? "fresh start. let's build it." : "today counts. that's a start \u{1F49C}")
       : streakDays === 1
         ? (isRylane ? 'day 1. respect.' : 'day 1. proud of you already \u{1F49C}')
         : (isRylane
@@ -207,14 +198,14 @@ export function HistoryScreen({
   const moodLine = moodTop
     ? (isRylane
         ? `most logged in the last 2 weeks: ${moodTop}. noted.`
-        : `most logged in the last 2 weeks: ${moodTop}. that’s real info \u{1F49C}`)
+        : `most logged in the last 2 weeks: ${moodTop}. that's real info \u{1F49C}`)
     : (isRylane
-        ? 'no mood logs yet. drop one when you’re ready.'
-        : 'no mood logs yet. tap one when you’re ready.');
+        ? "no mood logs yet. drop one when you're ready."
+        : "no mood logs yet. tap one when you're ready.");
 
   const stickyAffirmation = isRylane
     ? '“the reps are quiet. the change is loud.”'
-    : '“you’re actually doing better. it’s ok to notice.”';
+    : '"you\'re actually doing better. it\'s ok to notice."';
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -235,7 +226,7 @@ export function HistoryScreen({
             ]}
           >
             <Text style={[styles.pillText, { color: softAccent }]}>
-              {isRylane ? '\u{1F9CD} rylane is here' : '☁\uFE0F raylene is here'}
+              {isRylane ? '\u{1F9CD} sy is here' : '☁\uFE0F suhana is here'}
             </Text>
           </Animated.View>
 
@@ -253,7 +244,7 @@ export function HistoryScreen({
           <View style={styles.divider} />
           <Text style={styles.cardSub}>
             {isRylane
-              ? 'streak = days you opened the room. that’s it. small reps, real result.'
+              ? "streak = days you opened the room. that's it. small reps, real result."
               : 'streak = days you opened the room. soft and small. it counts \u{1F49C}'}
           </Text>
         </Animated.View>
@@ -298,7 +289,7 @@ export function HistoryScreen({
           </View>
           <Text style={styles.cardSub}>
             {isRylane
-              ? 'the reps don’t need to be huge. they need to be yours.'
+              ? "the reps don't need to be huge. they need to be yours."
               : 'small steps stack \u{1F49C} look at all that softness.'}
           </Text>
         </Animated.View>
@@ -314,8 +305,8 @@ export function HistoryScreen({
           </View>
           <Text style={styles.cardSub}>
             {isRylane
-              ? 'numbers are not the point. they’re proof the point is working.'
-              : 'these aren’t scores. they’re soft proof you showed up \u{1F49C}'}
+              ? "numbers are not the point. they're proof the point is working."
+              : "these aren't scores. they're soft proof you showed up \u{1F49C}"}
           </Text>
 
           <TouchableOpacity
@@ -332,7 +323,7 @@ export function HistoryScreen({
         <Animated.View style={[styles.sticky, enter(noteAnim)]}>
           <Text style={styles.stickyText}>{stickyAffirmation}</Text>
           <Text style={styles.stickySig}>
-            {isRylane ? '— rylane' : '— raylene'}
+            {isRylane ? '— sy' : '— suhana'}
           </Text>
         </Animated.View>
 
@@ -355,7 +346,7 @@ function Stat({ label, value, accent }: { label: string; value: number; accent: 
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  bg:     { flex: 1 },
+  bg:     { flex: 1, width: '100%', height: '100%' },
   scroll: { padding: 20, paddingTop: 60, ...(Platform.OS === 'web' ? { maxWidth: 520, width: '100%', alignSelf: 'center' as const } : {}) },
 
   hero:      { alignItems: 'center', marginBottom: 22 },

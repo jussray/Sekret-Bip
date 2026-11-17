@@ -1,0 +1,59 @@
+{
+  "contract": "sekret-bip/ai-labyrinth-external-access@v1",
+  "status": "proposal-only",
+  "repository": "jussray/Sekret-Bip",
+  "purpose": "License isolated AI Labyrinth security capabilities to independently verified external organizations without selling or exposing Se'kret Bip user information.",
+  "launchControls": {
+    "billingEnabled": false,
+    "externalExecutionEnabled": false,
+    "productionIntegrationEnabled": false,
+    "userDataAccessEnabled": false,
+    "failClosedOnUnknownAuthority": true
+  },
+  "commercialBoundary": {
+    "audience": "verified-external-organizations-only",
+    "minorAccountsMayPurchase": false,
+    "paymentIsAuthentication": false,
+    "paymentGrantsFounderPrivileges": false,
+    "paymentGrantsProductionAccess": false,
+    "paymentGrantsUserDataAccess": false,
+    "billingMetadataMustNotContainUserInformation": true
+  },
+  "founderBoundary": {
+    "authorizedFounderAgentsUseSeparateExistingApprovalPath": true,
+    "verifiedEmailAloneGrantsAuthority": false,
+    "accountConnectionAloneGrantsAuthority": false,
+    "licensingCannotModifyFounderAllowlist": true
+  },
+  "licensedCapabilities": [
+    "synthetic-prompt-injection-evaluation",
+    "synthetic-authorization-contract-testing",
+    "synthetic-policy-validation"
+  ],
+  "licenseScope": {
+    "resource": "labyrinth:isolated-sandbox",
+    "environment": "isolated-sandbox",
+    "dataClass": "synthetic-only"
+  },
+  "requiredFutureEnforcement": [
+    "adult-organization-identity-verified-by-trusted-server",
+    "active-entitlement-verified-server-side-not-from-caller-fields",
+    "capability-and-tenant-scoped-authorization",
+    "isolated-infrastructure-with-no-sekret-production-bindings",
+    "synthetic-input-validation-and-egress-controls",
+    "rate-limit-abuse-monitoring-and-revocation",
+    "metadata-only-billing-and-audit-logs",
+    "explicit-founder-provider-billing-and-launch-approval"
+  ],
+  "neverLicense": [
+    "user-identities-or-account-records",
+    "user-messages-journals-memories-or-voice",
+    "parent-teen-circle-bridge-or-guardian-data",
+    "real-user-derived-training-or-analytics-datasets",
+    "supabase-production-or-storage-access",
+    "production-workers-pages-or-secrets",
+    "founder-admin-or-incident-override-permissions",
+    "model-instructions-or-modes-as-privileged-credentials"
+  ],
+  "authorization": "This proposal and any future payment event are non-authorizing. Only a separately approved server-side identity, entitlement, capability, and tenant verifier may enable isolated execution."
+}

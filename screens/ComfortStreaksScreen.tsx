@@ -8,8 +8,8 @@
 // comfort tool. No fire emoji. No "don't break it" pressure.
 //
 // Voice:
-//   • Rylane: "respect, you kept showing up · the streak is the work"
-//   • Raylene: "look at you, soft and consistent 💜 · cozy on cozy"
+//   • Sy: "respect, you kept showing up · the streak is the work"
+//   • Suhana: "look at you, soft and consistent 💜 · cozy on cozy"
 //
 // Pulls from comfortSessions[] — every time trackActivity() fires we log a
 // session. We compute current streak, longest streak, by-type tallies, and
@@ -22,19 +22,10 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getRoomBg, TimeOfDay } from '../constants/theme';
-import type { ComfortSession } from '../types/index';
+import { glowForMood as glowFor } from '../constants/moodGlow';
+import type { ComfortSession } from '@/types';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-function glowFor(mood?: string): string {
-  const m = (mood || '').toLowerCase();
-  if (m.includes('happy'))       return '#fbbf24';
-  if (m.includes('sad') || m.includes('anx'))    return '#7dd3fc';
-  if (m.includes('angry') || m.includes('over') || m.includes('stress')) return '#f472b6';
-  if (m.includes('tired'))       return '#6d28d9';
-  if (m.includes('calm'))        return '#c4b5fd';
-  return '#c4b5fd';
-}
-
 function timeOfDay(): TimeOfDay {
   const h = new Date().getHours();
   if (h >= 5  && h < 11) return 'morning';
@@ -198,7 +189,7 @@ export function ComfortStreaksScreen({
   // ── Copy ───────────────────────────────────────────────────────────────────
   const heroTitle = isRylane ? 'comfort streaks' : 'comfort streaks \u{1F49C}';
   const heroSub = isRylane
-    ? 'soft reps. consistent. that’s the move.'
+    ? "soft reps. consistent. that's the move."
     : 'soft on soft. cozy on cozy. you keep showing up.';
 
   const currentCopy =
@@ -212,14 +203,14 @@ export function ComfortStreaksScreen({
 
   const longestCopy =
     longest <= 0
-      ? (isRylane ? 'no record yet. let’s build one.' : 'no record yet. soft beginnings \u{1F49C}')
+      ? (isRylane ? "no record yet. let's build one." : 'no record yet. soft beginnings \u{1F49C}')
       : (isRylane
           ? `your longest run: ${longest} days. legend.`
-          : `your longest run: ${longest} days \u{1F49C} that’s yours forever`);
+          : `your longest run: ${longest} days \u{1F49C} that's yours forever`);
 
   const stickyAffirmation = isRylane
     ? '“the streak is the work. not the number.”'
-    : '“cozy is a discipline too. you’re doing it.”';
+    : "“cozy is a discipline too. you're doing it.”";
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -240,7 +231,7 @@ export function ComfortStreaksScreen({
             ]}
           >
             <Text style={[styles.pillText, { color: softAccent }]}>
-              {isRylane ? '\u{1F9CD} rylane is here' : '☁\uFE0F raylene is here'}
+              {isRylane ? '\u{1F9CD} sy is here' : '☁\uFE0F suhana is here'}
             </Text>
           </Animated.View>
 
@@ -361,7 +352,7 @@ export function ComfortStreaksScreen({
         <Animated.View style={[styles.sticky, enter(noteAnim)]}>
           <Text style={styles.stickyText}>{stickyAffirmation}</Text>
           <Text style={styles.stickySig}>
-            {isRylane ? '— rylane' : '— raylene'}
+            {isRylane ? '— sy' : '— suhana'}
           </Text>
         </Animated.View>
 

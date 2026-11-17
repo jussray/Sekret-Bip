@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { createVoiceCompanionSession, type VoiceCompanionSession, type VoiceCompanionStatus } from '../utils/voiceCompanion';
+import { createVoiceCompanionSession, type VoiceCompanionSession, type VoiceCompanionStatus } from '@/utils/voiceCompanion';
 
 interface UseVoiceCompanionArgs {
   avatarKey?: string;

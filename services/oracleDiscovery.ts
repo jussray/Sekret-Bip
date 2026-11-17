@@ -1,3 +1,4 @@
+
 export type OracleSide = 'teen' | 'parent';
 
 export type TeenOracleDimension =
@@ -418,10 +419,61 @@ export function completeOracleSession(
   };
 }
 
-export function buildOracleContext(profileValue: OracleProfile | undefined, side: OracleSide): string[] {
+export function buildOracleContext(profileValue: OracleProfile | null | undefined, side: OracleSide): string[] {
   return normalizeOracleProfile(profileValue, side).understandings
     .slice()
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 8)
     .map(item => `${item.dimension}: ${item.theory}`);
+}
+
+export async function syncOracleDiscovery(profile: OracleProfile, session: OracleSessionSummary): Promise<void> {
+  try {
+    const { getSupabase } = await import('../src/utils/supabase');
+    const db = getSupabase();
+    if (!db) return;
+    const { data: authData } = await db.auth.getUser();
+    const user = authData?.user;
+    if (!user) return;
+    const dimensionSummary = Object.fromEntries(Object.entries(profile.dimensions));
+    await db.from('oracle_records').upsert({
+      user_id: user.id,
+      mode: profile.side,
+      session_count: profile.sessionCount,
+      total_turns: session.questionIds.length,
+      last_session: profile.updatedAt,
+      dimension_summary: dimensionSummary,
+      profile_snapshot: JSON.stringify(profile),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,mode' });
+    await db.from('oracle_session_log').insert({
+      user_id: user.id,
+      mode: profile.side,
+      session_index: profile.sessionCount,
+      total_turns: session.questionIds.length,
+      question_ids: session.questionIds,
+      dimension_summary: dimensionSummary,
+      profile_snapshot: JSON.stringify(profile),
+      completed_at: session.completedAt,
+    });
+  } catch { /* best-effort */ }
+}
+
+export async function restoreOracleDiscovery(side: OracleSide): Promise<OracleProfile | null> {
+  try {
+    const { getSupabase } = await import('../src/utils/supabase');
+    const db = getSupabase();
+    if (!db) return null;
+    const { data: authData } = await db.auth.getUser();
+    const user = authData?.user;
+    if (!user) return null;
+    const { data, error } = await db
+      .from('oracle_records')
+      .select('profile_snapshot')
+      .eq('user_id', user.id)
+      .eq('mode', side)
+      .maybeSingle();
+    if (error || !data?.profile_snapshot) return null;
+    return normalizeOracleProfile(JSON.parse(data.profile_snapshot as string), side);
+  } catch { return null; }
 }

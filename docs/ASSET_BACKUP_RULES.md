@@ -1,59 +1,100 @@
-# Asset Backup Rules — Room Art
+# Asset Backup Rules
 
-Room backgrounds (`assets/images/bg-*.png`) are the most expensive art asset
-in this repo to regenerate. Before any of them can be touched by Phase 2
-work, each one must have a verified backup.
+This document governs the `assets/images/archive/` directory. Read it before touching any room background.
 
-## The rule
+## Why the Archive Exists
 
-For every `assets/images/bg-*.png`:
+Phase 2 will overwrite the live `bg-*.png` files with composited illustrations (characters painted into the room). The archive holds the original, untouched room backgrounds so that:
 
-1. A matching file must exist at `assets/images/archive/bg-*.png` (same
-   filename).
-2. The archive file must be **at least 1 MB**. A URL, a text stub, or any
-   other placeholder is not a backup.
-3. The archive file's contents must be **byte-identical** to the live file
-   (verified by SHA-256 hash, not just file size).
+- Any composite can be rolled back to the original
+- `npm run verify:room-archives` can detect if a live file has been replaced with a composite
+- `npm run verify:room-archives -- --strict-match` blocks Phase 2 from starting if archives are missing or corrupt
 
-If any of these three conditions fails for any room background, the
-backup set is invalid.
+## The LFS Stub Problem
 
-## Enforcement
+Git LFS stores large files as small pointer stubs (~86–95 bytes) in the repository. When you clone or pull without running `git lfs pull`, all PNG files in the repo are these pointer stubs — not real image data.
 
-```bash
-npm run verify:room-archives
+The archive was seeded with stubs instead of real bytes. This causes `verify:room-archives` to fail with:
+
+```
+❌ archive is an LFS pointer stub (92 bytes)
+❌ DO NOT START PHASE 2
 ```
 
-This runs [`scripts/verify-room-archives.js`](../scripts/verify-room-archives.js),
-which:
-
-- Walks every `assets/images/bg-*.png`.
-- Confirms the matching `assets/images/archive/bg-*.png` exists.
-- Fails if the archive file is missing.
-- Fails if the archive file is under 1 MB.
-- Fails if the live and archive SHA-256 hashes don't match.
-- Prints `DO NOT START PHASE 2` and exits non-zero if anything above fails.
-
-This script is also part of `npm run verify:prepush`, so a broken backup
-set blocks every push, not just a manual check.
-
-## What counts as a real backup
-
-Copying the actual PNG bytes:
+## Repair Procedure (Run This Once)
 
 ```bash
-cp assets/images/bg-raylene-room-night.png assets/images/archive/bg-raylene-room-night.png
+# Step 1: Hydrate all LFS assets
+git lfs pull
+
+# Step 2: Confirm live files are real (expect 2–3 MB each)
+ls -lh assets/images/bg-*.png
+
+# Step 3: Copy real bytes into archive
+cp -f assets/images/bg-*.png assets/images/archive/
+
+# Step 4: Verify archive sizes (expect 2–3 MB each — no 80–100 byte stubs)
+ls -lh assets/images/archive/bg-*.png
+
+# Step 5: Run the repair helper script (alternative to steps 1–4)
+# node scripts/repair-archive-stubs.js
+
+# Step 6: Commit
+git add assets/images/archive/
+git commit -m "fix: replace LFS stub archive copies with real PNG bytes"
+git push
+
+# Step 7: Verify
+npm run verify:room-archives -- --strict-match
+# Expected: ✅ ALL 28 ARCHIVE FILES MATCH LIVE — strict-match passed.
+# Expected: ✅ Phase 2 may proceed.
 ```
 
-What does **not** count: a text file containing a GitHub raw URL, a git-lfs
-pointer, a symlink, or any file under 1 MB. `verify:room-archives` treats
-all of those as an invalid backup and will fail loudly.
+## Archive Rules (Ongoing)
 
-## Why this exists
+| Rule | Detail |
+|---|---|
+| **Never modify archive files** | Archive files are read-only originals. Only the live `bg-*.png` files are replaced during Phase 2. |
+| **Never delete archive files** | Even after Phase 2, keep archive files for rollback. |
+| **One archive file per live background** | Naming must exactly match: `archive/bg-X-room-Y.png` mirrors `bg-X-room-Y.png`. |
+| **Archive files must be real PNGs** | Minimum 1 MB. LFS pointer stubs are not valid archive files. |
+| **Strict match required before Phase 2** | `npm run verify:room-archives -- --strict-match` must pass (exit 0) before any composite is pushed. |
 
-Phase 2 room work (re-wiring room backgrounds through Supabase, swapping in
-new art, restructuring `constants/theme.ts`'s image map) is destructive if
-something goes wrong — there's no undo for a PNG that gets overwritten and
-has no real backup. This script is the gate: if it fails, fix the archive
-before doing any Phase 2 room integration work. See
-[`PHASE_2_ROOM_INTEGRATION.md`](./PHASE_2_ROOM_INTEGRATION.md).
+## What verify:room-archives Checks
+
+Default mode (`npm run verify:room-archives`):
+1. Every live `bg-*.png` has a counterpart in `archive/`
+2. Archive file is not an LFS pointer stub
+3. Archive file is >= 1 MB
+4. Reports whether each file is pre-composite or has been composited
+
+Strict mode (`npm run verify:room-archives -- --strict-match`):
+- All of the above, plus:
+- SHA-256 of live file must exactly match archive file
+- Use **before** pushing any Phase 2 composite to confirm originals are preserved
+
+## Rollback Procedure
+
+If a composite needs to be reverted to the original:
+
+```bash
+# Restore single file
+cp assets/images/archive/bg-X-room-Y.png assets/images/bg-X-room-Y.png
+
+# Restore all files (nuclear option)
+cp -f assets/images/archive/bg-*.png assets/images/
+
+git add assets/images/
+git commit -m "revert: restore original room backgrounds from archive"
+git push
+```
+
+## Codespaces / CI Note
+
+In GitHub Codespaces, run `git lfs pull` immediately after the environment starts. LFS assets are not automatically hydrated. Add to your Codespaces startup:
+
+```bash
+git lfs pull
+```
+
+See `docs/CODESPACES.md` for full setup.
