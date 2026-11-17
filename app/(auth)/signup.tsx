@@ -167,21 +167,27 @@ export default function SignupScreen() {
           />
         </View>
 
-        <TouchableOpacity
-          style={styles.consentRow}
-          onPress={() => setAgreed(v => !v)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
-            {agreed && <Text style={styles.checkmark}>✓</Text>}
-          </View>
+        <View style={styles.consentRow}>
+          <TouchableOpacity
+            onPress={() => setAgreed(v => !v)}
+            activeOpacity={0.7}
+            style={styles.checkboxHit}
+          >
+            <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+              {agreed && <Text style={styles.checkmark}>✓</Text>}
+            </View>
+          </TouchableOpacity>
           <Text style={styles.consentText}>
-            I agree to the{' '}
-            <Text style={styles.consentLink}>Privacy Policy</Text>
-            {' '}and{' '}
-            <Text style={styles.consentLink}>Terms of Service</Text>
+            {'I agree to the '}
+            <Text style={styles.consentLink} onPress={() => router.push('/(auth)/privacy-policy' as any)}>
+              Privacy Policy
+            </Text>
+            {' and '}
+            <Text style={styles.consentLink} onPress={() => router.push('/(auth)/terms' as any)}>
+              Terms of Service
+            </Text>
           </Text>
-        </TouchableOpacity>
+        </View>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -221,9 +227,10 @@ const styles = StyleSheet.create({
   birthSlash:     { color: '#555', fontSize: 20, marginHorizontal: 8, marginBottom: 12 },
   birthYearInput: { flex: 2, width: undefined },
   consentRow:     { flexDirection: 'row', alignItems: 'flex-start', width: '100%', marginTop: 12, marginBottom: 4 },
+  checkboxHit:    { padding: 4, marginRight: 6, marginTop: -3 },
   checkbox: {
     width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: '#6d28d9',
-    alignItems: 'center', justifyContent: 'center', marginRight: 10, marginTop: 1, flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   checkboxChecked: { backgroundColor: '#6d28d9' },
   checkmark:      { color: '#fff', fontSize: 12, fontWeight: '900', lineHeight: 14 },
