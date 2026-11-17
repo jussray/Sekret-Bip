@@ -59,6 +59,12 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION touch_user_profile_updated_at() FROM PUBLIC;
+
+CREATE TRIGGER user_profiles_updated_at
+  BEFORE UPDATE ON user_profiles
+  FOR EACH ROW EXECUTE FUNCTION touch_user_profile_updated_at();
+
 
 
 -- ── consent_log ──────────────────────────────────────────────────────────────
