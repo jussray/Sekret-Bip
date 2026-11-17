@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -117,6 +118,10 @@ export default function CirclePostDetail() {
     if (key === 'support') {
       setSupportSent(true);
       react('comfort');
+      return;
+    }
+    if (key === 'voice') {
+      Alert.alert('Voice Bip 🎙️', 'Voice replies are coming soon. 💜');
       return;
     }
     setReplyMode(replyMode === key ? null : key);
