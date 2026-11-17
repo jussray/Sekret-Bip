@@ -109,6 +109,9 @@ export function routeForSide(side: 'teen' | 'parent' | null | undefined, key: st
     mindReset: TEEN_ROUTES.mindReset,
     bodyReset: TEEN_ROUTES.bodyReset,
     resources: TEEN_ROUTES.resources,
+    repair: TEEN_ROUTES.bridge,
+    voiceReflect: TEEN_ROUTES.voiceBip,
+    voicereflect: TEEN_ROUTES.voiceBip,
   };
   return teenMap[key] ?? missingRoute('teen', key);
 }
