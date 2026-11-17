@@ -25,7 +25,7 @@ web-build/
 
 # ── Python (services/piper-tts) ───────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
 
 # ── Browser test artifacts ────────────────────────────────────────────────
 playwright-report/
@@ -72,3 +72,6 @@ assets/images/archive/
 
 # ── Logs ──────────────────────────────────────────────────────────────────
 *.log
+
+# ── Claude Code agent worktrees (isolated background-agent working dirs) ──
+.claude/worktrees/

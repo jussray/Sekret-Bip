@@ -20,6 +20,14 @@ test('Cloudflare Access audit is exact-head, credential-minimal, and action-pinn
     assert.ok(workflow.includes(required), `missing Access workflow contract: ${required}`);
   }
 
+  // CLOUDFLARE_ACCESS_API_TOKEN is a Production-environment secret; without this
+  // binding the audit job silently receives an empty token instead of failing loud.
+  assert.match(
+    workflow,
+    /audit:\n(?:.*\n)*?\s*environment:\s*Production\n/u,
+    'audit job must declare environment: Production to read the environment-scoped Access token',
+  );
+
   assert.ok(!workflow.includes('ref: ${{ github.sha }}'), 'account audit must not validate the synthetic PR merge SHA');
   assert.ok(!/uses:\s+actions\/(?:checkout|setup-node|upload-artifact)@v\d+/u.test(workflow), 'security-sensitive actions must be SHA-pinned');
   assert.ok(!workflow.includes('CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}'), 'Access audit must not receive the general Cloudflare API token');
