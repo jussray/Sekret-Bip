@@ -135,29 +135,18 @@ function validateSource(source: unknown): EligibleSource | null {
   return source as EligibleSource;
 }
 
-// ── Parent-safe alert copy ────────────────────────────────────────────────────
-// safety_alerts has real `title`/`summary` columns that reach the parent UI —
-// these must only ever describe severity/category, never source content.
-function buildAlertCopy(
-  alertType: 'moderation' | 'keyword',
-  severity:  Severity,
-): { title: string; summary: string } {
-  const title = severity === 'high' ? 'Wellness check suggested' : 'Wellness note';
-  const summary =
-    alertType === 'moderation'
-      ? 'Automated content review flagged a possible wellness concern.'
-      : 'A keyword pattern flagged a possible wellness concern.';
-  return { title, summary };
-}
-
-// ── Parent link lookup ────────────────────────────────────────────────────────
-// safety_alerts.parent_user_id is a stored column, not resolved via join at
-// read time — the parent-read RLS policy (`teen_user_id = auth.uid() or
-// parent_user_id = auth.uid()`) requires it to be set at write time.
-async function findActiveParent(
+// ── Parent notification ───────────────────────────────────────────────────────
+// safety_alerts.parent_notified_at is stamped on the alert row once a
+// currently-linked parent has been found; parent visibility itself is
+// computed dynamically by RLS (see 20260808222500_reconcile_safety_alert_
+// runtime_schema.sql), not stored on the row. No content leaves this
+// function — push wiring is still a TODO.
+async function notifyParentIfLinked(
   supabase:     ReturnType<typeof createClient>,
   teen_user_id: string,
-): Promise<string | null> {
+  severity:     Severity,
+  alert_id:     number,
+): Promise<void> {
   const { data: link } = await supabase
     .from('parent_links')
     .select('parent_user_id')
@@ -166,23 +155,18 @@ async function findActiveParent(
     .eq('is_active', true)
     .maybeSingle();
 
-  return link?.parent_user_id ?? null;
-}
+  if (!link?.parent_user_id) return;
 
-// ── Parent notification ───────────────────────────────────────────────────────
-// No content, no push wiring yet — see TODO below. Called only after the
-// alert row (with parent_user_id already stored) has been written.
-async function notifyParentIfLinked(
-  parent_user_id: string | null,
-  alert_id:        number,
-  severity:        Severity,
-): Promise<void> {
-  if (!parent_user_id) return;
+  await supabase
+    .from('safety_alerts')
+    .update({ parent_notified_at: new Date().toISOString() })
+    .eq('id', alert_id);
 
   // TODO: wire to Expo push token lookup + expo-server-sdk when push ships.
   // Payload shape when ready:
-  //   { to: <parent_expo_token>, title, body: summary,
-  //     data: { alert_id, severity } }   ← NO source content
+  //   { to: <parent_expo_token>, title: 'Wellness Check',
+  //     body: 'Someone you care about may need support',
+  //     data: { alert_id, severity } }   ← NO content, NO source text
   console.log('SAFETY_SCAN_PARENT_NOTIFY_QUEUED');
 }
 
@@ -242,33 +226,23 @@ Deno.serve(async (req: Request) => {
   }
 
   const alertType = mod?.flagged ? 'moderation' : 'keyword';
-  const { title, summary } = buildAlertCopy(alertType, severity);
-  const parent_user_id = await findActiveParent(supabase, metadata.user_id);
 
-  // Insert safety_alert — no content stored anywhere in this row.
-  //
-  // Live safety_alerts columns (confirmed 2026-07-01, see
-  // docs/circle-v2-migration-plan.md §10.3): id, teen_user_id,
-  // parent_user_id, source_mood_id, source_post_id, alert_type, severity,
-  // title, summary, is_read, created_at, updated_at, scan_metadata.
-  // There is no generic source_table/source_id pair — it's a typed-per-
-  // source design, but under TC-01 the only eligible source is
-  // public_circle_posts, which has no typed FK slot of its own — its
-  // origin is kept in scan_metadata instead of forcing it into a column
-  // it doesn't belong to.
+  // Insert safety_alert — no content stored anywhere in this row. Canonical
+  // runtime columns per 20260808222500_reconcile_safety_alert_runtime_schema.sql:
+  // user_id, alert_type, source_table, source_id, severity, scan_metadata
+  // (plus reviewed_by_parent/parent_notified_at, set elsewhere). teen_user_id/
+  // parent_user_id/title/summary are legacy-only and no longer required.
   const { data: alert, error: alertError } = await supabase
     .from('safety_alerts')
     .insert({
-      teen_user_id:  metadata.user_id,
-      parent_user_id,
+      user_id:       metadata.user_id,
       alert_type:    alertType,
+      source_table:  sourceTable,
+      source_id:     metadata.record_id,
       severity,
-      title,
-      summary,
-      is_read:       false,
-      scan_metadata: { ...scanMetadata, source_table: sourceTable, source_id: metadata.record_id },
+      scan_metadata: scanMetadata,
     })
-    .select('id, parent_user_id')
+    .select('id')
     .single();
 
   if (alertError || !alert) {
@@ -283,10 +257,8 @@ Deno.serve(async (req: Request) => {
     .eq('id', metadata.record_id);
 
   // Parent notification — high severity only, active link only, no content.
-  // parent_user_id was already resolved by findActiveParent and stored on
-  // the row above (the parent-read RLS policy needs it set at write time).
   if (severity === 'high') {
-    await notifyParentIfLinked(alert.parent_user_id, alert.id, severity);
+    await notifyParentIfLinked(supabase, metadata.user_id, severity, alert.id);
   }
 
   return new Response(JSON.stringify({ flagged: true, severity, alert_id: alert.id }), {

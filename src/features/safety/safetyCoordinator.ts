@@ -230,13 +230,10 @@ export async function checkForFlaggedItems(
     // 7-day window — old alerts don't resurface after acknowledged
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
-    // Live safety_alerts columns use teen_user_id (not user_id), and parent
-    // notification state is inferred from parent_user_id being set (there is
-    // no parent_notified_at column) — see supabase/functions/safety-scan.
     const { data, error } = await sb
       .from('safety_alerts')
-      .select('id, severity, parent_user_id')
-      .eq('teen_user_id', user.id)
+      .select('id, severity, parent_notified_at')
+      .eq('user_id', user.id)
       .gte('created_at', since)
       .order('created_at', { ascending: false })
       .limit(5);
@@ -251,7 +248,7 @@ export async function checkForFlaggedItems(
         if (tier !== targetTier) continue;
         const alertId = row.id as number;
         if (await isAcknowledged(alertId)) continue;
-        return buildExperience(tier, companionId, Boolean(row.parent_user_id), alertId);
+        return buildExperience(tier, companionId, Boolean(row.parent_notified_at), alertId);
       }
     }
 
