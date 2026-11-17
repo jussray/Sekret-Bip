@@ -76,6 +76,8 @@ import {
 import { fetchLinkedParentId } from '@/utils/parentLink';
 import { usePoints } from '@/features/activity/ledger';
 import { syncJournal } from '@/utils/sync';
+import { useSyncStatus } from '../../../hooks/useSyncStatus';
+import { SyncBadge } from '../../../components/SyncBadge';
 
 const ACTIVE_BRIDGE_SHARE_STATUSES = new Set(['pending', 'processing', 'ready', 'viewed']);
 
@@ -254,6 +256,7 @@ export default function TeenPagesRoute() {
   );
   const [avatarState, setAvatarState] = useState<SekretAvatarState>('neutral');
   const { total: totalPoints } = usePoints();
+  const { syncStatus, withSyncWrap } = useSyncStatus();
 
   // ── Composer state ─────────────────────────────────────────────────────────
   const [locked, setLocked]     = useState(false);
@@ -400,7 +403,7 @@ export default function TeenPagesRoute() {
     };
 
     setEntries(prev => [...prev, entry]);
-    syncJournal(entry);
+    void withSyncWrap(async () => syncJournal(entry));
     setJournalText('');
     setMediaUri(undefined);
     setMediaType(undefined);
@@ -866,6 +869,8 @@ export default function TeenPagesRoute() {
             </View>
           </View>
         )}
+
+        <SyncBadge status={syncStatus} color={companion.accent} />
 
         {/* Composer */}
         <KeyboardAvoidingView
