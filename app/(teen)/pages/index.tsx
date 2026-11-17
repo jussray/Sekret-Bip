@@ -35,6 +35,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type TextInputInstance,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -327,7 +328,7 @@ export default function TeenPagesRoute() {
   }, []);
 
   const flatListRef = useRef<FlatList<JournalEntry>>(null);
-  const composerRef = useRef<TextInput>(null);
+  const composerRef = useRef<TextInputInstance>(null);
 
   // Newest pages across every tab for the "My little universe" grid.
   const recentPages = useMemo(
