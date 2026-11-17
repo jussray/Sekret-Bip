@@ -229,7 +229,7 @@ export default function LoginScreen() {
         <View style={[s.inputWrap, error && !email ? s.inputError : null]}>
           <TextInput
             style={s.input}
-            placeholder="Phone number, username or email"
+            placeholder="Email address"
             placeholderTextColor={MUTED}
             autoCapitalize="none"
             autoComplete="email"

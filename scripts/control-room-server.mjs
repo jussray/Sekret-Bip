@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const host = '127.0.0.1';
 const port = Number(process.env.CONTROL_ROOM_LOCAL_PORT || 4317);
+const webPort = Number(process.env.CONTROL_ROOM_WEB_PORT || 8081);
 const token = String(process.env.CONTROL_ROOM_LOCAL_TOKEN || '');
 const timeoutMs = Number(process.env.CONTROL_ROOM_MISSION_TIMEOUT_MS || 10 * 60 * 1000);
 const terminationGraceMs = Number(process.env.CONTROL_ROOM_TERMINATION_GRACE_MS || 3_000);
@@ -30,6 +31,7 @@ let latestRun = null;
 
 if (token.length < 32) throw new Error('CONTROL_ROOM_LOCAL_TOKEN must be an ephemeral token of at least 32 characters.');
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('CONTROL_ROOM_LOCAL_PORT must be a valid non-privileged port.');
+if (!Number.isInteger(webPort) || webPort < 1024 || webPort > 65535) throw new Error('CONTROL_ROOM_WEB_PORT must be a valid non-privileged port.');
 if (!Number.isInteger(timeoutMs) || timeoutMs < 100) throw new Error('CONTROL_ROOM_MISSION_TIMEOUT_MS must be at least 100 milliseconds.');
 if (!Number.isInteger(terminationGraceMs) || terminationGraceMs < 100 || terminationGraceMs > 60_000) {
   throw new Error('CONTROL_ROOM_TERMINATION_GRACE_MS must be between 100 and 60000 milliseconds.');
@@ -47,14 +49,16 @@ function bearerToken(header) {
   return value.startsWith(prefix) ? value.slice(prefix.length) : '';
 }
 
-function isLocalOrigin(origin) {
-  if (!origin) return true;
-  try {
-    const value = new URL(origin);
-    return value.protocol === 'http:' && (value.hostname === '127.0.0.1' || value.hostname === 'localhost');
-  } catch {
-    return false;
-  }
+const trustedBrowserOrigins = Object.freeze([
+  `http://localhost:${webPort}`,
+  `http://127.0.0.1:${webPort}`,
+  `http://localhost:${port}`,
+  `http://127.0.0.1:${port}`,
+]);
+
+function approvedBrowserOrigin(origin) {
+  if (!origin) return '';
+  return trustedBrowserOrigins.find(allowed => allowed === origin) ?? null;
 }
 
 function writeJson(res, status, body, origin = '') {
@@ -385,7 +389,10 @@ function persistFounderOperatorPlan(plan) {
   for (let version = 1; version <= 10_000; version += 1) {
     const candidate = path.join(reportDir, version === 1 ? `${plan.id}.json` : `${plan.id}-v${version}.json`);
     try {
-      fs.writeFileSync(candidate, content, { flag: 'wx' });
+      // Reviewed false-positive: plan.id is a strict basename, parent directories reject symlinks,
+      // and exclusive create (wx) prevents overwrites or following a link at this filename.
+      // bearer:disable javascript_lang_path_traversal
+      fs.writeFileSync(candidate, content, { flag: 'wx', mode: 0o600 });
       reportPath = candidate;
       break;
     } catch (error) {
@@ -414,8 +421,8 @@ function persistFounderOperatorPlan(plan) {
 }
 
 const server = createServer(async (req, res) => {
-  const origin = String(req.headers.origin || '');
-  if (!isLocalOrigin(origin)) return writeJson(res, 403, { error: 'origin_not_allowed' });
+  const origin = approvedBrowserOrigin(String(req.headers.origin || ''));
+  if (origin === null) return writeJson(res, 403, { error: 'origin_not_allowed' });
 
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
@@ -458,14 +465,35 @@ const server = createServer(async (req, res) => {
 });
 
 server.listen(port, host, () => {
-  console.log(`Control Room local agent ready at http://${host}:${port}`);
+  console.log('CONTROL_ROOM_LOCAL_AGENT_READY');
   console.log('Loopback-only. Only fixed missions and fixed-path Founder Operator evidence persistence are available.');
 });
 
+let shuttingDown = false;
 function shutdown() {
-  if (activeChild) terminateProcessTree(activeChild, 'SIGTERM');
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 1_000).unref();
+  if (shuttingDown) return;
+  shuttingDown = true;
+  const missionChild = activeChild;
+  const started = Date.now();
+  let serverClosed = false;
+  if (missionChild) terminateProcessTree(missionChild, 'SIGTERM');
+  server.close(() => { serverClosed = true; });
+
+  const finishShutdown = () => {
+    const treeAlive = missionChild && processTreeAlive(missionChild.pid);
+    if (treeAlive && Date.now() - started >= terminationGraceMs) {
+      // Retain the original child pid so descendants are still terminated if
+      // the child closes before its process group does.
+      if (activeChild) terminateProcessTree(activeChild, 'SIGKILL');
+      else terminateProcessTree(missionChild, 'SIGKILL');
+    }
+    if (serverClosed && !treeAlive) return process.exit(0);
+    if (Date.now() - started >= terminationGraceMs + 2_000) {
+      return process.exit(1);
+    }
+    setTimeout(finishShutdown, 40).unref();
+  };
+  finishShutdown();
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

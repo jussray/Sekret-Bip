@@ -2,6 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {resolveCloudflareAccessServiceAuth} from './cloudflare-access-service-auth.mjs';
+import {
+  hasCloudflareAccessHtmlMarker,
+  hasCloudflareChallengeHtmlMarker,
+} from './probe-production-release-endpoints.mjs';
+
+// Default number of consecutive polls carrying the SAME transport-block
+// classification (Cloudflare Access login vs. WAF/bot-challenge) before
+// failing fast. A single blip isn't enough — momentary challenge responses
+// happen during a live cutover — but this incident (#696, 2026-10-18) showed
+// the opposite failure mode: the full 25-30 minute timeout elapsed while a
+// persistent challenge page silently masqueraded as "worker not yet
+// deployed" (readinessState stuck at worker-health-missing) the entire time.
+const DEFAULT_TRANSPORT_BLOCK_FAST_FAIL_POLLS = 3;
 
 export const REQUIRED_CLOUDFLARE_CHECKS = Object.freeze([
   'Workers Builds: sekret-backend',
@@ -129,6 +142,15 @@ function sleep(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+// A transient blip (one poll hitting a challenge page mid-cutover) must not
+// trip the fast-fail path — only the SAME block kind repeating, poll after
+// poll, distinguishes a persistent Cloudflare interception from noise.
+export function trackConsecutiveBlock(state, blocked) {
+  if (!blocked) return {kind: null, count: 0};
+  if (state.kind === blocked) return {kind: blocked, count: state.count + 1};
+  return {kind: blocked, count: 1};
+}
+
 async function fetchCheckRuns({repository, sha, token}) {
   const [owner, repo] = repository.split('/');
   if (!owner || !repo) throw new Error(`Invalid GITHUB_REPOSITORY: ${repository}`);
@@ -154,18 +176,43 @@ async function fetchCheckRuns({repository, sha, token}) {
   return Array.isArray(payload.check_runs) ? payload.check_runs : [];
 }
 
+// Returns {json, blocked, status}. `blocked` is 'access', 'challenge', or
+// null — distinguishing "Cloudflare intercepted this request" from "the
+// endpoint responded (or failed) on its own merits" is the whole point: a
+// bare `null` return (the prior behavior) made a Cloudflare challenge page
+// indistinguishable from a worker that simply isn't deployed yet.
 async function fetchJsonWithNoCache(rawUrl, accessAuth) {
   const url = new URL(rawUrl);
   url.searchParams.set('verify', `${Date.now()}-${Math.random().toString(16).slice(2)}`);
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json',
-      'Cache-Control': 'no-cache, no-store, max-age=0',
-      ...accessAuth.headers,
-    },
-  });
-  if (!response.ok) return null;
-  return response.json().catch(() => null);
+
+  let response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        Accept: 'application/json',
+        'Cache-Control': 'no-cache, no-store, max-age=0',
+        ...accessAuth.headers,
+      },
+    });
+  } catch {
+    return {json: null, blocked: null, status: null};
+  }
+
+  const contentType = response.headers.get('content-type') ?? '';
+  let blocked = null;
+  if (contentType.toLowerCase().startsWith('text/html') && typeof response.clone === 'function') {
+    try {
+      const body = await response.clone().text();
+      if (hasCloudflareAccessHtmlMarker(body)) blocked = 'access';
+      else if (hasCloudflareChallengeHtmlMarker(body)) blocked = 'challenge';
+    } catch {
+      blocked = null;
+    }
+  }
+
+  if (!response.ok || blocked) return {json: null, blocked, status: response.status};
+  const json = await response.json().catch(() => null);
+  return {json, blocked: null, status: response.status};
 }
 
 async function fetchReleaseMarker(releaseUrl, accessAuth) {
@@ -280,6 +327,9 @@ async function verifyCloudflareNativeDeploy() {
   const backendHealthUrl = process.env.BACKEND_HEALTH_URL ?? 'https://api.sekretbip.net/health';
   const timeoutMs = Number(process.env.CLOUDFLARE_CHECK_TIMEOUT_MS ?? 25 * 60 * 1000);
   const pollMs = Number(process.env.CLOUDFLARE_CHECK_POLL_MS ?? 10_000);
+  const transportBlockFastFailPolls = Number(
+    process.env.CLOUDFLARE_TRANSPORT_BLOCK_FAST_FAIL_POLLS ?? DEFAULT_TRANSPORT_BLOCK_FAST_FAIL_POLLS,
+  );
   const evidencePath = process.env.CLOUDFLARE_EVIDENCE_PATH ?? 'artifacts/cloudflare-native-deploy.json';
   const accessAuth = resolveCloudflareAccessServiceAuth();
 
@@ -289,6 +339,8 @@ async function verifyCloudflareNativeDeploy() {
 
   const startedAtMs = Date.now();
   const deadline = startedAtMs + timeoutMs;
+  let consecutiveMarkerBlock = {kind: null, count: 0};
+  let consecutiveHealthBlock = {kind: null, count: 0};
   let checkEvaluation = evaluateCloudflareChecks([]);
   let releaseEvaluation = evaluateReleaseMarker(null, sha);
   let workerEvaluation = evaluateWorkerRuntime(null, sha);
@@ -332,12 +384,60 @@ async function verifyCloudflareNativeDeploy() {
     }
 
     checkEvaluation = evaluateCloudflareChecks(allCheckRuns);
-    const [marker, workerHealth] = await Promise.all([
-      fetchReleaseMarker(releaseUrl, accessAuth).catch(() => null),
-      fetchWorkerHealth(backendHealthUrl, accessAuth).catch(() => null),
+    const fallbackFetchResult = {json: null, blocked: null, status: null};
+    const [markerFetch, healthFetch] = await Promise.all([
+      fetchReleaseMarker(releaseUrl, accessAuth).catch(() => fallbackFetchResult),
+      fetchWorkerHealth(backendHealthUrl, accessAuth).catch(() => fallbackFetchResult),
     ]);
-    releaseEvaluation = evaluateReleaseMarker(marker, sha);
-    workerEvaluation = evaluateWorkerRuntime(workerHealth, sha);
+    releaseEvaluation = evaluateReleaseMarker(markerFetch.json, sha);
+    workerEvaluation = evaluateWorkerRuntime(healthFetch.json, sha);
+
+    consecutiveMarkerBlock = trackConsecutiveBlock(consecutiveMarkerBlock, markerFetch.blocked);
+    consecutiveHealthBlock = trackConsecutiveBlock(consecutiveHealthBlock, healthFetch.blocked);
+
+    const persistentBlock =
+      consecutiveMarkerBlock.count >= transportBlockFastFailPolls
+        ? {surface: 'frontend', kind: consecutiveMarkerBlock.kind}
+        : consecutiveHealthBlock.count >= transportBlockFastFailPolls
+          ? {surface: 'backend', kind: consecutiveHealthBlock.kind}
+          : null;
+
+    if (persistentBlock) {
+      const readinessState =
+        persistentBlock.kind === 'access' ? 'cloudflare-access-intercepted' : 'cloudflare-challenge-intercepted';
+      latestEvidence = {
+        ...buildCloudflareEvidence({
+          repository,
+          sha,
+          releaseUrl,
+          backendHealthUrl,
+          checkEvaluation,
+          releaseEvaluation,
+          workerEvaluation,
+          allCheckRuns,
+          startedAtMs,
+          observedAtMs,
+          status: 'failed',
+        }),
+        readinessState,
+        transportBlocker: {
+          surface: persistentBlock.surface,
+          kind: persistentBlock.kind,
+          consecutivePolls: persistentBlock.surface === 'frontend' ? consecutiveMarkerBlock.count : consecutiveHealthBlock.count,
+          accessServiceAuthConfigured: accessAuth.configured,
+        },
+      };
+      writeEvidence(evidencePath, latestEvidence);
+
+      const guidance =
+        persistentBlock.kind === 'access'
+          ? 'This is a Cloudflare Access (Zero Trust SSO) login page. Configure CLOUDFLARE_ACCESS_CLIENT_ID/SECRET as a service-token bypass for this route, or add an Access bypass policy.'
+          : 'This is a Cloudflare WAF-layer bot/managed-challenge page (Bot Fight Mode, "I\'m Under Attack Mode", or a custom WAF rule). An Access service token does NOT clear this — add a WAF/Bot Fight Mode exception for this route.';
+      throw new Error(
+        `Cloudflare is intercepting the ${persistentBlock.surface} health/release probe with a ${persistentBlock.kind} page across ${transportBlockFastFailPolls} consecutive polls — failing fast instead of waiting out the full timeout. ${guidance} evidence: ${evidencePath}`,
+      );
+    }
+
     const readinessState = classifyCloudflareReadiness(checkEvaluation, releaseEvaluation, workerEvaluation);
     const completion = evaluateCloudflareDeploymentCompletion(checkEvaluation, releaseEvaluation, workerEvaluation);
     const complete = completion.complete;

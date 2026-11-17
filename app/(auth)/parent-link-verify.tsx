@@ -16,6 +16,7 @@ import {
   type ParentInviteEmailStatus,
 } from '@/utils/parentLink';
 import { fetchPendingInviteCodeResult } from '@/utils/pendingParentInvite';
+import { fetchParentLinkStatuses, reviewParentLinkRequestResult } from '@/utils/relationshipLinkStatus';
 import { useVerificationContext } from '@/context/VerificationContext';
 import { confirmOwnAdultTeenAgeAssurance } from '@/services/teenAgeAssurance';
 import { getSupabase } from '@/utils/supabase';
@@ -40,6 +41,7 @@ export default function ParentLinkVerifyScreen() {
   const [emailMessage, setEmailMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
+  const [pendingAdultRequestId, setPendingAdultRequestId] = useState<string | null>(null);
   const [lookupFailed, setLookupFailed] = useState(false);
   const [error, setError] = useState('');
   const [ageRange, setAgeRange] = useState<string | null>(null);
@@ -74,7 +76,22 @@ export default function ParentLinkVerifyScreen() {
     return () => { mounted = false; };
   }, []);
 
+  const readClaimedAdultRequest = useCallback(async (): Promise<'claimed' | 'none' | 'error'> => {
+    const result = await fetchParentLinkStatuses('teen');
+    if (!result.ok) {
+      setLookupFailed(true);
+      setError(result.message);
+      return 'error';
+    }
+    const pending = result.value.find(link => link.status === 'pending' && !link.isActive);
+    setPendingAdultRequestId(pending?.linkId ?? null);
+    if (pending) setCode(null);
+    return pending ? 'claimed' : 'none';
+  }, []);
+
   const createInvite = useCallback(async (parentEmailOverride?: string): Promise<boolean> => {
+    const claimed = await readClaimedAdultRequest();
+    if (claimed !== 'none') return false;
     const result = await generateInviteCodeWithDeliveryResult({
       parentEmail: parentEmailOverride,
     });
@@ -99,7 +116,7 @@ export default function ParentLinkVerifyScreen() {
 
     await refreshVerification();
     return true;
-  }, [refreshVerification]);
+  }, [readClaimedAdultRequest, refreshVerification]);
 
   useEffect(() => {
     if (isVerificationLoading) return;
@@ -113,6 +130,12 @@ export default function ParentLinkVerifyScreen() {
     let mounted = true;
     setCheckingExisting(true);
     void (async () => {
+      const claimed = await readClaimedAdultRequest();
+      if (!mounted) return;
+      if (claimed !== 'none') {
+        setCheckingExisting(false);
+        return;
+      }
       const lookup = await fetchPendingInviteCodeResult();
       if (!mounted) return;
       if (!lookup.ok) {
@@ -132,13 +155,15 @@ export default function ParentLinkVerifyScreen() {
       setCheckingExisting(false);
     })();
     return () => { mounted = false; };
-  }, [createInvite, isVerificationLoading, parentLinkState]);
+  }, [createInvite, isVerificationLoading, parentLinkState, readClaimedAdultRequest]);
 
   async function retryExistingCodeLookup() {
     if (parentLinkState === 'active') return;
     setLoading(true);
     setError('');
     setEmailMessage('');
+    const claimed = await readClaimedAdultRequest();
+    if (claimed !== 'none') { setLoading(false); return; }
     const lookup = await fetchPendingInviteCodeResult();
     if (!lookup.ok) {
       setLookupFailed(true);
@@ -189,8 +214,32 @@ export default function ParentLinkVerifyScreen() {
     setError('');
     try {
       await refreshVerification();
+      await readClaimedAdultRequest();
     } catch {
       setError('Could not check connection or verification status. Check your connection and try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function reviewAdultRequest(approve: boolean) {
+    const linkId = pendingAdultRequestId;
+    if (!linkId || loading) return;
+    setLoading(true);
+    setError('');
+    try {
+      const result = await reviewParentLinkRequestResult(linkId, approve);
+      if (!result.ok || !result.value) {
+        setError(result.ok
+          ? 'This request is no longer pending. Check connection status and retry.'
+          : result.message);
+        return;
+      }
+      setPendingAdultRequestId(null);
+      setCode(null);
+      await refreshVerification();
+    } catch {
+      setError('Could not review the request. Check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -213,6 +262,7 @@ export default function ParentLinkVerifyScreen() {
   const adultSelfAssuranceEligible = profileChecked && ageRange === '18-19';
   const displayCode = code ?? '•'.repeat(PARENT_INVITE_CODE_LENGTH);
   const canSendEmail = !connectionActive
+    && !pendingAdultRequestId
     && Boolean(normalizeEmailInput(parentEmail))
     && !loading
     && !checkingExisting;
@@ -244,6 +294,31 @@ export default function ParentLinkVerifyScreen() {
           </View>
         ) : (
           <>
+            {pendingAdultRequestId ? (
+              <View style={styles.connectedCard}>
+                <Text style={styles.connectedTitle}>Adult connection request</Text>
+                <Text style={styles.connectedBody}>
+                  An adult entered your private code. They cannot access Bridge until you choose to approve.
+                </Text>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.btn, loading && styles.btnDim]}
+                  disabled={loading}
+                  onPress={() => void reviewAdultRequest(true)}
+                >
+                  <Text style={styles.btnText}>Approve parent request</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.outlineBtn, loading && styles.outlineBtnDim]}
+                  disabled={loading}
+                  onPress={() => void reviewAdultRequest(false)}
+                >
+                  <Text style={styles.outlineBtnText}>Reject parent request</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
             <View style={styles.codeCard}>
               <Text style={styles.codeLabel}>
                 {code
@@ -321,6 +396,8 @@ export default function ParentLinkVerifyScreen() {
                 </Text>
               )}
             </TouchableOpacity>
+              </>
+            )}
           </>
         )}
 
