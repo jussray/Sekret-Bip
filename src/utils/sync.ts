@@ -15,6 +15,7 @@
 // because the cloud is down. Errors are logged and swallowed.
 
 import { getSupabase, TABLES } from './supabase';
+import { isGrowthTrackKey, type GrowthCloud } from '@/features/growth/progress';
 import { getCurrentSessionUserId } from '@/services/session';
 import { loadState } from './storage';
 import { emitEvent } from '@/features/activity/events';
@@ -687,6 +688,30 @@ export async function pullAll(): Promise<{
     return null;
   }
 }
+
+// Growth milestones: idempotent, ownership-checked writes for permanent accounts only.
+export const growthMilestoneCloud: GrowthCloud = {
+  async list(ownerId) {
+    if (await currentUserId() !== ownerId) throw new Error('GROWTH_OWNER_CHANGED');
+    const sb = getSupabase();
+    if (!sb) throw new Error('GROWTH_CLOUD_UNAVAILABLE');
+    const { data, error } = await sb.from(TABLES.growthMilestones)
+      .select('track_key').eq('user_id', ownerId);
+    if (error) throw error;
+    return (data ?? []).map(row => row.track_key).filter(isGrowthTrackKey);
+  },
+  async write(ownerId, keys) {
+    if (keys.length === 0) return;
+    if (await currentUserId() !== ownerId) throw new Error('GROWTH_OWNER_CHANGED');
+    const sb = getSupabase();
+    if (!sb) throw new Error('GROWTH_CLOUD_UNAVAILABLE');
+    const { error } = await sb.from(TABLES.growthMilestones).upsert(
+      keys.map(track_key => ({ user_id: ownerId, track_key })),
+      { onConflict: 'user_id,track_key', ignoreDuplicates: true },
+    );
+    if (error) throw error;
+  },
+};
 
 // ── Re-export compat modules so all @/utils/sync imports keep working ────────
 export * from './parentBridgeCompat';

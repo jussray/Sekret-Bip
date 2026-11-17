@@ -107,6 +107,8 @@ export const TABLES = {
   // ── Compliance tables (20260724_compliance_foundation.sql) ──────────────
   userProfiles:        'user_profiles',
   consentLog:          'consent_log',
+  // Account-owned Growth milestones (20261117 migration).
+  growthMilestones:   'growth_milestones',
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

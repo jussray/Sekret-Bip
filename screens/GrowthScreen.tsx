@@ -19,14 +19,13 @@
 // to onMilestone() so progress can count toward streaks once Supabase lands.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Text, TouchableOpacity, ScrollView, View,
   ImageBackground, Animated, Easing, StyleSheet, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import type { GrowthTrackKey } from '../src/features/growth/progress';
 
-const GROWTH_COMPLETED_KEY = 'bip_growth_completed';
 import { getRoomBg, TimeOfDay } from '../constants/theme';
 import { glowForMood as glowFor } from '../constants/moodGlow';
 
@@ -40,8 +39,7 @@ function timeOfDay(): TimeOfDay {
 }
 
 // ── Tracks ───────────────────────────────────────────────────────────────────
-type TrackKey =
-  | 'focus' | 'confidence' | 'mindset' | 'money' | 'school' | 'social' | 'habits';
+type TrackKey = GrowthTrackKey;
 
 interface Track {
   key:       TrackKey;
@@ -162,12 +160,15 @@ interface GrowthScreenProps {
   selectedSekret:  string;
   setScreen:       (s: string) => void;
   BottomNav:       React.ReactNode;
-  onMilestone?:    () => void;
+  onMilestone?:    (key: TrackKey) => void;
+  completedKeys:   readonly TrackKey[];
+  progressReady:   boolean;
   streakDays?:     number;
 }
 
 export function GrowthScreen({
-  t, mood, selectedSekret, setScreen, BottomNav, onMilestone, streakDays = 0,
+  t, mood, selectedSekret, setScreen, BottomNav, onMilestone,
+  completedKeys, progressReady, streakDays = 0,
 }: GrowthScreenProps) {
 
   const isRylane = selectedSekret === 'rylane';
@@ -179,25 +180,6 @@ export function GrowthScreen({
   const glow     = useMemo(() => glowFor(mood), [mood]);
 
   const [openKey, setOpenKey] = useState<TrackKey | null>(null);
-  const [completed, setCompleted] = useState<Record<TrackKey, boolean>>({
-    focus: false, confidence: false, mindset: false,
-    money: false, school: false, social: false, habits: false,
-  });
-
-  useEffect(() => {
-    AsyncStorage.getItem(GROWTH_COMPLETED_KEY).then(raw => {
-      if (!raw) return;
-      try {
-        const keys = JSON.parse(raw) as TrackKey[];
-        setCompleted(prev => {
-          const next = { ...prev };
-          keys.forEach(k => { if (k in next) next[k] = true; });
-          return next;
-        });
-      } catch {}
-    });
-  }, []);
-
   // ── Animations ──────────────────────────────────────────────────────────
   const fadeHero   = useRef(new Animated.Value(0)).current;
   const fadeStreak = useRef(new Animated.Value(0)).current;
@@ -234,13 +216,7 @@ export function GrowthScreen({
   const breathOpacity = breath.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1   ] });
 
   const markComplete = (key: TrackKey) => {
-    setCompleted(prev => {
-      const next = { ...prev, [key]: true };
-      const done = (Object.keys(next) as TrackKey[]).filter(k => next[k]);
-      AsyncStorage.setItem(GROWTH_COMPLETED_KEY, JSON.stringify(done)).catch(() => {});
-      return next;
-    });
-    onMilestone?.();
+    if (progressReady && !completedKeys.includes(key)) onMilestone?.(key);
   };
 
   const heroTitle = isRylane ? 'Growth 🪱' : 'Growth 🌱';
@@ -320,7 +296,7 @@ export function GrowthScreen({
           <View style={styles.grid}>
             {TRACKS.map(track => {
               const isOpen = openKey === track.key;
-              const done   = completed[track.key];
+              const done   = completedKeys.includes(track.key);
               return (
                 <View key={track.key} style={{ width: '100%' }}>
                   <TouchableOpacity
@@ -362,10 +338,10 @@ export function GrowthScreen({
                         <TouchableOpacity
                           style={[styles.doneBtn, { backgroundColor: done ? '#86efac' : glow, shadowColor: done ? '#86efac' : glow }]}
                           onPress={() => markComplete(track.key)}
-                          disabled={done}
+                          disabled={done || !progressReady}
                         >
                           <Text style={styles.doneBtnText}>
-                            {done ? 'logged ✓' : (isRylane ? 'bet, did one' : 'i tried one 💜')}
+                            {!progressReady ? 'loading progress…' : done ? 'logged ✓' : (isRylane ? 'bet, did one' : 'i tried one 💜')}
                           </Text>
                         </TouchableOpacity>
                       </View>
