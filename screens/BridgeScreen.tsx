@@ -263,7 +263,7 @@ export function BridgeScreen({
               <Animated.Text style={[styles.sentEmoji, { transform: [{ scale: breathScale }], opacity: breathOpacity }]}>💌</Animated.Text>
               <Text style={styles.sentTitle}>sent to your person.</Text>
               <Text style={styles.sentSub}>
-                they'll see it as a gentle note. you did something brave 💜
+                they'll see that you reached out — not the words you typed. you did something brave 💜
               </Text>
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: glow, marginTop: 18 }]}
