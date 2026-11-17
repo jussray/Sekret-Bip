@@ -91,7 +91,7 @@ export interface ParentProfile {
   setupComplete: boolean;
 }
 
-export type PersonalityId = 'raylene' | 'rylane' | 'cloud' | 'night' | 'oracle' | 'parentCoach';
+export type PersonalityId = 'raylene' | 'rylane' | 'cloud' | 'night' | 'ja' | 'parentCoach';
 
 export type ScreenKey =
   | 'home'

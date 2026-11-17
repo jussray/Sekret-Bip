@@ -25,7 +25,7 @@ import { syncOracleSession, loadOracleSession } from '@/utils/sync';
 import { buildOracleContext } from '@/services/oracleDiscovery';
 import { emitEvent } from '@/features/activity/events';
 
-const VALID_IDS: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'oracle'];
+const VALID_IDS: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'ja'];
 
 const TAB_BAR_HEIGHT = 68;
 const KB_OFFSET = Platform.OS === 'ios' ? TAB_BAR_HEIGHT : 0;

@@ -55,7 +55,7 @@ function normalizeCharacter(value: unknown): CharacterId {
   if (raw.includes('rylane')) return 'rylane';
   if (raw.includes('cloud')) return 'cloud';
   if (raw.includes('night')) return 'night';
-  if (raw.includes('sekret') || raw === 'secret' || raw === 'oracle') return 'sekret';
+  if (raw.includes('sekret') || raw === 'secret' || raw === 'oracle' || raw === 'ja') return 'sekret';
   return 'raylene';
 }
 

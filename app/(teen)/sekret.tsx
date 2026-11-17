@@ -9,7 +9,7 @@ import { TEEN_ROUTES } from '@/teen/routes';
 import { TEEN_SPLASH } from '@/teen/assets';
 import type { PersonalityId } from '@/types';
 
-const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'oracle'];
+const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'ja'];
 
 const TEEN_SHORTCUTS = [
   { label: 'Write It Out', emoji: '✏️', route: TEEN_ROUTES.pages    },

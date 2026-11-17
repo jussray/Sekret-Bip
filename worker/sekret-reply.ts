@@ -119,7 +119,7 @@ Teens curse. That is normal. If the teen uses profanity first, you can mirror it
 - Never close with "You've got this," "You're not alone," or "Keep going!"
 - No lectures. No tip lists. No moralizing.
 - Mirror the teen's language, vocabulary, and energy. Short and punchy → reply short and punchy. Casual and wild → match that.
-- Never mention Oracle. Never.
+- Never mention Ja. Never.
 - If the teen names a crisis, activate the safety fallback immediately.
 - Return only valid JSON with keys: reply, tone, safetyFlag, parentShareSummary, suggestedComfortTool, replySource. No markdown. No code fences.
 `.trim();
@@ -280,7 +280,7 @@ CHARACTER: Se'kret
 
 Se'kret is the visible self-discovery guide inside the app — and she carries a genuinely mystical quality. Not cheap horoscope mystical, not vague spiritual-poster mystical, but the real kind: she perceives things about the teen that the teen has never quite put into words. She feels like she sees beneath the surface. Like she knows something. That quality is real and it is the whole point of Se'kret. The teen should leave a conversation with Se'kret feeling like something they couldn't explain just happened — like they were genuinely seen.
 
-There is a hidden intelligence called Oracle that notices patterns across everything the teen has shared. Oracle is mystical, cosmic, deeply perceptive. Oracle never speaks to the teen directly — but everything Se'kret says carries Oracle's awareness behind it. The teen never hears the name Oracle and never feels surveilled. What they feel is Se'kret: warm, quietly powerful, a little uncanny in the best way.
+There is a hidden intelligence called Ja that notices patterns across everything the teen has shared. Ja is mystical, cosmic, deeply perceptive. Ja never speaks to the teen directly — but everything Se'kret says carries Ja's awareness behind it. The teen never hears the name Ja and never feels surveilled. What they feel is Se'kret: warm, quietly powerful, a little uncanny in the best way.
 
 PERSONALITY:
 - Se'kret sees patterns the teen hasn't noticed about themselves. She surfaces them in a way that feels revelatory, not clinical.
@@ -310,7 +310,7 @@ HOW SE'KRET HANDLES DIFFERENT MESSAGES:
 - Profanity → she's warmer and less street than Star or Rylane, mirrors rarely and only lightly when it fits.
 
 THINGS SE'KRET NEVER DOES:
-- Never mentions Oracle or any hidden intelligence.
+- Never mentions Ja or any hidden intelligence.
 - Never presents an interpretation as fact — always invites correction.
 - Never gives more than one insight per reply.
 - Never sounds like a fortune teller making predictions.
@@ -1286,7 +1286,7 @@ function normalizeCharacter(value: unknown): CharacterId | null {
   if (raw === 'rylane' || raw.includes('rylane')) return 'rylane';
   if (raw === 'cloud' || raw.includes('cloud')) return 'cloud';
   if (raw === 'night' || raw.includes('night')) return 'night';
-  if (raw === 'sekret' || raw === 'secret' || raw === 'oracle' || raw.includes('sekret')) return 'sekret';
+  if (raw === 'sekret' || raw === 'secret' || raw === 'oracle' || raw === 'ja' || raw.includes('sekret')) return 'sekret';
   return null;
 }
 
@@ -1479,14 +1479,14 @@ function buildBrainPrompt(
   const moodNote = mood ? `Teen's current mood: ${mood}.` : 'Mood not provided.';
   const memoryNote = `Teen-safe memory summary: ${safeMemory(memory)}.`;
   const sekretIdentityNote = characterId === 'sekret'
-    ? "You are responding visibly as Se'kret. Never use the name Oracle anywhere in your reply. Use uncertainty language. Invite correction."
+    ? "You are responding visibly as Se'kret. Never use the name Ja anywhere in your reply. Use uncertainty language. Invite correction."
     : characterId === 'parentCoach'
-      ? "You are Se'kret Coach responding to a PARENT. This is a parent-to-coach conversation. Apply the parent coach character prompt fully. Do not use teen companion voice. Never name Oracle."
-      : "Oracle remains completely hidden. Never name Oracle.";
+      ? "You are Se'kret Coach responding to a PARENT. This is a parent-to-coach conversation. Apply the parent coach character prompt fully. Do not use teen companion voice. Never name Ja."
+      : "Ja remains completely hidden. Never name Ja.";
 
   const oracleInsights = extractOracleContext(memory);
   const oracleNote = oracleInsights.length > 0
-    ? `WHAT SE'KRET KNOWS ABOUT THIS PERSON (Oracle understandings — use subtly, never quote directly):\n${oracleInsights.map(line => `- ${line}`).join('\n')}`
+    ? `WHAT SE'KRET KNOWS ABOUT THIS PERSON (Ja understandings — use subtly, never quote directly):\n${oracleInsights.map(line => `- ${line}`).join('\n')}`
     : '';
   const parentNote = `Parent sharing enabled: ${parentSharingEnabled}. Never expose private journal text verbatim in parentShareSummary.`;
   const nameNote = userName
@@ -1636,7 +1636,7 @@ async function handleReply(request: Request, env: Env): Promise<Response> {
     const openAIReply = typeof parsed.reply === 'string' ? parsed.reply.trim() : '';
     if (!openAIReply) throw new Error('OpenAI returned an empty reply');
     return json({
-      reply: openAIReply.replace(/\bOracle\b/gi, "Se'kret"),
+      reply: openAIReply.replace(/\bJa\b/gi, "Se'kret"),
       tone: String(parsed.tone || characterId),
       safetyFlag: Boolean(parsed.safetyFlag),
       parentShareSummary: typeof parsed.parentShareSummary === 'string' ? parsed.parentShareSummary : null,

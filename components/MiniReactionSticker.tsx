@@ -10,7 +10,7 @@ import { IMAGES } from '../constants/theme';
 import { getContextSticker, StickerContext } from '../constants/characterStickers';
 import { getAvatarForState } from '../constants/characterAvatars';
 
-export type MiniStickerCharacter = 'raylene' | 'rylane' | 'cloud' | 'night' | 'oracle' | null;
+export type MiniStickerCharacter = 'raylene' | 'rylane' | 'cloud' | 'night' | 'ja' | null;
 
 interface MiniReactionStickerProps {
   character: MiniStickerCharacter;
@@ -19,7 +19,7 @@ interface MiniReactionStickerProps {
 }
 
 export function MiniReactionSticker({ character, screenContext, size = 40 }: MiniReactionStickerProps) {
-  if (!character || character === 'oracle') return null;
+  if (!character || character === 'ja') return null;
 
   const ctx: StickerContext = screenContext ?? 'general';
 

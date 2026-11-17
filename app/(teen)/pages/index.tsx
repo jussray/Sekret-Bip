@@ -78,12 +78,12 @@ const COMPANIONS = [
   { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure' },
   { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady'    },
   { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages'     },
-  { id: 'oracle',  name: 'Oracle',  accent: '#c7b87a', vibe: 'guided discovery'  },
+  { id: 'ja',      name: 'Ja',      accent: '#c7b87a', vibe: 'guided discovery'  },
 ] as const;
 
 type CompanionId = (typeof COMPANIONS)[number]['id'];
 
-// Companions that map directly to SekretCharacterId (excludes 'me' and 'oracle')
+// Companions that map directly to SekretCharacterId (excludes 'me' and 'ja')
 type AiCompanionId = 'raylene' | 'rylane' | 'cloud' | 'night';
 
 function isAiTab(id: CompanionId): id is AiCompanionId {
@@ -122,7 +122,7 @@ const PROMPTS: Record<string, string[]> = {
     "This page is yours alone.",
     "What's really going on?",
   ],
-  oracle: [
+  ja: [
     "What pattern keeps showing up in your life?",
     "If your gut had a voice today, what would it say?",
     "What are you avoiding discovering?",
@@ -143,7 +143,7 @@ function avatarImage(character: SekretCharacterId, state: SekretAvatarState) {
     night:   { neutral: IMAGES.nightNeutral, listening: IMAGES.nightListening, thinking: IMAGES.nightThinking, comforting: IMAGES.nightRelaxed, happy: IMAGES.nightHappy, concerned: IMAGES.nightProtective, responding: IMAGES.nightSoftsmile },
     sekret:  { neutral: IMAGES.rayleneNeutral, listening: IMAGES.rayleneThinking, thinking: IMAGES.rayleneThinking, comforting: IMAGES.rayleneWindow, happy: IMAGES.rayleneHappy, concerned: IMAGES.rayleeneSad, responding: IMAGES.rayleneConfident },
   };
-  // 'me' and 'oracle' are never passed — isAiTab() guards all call sites.
+  // 'me' and 'ja' are never passed — isAiTab() guards all call sites.
   return map[character][state] ?? map[character].neutral;
 }
 
@@ -158,7 +158,7 @@ function inferState(state: SekretAvatarState, mood?: string, tone?: string): Sek
 
 // ─── Companion unlock thresholds (points required, matches TIERS) ─────────────
 const COMPANION_UNLOCK_PTS: Record<CompanionId, number> = {
-  raylene: 0, me: 0, oracle: 0,
+  raylene: 0, me: 0, ja: 0,
   rylane: 50, cloud: 150, night: 350,
 };
 
@@ -502,7 +502,7 @@ export default function TeenPagesRoute() {
             activeOpacity={unlocked ? 0.7 : 1}
             style={[s.tab, active && { borderColor: c.accent, backgroundColor: `${c.accent}18` }, !unlocked && s.tabLocked]}
           >
-            {c.id !== 'me' && c.id !== 'oracle' ? (
+            {c.id !== 'me' && c.id !== 'ja' ? (
               <Image
                 source={avatarImage(c.id as SekretCharacterId, active ? avatarState : 'neutral')}
                 style={[s.tabImg, !unlocked && { opacity: 0.3 }]}
@@ -674,7 +674,7 @@ export default function TeenPagesRoute() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={s.emptyState}>
-              <Text style={s.emptyEmoji}>{activeTab === 'me' ? '🪞' : activeTab === 'oracle' ? '🔮' : '💜'}</Text>
+              <Text style={s.emptyEmoji}>{activeTab === 'me' ? '🪞' : activeTab === 'ja' ? '🔮' : '💜'}</Text>
               <Text style={[s.emptyTitle, { color: companion.accent }]}>
                 {companion.name === 'Me' ? 'Your private pages' : `Start talking to ${companion.name}`}
               </Text>

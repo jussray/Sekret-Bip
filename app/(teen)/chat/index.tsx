@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { PERSONALITY_CONFIG } from '@/services/ai';
 import type { PersonalityId } from '@/types';
 
-const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'oracle'];
+const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'ja'];
 
 export default function ChatHubScreen() {
   return (

@@ -13,7 +13,7 @@
 //   rylane  page/context  → rylane  mini sticker, fallback to Rylane avatar
 //   cloud   page/context  → cloud   mini sticker, fallback to Cloud avatar
 //   night   context       → night/rylane-night sticker, fallback to Night avatar
-//   oracle  / sekretBrain → return null (never shown, never rendered)
+//   ja      / sekretBrain → return null (never shown, never rendered)
 //   null / unknown        → return null
 
 import React from 'react';
@@ -30,12 +30,12 @@ export type MiniAvatarCharacter =
   | 'rylane'
   | 'cloud'
   | 'night'
-  | 'oracle'
+  | 'ja'
   | 'sekretBrain'
   | null;
 
 interface MiniAvatarStickerProps {
-  /** Which character owns this page/context. Oracle and sekretBrain always render null. */
+  /** Which character owns this page/context. Ja and sekretBrain always render null. */
   character: MiniAvatarCharacter;
   /** Screen context used to pick the right sticker emotion from the registry. */
   screenContext?: StickerContext | null;
@@ -48,7 +48,7 @@ interface MiniAvatarStickerProps {
   opacity?: number;
 }
 
-function fallbackAvatar(character: Exclude<MiniAvatarCharacter, 'oracle' | 'sekretBrain' | null>) {
+function fallbackAvatar(character: Exclude<MiniAvatarCharacter, 'ja' | 'sekretBrain' | null>) {
   const avatarMap = AVATARS as Record<string, Record<string, unknown> | unknown>;
   const imageMap = IMAGES as Record<string, unknown>;
 
@@ -99,8 +99,8 @@ export function MiniAvatarSticker({
   right = 8,
   opacity = 0.88,
 }: MiniAvatarStickerProps) {
-  // Hard block: Oracle and Se'kret Brain are never shown as stickers
-  if (!character || character === 'oracle' || character === 'sekretBrain') return null;
+  // Hard block: Ja and Se'kret Brain are never shown as stickers
+  if (!character || character === 'ja' || character === 'sekretBrain') return null;
 
   const ctx: StickerContext = screenContext ?? 'general';
   const imageMap = IMAGES as Record<string, unknown>;

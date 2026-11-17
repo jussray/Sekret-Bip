@@ -80,8 +80,8 @@ const PARENT_PAGES_SECTIONS: SectionDef[] = [
 
 // ── Legacy write-tab definitions (unchanged) ───────────────────────────────
 
-type TeenTab = 'me' | 'oracle' | 'raylene' | 'rylane' | 'cloud' | 'night';
-type ParentTab = 'me' | 'oracle' | 'parentSekret' | 'bridge';
+type TeenTab = 'me' | 'ja' | 'raylene' | 'rylane' | 'cloud' | 'night';
+type ParentTab = 'me' | 'ja' | 'parentSekret' | 'bridge';
 export type PagesTab = TeenTab | ParentTab;
 
 interface TabDefinition {
@@ -162,7 +162,7 @@ export interface PagesScreenProps {
 
 const TEEN_TABS: TabDefinition[] = [
   { id: 'me', label: 'Me', icon: '\u25cc', title: '', accent: '#c4b5fd' },
-  { id: 'oracle', label: 'Se\u2019kret', icon: '\u25c7', title: 'Se\u2019kret Discovery', accent: '#8b7bb8' },
+  { id: 'ja', label: 'Se\u2019kret', icon: '\u25c7', title: 'Se\u2019kret Discovery', accent: '#8b7bb8' },
   {
     id: 'raylene', label: 'Raylene', icon: '\u2726', eyebrow: 'Raylene pulled up',
     title: 'You been a little too quiet. What happened?',
@@ -215,7 +215,7 @@ const TEEN_TABS: TabDefinition[] = [
 
 const PARENT_TABS: TabDefinition[] = [
   { id: 'me', label: 'Me', icon: '\u25cc', title: '', accent: '#d8c9b8' },
-  { id: 'oracle', label: 'Se\u2019kret', icon: '\u25c7', title: 'Se\u2019kret Discovery', accent: '#8d877f' },
+  { id: 'ja', label: 'Se\u2019kret', icon: '\u25c7', title: 'Se\u2019kret Discovery', accent: '#8d877f' },
   {
     id: 'parentSekret', label: 'Parent Se\u2019kret', icon: '\u2726', eyebrow: 'Parent Se\u2019kret',
     title: 'Let\u2019s get honest before this turns into a whole thing.',
@@ -245,7 +245,7 @@ const PARENT_TABS: TabDefinition[] = [
 const TEEN_TAGS = ['heavy', 'mad', 'numb', 'confused', 'hopeful', 'okay'];
 const PARENT_TAGS = ['reactive', 'worried', 'hurt', 'stuck', 'open', 'steady'];
 
-const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'oracle'];
+const PERSONALITY_ORDER: PersonalityId[] = ['raylene', 'rylane', 'cloud', 'night', 'ja'];
 
 function tabToStickerCharacter(tab: PagesTab): MiniAvatarCharacter {
   if (tab === 'raylene') return 'raylene';
@@ -258,7 +258,7 @@ function tabToStickerCharacter(tab: PagesTab): MiniAvatarCharacter {
 function normalizeSource(entry: JournalEntry): PagesTab {
   const source = entry.activeTab || entry.source;
   if (
-    source === 'parentSekret' || source === 'bridge' || source === 'oracle' ||
+    source === 'parentSekret' || source === 'bridge' || source === 'ja' ||
     source === 'raylene' || source === 'rylane' || source === 'cloud' || source === 'night'
   ) {
     return source;
@@ -368,7 +368,7 @@ interface SekretRepliesPanelProps {
 function SekretRepliesPanel({ entries, onOpenCompanion }: SekretRepliesPanelProps) {
   // Entries that have a sekretReply
   const replyEntries = useMemo(
-    () => entries.filter(e => e.sekretReply || (e.source && e.source !== 'me' && e.source !== 'oracle')),
+    () => entries.filter(e => e.sekretReply || (e.source && e.source !== 'me' && e.source !== 'ja')),
     [entries],
   );
 
@@ -609,7 +609,7 @@ function PagesWorkspace({
     [activeTab, entries],
   );
   const visiblePrompt =
-    Boolean(tab.prompts?.length) && promptVisible && !noPressure && activeTab !== 'oracle';
+    Boolean(tab.prompts?.length) && promptVisible && !noPressure && activeTab !== 'ja';
 
   const miniStickerCharacter = tabToStickerCharacter(activeTab);
 
@@ -709,7 +709,7 @@ function PagesWorkspace({
               contentContainerStyle={styles.content}
               keyboardShouldPersistTaps="handled"
             >
-              {activeTab === 'oracle' ? (
+              {activeTab === 'ja' ? (
                 <>
                   <OracleDiscoveryPanel
                     side={side}

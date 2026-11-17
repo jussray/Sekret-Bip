@@ -101,7 +101,7 @@ function localFallback(
     return "Are we trying to understand this, plan it, create something, or finish one small part?";
   }
 
-  if (personalityId === 'oracle') {
+  if (personalityId === 'ja') {
     return "What does this keep revealing about who you are, what you value, or what you are trying to become?";
   }
 
