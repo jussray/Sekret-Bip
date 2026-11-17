@@ -75,19 +75,19 @@ Deno.serve(async (req: Request) => {
     .returns<DeletionRow[]>();
 
   if (fetchErr) {
-    console.error('[process-deletions] fetch error:', fetchErr.message);
+    console.error('DELETION_FETCH_ERROR');
     return new Response('db error', { status: 500 });
   }
 
   if (!pending?.length) {
-    console.log('[process-deletions] nothing to process');
+    console.log('DELETION_BATCH_EMPTY');
     return new Response(JSON.stringify({ processed: 0 }), {
       status:  200,
       headers: { 'Content-Type': 'application/json' },
     });
   }
 
-  console.log(`[process-deletions] processing ${pending.length} accounts`);
+  console.log('DELETION_BATCH_PROCESSING');
 
   const results: { id: string; outcome: 'deleted' | 'error'; detail?: string }[] = [];
 
@@ -102,11 +102,11 @@ Deno.serve(async (req: Request) => {
       // so we cannot UPDATE data_deletion_completed_at. The deletion itself
       // is the record of completion. Ops can query auth.audit_log_entries for confirmation.
       results.push({ id: row.id, outcome: 'deleted' });
-      console.log(`[process-deletions] deleted user=${row.id}`);
+      console.log('DELETION_USER_DELETED');
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);
       results.push({ id: row.id, outcome: 'error', detail });
-      console.error(`[process-deletions] error user=${row.id}:`, detail);
+      console.error('DELETION_USER_ERROR');
     }
   }
 
