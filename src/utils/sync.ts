@@ -817,6 +817,34 @@ export async function loadDiscoveryProfile(
   }
 }
 
+// ── Bridge shares ──────────────────────────────────────────────────────────
+
+export async function syncBridgeShare(id: number, text: string): Promise<void> {
+  await safeUpsert(TABLES.bridgeShares, { id, payload: { text } });
+}
+
+export async function loadBridgeShares(): Promise<string[]> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const uid = await currentUserId();
+  if (!uid) return [];
+  try {
+    const { data, error } = await sb
+      .from(TABLES.bridgeShares)
+      .select('payload')
+      .eq('user_id', uid)
+      .order('shared_at', { ascending: false })
+      .limit(50);
+    if (error || !data) return [];
+    return data.map((r: any) => r.payload?.text ?? '').filter(Boolean);
+  } catch (e) {
+    if (__DEV__) console.warn('[sync] loadBridgeShares failed', e);
+    return [];
+  }
+}
+
+// ── Oracle Discovery Profile ────────────────────────────────────────────────
+
 export async function saveDiscoveryProfile(
   mode: 'teen' | 'parent',
   profile: OracleProfile,

@@ -161,9 +161,12 @@ export function MindBodyResetScreen({
 
   // ─── Tool stub alerts ────────────────────────────────────────────────────
   const handleTool = (label: string) => {
-    // Stub — future: navigate or open modal
-    // e.g. if (label === 'Brain Dump') setScreen('pages');
-    //      if (label === 'Calm Sounds') setScreen('calm');
+    const dest: Record<string, string> = {
+      'Brain Dump':  'pages',
+      'Calm Sounds': 'calm',
+    };
+    const target = dest[label];
+    if (target) setScreen(target);
   };
 
   // ─── onComplete hook ─────────────────────────────────────────────────────

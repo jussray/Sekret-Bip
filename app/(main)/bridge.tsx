@@ -17,9 +17,9 @@
  *   so tapping S2Tell in Pages feels like one continuous gesture
  *   rather than two separate screens.
  *
- * NOTE: `sent` is local component state — notes are only visible
- * this session. Supabase sync (cross-device persistence) is wired
- * in a later sprint.
+ * Teen notes persist to `bridge_shares` in Supabase so they survive
+ * app restarts. Parent view remains session-local (cross-user reads
+ * require a backend relay beyond the current RLS model).
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -34,6 +34,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
+import { syncBridgeShare, loadBridgeShares } from '@/utils/sync';
 
 const BRIDGE_PROMPTS = [
   'I had a hard day.',
@@ -53,6 +54,14 @@ export default function BridgeScreen() {
   const inputRef              = useRef<TextInputType>(null);
   const scrollRef             = useRef<ScrollView>(null);
 
+  // Load persisted notes from Supabase on mount (teen side only).
+  useEffect(() => {
+    if (userSide === 'parent') return;
+    void loadBridgeShares().then(notes => {
+      if (notes.length) setSent(notes);
+    });
+  }, [userSide]);
+
   // When arriving from Pages → S2Tell, focus the input immediately.
   useEffect(() => {
     if (autoFocus && userSide !== 'parent') {
@@ -67,8 +76,10 @@ export default function BridgeScreen() {
   function sendNote(text: string) {
     const t = text.trim();
     if (!t) return;
+    const id = Date.now();
     setSent((s) => [t, ...s]);
     setMessage('');
+    void syncBridgeShare(id, t);
   }
 
   return (

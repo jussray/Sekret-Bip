@@ -2,8 +2,7 @@
  * app/(main)/discover.tsx
  *
  * Discover / Oracle screen.
- * Houses the Oracle companion entry point + future content discovery.
- * Full Supabase-backed content feed in a later sprint.
+ * Houses the Oracle companion entry point + quick-access navigation cards.
  */
 import React from 'react';
 import {
