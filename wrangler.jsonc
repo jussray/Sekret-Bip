@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "bip",
+  "compatibility_date": "2026-06-13",
+  "main": "worker/sekret-reply.ts",
+  "observability": {
+    "enabled": true
+  },
+  "compatibility_flags": [
+    "nodejs_compat"
+  ]
+  // No routes block — this deploys to the default workers.dev URL
+  // (https://bip.<your-account>.workers.dev). Set EXPO_PUBLIC_BACKEND_URL
+  // to that address in .env.local. Add a routes block back here once a
+  // real custom domain (e.g. api.bipapp.com) is configured as a zone in
+  // the Cloudflare dashboard.
+}

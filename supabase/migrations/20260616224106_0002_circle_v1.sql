@@ -1,0 +1,2 @@
+-- Migration already applied remotely.
+-- Compatibility placeholder to align local and remote migration history.
