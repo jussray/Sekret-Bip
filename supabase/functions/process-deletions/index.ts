@@ -89,7 +89,7 @@ Deno.serve(async (req: Request) => {
 
   console.log('DELETION_BATCH_PROCESSING');
 
-  const results: { id: string; outcome: 'deleted' | 'error'; detail?: string }[] = [];
+  const results: { id: string; outcome: 'deleted' | 'error' }[] = [];
 
   for (const row of pending) {
     try {
@@ -103,9 +103,8 @@ Deno.serve(async (req: Request) => {
       // is the record of completion. Ops can query auth.audit_log_entries for confirmation.
       results.push({ id: row.id, outcome: 'deleted' });
       console.log('DELETION_USER_DELETED');
-    } catch (err) {
-      const detail = err instanceof Error ? err.message : String(err);
-      results.push({ id: row.id, outcome: 'error', detail });
+    } catch {
+      results.push({ id: row.id, outcome: 'error' });
       console.error('DELETION_USER_ERROR');
     }
   }
