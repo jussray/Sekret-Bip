@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type TextInputInstance,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -45,7 +46,7 @@ export default function ParentSetup() {
   const [focus, setFocus] = useState<ParentFocus | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputInstance>(null);
   const underline = useRef(new Animated.Value(0)).current;
 
   function handleNameChange(text: string) {
