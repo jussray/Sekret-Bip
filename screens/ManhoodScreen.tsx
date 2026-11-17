@@ -42,10 +42,10 @@ function timeGreeting() {
 }
 
 const QUICK_ACCESS = [
-  { emoji: '⚡', label: 'puberty\nguide',         target: null },
-  { emoji: '💪', label: 'body\nchanges',           target: null },
-  { emoji: '⭐', label: 'confidence\nboost',       target: null },
-  { emoji: '🧼', label: 'hygiene +\nself-care',   target: null },
+  { emoji: '⚡', label: 'puberty\nguide',         target: 'sekret' },
+  { emoji: '💪', label: 'body\nchanges',           target: 'sekret' },
+  { emoji: '⭐', label: 'confidence\nboost',       target: 'growth' },
+  { emoji: '🧼', label: 'hygiene +\nself-care',   target: 'sekret' },
   { emoji: '🧠', label: 'mind\ncheck-in',          target: 'sekret' },
   { emoji: '📔', label: 'private\njournal',        target: 'pages' },
 ];
