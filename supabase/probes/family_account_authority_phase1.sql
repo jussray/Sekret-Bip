@@ -224,21 +224,46 @@ reset role;
 
 insert into family_authority_results
 select
-  'parent_redemption_activates_relationship_without_minting_teen_verification',
+  'parent_redemption_requires_teen_approval_without_minting_verification',
   (select value = '1' from family_authority_runtime where key = 'redeemed_rows')
   and coalesce((
-    select verification_state = 'UNVERIFIED' and parent_link_state = 'active'
+    select verification_state = 'UNVERIFIED' and parent_link_state = 'pending'
     from public.account_verification
     where user_id = (select user_id from family_authority_context where label = 'teen')
   ), false)
   and coalesce((
-    select status = 'active'
-      and is_active = true
+    select status = 'pending'
+      and is_active = false
       and parent_user_id = (select user_id from family_authority_context where label = 'parent')
     from public.parent_links
     where teen_user_id = (select user_id from family_authority_context where label = 'teen')
   ), false),
-  'Parent redemption activates only the teen-issued relationship';
+  'Parent redemption leaves the request disabled until Teen approval';
+
+-- The Teen must independently authorize activation after adult code redemption.
+select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'teen'), true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', (select user_id::text from family_authority_context where label = 'teen'),
+  'role', 'authenticated', 'is_anonymous', false
+)::text, true);
+set local role authenticated;
+insert into family_authority_runtime(key, value)
+select 'teen_approved_link', public.approve_parent_link_request(
+  (select id from public.parent_links where teen_user_id =
+    (select user_id from family_authority_context where label = 'teen')), true
+)::text;
+reset role;
+
+insert into family_authority_results
+select 'teen_confirmation_activates_relationship',
+  (select value = 'true' from family_authority_runtime where key = 'teen_approved_link')
+  and coalesce((select status = 'active' and is_active = true
+    from public.parent_links where teen_user_id =
+      (select user_id from family_authority_context where label = 'teen')), false)
+  and coalesce((select parent_link_state = 'active' and verification_state = 'UNVERIFIED'
+    from public.account_verification where user_id =
+      (select user_id from family_authority_context where label = 'teen')), false),
+  'Teen confirms the Parent request without changing independent age verification';
 
 select set_config('request.jwt.claim.sub', (select user_id::text from family_authority_context where label = 'unverified_parent'), true);
 select set_config(

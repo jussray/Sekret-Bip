@@ -50,6 +50,7 @@ export const TEEN_MORE_GROUPS: FeatureDrawerGroup[] = [
     { emoji: '✅', label: 'Chores', route: 'chores', description: 'Tasks your parent set up, when a trusted connection exists.' },
     { emoji: '🔭', label: 'Discover', route: 'discover', description: 'Explore companions, topics, and experiences.' },
     { emoji: '⭐', label: 'Bip Points', route: 'points', description: 'See the private receipts from showing up for yourself.' },
+    { emoji: '🌟', label: 'Meaning', route: 'meaning', description: 'Night-led space to explore purpose, values, and what pulls you forward.' },
   ] },
   { title: 'ACCOUNT & SAFETY', items: [
     { emoji: '🔗', label: 'Parent Link', route: 'parent-link-verify', description: 'Manage the trusted adult connection used by Bridge. Verification is a separate action.' },

@@ -6,7 +6,6 @@ export interface BridgeShare {
   user_id: string;
   payload: {
     kind?: string;
-    raw?: string;
     text?: string;
     rewrite?: string;
     tone?: string;
@@ -14,20 +13,21 @@ export interface BridgeShare {
   shared_at: string;
 }
 
-async function currentUserId(): Promise<string | null> {
+async function permanentUserId(): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return null;
   const { data } = await sb.auth.getUser();
-  return data.user?.id ?? null;
+  const user = data.user;
+  if (!user || user.is_anonymous) return null;
+  return user.id;
 }
 
 export async function sendS2TellShare(params: {
-  raw?: string;
   text: string;
   tone?: string;
 }): Promise<boolean> {
   const sb = getSupabase();
-  const userId = await currentUserId();
+  const userId = await permanentUserId();
   if (!sb || !userId || !params.text.trim()) return false;
 
   const { error } = await sb.from('bridge_shares').insert({
@@ -35,7 +35,6 @@ export async function sendS2TellShare(params: {
     id: Date.now(),
     payload: {
       kind: 's2tell',
-      raw: params.raw ?? null,
       rewrite: params.text.trim(),
       tone: params.tone ?? null,
     },
@@ -50,7 +49,8 @@ export async function sendS2TellShare(params: {
 
 export async function fetchBridgeShares(teenId: string): Promise<BridgeShare[]> {
   const sb = getSupabase();
-  if (!sb || !teenId) return [];
+  const userId = await permanentUserId();
+  if (!sb || !userId || !teenId) return [];
   const { data } = await sb
     .from('bridge_shares')
     .select('id,user_id,payload,shared_at')
@@ -65,7 +65,8 @@ export async function subscribeToBridgeShares(
   onNew: (share: BridgeShare) => void,
 ): Promise<() => void> {
   const sb = getSupabase();
-  if (!sb || !teenId) return () => {};
+  const userId = await permanentUserId();
+  if (!sb || !userId || !teenId) return () => {};
   const channel = sb.channel(`bridge-shares-${teenId}`).on(
     'postgres_changes',
     { event: 'INSERT', schema: 'public', table: 'bridge_shares', filter: `user_id=eq.${teenId}` },

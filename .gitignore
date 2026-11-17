@@ -20,6 +20,13 @@ npm-debug.*
 *.orig.*
 web-build/
 
+# ── Room production foreman local state ──────────────────────────────────
+.room-foreman/
+
+# ── Python (services/piper-tts) ───────────────────────────────────────────
+__pycache__/
+*.py[cod]
+
 # ── Browser test artifacts ────────────────────────────────────────────────
 playwright-report/
 test-results/
@@ -65,3 +72,6 @@ assets/images/archive/
 
 # ── Logs ──────────────────────────────────────────────────────────────────
 *.log
+
+# ── Claude Code agent worktrees (isolated background-agent working dirs) ──
+.claude/worktrees/

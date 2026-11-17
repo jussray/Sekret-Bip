@@ -93,3 +93,39 @@ BRIDGE_SUMMARIES_ROLLOUT = "disabled"
 name = "SEKRET_RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 60, period = 10 }
+
+# ── Preview builds (`npx wrangler preview`) ───────────────────────────
+# Workers Builds runs `npx wrangler preview` to publish a per-branch
+# Preview URL for each PR. Recent Wrangler releases REQUIRE a `previews`
+# block to exist or the preview build fails before it can create a URL
+# (this is what broke every PR's "Workers Builds: sekret-backend" check).
+# Previews do NOT inherit production settings, so the non-secret vars and
+# managed bindings the Worker needs at runtime are mirrored here. Secrets
+# (OPENAI_API_KEY, ANTHROPIC_API_KEY, SEKRET_CLIENT_TOKEN, …) are applied
+# to Previews separately via `wrangler secret` and are never committed.
+# This block only affects Preview deploys; production `wrangler deploy`
+# ignores it.
+[previews]
+
+[previews.vars]
+SUPABASE_URL = "https://tbsevonvegdnlyjgplmm.supabase.co"
+OPENAI_CHAT_MODEL = "gpt-4o"
+OPENAI_TTS_MODEL  = "gpt-4o-mini-tts"
+OPENAI_STT_MODEL  = "whisper-1"
+BIP_OPENAI_MODEL = "gpt-5.6-sol"
+BIP_ANTHROPIC_MODEL = "claude-sonnet-5"
+BIP_MUSE_MODEL = "muse-spark-1.3"
+FIREBASE_APPCHECK_MODE = "off"
+VOICE_PROVIDER_MODE = "hybrid"
+BRIDGE_SUMMARIES_ROLLOUT = "disabled"
+
+[previews.ai]
+binding = "AI"
+
+[previews.version_metadata]
+binding = "CF_VERSION_METADATA"
+
+[[previews.ratelimits]]
+name = "SEKRET_RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 60, period = 10 }
