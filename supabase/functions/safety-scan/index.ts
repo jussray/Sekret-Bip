@@ -135,22 +135,16 @@ function validateSource(source: unknown): EligibleSource | null {
   return source as EligibleSource;
 }
 
-// ── Parent notification ───────────────────────────────────────────────────────
-// safety_alerts.parent_notified_at is stamped on the alert row once a
-// currently-linked parent has been found; parent visibility itself is
-// computed dynamically by RLS (see 20260808222500_reconcile_safety_alert_
-// runtime_schema.sql), not stored on the row. No content leaves this
-// function — push delivery is not wired up yet.
 async function notifyParentIfLinked(
-  supabase:     ReturnType<typeof createClient>,
-  teen_user_id: string,
-  severity:     Severity,
-  alert_id:     number,
+  supabase: ReturnType<typeof createClient>,
+  teenUserId: string,
+  severity: Severity,
+  alertId: number,
 ): Promise<void> {
   const { data: link } = await supabase
     .from('parent_links')
     .select('parent_user_id')
-    .eq('teen_user_id', teen_user_id)
+    .eq('teen_user_id', teenUserId)
     .eq('status', 'active')
     .eq('is_active', true)
     .maybeSingle();
@@ -160,13 +154,9 @@ async function notifyParentIfLinked(
   await supabase
     .from('safety_alerts')
     .update({ parent_notified_at: new Date().toISOString() })
-    .eq('id', alert_id);
+    .eq('id', alertId);
 
-  // Push delivery (Expo token lookup + expo-server-sdk) is not wired yet.
-  // Planned payload once it ships:
-  //   { to: <parent_expo_token>, title: 'Wellness Check',
-  //     body: 'Someone you care about may need support',
-  //     data: { alert_id, severity } }   ← NO content, NO source text
+  // Deliberately content-free. Actual delivery remains separate work.
   console.log('SAFETY_SCAN_PARENT_NOTIFY_QUEUED');
 }
 
@@ -225,20 +215,13 @@ Deno.serve(async (req: Request) => {
     });
   }
 
-  const alertType = mod?.flagged ? 'moderation' : 'keyword';
-
-  // Insert safety_alert — no content stored anywhere in this row. Canonical
-  // runtime columns per 20260808222500_reconcile_safety_alert_runtime_schema.sql:
-  // user_id, alert_type, source_table, source_id, severity, scan_metadata
-  // (plus reviewed_by_parent/parent_notified_at, set elsewhere). teen_user_id/
-  // parent_user_id/title/summary are legacy-only and no longer required.
   const { data: alert, error: alertError } = await supabase
     .from('safety_alerts')
     .insert({
-      user_id:       metadata.user_id,
-      alert_type:    alertType,
-      source_table:  sourceTable,
-      source_id:     metadata.record_id,
+      user_id: metadata.user_id,
+      alert_type: mod?.flagged ? 'moderation' : 'keyword',
+      source_table: sourceTable,
+      source_id: metadata.record_id,
       severity,
       scan_metadata: scanMetadata,
     })
@@ -256,7 +239,6 @@ Deno.serve(async (req: Request) => {
     .eq('user_id', metadata.user_id)
     .eq('id', metadata.record_id);
 
-  // Parent notification — high severity only, active link only, no content.
   if (severity === 'high') {
     await notifyParentIfLinked(supabase, metadata.user_id, severity, alert.id);
   }

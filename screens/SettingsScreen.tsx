@@ -220,9 +220,8 @@ export function SettingsScreen({
         <View style={[styles.heroWrap, { borderColor: glow + '70' }]}>
           <ImageBackground
             source={vibe.previewBg}
-            style={styles.heroBg}
+            style={[styles.heroBg, { borderRadius: 22 }]}
             resizeMode="cover"
-            borderRadius={22}
           >
             <LinearGradient
               colors={[vibe.gtop, vibe.gbot] as any}
@@ -260,9 +259,8 @@ export function SettingsScreen({
               >
                 <ImageBackground
                   source={cfg.previewBg}
-                  style={styles.vibeCardBg}
+                  style={[styles.vibeCardBg, { borderRadius: 16 }]}
                   resizeMode="cover"
-                  borderRadius={16}
                 >
                   <LinearGradient
                     colors={[cfg.gtop, cfg.gbot] as any}
