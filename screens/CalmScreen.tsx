@@ -460,7 +460,7 @@ export function CalmScreen({
         <Animated.View style={cardAnim(3)}>
           <View style={styles.toolsHeader}>
             <Text style={[styles.sectionTitle, { color: t.accent }]}>Today's Calm Plan 💜</Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => Alert.alert('Edit Plan ✏️', 'Tap any item to check it off. Custom plan editing coming soon. 💜')}>
               <Text style={[styles.seeAll, { color: t.soft }]}>edit plan ✏️</Text>
             </TouchableOpacity>
           </View>
@@ -510,7 +510,7 @@ export function CalmScreen({
         {/* Calm Picks */}
         <View style={styles.toolsHeader}>
           <Text style={[styles.sectionTitle, { color: t.accent }]}>Calm Picks for You ✦</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => Alert.alert('More Calm Picks 💜', 'Full audio library coming soon.')}>
             <Text style={[styles.seeAll, { color: t.soft }]}>see all</Text>
           </TouchableOpacity>
         </View>
