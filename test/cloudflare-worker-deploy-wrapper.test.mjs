@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -40,6 +41,21 @@ test('refuses tracked or untracked dirty worktrees before deployment', () => {
     () => inspectDeployGitState({ execFile: fakeGit({ status: ' M worker/voice-entry.ts\n?? scratch.txt\n' }) }),
     /dirty worktree/,
   );
+});
+
+test('ignores generated Python unittest bytecode without hiding source changes', () => {
+  const cases = [
+    [path.join('services', 'piper-tts', '__pycache__', 'auth_guard.cpython-313.pyc'), 0],
+    [path.join('services', 'piper-tts', 'auth_guard.py'), 1],
+  ];
+  for (const [file, expectedStatus] of cases) {
+    const result = spawnSync('git', ['check-ignore', '--no-index', '--quiet', file], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    });
+    assert.ifError(result.error);
+    assert.equal(result.status, expectedStatus, `unexpected Git ignore result for ${file}: ${result.stderr}`);
+  }
 });
 
 test('prefers the immutable Workers Builds commit SHA only when it matches checked-out HEAD', () => {

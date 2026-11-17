@@ -27,6 +27,7 @@ import {
   Text,
   TouchableOpacity,
   ScrollView,
+  type ScrollViewInstance,
   View,
   Animated,
   Image,
@@ -142,7 +143,7 @@ export function CalmScreen({
   const [breatheRunning, setBreatheRunning] = useState(false);
   const reduceMotion = useReducedMotion();
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const moodRowY  = useRef(0);
 
   // Character / time / mood ─────────────────────────────────────────────────

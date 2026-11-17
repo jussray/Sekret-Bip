@@ -74,3 +74,13 @@ test('Supabase fresh replay serializes container-heavy PR proof across the repos
   assert.match(content, /group: supabase-fresh-replay-\$\{\{ github\.repository \}\}/);
   assert.match(content, /cancel-in-progress: false/);
 });
+
+
+test('Supabase fresh replay restores registry fallbacks when setup-cli exports GHCR', () => {
+  const content = workflow('supabase-fresh-replay.yml');
+
+  // The action exports SUPABASE_INTERNAL_IMAGE_REGISTRY=ghcr.io. Passing this
+  // override to the CLI disables its built-in alternate registry candidates.
+  assert.ok(content.includes('env -u SUPABASE_INTERNAL_IMAGE_REGISTRY supabase start -x "$excluded_services"'));
+  assert.ok(!content.includes('SUPABASE_INTERNAL_IMAGE_REGISTRY: ghcr.io'));
+});
