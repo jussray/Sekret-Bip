@@ -46,6 +46,7 @@ export function useSekretState() {
   const [parentOracleSessions, setParentOracleSessions] = useState<OracleSessionSummary[]>([]);
 
   // ── Crew state (teen + parent, separate lists) ────────────────────────────
+  const [comfortSessions, setComfortSessions]       = useState<import('@/types').ComfortSession[]>([]);
   const [crewMembers, setCrewMembers]               = useState<CrewMember[]>([]);
   const [crewCheckIns, setCrewCheckIns]             = useState<CrewCheckIn[]>([]);
   const [parentCrewMembers, setParentCrewMembers]   = useState<CrewMember[]>([]);
@@ -77,6 +78,7 @@ export function useSekretState() {
       if (state.oracleSessions)          setOracleSessions(state.oracleSessions);
       if (state.parentOracleProfile)    setParentOracleProfile(state.parentOracleProfile);
       if (state.parentOracleSessions)   setParentOracleSessions(state.parentOracleSessions);
+      if (Array.isArray(state.comfortSessions))     setComfortSessions(state.comfortSessions);
       if (Array.isArray(state.crewMembers))        setCrewMembers(state.crewMembers);
       if (Array.isArray(state.crewCheckIns))       setCrewCheckIns(state.crewCheckIns);
       if (Array.isArray(state.parentCrewMembers))  setParentCrewMembers(state.parentCrewMembers);
@@ -96,6 +98,7 @@ export function useSekretState() {
         parentPagesDraft, parentPagesEntries,
         parentCirclePosts, parentCirclePostText,
         parentVoiceNotes, parentOracleProfile, parentOracleSessions,
+        comfortSessions,
         crewMembers, crewCheckIns,
         parentCrewMembers, parentCrewCheckIns,
       });
@@ -108,6 +111,7 @@ export function useSekretState() {
     parentPagesDraft, parentPagesEntries,
     parentCirclePosts, parentCirclePostText,
     parentVoiceNotes, parentOracleProfile, parentOracleSessions,
+    comfortSessions,
     crewMembers, crewCheckIns,
     parentCrewMembers, parentCrewCheckIns,
     isLoading,
@@ -135,6 +139,7 @@ export function useSekretState() {
     setOracleSessions([]);
     setParentOracleProfile(null);
     setParentOracleSessions([]);
+    setComfortSessions([]);
     setCrewMembers([]);
     setCrewCheckIns([]);
     setParentCrewMembers([]);
@@ -164,6 +169,7 @@ export function useSekretState() {
     oracleSessions, setOracleSessions,
     parentOracleProfile, setParentOracleProfile,
     parentOracleSessions, setParentOracleSessions,
+    comfortSessions, setComfortSessions,
     crewMembers, setCrewMembers,
     crewCheckIns, setCrewCheckIns,
     parentCrewMembers, setParentCrewMembers,

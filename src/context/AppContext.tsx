@@ -26,6 +26,7 @@ import type {
   MoodEntry,
   VoiceNote,
   ParentCirclePost,
+  ComfortSession,
   CrewMember,
   CrewCheckIn,
 } from '@/types';
@@ -63,6 +64,10 @@ interface AppContextValue {
   // Teen voice notes
   voiceNotes: VoiceNote[];
   setVoiceNotes: React.Dispatch<React.SetStateAction<VoiceNote[]>>;
+
+  // Comfort sessions
+  comfortSessions: ComfortSession[];
+  setComfortSessions: React.Dispatch<React.SetStateAction<ComfortSession[]>>;
 
   // Teen circle
   circlePosts: CirclePost[];
@@ -269,6 +274,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     patchJournalEntry,
     voiceNotes,
     setVoiceNotes,
+    comfortSessions: s.comfortSessions,
+    setComfortSessions: s.setComfortSessions,
     circlePosts,
     setCirclePosts,
     oracleProfile: s.oracleProfile,
