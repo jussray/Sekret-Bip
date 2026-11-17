@@ -3,9 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { BipCrewScreen } from '@screens/BipCrewScreen';
+import { ParentCircleScreen } from '@screens/ParentCircleScreen';
 import { THEME_PACKS } from '@/constants/theme';
 import { routeForSide } from '@/shared/routes';
-import ParentCircle from '../(main)/parent-circle';
 
 type Tab = 'circle' | 'crew';
 
@@ -14,6 +14,8 @@ export default function ParentCircleRoute() {
     theme, parentMood, parentRoomStyle,
     parentCrewMembers, setParentCrewMembers,
     parentCrewCheckIns, setParentCrewCheckIns,
+    parentCirclePosts, parentCirclePostText,
+    setParentCirclePostText, saveParentCirclePost, reactToParentPost,
   } = useAppContext();
   const t = THEME_PACKS[theme] ?? THEME_PACKS.neon;
   const [tab, setTab] = useState<Tab>('circle');
@@ -40,7 +42,15 @@ export default function ParentCircleRoute() {
 
       <View style={s.content}>
         {tab === 'circle' ? (
-          <ParentCircle />
+          <ParentCircleScreen
+            parentCirclePosts={parentCirclePosts}
+            parentCirclePostText={parentCirclePostText}
+            setParentCirclePostText={setParentCirclePostText}
+            saveParentCirclePost={saveParentCirclePost}
+            reactToParentPost={(id, type) => reactToParentPost(Number(id), type)}
+            setScreen={(screen: string) => router.push(routeForSide('parent', screen) as any)}
+            BottomNav={null}
+          />
         ) : (
           <BipCrewScreen
             t={t}
