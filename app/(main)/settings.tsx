@@ -10,7 +10,7 @@
  * - notificationsEnabled persisted in AppContext instead of ephemeral useState.
  * - Back chevron added so the screen is dismissible without the tab bar.
  */
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -19,10 +19,14 @@ import {
   StyleSheet,
   SafeAreaView,
   Switch,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { THEME_PACKS } from '@constants/theme';
+import { getSupabase } from '@/utils/supabase';
+import { AccountDeletionControls } from '@/components/settings/AccountDeletionControls';
 
 const THEME_ORDER = Object.keys(THEME_PACKS) as (keyof typeof THEME_PACKS)[];
 
@@ -33,6 +37,27 @@ export default function SettingsScreen() {
     notificationsEnabled,
     setNotificationsEnabled,
   } = useAppContext();
+
+  const [exportPending, setExportPending] = useState(false);
+
+  async function handleExportData() {
+    setExportPending(true);
+    try {
+      const sb = getSupabase();
+      if (!sb) throw new Error('Account export service unavailable');
+      const { error } = await sb.rpc('request_data_export');
+      if (error) throw error;
+      Alert.alert(
+        'Export requested',
+        'Your export request was submitted. Check your account email for updates.'
+      );
+    } catch {
+      Alert.alert('Error', 'Could not submit export request. Please try again.');
+      return false;
+    } finally {
+      setExportPending(false);
+    }
+  }
 
   const currentTheme = THEME_PACKS[theme] ?? THEME_PACKS.neon;
 
@@ -87,12 +112,27 @@ export default function SettingsScreen() {
 
         {/* ── Account ── */}
         <Text style={styles.sectionLabel}>Account</Text>
-        {["Sign in / Create account", "Privacy settings", "Delete my data"].map(item => (
-          <TouchableOpacity key={item} style={styles.row}>
-            <Text style={styles.rowLabel}>{item}</Text>
-            <Text style={styles.rowArrow}>\u203a</Text>
-          </TouchableOpacity>
-        ))}
+        <TouchableOpacity style={styles.row}>
+          <Text style={styles.rowLabel}>Sign in / Create account</Text>
+          <Text style={styles.rowArrow}>\u203a</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.row}>
+          <Text style={styles.rowLabel}>Privacy settings</Text>
+          <Text style={styles.rowArrow}>\u203a</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={handleExportData}
+          disabled={exportPending}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.rowLabel}>Download my data</Text>
+          {exportPending
+            ? <ActivityIndicator size="small" color="#888" />
+            : <Text style={styles.rowArrow}>\u203a</Text>
+          }
+        </TouchableOpacity>
+        <AccountDeletionControls />
 
         {/* ── About ── */}
         <Text style={styles.sectionLabel}>About</Text>
@@ -125,8 +165,10 @@ const styles = StyleSheet.create({
   themeName:     { color: '#D1D5DB', fontSize: 15, fontWeight: '600' },
   themeActive:   { color: '#D946EF', fontSize: 11, marginTop: 2 },
   themeTick:     { color: '#D946EF', fontSize: 18, fontWeight: '700' },
-  row:           { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#111827', borderRadius: 14, padding: 16, marginBottom: 8 },
-  rowLabel:      { color: '#D1D5DB', fontSize: 15 },
-  rowArrow:      { color: '#555', fontSize: 20 },
-  version:       { color: '#333', fontSize: 12, textAlign: 'center', marginTop: 40 },
+  row:            { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#111827', borderRadius: 14, padding: 16, marginBottom: 8 },
+  rowLabel:       { color: '#D1D5DB', fontSize: 15 },
+  rowArrow:       { color: '#555', fontSize: 20 },
+  rowDanger:      { borderWidth: 1, borderColor: 'rgba(248,113,113,0.25)' },
+  rowLabelDanger: { color: '#f87171' },
+  version:        { color: '#333', fontSize: 12, textAlign: 'center', marginTop: 40 },
 });

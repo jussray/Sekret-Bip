@@ -7,7 +7,7 @@ export type ActiveCharacter = 'raylene' | 'rylane' | 'cloud' | 'night' | null;
 
 /**
  * Maps any stored sekret/theme key to a typed character identity.
- * 'soft' is the legacy AsyncStorage key for Raylene — kept for backwards compat.
+ * 'soft' is the legacy AsyncStorage key for Suhana — kept for backwards compat.
  */
 export function getActiveCharacter(themeKey: string): ActiveCharacter {
   if (themeKey === 'raylene' || themeKey === 'soft') return 'raylene';

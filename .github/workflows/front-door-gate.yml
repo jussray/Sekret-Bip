@@ -1,0 +1,163 @@
+name: Front Door Exact-Head Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - app/index.tsx
+      - screens/WebWelcomeScreen.tsx
+      - src/components/FrontDoorSceneArrival.tsx
+      - src/motion/frontDoorMotion.ts
+      - constants/frontDoorTheme.ts
+      - constants/vibeColors.ts
+      - test/dual-front-door-contract.test.mjs
+      - test/front-door-motion-contract.test.mjs
+      - test/mobile-entry-performance-contract.test.mjs
+      - src/context/VerificationContext.tsx
+      - src/middleware/auth.ts
+      - src/utils/supabase.ts
+      - scripts/playwright-executable.mjs
+      - assets/brand/sekret-bip-teen-family-v1.jpg
+      - assets/images/parent-space-splash.png
+      - e2e/smoke.spec.ts
+      - e2e/front-door-scene-arrival.spec.ts
+      - playwright.config.ts
+      - package.json
+      - package-lock.json
+      - .github/workflows/front-door-gate.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: front-door-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: true
+  EXPO_NO_TELEMETRY: '1'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+
+jobs:
+  verify-front-door:
+    name: No-new-type-errors and focused Playwright
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p gate-evidence
+          ACTUAL_HEAD_SHA="$(git rev-parse HEAD)"
+          printf 'expected_head_sha=%s\nactual_head_sha=%s\nbase_sha=%s\nworkflow_run_id=%s\n' \
+            "$EXPECTED_HEAD_SHA" "$ACTUAL_HEAD_SHA" "$BASE_SHA" "$GITHUB_RUN_ID" \
+            | tee gate-evidence/exact-head.txt
+          test "$ACTUAL_HEAD_SHA" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Run front-door source contracts
+        shell: bash
+        run: |
+          set -o pipefail
+          node --test \
+            test/dual-front-door-contract.test.mjs \
+            test/front-door-motion-contract.test.mjs \
+            test/mobile-entry-performance-contract.test.mjs \
+            2>&1 | tee gate-evidence/front-door-contracts.log
+
+      - name: Compare TypeScript diagnostics with base
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_DIR="$RUNNER_TEMP/front-door-base"
+
+          git fetch --no-tags --depth=1 origin "$BASE_SHA"
+          git worktree add --detach "$BASE_DIR" "$BASE_SHA"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$BASE_DIR/node_modules"
+
+          set +e
+          (cd "$BASE_DIR" && npx tsc --noEmit --pretty false) > gate-evidence/typecheck-base.log 2>&1
+          BASE_STATUS=$?
+          npx tsc --noEmit --pretty false > gate-evidence/typecheck-head.log 2>&1
+          HEAD_STATUS=$?
+          set -e
+
+          normalize_diagnostics() {
+            grep -E 'error TS[0-9]+:' "$1" \
+              | sed -E 's/^([^(:]+)\([0-9]+,[0-9]+\): /\1: /' \
+              | sort -u || true
+          }
+
+          normalize_diagnostics gate-evidence/typecheck-base.log > gate-evidence/typecheck-base.normalized.log
+          normalize_diagnostics gate-evidence/typecheck-head.log > gate-evidence/typecheck-head.normalized.log
+          comm -13 \
+            gate-evidence/typecheck-base.normalized.log \
+            gate-evidence/typecheck-head.normalized.log \
+            > gate-evidence/typecheck-new-errors.log
+
+          printf 'base_status=%s\nhead_status=%s\nbase_diagnostics=%s\nhead_diagnostics=%s\nnew_diagnostics=%s\n' \
+            "$BASE_STATUS" \
+            "$HEAD_STATUS" \
+            "$(wc -l < gate-evidence/typecheck-base.normalized.log)" \
+            "$(wc -l < gate-evidence/typecheck-head.normalized.log)" \
+            "$(wc -l < gate-evidence/typecheck-new-errors.log)" \
+            | tee gate-evidence/typecheck-summary.txt
+
+          if [[ -s gate-evidence/typecheck-new-errors.log ]]; then
+            echo 'New TypeScript diagnostics introduced by this PR:'
+            cat gate-evidence/typecheck-new-errors.log
+            exit 1
+          fi
+
+          if [[ "$HEAD_STATUS" -ne 0 && ! -s gate-evidence/typecheck-head.normalized.log ]]; then
+            echo 'TypeScript failed without parseable diagnostics.'
+            cat gate-evidence/typecheck-head.log
+            exit 1
+          fi
+
+          echo 'No new TypeScript diagnostics relative to the exact base SHA.'
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run focused front-door Playwright contracts
+        shell: bash
+        run: |
+          set -o pipefail
+          npx playwright test \
+            e2e/smoke.spec.ts \
+            e2e/front-door-scene-arrival.spec.ts \
+            --grep "teen front door|parent front door|rollback front door|web welcome|frontend entry|canonical teen front door|reduced motion renders" \
+            --trace on 2>&1 | tee gate-evidence/playwright.log
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: front-door-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            gate-evidence/
+            test-results/
+            playwright-report/
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,80 @@
+{
+  "version": "2.0.0",
+  "description": "Observable signals for the Se'kret Bip onboarding OODA loop. Feed into founder control room Observe layer.",
+  "last_updated": "2026-07-18",
+
+  "funnel_stages": [
+    { "stage": "pre_signup",            "screen": null,                              "ooda": "Observe" },
+    { "stage": "signed_up",             "screen": "welcome.tsx",                    "ooda": "Observe" },
+    { "stage": "consent_complete",      "screen": "consent.tsx",                   "ooda": "Observe" },
+    { "stage": "age_verified",          "screen": "age.tsx",                       "ooda": "Orient"  },
+    { "stage": "role_selected",         "screen": "identity.tsx",                  "ooda": "Orient"  },
+    { "stage": "name_set",              "screen": "name.tsx",                      "ooda": "Orient"  },
+    { "stage": "identity_set",          "screen": "name.tsx (alias)",              "ooda": "Orient"  },
+    { "stage": "reflection_complete",   "screen": "reflection.tsx",               "ooda": "Orient"  },
+    { "stage": "parent_link_sent",      "screen": "parent-link.tsx (teen)",        "ooda": "Act"     },
+    { "stage": "parent_linked",         "screen": "parent-link.tsx (parent)",      "ooda": "Act"     },
+    { "stage": "parent_link_skipped",   "screen": "parent-link.tsx (parent skip)", "ooda": "Act"     },
+    { "stage": "parent_setup_complete", "screen": "parent-setup.tsx",             "ooda": "Act"     },
+    { "stage": "activated",             "screen": "(first core action)",           "ooda": "Act"     },
+    { "stage": "steady_state",          "screen": "(in-app)",                     "ooda": "Act"     }
+  ],
+
+  "activation_milestones": [
+    {
+      "action": "first_mood_log",
+      "role": "teen",
+      "how_fired": ["DB trigger (trg_first_mood_log_activation)", "app-side markActivated()"],
+      "priority": "primary"
+    },
+    {
+      "action": "first_journal_entry",
+      "role": "teen",
+      "how_fired": ["app-side markActivated()"],
+      "priority": "secondary"
+    },
+    {
+      "action": "first_post",
+      "role": "teen",
+      "how_fired": ["app-side markActivated()"],
+      "priority": "secondary"
+    },
+    {
+      "action": "first_bridge_message",
+      "role": "parent",
+      "how_fired": ["app-side markActivated()"],
+      "priority": "primary"
+    },
+    {
+      "action": "first_checkin_viewed",
+      "role": "parent",
+      "how_fired": ["app-side markActivated()"],
+      "priority": "secondary"
+    },
+    {
+      "action": "onboarding_complete",
+      "role": "both",
+      "how_fired": ["app-side markActivated() from reflection.tsx + parent-setup.tsx"],
+      "note": "Fired at end of onboarding flow before first core action. Upgraded to role-specific action when first action happens.",
+      "priority": "fallback"
+    }
+  ],
+
+  "funnel_kpi_queries": {
+    "activation_rate": "SELECT COUNT(*) FILTER (WHERE stage = 'activated') * 100.0 / COUNT(*) AS activation_rate_pct FROM user_onboarding_state;",
+    "stage_dropoff": "SELECT stage, COUNT(*) AS users_at_stage FROM user_onboarding_state GROUP BY stage ORDER BY MIN(created_at);",
+    "avg_time_to_activate": "SELECT role, AVG(identity_to_activated_secs) AS avg_secs FROM user_onboarding_state WHERE activated_at IS NOT NULL GROUP BY role;",
+    "activation_action_split": "SELECT activation_action, COUNT(*) AS count FROM user_onboarding_state WHERE activated_at IS NOT NULL GROUP BY activation_action ORDER BY count DESC;",
+    "parent_link_conversion": "SELECT COUNT(*) FILTER (WHERE stage='parent_link_skipped') AS skipped, COUNT(*) FILTER (WHERE stage='parent_linked') AS linked FROM user_onboarding_state WHERE role='parent';",
+    "platform_split": "SELECT device_platform, COUNT(*) AS users FROM user_onboarding_state GROUP BY device_platform;"
+  },
+
+  "timing_columns": [
+    { "column": "signup_to_consent_secs",     "from": "signed_up",          "to": "consent_complete" },
+    { "column": "consent_to_age_secs",        "from": "consent_complete",   "to": "age_verified" },
+    { "column": "age_to_role_secs",           "from": "age_verified",       "to": "role_selected" },
+    { "column": "role_to_name_secs",          "from": "role_selected",      "to": "name_set" },
+    { "column": "name_to_identity_secs",      "from": "name_set",           "to": "reflection_complete" },
+    { "column": "identity_to_activated_secs", "from": "reflection_complete","to": "activated" }
+  ]
+}

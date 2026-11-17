@@ -1,0 +1,10 @@
+{
+  "$themes": [
+    { "id": "raylene", "name": "Raylene's Room",    "selectedTokenSets": { "global": "enabled", "raylene": "enabled" } },
+    { "id": "rylane",  "name": "Rylane After Dark",  "selectedTokenSets": { "global": "enabled", "rylane":  "enabled" } },
+    { "id": "cloud",   "name": "Cloud Drift",         "selectedTokenSets": { "global": "enabled", "cloud":   "enabled" } },
+    { "id": "night",   "name": "Night Comfort",       "selectedTokenSets": { "global": "enabled", "night":   "enabled" } },
+    { "id": "rain",    "name": "Window Rain",         "selectedTokenSets": { "global": "enabled", "rain":    "enabled" } },
+    { "id": "sunset",  "name": "Sunset Exhale",       "selectedTokenSets": { "global": "enabled", "sunset":  "enabled" } }
+  ]
+}

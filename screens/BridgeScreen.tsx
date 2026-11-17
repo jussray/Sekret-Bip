@@ -3,10 +3,10 @@
 // Phase 1 polish: time-of-day backdrop, char-aware tone, mood glow,
 // staggered entrance, breath badge, sticky note, send confirmation glow.
 //
-// P6: handleSend now writes a signal row to `bridge_signals` in Supabase.
+// P6: handleSend writes a signal row to `bridge_signals` in Supabase.
 // MESSAGE CONTENT IS NEVER STORED — only share_type, conv_mode, char_key,
-// and a timestamp leave the device. AsyncStorage flag kept as instant
-// parent-side nudge even when offline.
+// response preference, and a timestamp leave the device. The UI reports sent
+// only after that metadata write is confirmed.
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
@@ -26,7 +26,21 @@ import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getRoomBg, TimeOfDay } from '../constants/theme';
-import { supabase } from '../utils/supabase';
+import {
+  sendBridgeSignal,
+  fetchParentNotes,
+  markParentNoteSeen,
+  subscribeToParentNotes,
+  type ParentNote,
+} from '@/utils/sync';
+import { getSupabase } from '@/utils/supabase';
+import { fetchBridgeSignals, type BridgeSignal } from '@/utils/parentBridgeCompat';
+import { fetchBridgeShares, type BridgeShare } from '@/features/bridge/bridgeShareCompat';
+import {
+  fetchTeenBridgeShareHistory,
+  revokeBridgeShareRequest,
+} from '@/services/bridgeSummaryService';
+import type { BridgeSummaryListItem } from '@/types/bridgeSummary';
 
 interface BridgeScreenProps {
   t:             Record<string, any>;
@@ -78,6 +92,13 @@ export function BridgeScreen({
   const [message, setMessage]       = useState('');
   const [sent, setSent]             = useState(false);
   const [sending, setSending]       = useState(false);
+  const [parentNotes, setParentNotes] = useState<ParentNote[]>([]);
+  const [view, setView]             = useState<'share' | 'history'>('share');
+  const [mySignals, setMySignals]   = useState<BridgeSignal[]>([]);
+  const [myShares, setMyShares]     = useState<BridgeShare[]>([]);
+  const [historyLoaded, setHistoryLoaded] = useState(false);
+  const [bridgeSummaryHistory, setBridgeSummaryHistory] = useState<BridgeSummaryListItem[]>([]);
+  const [bridgeStatus, setBridgeStatus] = useState<string | null>(null);
 
   const selectedType = SHARE_TYPES.find(s => s.id === shareType);
   const isRylane = selectedSekret === 'rylane';
@@ -108,8 +129,66 @@ export function BridgeScreen({
       ])
     );
     loop.start();
-    return () => loop.stop();
+
+    fetchParentNotes().then(setParentNotes);
+    let unsub = () => {};
+    subscribeToParentNotes((note) => {
+      setParentNotes(prev => [note, ...prev]);
+    }).then(fn => { unsub = fn; });
+
+    return () => { loop.stop(); unsub(); };
   }, [fade1, fade2, fade3, breath]);
+
+  useEffect(() => {
+    if (view !== 'history' || historyLoaded) return;
+    (async () => {
+      const sb = getSupabase();
+      const { data } = (await sb?.auth.getUser()) ?? { data: { user: null } };
+      const myId = data.user?.id;
+      if (!myId) { setHistoryLoaded(true); return; }
+      const [signals, shares, summaryHistory] = await Promise.all([
+        fetchBridgeSignals(myId),
+        fetchBridgeShares(myId),
+        fetchTeenBridgeShareHistory(),
+      ]);
+      setMySignals(signals);
+      setMyShares(shares);
+      if (summaryHistory.ok) setBridgeSummaryHistory(summaryHistory.value);
+      setHistoryLoaded(true);
+    })();
+  }, [view, historyLoaded]);
+
+  type HistoryItem = { id: string; emoji: string; label: string; detail?: string; timestamp: string };
+  const historyItems: HistoryItem[] = [
+    ...mySignals.map(sig => ({
+      id: `signal-${sig.id}`,
+      emoji: sig.share_type === 'mood' ? '💜' : sig.share_type === 'thought' ? '💭' : sig.share_type === 'need' ? '🌿' : '⚡',
+      label: 'You sent a signal',
+      detail: sig.share_type === 'mood' ? 'My Mood' : sig.share_type === 'thought' ? 'A Thought' : sig.share_type === 'need' ? 'Something I Need' : 'A Win',
+      timestamp: sig.sent_at,
+    })),
+    ...bridgeSummaryHistory.map(item => ({
+      id: `summary-${item.requestId}`,
+      emoji: item.status === 'revoked' ? '🔒' : '🌉',
+      label: item.status === 'revoked' ? 'Bridge Summary revoked' : 'Bridge Summary share',
+      detail: item.summary?.themes?.length ? item.summary.themes.join(', ') : `Status: ${item.status}`,
+      timestamp: item.generatedAt ?? new Date().toISOString(),
+    })),
+    ...myShares.map(share => ({
+      id: `share-${share.id}`,
+      emoji: '🌉',
+      label: 'You sent an S2Tell share',
+      detail: share.payload.rewrite ?? share.payload.text,
+      timestamp: share.shared_at,
+    })),
+    ...parentNotes.map(note => ({
+      id: `note-${note.id}`,
+      emoji: '💌',
+      label: 'From your person',
+      detail: note.content,
+      timestamp: note.sent_at,
+    })),
+  ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
   const breathScale = breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
   const breathOpacity = breath.interpolate({ inputRange: [0, 1], outputRange: [0.78, 1] });
@@ -118,7 +197,27 @@ export function BridgeScreen({
     transform: [{ translateY: val.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
   });
 
-  // ─── P6: send signal ─────────────────────────────────────────────────────────
+  const refreshBridgeSummaryHistory = async () => {
+    const result = await fetchTeenBridgeShareHistory();
+    if (result.ok) setBridgeSummaryHistory(result.value);
+  };
+
+  const handleCreateBridgeSummary = () => {
+    setBridgeStatus('Opening Pages so you can choose what to share. Nothing is sent until you preview and confirm it there.');
+    setScreen('pages');
+  };
+
+  const handleRevokeBridgeSummary = async (requestId: string) => {
+    setBridgeStatus('Revoking Bridge Summary access…');
+    const result = await revokeBridgeShareRequest(requestId);
+    if (!result.ok) {
+      setBridgeStatus(result.message);
+      return;
+    }
+    setBridgeStatus(result.value.revoked ? 'Bridge Summary access revoked.' : 'That share could not be revoked.');
+    await refreshBridgeSummaryHistory();
+  };
+
   const handleSend = async () => {
     if (!shareType || !message.trim()) {
       Alert.alert('almost there', 'pick a share type and write your message first.');
@@ -126,34 +225,21 @@ export function BridgeScreen({
     }
 
     setSending(true);
+    setBridgeStatus(null);
     try {
-      // 1. Instant local flag so the parent UI reacts even when offline.
+      await sendBridgeSignal({ shareType, convMode, charKey });
       await AsyncStorage.setItem('parent_bridge_pending', 'true');
-
-      // 2. Cloud signal — NO message content, only metadata.
-      if (!supabase) return;
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from('bridge_signals').insert({
-          teen_user_id: user.id,
-          char_key:    charKey,
-          share_type:  shareType,
-          conv_mode:   convMode ?? null,
-          sent_at:     new Date().toISOString(),
-        });
-        // Errors are intentionally swallowed — the teen's send still succeeds
-        // locally. Cloud sync is best-effort.
-      }
+      setSent(true);
+      setMessage('');
+      setShareType(null);
+      setConvMode(null);
     } catch {
-      // Network failure: local flag already set, nothing else to do.
+      setBridgeStatus('Bridge could not confirm delivery. Nothing was marked sent. Try again when the connection is available.');
+      Alert.alert('Could not send to Bridge', 'Nothing was marked sent. Check your connection and try again.');
+      return false;
     } finally {
       setSending(false);
     }
-
-    setSent(true);
-    setMessage('');
-    setShareType(null);
-    setConvMode(null);
   };
 
   const heroCopy = isRylane
@@ -225,8 +311,54 @@ export function BridgeScreen({
               {charLabel} helps you bridge it · you stay in control
             </Text>
           </Animated.View>
+
+          <View style={styles.viewToggleRow}>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, view === 'share' && { backgroundColor: glow + '33', borderColor: glow }]}
+              onPress={() => setView('share')}
+            >
+              <Text style={[styles.viewToggleText, { color: view === 'share' ? '#fff' : '#cbb6f7' }]}>share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.viewToggleBtn, view === 'history' && { backgroundColor: glow + '33', borderColor: glow }]}
+              onPress={() => setView('history')}
+            >
+              <Text style={[styles.viewToggleText, { color: view === 'history' ? '#fff' : '#cbb6f7' }]}>history</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
 
+        {view === 'history' && (
+          <Animated.View style={cardStyle(fade2)}>
+            <Text style={[styles.sectionLabel, { color: '#cbb6f7', marginBottom: 10 }]}>connection history</Text>
+            {historyItems.length === 0 && (
+              <Text style={styles.historyEmptyText}>
+                {historyLoaded ? "Nothing's passed through Bridge yet." : 'Loading…'}
+              </Text>
+            )}
+            {historyItems.map(item => (
+              <View key={item.id} style={[styles.card, { backgroundColor: 'rgba(30,18,55,0.75)', borderColor: glow + '44', marginBottom: 10 }]}>
+                <Text style={[styles.cardLabel, { color: glow, marginBottom: 4 }]}>{item.emoji} {item.label}</Text>
+                {!!item.detail && (
+                  <Text style={styles.noteText} numberOfLines={2}>{item.detail}</Text>
+                )}
+                <Text style={styles.noteTime}>
+                  {new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                {item.id.startsWith('summary-') && item.label !== 'Bridge Summary revoked' && (
+                  <TouchableOpacity
+                    onPress={() => void handleRevokeBridgeSummary(item.id.replace('summary-', ''))}
+                    style={[styles.seenBtn, { borderColor: glow + '66' }]}
+                  >
+                    <Text style={[styles.seenBtnText, { color: glow }]}>revoke</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </Animated.View>
+        )}
+
+        {view === 'share' && (
         <Animated.View style={cardStyle(fade2)}>
           <Text style={[styles.sectionLabel, { color: '#cbb6f7' }]}>what do you want to share?</Text>
           <View style={styles.typeRow}>
@@ -303,7 +435,51 @@ export function BridgeScreen({
             </>
           )}
         </Animated.View>
+        )}
 
+        {view === 'share' && parentNotes.length > 0 && (
+          <Animated.View style={cardStyle(fade2)}>
+            <Text style={[styles.sectionLabel, { color: '#cbb6f7', marginBottom: 10 }]}>
+              💌 from your person
+            </Text>
+            {parentNotes.map(note => (
+              <View
+                key={note.id}
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: note.seen_by_teen ? 'rgba(30,18,55,0.6)' : 'rgba(30,18,55,0.92)',
+                    borderColor: note.seen_by_teen ? glow + '33' : glow + '88',
+                    marginBottom: 10,
+                  },
+                ]}
+              >
+                {!note.seen_by_teen && (
+                  <View style={[styles.unseenDot, { backgroundColor: glow }]} />
+                )}
+                <Text style={[styles.noteText, { color: note.seen_by_teen ? '#9d8eb8' : '#e9defc' }]}>
+                  {note.content}
+                </Text>
+                <Text style={styles.noteTime}>
+                  {new Date(note.sent_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                {!note.seen_by_teen && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      markParentNoteSeen(note.id);
+                      setParentNotes(prev => prev.map(n => n.id === note.id ? { ...n, seen_by_teen: true } : n));
+                    }}
+                    style={[styles.seenBtn, { borderColor: glow + '66' }]}
+                  >
+                    <Text style={[styles.seenBtnText, { color: glow }]}>mark as read</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </Animated.View>
+        )}
+
+        {view === 'share' && (
         <Animated.View style={cardStyle(fade3)}>
           <View style={styles.stickyNote}>
             <Text style={styles.stickyText}>
@@ -311,6 +487,21 @@ export function BridgeScreen({
                 ? '"share what you can. they don\'t need the whole story."'
                 : '"soft is brave. you don\'t have to explain everything."'}
             </Text>
+          </View>
+
+          <View style={[styles.card, { backgroundColor: 'rgba(30,18,55,0.72)', borderColor: glow + '66' }]}>
+            <Text style={[styles.cardLabel, { color: glow }]}>Parent-safe Bridge Summary</Text>
+            <Text style={styles.noteText}>
+              Choose an existing journal, check-in, or reflection in Pages. You preview exactly what will be shared before anything can leave your private space.
+            </Text>
+            {!!bridgeStatus && <Text style={[styles.noteText, { color: '#cbb6f7' }]}>{bridgeStatus}</Text>}
+            <TouchableOpacity
+              style={[styles.seenBtn, { borderColor: glow + '88', marginTop: 8 }]}
+              onPress={handleCreateBridgeSummary}
+              disabled={sending}
+            >
+              <Text style={[styles.seenBtnText, { color: glow }]}>choose something in Pages →</Text>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -328,14 +519,15 @@ export function BridgeScreen({
               {sending ? 'sending…' : '🌉 send to bridge'}
             </Text>
           </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.ghostButton, { borderColor: glow + '88' }]}
-            onPress={() => setScreen('home')}
-          >
-            <Text style={[styles.ghostButtonText, { color: '#cbb6f7' }]}>back to room</Text>
-          </TouchableOpacity>
         </Animated.View>
+        )}
+
+        <TouchableOpacity
+          style={[styles.ghostButton, { borderColor: glow + '88' }]}
+          onPress={() => setScreen('home')}
+        >
+          <Text style={[styles.ghostButtonText, { color: '#cbb6f7' }]}>back to room</Text>
+        </TouchableOpacity>
 
         {BottomNav}
       </ScrollView>
@@ -350,30 +542,33 @@ const styles = StyleSheet.create({
   subtitle:        { fontSize: 14, color: '#cbb6f7', textAlign: 'center', marginBottom: 14, fontStyle: 'italic', lineHeight: 20 },
   energyBadge:     { alignSelf: 'center', borderWidth: 1, borderRadius: 20, paddingHorizontal: 14, paddingVertical: 7, marginBottom: 16 },
   energyText:      { fontSize: 12, fontWeight: '600' },
-
+  viewToggleRow:   { flexDirection: 'row', gap: 8, marginBottom: 6 },
+  viewToggleBtn:   { flex: 1, borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', borderRadius: 14, paddingVertical: 9, alignItems: 'center' },
+  viewToggleText:  { fontSize: 13, fontWeight: '700' },
+  historyEmptyText:{ color: '#9d8eb8', fontSize: 13, lineHeight: 20, textAlign: 'center', paddingVertical: 20 },
   sectionLabel:    { fontSize: 14, fontWeight: '600', marginBottom: 12 },
   typeRow:         { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 16 },
   typeChip:        { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 20, borderWidth: 1 },
   typeEmoji:       { fontSize: 18 },
   typeLabel:       { fontSize: 14, fontWeight: '600' },
-
   card:            { padding: 18, borderRadius: 20, marginBottom: 16, borderWidth: 1, shadowOpacity: 0.4, shadowRadius: 14 },
   cardLabel:       { fontSize: 14, fontWeight: '700', marginBottom: 10 },
   input:           { borderWidth: 1, borderRadius: 14, padding: 14, fontSize: 15, minHeight: 110, textAlignVertical: 'top', marginBottom: 8, backgroundColor: 'rgba(0,0,0,0.35)' },
   charCount:       { fontSize: 12, textAlign: 'right' },
-
   convModeHint:    { borderWidth: 1, borderRadius: 14, padding: 12, marginBottom: 12 },
   convModeHintText: { fontSize: 13, fontStyle: 'italic', lineHeight: 19 },
-
   stickyNote:      { backgroundColor: '#fff8e7', borderColor: '#7c3aed', borderWidth: 1, borderStyle: 'dashed', borderRadius: 12, padding: 12, marginBottom: 14, transform: [{ rotate: '-2deg' }] },
   stickyText:      { color: '#3a2461', fontSize: 13, fontStyle: 'italic', textAlign: 'center', lineHeight: 19 },
-
   button:          { padding: 16, borderRadius: 18, marginBottom: 12, alignItems: 'center' },
   buttonText:      { color: '#fff', fontSize: 16, fontWeight: 'bold' },
   ghostButton:     { padding: 14, borderRadius: 18, marginBottom: 12, alignItems: 'center', borderWidth: 1 },
   ghostButtonText: { fontSize: 14, fontWeight: '600' },
-
   sentEmoji:       { fontSize: 56, textAlign: 'center', marginBottom: 12 },
   sentTitle:       { fontSize: 22, fontWeight: 'bold', color: '#fff', textAlign: 'center', marginBottom: 8 },
   sentSub:         { fontSize: 14, color: '#e9defc', textAlign: 'center', lineHeight: 21 },
+  unseenDot:       { position: 'absolute', top: 14, right: 14, width: 8, height: 8, borderRadius: 4 },
+  noteText:        { fontSize: 14, lineHeight: 22, marginBottom: 6 },
+  noteTime:        { fontSize: 11, color: '#5a4d74', marginBottom: 6 },
+  seenBtn:         { alignSelf: 'flex-start', borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 5 },
+  seenBtnText:     { fontSize: 11, fontWeight: '700' },
 });

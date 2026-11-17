@@ -1,0 +1,11 @@
+{
+  "name": "Bip Vibe Frame Builder",
+  "id": "1513372448806800100",
+  "api": "1.0.0",
+  "main": "code.js",
+  "editorType": ["figma"],
+  "documentAccess": "dynamic-page",
+  "networkAccess": {
+    "allowedDomains": ["none"]
+  }
+}
