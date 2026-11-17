@@ -43,6 +43,7 @@ import {
   SEKRET_PROFILES,
   type Character,
 } from '../../constants/theme';
+import { syncOracleSession, loadOracleSession } from '../../src/utils/sync';
 
 // ── Types ────────────────────────────────────────────────────────────────────────────────
 export type ChatMsg = {
@@ -114,23 +115,41 @@ export default function CompanionChatScreen() {
   const [msgs, setMsgs] = useState<ChatMsg[]>([]);
   const [loading, setLoading] = useState(false);
   const listRef = useRef<FlatList<ChatMsg>>(null);
+  const sessionCountRef = useRef(0);
 
-  // Load history on mount; show companion greeting if empty
+  // Load history on mount; fall back to cloud oracle memory if AsyncStorage empty
   useEffect(() => {
-    loadHistory(storageKey).then((saved) => {
-      if (saved.length === 0) {
-        const welcome: ChatMsg = {
-          id: 'welcome',
-          from: 'companion',
-          text: profile.greeting,
-          time: nowTime(),
-        };
-        setMsgs([welcome]);
-        persistHistory(storageKey, [welcome]);
-      } else {
+    (async () => {
+      const saved = await loadHistory(storageKey);
+      if (saved.length > 0) {
         setMsgs(saved);
+        // Restore session count from cloud (non-blocking)
+        loadOracleSession(profileKey).then((cloud) => {
+          if (cloud) sessionCountRef.current = cloud.sessionCount;
+        });
+        return;
       }
-    });
+
+      // Try cloud restore first — gives returning users continuity on a new device
+      const cloud = await loadOracleSession(profileKey);
+      if (cloud?.memory?.recentMessages) {
+        const restored = cloud.memory.recentMessages as ChatMsg[];
+        sessionCountRef.current = cloud.sessionCount;
+        setMsgs(restored);
+        await persistHistory(storageKey, restored);
+        return;
+      }
+
+      // Brand new — show greeting
+      const welcome: ChatMsg = {
+        id: 'welcome',
+        from: 'companion',
+        text: profile.greeting,
+        time: nowTime(),
+      };
+      setMsgs([welcome]);
+      persistHistory(storageKey, [welcome]);
+    })();
   }, [storageKey]);
 
   // ── Send ─────────────────────────────────────────────────────────────────────────────
@@ -173,6 +192,14 @@ export default function CompanionChatScreen() {
       const final = [...withUser, companionMsg];
       setMsgs(final);
       await persistHistory(storageKey, final);
+
+      // Sync compact memory snapshot to Supabase (cross-device continuity)
+      sessionCountRef.current += 1;
+      syncOracleSession(
+        profileKey,
+        { recentMessages: final.slice(-20), surface },
+        sessionCountRef.current,
+      );
     } catch {
       const errMsg: ChatMsg = {
         id: String(Date.now() + 1),
