@@ -388,7 +388,7 @@ export function HomeScreen({
       {ambientBg && (
         <Animated.View
           pointerEvents="none"
-          style={[StyleSheet.absoluteFillObject, { opacity: fadeIn }]}
+          style={[StyleSheet.absoluteFill, { opacity: fadeIn }]}
         >
           <Image
             source={ambientBg}
@@ -648,14 +648,14 @@ const styles = StyleSheet.create({
 
   // Ambient time-of-day room background (blurred, dimmed) behind the dashboard
   ambientImg:     { width: '100%', height: '100%' },
-  ambientScrim:   { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(13,0,20,0.72)' },
+  ambientScrim:   { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(13,0,20,0.72)' },
 
   bgGlow:         {
     position: 'absolute', top: -80, alignSelf: 'center',
     width: 320, height: 320, borderRadius: 160,
   },
   environmentLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
     paddingRight: 16,

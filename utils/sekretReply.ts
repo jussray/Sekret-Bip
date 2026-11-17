@@ -19,18 +19,23 @@ import { normalizeSekretPersonality } from '../services/sekretPresence';
 import type { PagesTab } from '../screens/PagesScreen';
 
 /** Tabs that are allowed to trigger a Worker reply. */
-const REPLY_TABS = new Set<PagesTab>(['raylene', 'rylane', 'cloud', 'night']);
+const REPLY_TABS = new Set<PagesTab>(['suhana', 'sy', 'cloud', 'night']);
 
 /**
  * Maps a PagesTab to the avatarKey expected by fetchSekretReply.
  * Returns null for tabs that must not call the Worker.
+ * Tab IDs use current canon names (suhana/sy); Worker keys remain raylene/rylane.
  */
 export function tabToAvatarKey(
   tab: PagesTab,
 ): 'raylene' | 'rylane' | 'cloud' | 'night' | null {
-  if (!REPLY_TABS.has(tab)) return null;
-  // Tab id already matches the avatarKey shape exactly.
-  return tab as 'raylene' | 'rylane' | 'cloud' | 'night';
+  switch (tab) {
+    case 'suhana': return 'raylene';
+    case 'sy':     return 'rylane';
+    case 'cloud':  return 'cloud';
+    case 'night':  return 'night';
+    default:       return null;
+  }
 }
 
 /**
