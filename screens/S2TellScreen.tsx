@@ -19,6 +19,7 @@ import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { fetchSekretReply } from '../utils/api';
+import { shareS2Tell } from '@/utils/sync';
 import type { OracleProfile } from '../services/oracleDiscovery';
 import { createStyles } from '../constants/styles';
 
@@ -172,8 +173,11 @@ export function S2TellScreen({
       // Mark the first unshared entry that matches this rewrite
       const idx = history.findIndex(e => e.rewrite === s2tellRewrite && !e.shared);
       if (idx !== -1) {
-        history[idx] = { ...history[idx], shared: true };
+        const updated = { ...history[idx], shared: true };
+        history[idx] = updated;
         await AsyncStorage.setItem('s2tell_history', JSON.stringify(history));
+        // fire-and-forget cloud delivery — raw is NEVER sent
+        void shareS2Tell({ id: updated.id, rewrite: updated.rewrite, tone: updated.tone, savedAt: updated.savedAt });
       }
 
       // Lightweight signal — parent side only learns teen chose to share,

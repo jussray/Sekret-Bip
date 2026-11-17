@@ -74,6 +74,8 @@ export const TABLES = {
   // ── Parent repair + voice reflection (20261117 migration) ───────────────
   parentRepairWins:       'parent_repair_wins',
   parentVoiceReflections: 'parent_voice_reflections',
+  // ── S2Tell cross-device delivery (20261117 migration) ───────────────────
+  s2tellShares:           's2tell_shares',
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

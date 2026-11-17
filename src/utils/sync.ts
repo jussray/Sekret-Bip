@@ -862,6 +862,69 @@ export function syncVoiceReflection(entry: { id: number; prompt: string; text: s
   });
 }
 
+// ── S2Tell cross-device delivery ─────────────────────────────────────────────
+
+/** Teen shares a rewrite with their linked parent. raw is NEVER passed or stored. */
+export async function shareS2Tell(entry: {
+  id: string; rewrite: string; tone: string; savedAt: string;
+}): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  try {
+    const { data: link } = await sb
+      .from('parent_links')
+      .select('parent_user_id')
+      .eq('teen_user_id', uid)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (!link?.parent_user_id) return;
+    const { error } = await sb.from(TABLES.s2tellShares).upsert(
+      {
+        teen_user_id:   uid,
+        parent_user_id: link.parent_user_id,
+        id:             entry.id,
+        rewrite:        entry.rewrite,
+        tone:           entry.tone,
+        saved_at:       entry.savedAt,
+      },
+      { onConflict: 'teen_user_id,id' },
+    );
+    if (error) console.warn('[sync] shareS2Tell failed:', error.message);
+  } catch (e) {
+    if (__DEV__) console.warn('[sync] shareS2Tell failed', e);
+  }
+}
+
+/** Parent fetches all S2Tell shares addressed to them. */
+export async function fetchS2TellShares(): Promise<Array<{
+  id: string; rewrite: string; tone: string; savedAt: string;
+}>> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const uid = await currentUserId();
+  if (!uid) return [];
+  try {
+    const { data, error } = await sb
+      .from(TABLES.s2tellShares)
+      .select('id, rewrite, tone, saved_at')
+      .eq('parent_user_id', uid)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return (data ?? []).map((r: any) => ({
+      id:      r.id,
+      rewrite: r.rewrite,
+      tone:    r.tone,
+      savedAt: r.saved_at,
+    }));
+  } catch (e) {
+    if (__DEV__) console.warn('[sync] fetchS2TellShares failed', e);
+    return [];
+  }
+}
+
 /** Parent sends a warm note to their linked teen. */
 export async function sendParentNote(teenId: string, content: string): Promise<boolean> {
   const sb = getSupabase();
