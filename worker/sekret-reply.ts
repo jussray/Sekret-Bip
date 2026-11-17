@@ -1678,8 +1678,8 @@ async function handleReply(request: Request, env: Env, principal: PreflightPrinc
       },
       durationMs: Date.now() - startedAt,
     });
-  } catch (error) {
-    console.error('[sekret/reply]', error);
+  } catch {
+    console.error('SEKRET_REPLY_PROVIDER_FAILED');
     return json({
       reply: fallbackReply,
       tone: intent === 'greeting' ? 'casual' : characterId,
@@ -1765,8 +1765,8 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
     if (!res.ok) return json({ error: 'transcription failed' }, 502);
     const data = await res.json() as { text?: string };
     return json({ transcript: typeof data.text === 'string' ? data.text.trim() : '', model: getModels(env).stt });
-  } catch (error) {
-    console.error('[sekret/transcribe]', error);
+  } catch {
+    console.error('SEKRET_TRANSCRIPTION_FAILED');
     return json({ error: 'transcription error' }, 500);
   }
 }

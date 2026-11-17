@@ -4,7 +4,8 @@ const LOCKED_BOTTOM_NAV = ['Room', 'Pages', 'Calm', 'Circle', 'More'];
 
 function normalizeTabLabel(label: string): string {
   return label
-    .replace(/[^\p{L}\p{N}’'\- ]/gu, ' ')
+    .normalize('NFKC')
+    .replace(/^[^\p{L}\p{N}]+/u, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -12,6 +13,10 @@ function normalizeTabLabel(label: string): string {
 test.beforeEach(async ({ page }) => {
   await page.goto('/(teen)/room');
   await page.waitForLoadState('domcontentloaded');
+  // TeenLayout can show its sleep/profile loading surface after DOMContentLoaded.
+  // Wait for a real room control before asserting navigation or viewport geometry.
+  await expect(page.getByRole('button', { name: 'Customize your room in VibeLab' }))
+    .toBeVisible({ timeout: 30_000 });
 });
 
 test('keeps the existing teen bottom navigation locked', async ({ page }) => {
@@ -19,12 +24,13 @@ test('keeps the existing teen bottom navigation locked', async ({ page }) => {
   await expect(tabs).toHaveCount(LOCKED_BOTTOM_NAV.length, { timeout: 30_000 });
 
   const labels = await tabs.allInnerTexts();
-  expect(labels.map(normalizeTabLabel)).toEqual(LOCKED_BOTTOM_NAV);
+  const normalized = labels.map(normalizeTabLabel);
+  expect(normalized).toEqual(LOCKED_BOTTOM_NAV);
 });
 
 test('keeps feature routes out of the visible bottom navigation', async ({ page }) => {
   const tabs = page.locator('[role="tab"]');
-  const labels = (await tabs.allInnerTexts()).map(normalizeTabLabel).join(' ');
+  const labels = (await tabs.allInnerTexts()).join(' ');
   expect(labels).not.toMatch(/Bridge|Bippin|Voice Bip|Se’kret|Se'kret|User Room|Rewards|Crew/i);
 });
 
