@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   unsetRoot: { flex: 1 },
   loadingCover: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 3000,
     backgroundColor: '#0d0820',
     alignItems: 'center',
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2.5,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute' as const, top: 0, left: 0, right: 0, bottom: 0,
     zIndex: 3000,
     backgroundColor: 'rgba(8,4,18,0.68)',
     justifyContent: 'flex-end',

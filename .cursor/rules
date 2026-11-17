@@ -1,0 +1,37 @@
+# Cursor Rules — Sekret-Bip
+
+## 5W1H Operating Contract
+
+Before every nontrivial edit, establish and state:
+
+- **Who** — requester, decision owner, affected data subjects, execution authority
+- **What** — exact outcome, deliverable, non-goals, preserved IP
+- **Where** — `jussray/Sekret-Bip`, exact branch, environment, IP asset boundary
+- **When** — lifecycle state, ordering constraint, rollback window
+- **Why** — verified creative problem and evidence
+- **How** — smallest safe implementation, verification plan, rollback
+
+## Repository Identity
+
+Private Se’kret Bip creative universe — characters, lore, stories, production tools, and IP assets. Strictly separate from all other Chief AI projects.
+
+## Rules
+
+- Never expose unreleased characters, lore, story arcs, or IP assets in any context.
+- Never blend Se’kret Bip IP with other project content.
+- All changes via branch + PR, never direct to `main`.
+- Credentials and signing keys must stay in vault.
+- Run any available lint/build checks before PR.
+- Creative and publishing decisions require explicit founder approval.
+
+## Governed Gap-to-Merge Workflow
+
+When the founder invokes `/gaps`, `/blueprint`, `/rent`, `/implement`, `/review`, `/merge`, `/cont`, or equivalent stacked language, read `.ai-skills/skills/gap-blueprint-implement-review.md` and follow:
+
+`GAPS → BLUEPRINT → RENT → IMPLEMENT → VERIFY → REVIEW → MERGE GATE → CONTINUE`
+
+Cursor must inspect the current repository, `main`, exact branch/PR head, Founder Control Room, provider/database boundaries, checks, jobs, steps, logs, and review state before editing. Claims use `VERIFIED`, `INFERRED`, `UNKNOWN`, or `BLOCKED`. Failed lookups do not prove absence. Missing or zero-step CI evidence does not prove a regression. Rendered changes require Playwright/device proof. Production and merge actions require explicit authority, and verification is invalidated when the final head moves.
+
+## Approval Gates
+
+Require explicit founder approval before: merging, publishing, deploying, releasing IP, platform config changes, or rotating secrets.

@@ -1,0 +1,4 @@
+// See individual token files for the split source of truth.
+// This file is a convenience export of all 6 vibe token sets + global merged.
+// Generated from: tokens.global.json + tokens.raylene.json + tokens.rylane.json + tokens.cloud.json + tokens.night.json + tokens.rain.json + tokens.sunset.json
+// Refer to tokens.-themes.json for theme definitions and tokens.-metadata.json for set order.

@@ -1,0 +1,203 @@
+name: Quality Gate
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  typecheck:
+    name: "Typecheck"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  lint:
+    name: "Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run lint
+
+  unit-tests:
+    name: "Unit Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run unit tests with concise failure evidence
+        shell: bash
+        run: |
+          set +e
+          npm test > unit-test-output.log 2>&1
+          status=$?
+          if [[ $status -ne 0 ]]; then
+            echo "::group::Unit test failure tail"
+            tail -n 240 unit-test-output.log
+            echo "::endgroup::"
+            exit $status
+          fi
+          cat unit-test-output.log
+      - name: Upload unit test failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-failure-evidence
+          path: unit-test-output.log
+          if-no-files-found: error
+          retention-days: 14
+
+  runtime-truth-contracts:
+    name: "Runtime Truth Contracts"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - run: node --test test/runtime-truth-contract.test.mjs
+
+  implementation-evidence:
+    name: "Implementation Evidence"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify implementation claims
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          if [[ -n "$BASE_REF" ]]; then
+            npm run verify:implementation-ledger -- --changed-since "origin/$BASE_REF"
+          else
+            npm run verify:implementation-ledger
+          fi
+
+  rls-audit:
+    name: "RLS Audit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+      - name: Run canonical repository RLS scanner
+        run: npm run audit:control-room:rls
+
+  qodo-contracts:
+    name: "Qodo – Data + API Contract Tests"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Detect Qodo configuration
+        id: qodo_config
+        shell: bash
+        env:
+          QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
+        run: |
+          if [[ -n "$QODO_API_KEY" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Qodo is not configured; skipping the optional vendor gate."
+          fi
+
+      - name: Run Qodo tests
+        if: steps.qodo_config.outputs.configured == 'true'
+        run: npx qodo test --coverage --reporter=json --output=qodo-results.json
+        env:
+          QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
+
+      - name: Evaluate Qodo gate
+        if: steps.qodo_config.outputs.configured == 'true'
+        run: |
+          node -e "
+            const r = require('./qodo-results.json');
+            const failed = r.failures ?? [];
+            const contracts = r.contractViolations ?? [];
+            if (failed.length > 0 || contracts.length > 0) {
+              console.error('Qodo gate failed:');
+              [...failed, ...contracts].forEach(f => console.error(' •', f.message));
+              process.exit(1);
+            }
+            console.log('Qodo gate passed.');
+          "
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && steps.qodo_config.outputs.configured == 'true' }}
+        with:
+          name: qodo-results
+          path: qodo-results.json
+          if-no-files-found: ignore
+
+  sonarqube:
+    name: "SonarQube – API + Data Standard"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+      - run: npm ci
+
+      - name: Detect SonarQube configuration
+        id: sonar_config
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          if [[ -n "$SONAR_TOKEN" && -n "$SONAR_HOST_URL" ]]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "SonarQube is not configured; skipping the optional vendor gate."
+          fi
+
+      - name: SonarQube Scan
+        if: steps.sonar_config.outputs.configured == 'true'
+        uses: SonarSource/sonarqube-scan-action@ad8210318ac8bb816e41990d5af2b304f7a6c213
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        with:
+          args: >
+            -Dsonar.projectKey=sekret-bip
+            -Dsonar.qualitygate.wait=true
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info

@@ -1,5 +1,5 @@
 // screens/WomanhoodScreen.tsx
-// Se'kret Bip — Bippin 2: Womanhood Dashboard (Raylene-led)
+// Se'kret Bip — Bippin 2: Womanhood Dashboard (Suhana-led)
 // Layout matches the Womanhood mockup:
 //   Hero → Greeting + Streak → Quick Access Grid →
 //   First Period + Comfort Tip cards → Mood Check-In →
@@ -46,7 +46,7 @@ const QUICK_ACCESS = [
   { emoji: '🌙', label: 'cycle\nwellness',       target: 'periodCalendar' },
   { emoji: '💜', label: 'mood + body\ncheck-in',  target: null },
   { emoji: '🫂', label: 'comfort\nmode',          target: 'calm' },
-  { emoji: '💬', label: "ask\nse'kret",           target: 'sekret' },
+  { emoji: '💬', label: "ask\nse\'kret",           target: 'sekret' },
   { emoji: '📔', label: 'private\njournal',       target: 'pages' },
 ];
 
@@ -107,7 +107,7 @@ export function WomanhoodScreen({
         {/* ── GREETING + STREAK ── */}
         <View style={styles.row}>
           <View style={[cardHalf, { flex: 1.6 }]}>
-            <Text style={styles.greetLabel}>{greeting}, Raylene 💜</Text>
+            <Text style={styles.greetLabel}>{greeting}, Suhana 💜</Text>
             <Text style={styles.greetBody}>
               Your body is changing.{"\n"}
               That's not something{"\n"}to fear or hide.

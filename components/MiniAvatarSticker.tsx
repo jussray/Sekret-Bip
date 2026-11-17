@@ -9,8 +9,8 @@
 // Stickers NEVER replace full-size avatars.
 //
 // CHARACTER ROUTING RULES:
-//   raylene page/context  → raylene mini sticker, fallback to Raylene avatar
-//   rylane  page/context  → rylane  mini sticker, fallback to Rylane avatar
+//   raylene page/context  → raylene mini sticker, fallback to Suhana avatar
+//   rylane  page/context  → rylane  mini sticker, fallback to Sy avatar
 //   cloud   page/context  → cloud   mini sticker, fallback to Cloud avatar
 //   night   context       → night/rylane-night sticker, fallback to Night avatar
 //   oracle  / sekretBrain → return null (never shown, never rendered)
@@ -122,7 +122,7 @@ export function MiniAvatarSticker({
     );
   }
 
-  // Raylene / Rylane / Cloud: look up context sticker from registry first.
+  // Suhana / Sy / Cloud: look up context sticker from registry first.
   const sticker = getContextSticker(character, ctx);
   const imgSource = sticker?.renderable && sticker.assetKey
     ? imageMap[sticker.assetKey]

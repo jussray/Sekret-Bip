@@ -89,19 +89,18 @@ ALTER TABLE public.public_circle_posts
 -- TG_ARGV[0] carries the content column name so one function serves all tables.
 -- NEW.id is cast to TEXT — safe for bigint, bigserial, and uuid source tables.
 --
--- Shared secret is read from app.safety_scan_secret (superuser-set config).
--- If URL is not yet configured the trigger returns immediately — user write
--- is never blocked.
+-- URL is hardcoded (project ref is stable and not sensitive).
+-- Shared secret is read from Supabase Vault (vault.decrypted_secrets) — no
+-- superuser config needed. If the secret hasn't been stored in Vault yet the
+-- trigger returns immediately without blocking the user write.
 --
--- SECURITY DEFINER: allows the function to read app.safety_scan_secret
---   without granting that config access to the calling session role.
+-- SECURITY DEFINER: allows the function to read vault.decrypted_secrets
+--   without granting Vault access to the calling session role.
 -- search_path pinned to public: prevents search_path injection attacks.
 --
--- FIX M1 + M2: uses net.http_post() — the correct pg_net schema.
+-- Uses net.http_post() — the correct pg_net schema.
 --   pg_net installs into the 'net' schema even when the extension itself is
---   created in 'extensions'. Calling extensions.http_post() would error.
---   body and headers are passed as jsonb — net.http_post() signature:
---     net.http_post(url text, body jsonb, params jsonb, headers jsonb, timeout_ms int)
+--   created in 'extensions'. body and headers are passed as jsonb.
 
 CREATE OR REPLACE FUNCTION public.trigger_safety_scan()
   RETURNS trigger
@@ -112,7 +111,6 @@ AS $$
 DECLARE
   _col_name text := TG_ARGV[0];  -- 'text' | 'body'
   _content  text;
-  _fn_url   text;
   _secret   text;
 BEGIN
   -- Resolve content column
@@ -127,12 +125,16 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  -- Read superuser-only config (not readable by anon or authenticated roles)
-  _fn_url := current_setting('app.safety_scan_url',    true);
-  _secret  := current_setting('app.safety_scan_secret', true);
+  -- Read shared secret from Supabase Vault (no superuser required).
+  -- Store it with: SELECT vault.create_secret('<value>', 'safety_scan_secret');
+  SELECT decrypted_secret
+    INTO _secret
+    FROM vault.decrypted_secrets
+   WHERE name = 'safety_scan_secret'
+   LIMIT 1;
 
-  -- Silently skip if Edge Function URL not yet configured
-  IF _fn_url IS NULL OR _fn_url = '' THEN
+  -- Silently skip if secret not yet stored in Vault
+  IF _secret IS NULL OR _secret = '' THEN
     RETURN NEW;
   END IF;
 
@@ -140,7 +142,7 @@ BEGIN
   -- AFTER INSERT: user write is already committed before this runs.
   -- net.http_post() is non-blocking — result is queued, not awaited.
   PERFORM net.http_post(
-    url     := _fn_url,
+    url     := 'https://tbsevonvegdnlyjgplmm.supabase.co/functions/v1/safety-scan',
     body    := jsonb_build_object(
                  'record_id',    NEW.id::text,
                  'user_id',      NEW.user_id::text,
@@ -149,7 +151,7 @@ BEGIN
                ),
     headers := jsonb_build_object(
                  'Content-Type',  'application/json',
-                 'x-scan-secret', coalesce(_secret, '')
+                 'x-scan-secret', _secret
                )
   );
 
@@ -186,18 +188,20 @@ CREATE TRIGGER safety_scan_public_circle
 
 -- ── 7. Post-deploy config — run MANUALLY in Supabase SQL editor ───────────────
 --
--- Run as the postgres (superuser) role AFTER deploying the Edge Function.
--- These values are NOT readable by anon or authenticated database roles.
+-- NOTE: ALTER DATABASE SET requires superuser — Supabase does not grant this.
+-- Instead the trigger reads the secret from Supabase Vault and the URL is
+-- hardcoded. Follow these steps after running this migration:
 --
--- Step 1: deploy the function
+-- Step 1: deploy the Edge Function (run from your local machine with Supabase CLI)
 --   supabase functions deploy safety-scan --no-verify-jwt
 --
--- Step 2: set Edge Function secrets
+-- Step 2: set Edge Function env secrets (local CLI)
 --   supabase secrets set SAFETY_SCAN_SECRET=<random-32+-char-secret>
 --   supabase secrets set OPENAI_API_KEY=<your-key>
 --
--- Step 3: set database config (in Supabase SQL editor as postgres role)
---   ALTER DATABASE postgres
---     SET app.safety_scan_url    = 'https://<ref>.supabase.co/functions/v1/safety-scan';
---   ALTER DATABASE postgres
---     SET app.safety_scan_secret = '<same-value-as-SAFETY_SCAN_SECRET>';
+-- Step 3: store the shared secret in Supabase Vault (paste into SQL editor)
+--   SELECT vault.create_secret('<same-value-as-SAFETY_SCAN_SECRET>', 'safety_scan_secret');
+--
+-- That's it — no ALTER DATABASE needed. The trigger reads from Vault and the
+-- URL (https://tbsevonvegdnlyjgplmm.supabase.co/functions/v1/safety-scan)
+-- is already hardcoded in the function above.

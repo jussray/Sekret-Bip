@@ -1,0 +1,18 @@
+name: Deprecated — Deploy Worker
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deprecated:
+    name: Use Deploy to Cloudflare instead
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain canonical deployment path
+        run: |
+          echo "This workflow is intentionally disabled for automatic deploys."
+          echo "Use .github/workflows/deploy-cloudflare.yml."
+          echo "Canonical targets: bip = backend Worker; sekret = frontend Pages."
