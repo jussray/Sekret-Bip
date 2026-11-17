@@ -31,8 +31,12 @@ jobs:
           # .agents/skills/** is vendored third-party content (npx skills add
           # cloudflare/skills) — not ours to patch, and re-fetched verbatim on
           # every update, so a suppression here is the durable fix rather than
-          # editing lines that would just reappear.
-          ignore-globs: ".agents/skills/**"
+          # editing lines that would just reappear. .claude/skills/* holds
+          # symlinks into that same vendored tree (checked out as real
+          # symlinks by actions/checkout on Linux), so each is listed here too
+          # — except .claude/skills/makevideo, which is our own committed
+          # SKILL.md, not vendored, and stays in scope for scanning.
+          ignore-globs: ".agents/skills/**,.claude/skills/agents-sdk/**,.claude/skills/basin/**,.claude/skills/cf-cli/**,.claude/skills/cloudflare/**,.claude/skills/cloudflare-email-service/**,.claude/skills/cloudflare-one/**,.claude/skills/cloudflare-one-migrations/**,.claude/skills/durable-objects/**,.claude/skills/gateway-workers/**,.claude/skills/k2/**,.claude/skills/nextjs-on-cloudflare/**,.claude/skills/sandbox-migrate-to-next/**,.claude/skills/sandbox-next/**,.claude/skills/sandbox-stable/**,.claude/skills/turnstile-spin/**,.claude/skills/web-perf/**,.claude/skills/workers-best-practices/**,.claude/skills/workers-profiling/**,.claude/skills/wrangler/**"
 
       # Read-only proof: no source snippets, messages, credentials, or SARIF payload exported.
       - name: Record DevSkim finding locations without source content
