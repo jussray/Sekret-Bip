@@ -39,14 +39,14 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
   if (req.method !== 'POST')   return json({ error: 'method_not_allowed' }, 405);
 
-  let body: { email?: unknown; password?: unknown; birth_month?: unknown; birth_year?: unknown };
+  let body: { email?: unknown; password?: unknown; birth_month?: unknown; birth_year?: unknown; consent_at?: unknown };
   try {
     body = await req.json() as typeof body;
   } catch {
     return json({ error: 'invalid_json' }, 400);
   }
 
-  const { email, password, birth_month, birth_year } = body;
+  const { email, password, birth_month, birth_year, consent_at } = body;
 
   if (
     typeof email        !== 'string' || !email.trim() ||
@@ -89,7 +89,10 @@ Deno.serve(async (req: Request) => {
     email:         email.trim(),
     password,
     email_confirm: false, // Supabase sends the confirmation email
-    user_metadata: { date_of_birth: dateOfBirth },
+    user_metadata: {
+      date_of_birth: dateOfBirth,
+      consent_at: typeof consent_at === 'string' ? consent_at : new Date().toISOString(),
+    },
   });
 
   if (createErr) {

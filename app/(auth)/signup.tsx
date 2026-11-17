@@ -19,6 +19,7 @@ export default function SignupScreen() {
   const [confirm, setConfirm]       = useState('');
   const [birthMonth, setBirthMonth] = useState('');
   const [birthYear, setBirthYear]   = useState('');
+  const [agreed, setAgreed]         = useState(false);
   const [error, setError]           = useState('');
   const [success, setSuccess]       = useState(false);
   const [loading, setLoading]       = useState(false);
@@ -45,12 +46,17 @@ export default function SignupScreen() {
       return;
     }
 
+    if (!agreed) {
+      setError('Please agree to the Privacy Policy and Terms of Service.');
+      return;
+    }
+
     setLoading(true);
     const sb = getSupabase();
     if (!sb) { setError('Auth unavailable. Try skipping for now.'); setLoading(false); return; }
 
     const { data, error: fnErr } = await sb.functions.invoke('register', {
-      body: { email: e, password: p, birth_month: mm, birth_year: yy },
+      body: { email: e, password: p, birth_month: mm, birth_year: yy, consent_at: new Date().toISOString() },
     });
 
     setLoading(false);
@@ -161,6 +167,22 @@ export default function SignupScreen() {
           />
         </View>
 
+        <TouchableOpacity
+          style={styles.consentRow}
+          onPress={() => setAgreed(v => !v)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.checkbox, agreed && styles.checkboxChecked]}>
+            {agreed && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <Text style={styles.consentText}>
+            I agree to the{' '}
+            <Text style={styles.consentLink}>Privacy Policy</Text>
+            {' '}and{' '}
+            <Text style={styles.consentLink}>Terms of Service</Text>
+          </Text>
+        </TouchableOpacity>
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         <TouchableOpacity style={styles.btn} onPress={handleSignUp} disabled={loading}>
@@ -198,6 +220,15 @@ const styles = StyleSheet.create({
   birthMonthInput: { flex: 1, width: undefined },
   birthSlash:     { color: '#555', fontSize: 20, marginHorizontal: 8, marginBottom: 12 },
   birthYearInput: { flex: 2, width: undefined },
+  consentRow:     { flexDirection: 'row', alignItems: 'flex-start', width: '100%', marginTop: 12, marginBottom: 4 },
+  checkbox: {
+    width: 20, height: 20, borderRadius: 5, borderWidth: 1.5, borderColor: '#6d28d9',
+    alignItems: 'center', justifyContent: 'center', marginRight: 10, marginTop: 1, flexShrink: 0,
+  },
+  checkboxChecked: { backgroundColor: '#6d28d9' },
+  checkmark:      { color: '#fff', fontSize: 12, fontWeight: '900', lineHeight: 14 },
+  consentText:    { color: '#888', fontSize: 12, flex: 1, lineHeight: 18 },
+  consentLink:    { color: '#c4b5fd', textDecorationLine: 'underline' },
   error:          { color: '#f87171', fontSize: 13, marginBottom: 10, textAlign: 'center' },
   btn: {
     width: '100%', backgroundColor: '#6d28d9', borderRadius: 16,
