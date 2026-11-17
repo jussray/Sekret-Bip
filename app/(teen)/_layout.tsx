@@ -142,8 +142,12 @@ export default function TeenLayout() {
   }, [isTeenActive]);
 
   // Split View and exact-head browser proof can land on the teen copy of a
-  // duplicate web URL first. Honor the explicit side before Founder Preview
-  // renders so /(teen) and /(parent) remain deterministic in development.
+  // duplicate web URL first. Honor the explicit side even outside Founder
+  // Preview (mirrors the parent layout's symmetric check) so /(teen) and
+  // /(parent) remain deterministic in development, pathname included —
+  // without this, a parent-side pane that resolves into this route group
+  // falls through to the generic `/(parent)/room` redirect below and loses
+  // whatever path it was actually trying to reach.
   if (devSideOverride === 'parent') {
     return <Redirect href={`/(parent)${pathname}` as never} />;
   }
