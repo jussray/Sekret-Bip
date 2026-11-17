@@ -17,6 +17,7 @@ try {
     '--target', 'ES2020',
     '--module', 'commonjs',
     '--skipLibCheck',
+    '--ignoreConfig',
   ], { stdio: 'inherit' });
 
   const oracle = require(path.join(outputDirectory, 'services', 'oracleDiscovery.js'));
