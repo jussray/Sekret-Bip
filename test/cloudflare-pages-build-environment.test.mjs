@@ -13,7 +13,7 @@ const releaseWriter = fs.readFileSync('scripts/write-release-metadata.mjs', 'utf
 test('Cloudflare Pages uses the repository-supported Node runtime', () => {
   assert.equal(nodeVersion, '24.22.1');
   assert.equal(nvmVersion, nodeVersion);
-  assert.match(packageJson.dependencies.expo, /56/);
+  assert.match(packageJson.dependencies.expo, /58/);
 });
 
 test('frontend build exports Expo and writes the release marker', () => {
