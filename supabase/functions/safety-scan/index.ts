@@ -169,6 +169,23 @@ async function findActiveParent(
   return link?.parent_user_id ?? null;
 }
 
+// ── Parent notification ───────────────────────────────────────────────────────
+// No content, no push wiring yet — see TODO below. Called only after the
+// alert row (with parent_user_id already stored) has been written.
+async function notifyParentIfLinked(
+  parent_user_id: string | null,
+  alert_id:        number,
+  severity:        Severity,
+): Promise<void> {
+  if (!parent_user_id) return;
+
+  // TODO: wire to Expo push token lookup + expo-server-sdk when push ships.
+  // Payload shape when ready:
+  //   { to: <parent_expo_token>, title, body: summary,
+  //     data: { alert_id, severity } }   ← NO source content
+  console.log('SAFETY_SCAN_PARENT_NOTIFY_QUEUED');
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
 
@@ -266,13 +283,10 @@ Deno.serve(async (req: Request) => {
     .eq('id', metadata.record_id);
 
   // Parent notification — high severity only, active link only, no content.
-  // parent_user_id was already resolved and stored on the row above.
-  if (severity === 'high' && alert.parent_user_id) {
-    // TODO: wire to Expo push token lookup + expo-server-sdk when push ships.
-    // Payload shape when ready:
-    //   { to: <parent_expo_token>, title, body: summary,
-    //     data: { alert_id: alert.id, severity } }   ← NO source content
-    console.log('SAFETY_SCAN_PARENT_NOTIFY_QUEUED');
+  // parent_user_id was already resolved by findActiveParent and stored on
+  // the row above (the parent-read RLS policy needs it set at write time).
+  if (severity === 'high') {
+    await notifyParentIfLinked(alert.parent_user_id, alert.id, severity);
   }
 
   return new Response(JSON.stringify({ flagged: true, severity, alert_id: alert.id }), {
