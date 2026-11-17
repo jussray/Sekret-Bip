@@ -24,6 +24,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { getRoomBg, TimeOfDay } from '../constants/theme';
 import { glowForMood as glowFor } from '../constants/moodGlow';
 import { syncCrewMember, deleteCrewMember, syncCrewCheckIn } from '@/utils/sync';
+import { scheduleCrewReminder, cancelCrewReminder } from '@/utils/notifications';
 import { SyncBadge, type SyncStatus } from '../components/SyncBadge';
 import type { CrewMember, CrewCheckIn } from '@/types';
 
@@ -142,6 +143,7 @@ export function BipCrewScreen({
       addedAt: new Date().toISOString(),
     };
     setCrewMembers(prev => [...prev, member]);
+    void scheduleCrewReminder(member);
     const sync = () => syncCrewMember(member);
     if (withSyncWrap) void withSyncWrap(async () => sync());
     else sync();
@@ -153,6 +155,7 @@ export function BipCrewScreen({
   const removeMember = (id: string | number) => {
     setCrewMembers(prev => prev.filter(m => String(m.id) !== String(id)));
     setCrewCheckIns(prev => prev.filter(c => String(c.memberId) !== String(id)));
+    void cancelCrewReminder(id);
     const sync = () => deleteCrewMember(Number(id));
     if (withSyncWrap) void withSyncWrap(async () => sync());
     else sync();

@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { getSupabase } from '@/utils/supabase';
+import type { CrewMember } from '@/types';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -55,6 +56,37 @@ export async function getExpoPushToken(): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+// ── Crew check-in reminders ───────────────────────────────────────────────────
+
+function crewReminderId(memberId: string | number): string {
+  return `bip-crew-${memberId}`;
+}
+
+export async function scheduleCrewReminder(member: CrewMember): Promise<void> {
+  if (Platform.OS === 'web') return;
+  if (!member.cadence || member.cadence === 'whenever') return;
+  const granted = await requestNotificationPermissions();
+  if (!granted) return;
+  const id = crewReminderId(member.id);
+  await Notifications.cancelScheduledNotificationAsync(id).catch(() => {});
+  const seconds = member.cadence === 'daily' ? 86400 : 604800;
+  const body = member.cadence === 'daily'
+    ? 'Daily crew check-in is due 💫'
+    : 'Weekly crew check-in is due 💫';
+  await Notifications.scheduleNotificationAsync({
+    identifier: id,
+    content: {
+      title: `${member.emoji ?? '💜'} Check in with ${member.name}`,
+      body,
+    },
+    trigger: { seconds, repeats: true } as Notifications.TimeIntervalTriggerInput,
+  });
+}
+
+export async function cancelCrewReminder(memberId: string | number): Promise<void> {
+  await Notifications.cancelScheduledNotificationAsync(crewReminderId(memberId)).catch(() => {});
 }
 
 export async function registerAndSavePushToken(userId: string): Promise<void> {
