@@ -1,9 +1,15 @@
 // screens/ParentBridgeScreen.tsx
-// Parent Window — two tabs:
-//   "Se'kret Advice" → Parent Se'kret advisor with topic picker
-//   "Send a Note"    → one-way warm message to teen
+// Parent Bridge — the canonical linked-account connection surface:
+//   "Shared"  → signals, S2Tell shares, and moments the teen chose to share
+//   "History" → a chronological log of the whole connection
+//   "Reply"   → one-way warm message to teen
+//
+// Parent Se'kret advice (topic picker) moved to its own screen —
+// see src/parent/features/sekret/ParentSekretCoachScreen.tsx — since it
+// duplicated that richer, AI-backed coaching surface. Bridge stays scoped
+// to intentionally shared relationship content (see docs/BRIDGE_CONNECTION_AUDIT.md).
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Text,
   TouchableOpacity,
@@ -15,22 +21,14 @@ import {
   Platform,
   Alert,
   Easing,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import {
-  PARENT_TOPICS,
-  getParentSekretResponse,
-  type ParentTopicId,
-  type ParentSekretResponse,
-} from '../constants/parentSekret';
-import {
   sendParentNote,
 } from '@/utils/sync';
+import { fetchParentSentNotes, type ParentNote } from '@/utils/parentBridgeCompat';
 import type { LinkedTeenData } from '@/hooks/useLinkedTeen';
-
-const { width: W } = Dimensions.get('window');
 
 // ─── palette ──────────────────────────────────────────────────────────────────
 const P = {
@@ -61,20 +59,19 @@ interface ParentBridgeScreenProps {
 }
 
 export function ParentBridgeScreen({ t, setScreen, BottomNav, linkedTeen }: ParentBridgeScreenProps) {
-  const { linkedTeenId: teenId, isLinked: linked, activitySummary, sharedJournal, sharedMoods, signals } = linkedTeen;
+  const { linkedTeenId: teenId, isLinked: linked, sharedJournal, sharedMoods, signals } = linkedTeen;
 
-  const [tab,        setTab]        = useState<'advice' | 'bridge' | 'shared'>('advice');
-  const [topic,      setTopic]      = useState<ParentTopicId | null>(null);
+  const [tab,        setTab]        = useState<'shared' | 'history' | 'bridge'>('shared');
   const [message,    setMessage]    = useState('');
   const [sent,       setSent]       = useState(false);
   const [sending,    setSending]    = useState(false);
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const [sentNotes,  setSentNotes]  = useState<ParentNote[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
 
   const fade1 = useRef(new Animated.Value(0)).current;
   const fade2 = useRef(new Animated.Value(0)).current;
   const fade3 = useRef(new Animated.Value(0)).current;
   const breath = useRef(new Animated.Value(0)).current;
-  const responseAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const s = (val: Animated.Value, delay: number) =>
@@ -88,16 +85,40 @@ export function ParentBridgeScreen({ t, setScreen, BottomNav, linkedTeen }: Pare
     return () => loop.stop();
   }, []);
 
-  const animateResponse = () => {
-    responseAnim.setValue(0);
-    Animated.timing(responseAnim, { toValue: 1, duration: 380, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  };
+  const loadHistory = useCallback(async () => {
+    setHistoryLoading(true);
+    setSentNotes(await fetchParentSentNotes());
+    setHistoryLoading(false);
+  }, []);
 
-  const handleTopicSelect = (id: ParentTopicId) => {
-    setTopic(id);
-    setExpandedSection(null);
-    animateResponse();
-  };
+  useEffect(() => {
+    if (tab === 'history' && sentNotes.length === 0) void loadHistory();
+  }, [tab, sentNotes.length, loadHistory]);
+
+  type HistoryItem = { id: string; emoji: string; label: string; detail?: string; timestamp: string };
+  const historyItems: HistoryItem[] = [
+    ...signals.map(sig => ({
+      id: `signal-${sig.id}`,
+      emoji: sig.share_type === 'mood' ? '💜' : sig.share_type === 'thought' ? '💭' : sig.share_type === 'need' ? '🌿' : '⚡',
+      label: 'Teen sent a signal',
+      detail: sig.share_type === 'mood' ? 'My Mood' : sig.share_type === 'thought' ? 'A Thought' : sig.share_type === 'need' ? 'Something I Need' : 'A Win',
+      timestamp: sig.sent_at,
+    })),
+    ...sharedJournal.map(entry => ({
+      id: `shared-${entry.id}`,
+      emoji: entry.mood_tag === 's2tell' ? '🌉' : '📖',
+      label: entry.mood_tag === 's2tell' ? 'Teen shared through S2Tell' : 'Teen shared a page',
+      detail: entry.text ? (entry.text.length > 60 ? `${entry.text.slice(0, 60)}…` : entry.text) : undefined,
+      timestamp: entry.created_at,
+    })),
+    ...sentNotes.map(note => ({
+      id: `note-${note.id}`,
+      emoji: '💌',
+      label: 'You sent a note',
+      detail: note.content,
+      timestamp: note.sent_at,
+    })),
+  ].sort((a, b) => b.timestamp.localeCompare(a.timestamp));
 
   const handleSend = async () => {
     const text = message.trim();
@@ -124,13 +145,6 @@ export function ParentBridgeScreen({ t, setScreen, BottomNav, linkedTeen }: Pare
     opacity: val,
     transform: [{ translateY: val.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
   });
-  const responseCardStyle = {
-    opacity: responseAnim,
-    transform: [{ translateY: responseAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-  };
-
-  const response: ParentSekretResponse | null = topic ? getParentSekretResponse(topic) : null;
-
   return (
     <View style={styles.root}>
       <AmbientWeatherOverlay />
@@ -143,15 +157,15 @@ export function ParentBridgeScreen({ t, setScreen, BottomNav, linkedTeen }: Pare
         <Animated.View style={cardSlide(fade1)}>
           <View style={styles.header}>
             <Animated.View style={[styles.avatarRing, { borderColor: P.accent, shadowColor: P.accent, transform: [{ scale: breathScale }], opacity: breathOpacity }]}>
-              <Text style={styles.avatarEmoji}>🎧</Text>
+              <Text style={styles.avatarEmoji}>🌉</Text>
             </Animated.View>
-            <Text style={styles.headerName}>Parent Se'kret</Text>
+            <Text style={styles.headerName}>Parent Bridge</Text>
             <Text style={[styles.headerTagline, { color: P.soft }]}>
-              Sitting on the stoop with you.
+              The private connection to your teen.
             </Text>
             <Text style={[styles.headerDesc, { color: P.soft + 'cc' }]}>
-              Street-smart. Emotionally intelligent. A little salty. A little funny.{'\n'}
-              Never going to pick sides. Always going to keep it real.
+              Only what they choose to share, and what you choose to send back.{'\n'}
+              Nothing more.
             </Text>
           </View>
         </Animated.View>
@@ -167,43 +181,24 @@ export function ParentBridgeScreen({ t, setScreen, BottomNav, linkedTeen }: Pare
           </Animated.View>
         )}
 
-        {/* ─── ACTIVITY PULSE (when linked) ───────────────────────────────────── */}
-        {linked && activitySummary && (
-          <Animated.View style={cardSlide(fade2)}>
-            <View style={[styles.pulseCard, { borderColor: P.accent + '44' }]}>
-              <Text style={[styles.pulseLine, { color: P.soft + 'aa' }]}>
-                Activity Pulse · your teen is showing up 💪
-              </Text>
-              <View style={styles.pulseRow}>
-                <View style={styles.pulseStat}>
-                  <Text style={[styles.pulseValue, { color: P.accent }]}>{activitySummary.streakDays}</Text>
-                  <Text style={[styles.pulseLabel, { color: P.soft + '88' }]}>day streak</Text>
-                </View>
-                <View style={[styles.pulseDivider, { backgroundColor: P.accent + '33' }]} />
-                <View style={styles.pulseStat}>
-                  <Text style={[styles.pulseValue, { color: P.accent }]}>{activitySummary.sessionCount}</Text>
-                  <Text style={[styles.pulseLabel, { color: P.soft + '88' }]}>sessions</Text>
-                </View>
-                <View style={[styles.pulseDivider, { backgroundColor: P.accent + '33' }]} />
-                <View style={styles.pulseStat}>
-                  <Text style={[styles.pulseValue, { color: P.accent }]}>{activitySummary.pointsTier.toUpperCase()}</Text>
-                  <Text style={[styles.pulseLabel, { color: P.soft + '88' }]}>tier</Text>
-                </View>
-              </View>
+        {/* ─── NEED ADVICE? → Parent Se'kret Coach lives on its own screen ──────── */}
+        <Animated.View style={cardSlide(fade2)}>
+          <TouchableOpacity
+            style={[styles.coachLink, { borderColor: P.accent + '44' }]}
+            onPress={() => setScreen('sekret')}
+            activeOpacity={0.82}
+          >
+            <Text style={styles.coachLinkEmoji}>🎧</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.coachLinkTitle, { color: P.soft }]}>Need advice on a conversation?</Text>
+              <Text style={[styles.coachLinkSub, { color: P.soft + '99' }]}>Talk it through with Parent Se'kret Coach</Text>
             </View>
-          </Animated.View>
-        )}
+            <Text style={[styles.coachLinkArrow, { color: P.accent }]}>›</Text>
+          </TouchableOpacity>
+        </Animated.View>
 
         {/* ─── TABS ──────────────────────────────────────────────────────────── */}
         <Animated.View style={[cardSlide(fade2), styles.tabRow]}>
-          <TouchableOpacity
-            style={[styles.tabBtn, tab === 'advice' && { backgroundColor: P.accent + '33', borderColor: P.accent }]}
-            onPress={() => setTab('advice')}
-          >
-            <Text style={[styles.tabLabel, { color: tab === 'advice' ? P.accent : P.soft + '99' }]}>
-              Advice
-            </Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tabBtn, tab === 'shared' && { backgroundColor: P.accent + '33', borderColor: P.accent }]}
             onPress={() => setTab('shared')}
@@ -213,133 +208,68 @@ export function ParentBridgeScreen({ t, setScreen, BottomNav, linkedTeen }: Pare
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
+            style={[styles.tabBtn, tab === 'history' && { backgroundColor: P.accent + '33', borderColor: P.accent }]}
+            onPress={() => setTab('history')}
+          >
+            <Text style={[styles.tabLabel, { color: tab === 'history' ? P.accent : P.soft + '99' }]}>
+              History
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.tabBtn, tab === 'bridge' && { backgroundColor: P.accent + '33', borderColor: P.accent }]}
             onPress={() => setTab('bridge')}
           >
             <Text style={[styles.tabLabel, { color: tab === 'bridge' ? P.accent : P.soft + '99' }]}>
-              Send Note
+              Reply
             </Text>
           </TouchableOpacity>
         </Animated.View>
 
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/*  TAB: ADVICE                                                        */}
+        {/*  TAB: HISTORY — CHRONOLOGICAL CONNECTION LOG                        */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
-        {tab === 'advice' && (
+        {tab === 'history' && (
           <Animated.View style={cardSlide(fade3)}>
 
-            <Text style={[styles.sectionTitle, { color: P.soft }]}>
-              What's going on?
-            </Text>
-
-            {/* ─── TOPIC GRID ────────────────────────────────────────────── */}
-            <View style={styles.topicGrid}>
-              {PARENT_TOPICS.map((t) => {
-                const active = topic === t.id;
-                return (
-                  <TouchableOpacity
-                    key={t.id}
-                    style={[
-                      styles.topicChip,
-                      {
-                        backgroundColor: active ? P.accent + '33' : 'rgba(46,26,16,0.75)',
-                        borderColor: active ? P.accent : P.accent + '44',
-                      },
-                    ]}
-                    onPress={() => handleTopicSelect(t.id as ParentTopicId)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={styles.topicEmoji}>{t.emoji}</Text>
-                    <Text style={[styles.topicLabel, { color: active ? P.accent : P.soft + 'cc' }]}>
-                      {t.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+            <View style={[styles.card, { marginBottom: 16 }]}>
+              <Text style={styles.cardTitle}>Connection history</Text>
+              <Text style={[styles.bodyText, { color: P.soft }]}>
+                Everything that's passed through this Bridge, in order — what your
+                teen shared and what you sent back. Nothing else.
+              </Text>
             </View>
 
-            {/* ─── RESPONSE CARD ─────────────────────────────────────────── */}
-            {response ? (
-              <Animated.View style={[styles.responseCard, responseCardStyle]}>
-
-                {/* Opening line */}
-                <View style={styles.openingBlock}>
-                  <Text style={[styles.openingLine, { color: P.accent }]}>
-                    "{response.openingLine}"
-                  </Text>
-                </View>
-
-                {/* Real Talk */}
-                <ResponseSection
-                  id="realTalk"
-                  label="Real Talk"
-                  icon="🗣"
-                  content={response.realTalk}
-                  accent={P.accent}
-                  soft={P.soft}
-                  expanded={expandedSection === 'realTalk'}
-                  onToggle={setExpandedSection}
-                />
-
-                {/* Tiny Action */}
-                <ResponseSection
-                  id="tinyAction"
-                  label="Try This"
-                  icon="✅"
-                  content={response.tinyAction}
-                  accent={P.accent}
-                  soft={P.soft}
-                  expanded={expandedSection === 'tinyAction'}
-                  onToggle={setExpandedSection}
-                  highlight
-                />
-
-                {/* Avoid This */}
-                <ResponseSection
-                  id="avoidThis"
-                  label="Avoid This"
-                  icon="🚫"
-                  content={response.avoidThis}
-                  accent="#f87171"
-                  soft={P.soft}
-                  expanded={expandedSection === 'avoidThis'}
-                  onToggle={setExpandedSection}
-                />
-
-                {/* Reality Check */}
-                <ResponseSection
-                  id="realityCheck"
-                  label="Reality Check"
-                  icon="💡"
-                  content={response.realityCheck}
-                  accent="#a78bfa"
-                  soft={P.soft}
-                  expanded={expandedSection === 'realityCheck'}
-                  onToggle={setExpandedSection}
-                />
-
-                {/* Flex Option */}
-                <ResponseSection
-                  id="flexOption"
-                  label="If That Don't Fit"
-                  icon="🔄"
-                  content={response.flexOption}
-                  accent={P.soft}
-                  soft={P.soft}
-                  expanded={expandedSection === 'flexOption'}
-                  onToggle={setExpandedSection}
-                  last
-                />
-
-              </Animated.View>
-            ) : (
+            {historyLoading && historyItems.length === 0 && (
               <View style={[styles.emptyState, { borderColor: P.accent + '33' }]}>
-                <Text style={styles.emptyEmoji}>☝️</Text>
-                <Text style={[styles.emptyText, { color: P.soft + '99' }]}>
-                  Pick a situation above.{'\n'}Parent Se'kret will keep it real.
+                <Text style={[styles.emptyText, { color: P.soft + '99' }]}>Loading…</Text>
+              </View>
+            )}
+
+            {!historyLoading && historyItems.length === 0 && (
+              <View style={[styles.emptyState, { borderColor: P.accent + '33' }]}>
+                <Text style={styles.emptyEmoji}>🕊️</Text>
+                <Text style={[styles.emptyText, { color: P.soft + '88' }]}>
+                  Nothing has passed through Bridge yet.
                 </Text>
               </View>
             )}
+
+            {historyItems.map(item => (
+              <View key={item.id} style={[styles.signalCard, { borderColor: P.accent + '44' }]}>
+                <Text style={styles.signalEmoji}>{item.emoji}</Text>
+                <View style={styles.signalBody}>
+                  <Text style={[styles.signalType, { color: P.accent }]}>{item.label}</Text>
+                  {!!item.detail && (
+                    <Text style={[styles.bodyText, { color: P.soft, marginBottom: 2 }]} numberOfLines={2}>
+                      {item.detail}
+                    </Text>
+                  )}
+                  <Text style={[styles.signalTime, { color: P.soft + '77' }]}>
+                    {new Date(item.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+              </View>
+            ))}
 
           </Animated.View>
         )}
@@ -540,44 +470,6 @@ export function ParentBridgeScreen({ t, setScreen, BottomNav, linkedTeen }: Pare
   );
 }
 
-// ─── RESPONSE SECTION COMPONENT ──────────────────────────────────────────────
-interface ResponseSectionProps {
-  id:        string;
-  label:     string;
-  icon:      string;
-  content:   string;
-  accent:    string;
-  soft:      string;
-  expanded:  boolean;
-  onToggle:  (id: string | null) => void;
-  highlight?: boolean;
-  last?:     boolean;
-}
-
-function ResponseSection({ id, label, icon, content, accent, soft, expanded, onToggle, highlight, last }: ResponseSectionProps) {
-  return (
-    <View style={[styles.responseSection, last ? {} : { borderBottomWidth: 1, borderBottomColor: '#ffffff11' }]}>
-      <TouchableOpacity
-        style={styles.responseSectionHeader}
-        onPress={() => onToggle(expanded ? null : id)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.responseSectionLeft}>
-          <Text style={styles.responseSectionIcon}>{icon}</Text>
-          <Text style={[styles.responseSectionLabel, { color: accent }]}>{label}</Text>
-        </View>
-        <Text style={[styles.responseToggle, { color: accent + 'aa' }]}>{expanded ? '▲' : '▼'}</Text>
-      </TouchableOpacity>
-
-      {expanded && (
-        <View style={[styles.responseSectionBody, highlight && { backgroundColor: accent + '18', borderRadius: 10, padding: 10 }]}>
-          <Text style={[styles.responseSectionText, { color: soft }]}>{content}</Text>
-        </View>
-      )}
-    </View>
-  );
-}
-
 // ─── STYLES ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: '#1e0f06' },
@@ -591,14 +483,12 @@ const styles = StyleSheet.create({
   signalType:    { fontSize: 13, fontWeight: '700', marginBottom: 2 },
   signalTime:    { fontSize: 11 },
 
-  // Activity pulse
-  pulseCard:    { backgroundColor: 'rgba(46,26,16,0.75)', borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 14 },
-  pulseLine:    { fontSize: 12, fontWeight: '600', marginBottom: 10 },
-  pulseRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' },
-  pulseStat:    { alignItems: 'center', flex: 1 },
-  pulseValue:   { fontSize: 24, fontWeight: '900' },
-  pulseLabel:   { fontSize: 10, fontWeight: '600', marginTop: 2 },
-  pulseDivider: { width: 1, height: 32 },
+  // Coach link-out card (replaces the old embedded Advice tab)
+  coachLink:      { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: 'rgba(46,26,16,0.75)', borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 14 },
+  coachLinkEmoji: { fontSize: 22 },
+  coachLinkTitle: { fontSize: 13, fontWeight: '700', marginBottom: 2 },
+  coachLinkSub:   { fontSize: 12 },
+  coachLinkArrow: { fontSize: 24 },
 
   // Shared tab
   sharedEntryCard: { backgroundColor: 'rgba(46,26,16,0.75)', borderWidth: 1, borderRadius: 14, padding: 14, marginBottom: 10 },
@@ -622,31 +512,7 @@ const styles = StyleSheet.create({
   tabBtn:    { flex: 1, paddingVertical: 10, borderRadius: 14, borderWidth: 1, borderColor: 'transparent', alignItems: 'center' },
   tabLabel:  { fontSize: 14, fontWeight: '700' },
 
-  // Topics
   sectionTitle: { fontSize: 15, fontWeight: '700', marginBottom: 12, color: '#fff' },
-  topicGrid:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18 },
-  topicChip:    {
-    width:         (W - 56) / 3,
-    paddingVertical: 10,
-    borderRadius:  12,
-    borderWidth:   1,
-    alignItems:    'center',
-  },
-  topicEmoji:  { fontSize: 20, marginBottom: 4 },
-  topicLabel:  { fontSize: 11, fontWeight: '600', textAlign: 'center' },
-
-  // Response card
-  responseCard:    { backgroundColor: 'rgba(46,26,16,0.92)', borderRadius: 20, borderWidth: 1, borderColor: '#e9a04a33', marginBottom: 16, overflow: 'hidden' },
-  openingBlock:    { padding: 18, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#ffffff11' },
-  openingLine:     { fontSize: 16, fontStyle: 'italic', fontWeight: '700', lineHeight: 24 },
-  responseSection: { paddingHorizontal: 18 },
-  responseSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 13 },
-  responseSectionLeft:   { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  responseSectionIcon:   { fontSize: 15 },
-  responseSectionLabel:  { fontSize: 13, fontWeight: '700' },
-  responseToggle:        { fontSize: 11 },
-  responseSectionBody:   { paddingBottom: 14 },
-  responseSectionText:   { fontSize: 14, lineHeight: 22 },
 
   // Empty state
   emptyState: { borderWidth: 1, borderRadius: 18, borderStyle: 'dashed', padding: 32, alignItems: 'center', marginBottom: 16 },

@@ -2,6 +2,7 @@
   "name": "bip-vibe-frame-builder",
   "version": "1.0.0",
   "private": true,
+  "license": "UNLICENSED",
   "description": "Local Figma plugin that builds the six canonical 390x844 Bip vibe frames from the shared design tokens.",
   "main": "code.js",
   "scripts": {

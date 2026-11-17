@@ -1,0 +1,30 @@
+{
+  "date": "2026-07-19",
+  "repository": "jussray/Sekret-Bip",
+  "classification": "actions_fanout_noise_reduction",
+  "notCodeRegression": true,
+  "runnerFailurePolicy": "zero-step/no-log failures remain runner_startup_failure until a job executes real steps/logs",
+  "changedWorkflowTriggerMode": "workflow_dispatch_only",
+  "workflows": [
+    "account-deletion-sweep.yml",
+    "ci.yml",
+    "companion-lab.yml",
+    "control-room-manifest.yml",
+    "deploy-cloudflare.yml",
+    "implementation-evidence.yml",
+    "playwright.yml",
+    "prepush.yml",
+    "quality-gate.yml",
+    "regression-tests.yml",
+    "trigger-audit-debug.yml",
+    "typecheck.yml",
+    "verify-room-archives.yml"
+  ],
+  "boundaries": {
+    "runtimeCodeChanged": false,
+    "supabaseChanged": false,
+    "secretsChanged": false,
+    "workflowFilesDeleted": false,
+    "deploymentPerformed": false
+  }
+}

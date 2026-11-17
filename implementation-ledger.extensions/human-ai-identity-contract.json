@@ -1,0 +1,30 @@
+{
+  "id": "human-ai-identity-contract",
+  "name": "HUMAN-AI relational companion identity and canonical naming contract",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/357",
+  "acceptanceCriteria": [
+    "Suhana and Sy are the canonical display and canon names while legacy raylene and rylane identifiers remain compatibility aliases until a dedicated migration is approved.",
+    "Companions preserve HUMAN-AI relational voice, Soria-rooted canon life, distinct mannerisms, and relationship texture without flattening into generic disclaimer mode.",
+    "When identity, trust, capability, memory, safety, or real-world access is relevant, the companion clearly preserves the factual AI boundary and does not claim biological embodiment, offline access, sentience, or unsupplied teen memory.",
+    "Agent handoffs and focused contract tests make the current identity precedence discoverable and guard against drift from legacy peer-fiction or legacy display-name wording."
+  ],
+  "contractPaths": [
+    "docs/HUMAN_AI_IDENTITY_AGENT_HANDOFF.md",
+    "docs/COMPANION_NAME_CANON.md",
+    "docs/COMPANION_IDENTITY_BIBLE.md",
+    "docs/OPENAI_COMPANION_RUNTIME.md",
+    "src/features/sekret/styleProfiles.ts",
+    "worker/runtime-style.ts"
+  ],
+  "testPaths": [
+    "test/human-ai-doc-contract.test.mjs",
+    "test/human-ai-runtime-precedence.test.mjs",
+    "test/openai-prompt-injection.test.mjs"
+  ],
+  "verification": {
+    "state": "partial",
+    "evidence": "https://github.com/jussray/Sekret-Bip/pull/589",
+    "blocker": "The identity contract, precedence handoff, canonical-name crosslinks, and focused test command are merged, but no pull-request workflow runs attached to the founder-directed merge chain. Run npm run test:human-ai-contract and the required exact-head repository gates before promoting beyond contract."
+  }
+}

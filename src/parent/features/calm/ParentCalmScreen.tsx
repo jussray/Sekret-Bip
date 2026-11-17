@@ -7,9 +7,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, ScrollView,
-  StyleSheet, Animated, Platform, Easing, Alert,
+  StyleSheet, Animated, Platform, Easing,
 } from 'react-native';
-import { useAudioPlayer } from '../../../../hooks/useAudioPlayer';
 
 const TOP = Platform.OS === 'ios' ? 56 : 36;
 
@@ -78,14 +77,6 @@ const PRESENCE = [
   "come back with love first. everything else is secondary.",
 ];
 
-// Replace uri values with real CDN audio URLs before shipping.
-const PARENT_SOUNDS = [
-  { id: 'rain',   emoji: '🌧️', label: 'rain',   uri: '' },
-  { id: 'forest', emoji: '🌿', label: 'forest', uri: '' },
-  { id: 'ocean',  emoji: '🌊', label: 'ocean',  uri: '' },
-  { id: 'fire',   emoji: '🕯️', label: 'candle', uri: '' },
-];
-
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -106,11 +97,9 @@ export function ParentCalmScreen({ setScreen, BottomNav }: ParentCalmScreenProps
   const [promptIdx, setPromptIdx] = useState(() => Math.floor(Math.random() * REFLECT_PROMPTS.length));
   const [starterIdx, setStarterIdx] = useState(0);
   const [presenceLine]            = useState(() => pick(PRESENCE));
-  const [activeSound, setActiveSound] = useState<string | null>(null);
 
   const circleScale = useRef(new Animated.Value(1)).current;
   const fadeIn      = useRef(new Animated.Value(0)).current;
-  const soundPlayer = useAudioPlayer();
 
   useEffect(() => {
     Animated.timing(fadeIn, { toValue: 1, duration: 500, useNativeDriver: true }).start();
@@ -152,21 +141,6 @@ export function ParentCalmScreen({ setScreen, BottomNav }: ParentCalmScreenProps
     setPhase(p);
   };
 
-  async function handleSoundPress(sound: typeof PARENT_SOUNDS[number]) {
-    if (!sound.uri) {
-      Alert.alert('Coming soon', 'Ambient sounds will be available in the next update.');
-      return;
-    }
-    if (activeSound === sound.id) {
-      if (soundPlayer.state === 'playing') await soundPlayer.pause();
-      else await soundPlayer.play();
-      return;
-    }
-    setActiveSound(sound.id);
-    await soundPlayer.load(sound.uri);
-    await soundPlayer.play();
-  }
-
   return (
     <View style={s.root}>
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
@@ -185,28 +159,6 @@ export function ParentCalmScreen({ setScreen, BottomNav }: ParentCalmScreenProps
         {/* ── Presence line ── */}
         <View style={s.presenceRow}>
           <Text style={s.presenceText}>{'"'}{presenceLine}{'"'}</Text>
-        </View>
-
-        {/* ── Calm Sounds ── */}
-        <View style={s.soundsRow}>
-          <Text style={s.soundsLabel}>ambient sounds</Text>
-          <View style={s.soundsChips}>
-            {PARENT_SOUNDS.map(snd => {
-              const isActive  = activeSound === snd.id;
-              const isPlaying = isActive && soundPlayer.state === 'playing';
-              return (
-                <TouchableOpacity
-                  key={snd.id}
-                  style={[s.soundChip, isActive && s.soundChipActive]}
-                  onPress={() => handleSoundPress(snd)}
-                >
-                  <Text style={s.soundChipEmoji}>{snd.emoji}</Text>
-                  <Text style={[s.soundChipText, isActive && s.soundChipTextActive]}>{snd.label}</Text>
-                  {isActive && <Text style={s.soundChipPlay}>{isPlaying ? '⏸' : '▶'}</Text>}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
         </View>
 
         {/* ── Phase tabs ── */}
@@ -351,15 +303,6 @@ const s = StyleSheet.create({
   },
   presenceText: { color: '#e9d5ff', fontSize: 13, fontStyle: 'italic', lineHeight: 20 },
 
-  soundsRow:     { paddingHorizontal: 20, marginBottom: 16 },
-  soundsLabel:   { color: '#64748B', fontSize: 10, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 8 },
-  soundsChips:   { flexDirection: 'row', gap: 8 },
-  soundChip:     { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 20, backgroundColor: 'rgba(192,132,252,0.07)', borderWidth: 1, borderColor: '#374151' },
-  soundChipActive: { backgroundColor: 'rgba(192,132,252,0.18)', borderColor: '#c084fc' },
-  soundChipEmoji:  { fontSize: 13 },
-  soundChipText:   { color: '#64748B', fontSize: 11, fontWeight: '600' },
-  soundChipTextActive: { color: '#e9d5ff' },
-  soundChipPlay:   { color: '#c084fc', fontSize: 10, marginLeft: 2 },
 
   tabs: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 8,

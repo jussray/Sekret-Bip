@@ -1,250 +1,174 @@
-# Se'kret Bip 💜
+<!-- truth-mode: durable -->
+# Se’kret Bip 💜
 
-Se'kret Bip is a privacy-first emotional growth and self-expression app for teens, built with React Native, Expo Router, TypeScript, Supabase, and Cloudflare Workers.
+**A private, age-aware space for reflection, self-expression, emotional growth, and healthier family communication.**
 
-> Cool cousin energy: warm, slightly nosy, funny, soft, never clinical.
->
-> Dark-night scrapbook visuals, private rooms, taped notes, stickers, clouds, moonlight, and companion-led support.
+🌐 **Official site:** https://sekretbip.net
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/jussray/Bip?quickstart=1)
+Se’kret Bip is built for teens and the families who support them. It combines private reflection, journaling, voice, comfort tools, companions, relationship-aware family experiences, and expressive social spaces without turning parent access into surveillance. The product centers privacy-first emotional growth and self-expression while preserving clear family and safety boundaries.
 
-## Product Promise
+> **Boundary:** Se’kret Bip is not a medical, therapy, crisis, or emergency service. It does not diagnose users or replace professional or emergency care.
 
-Se'kret Bip is designed around four rules:
+Copyright © 2024–2026 Juss Ray. All rights reserved. Proprietary software; see `LICENSE`.
 
-- **Privacy by default** — private journals, Voice Bip, AI companion chats, and private memories stay private.
-- **Support by choice** — teens decide what they explicitly share through Bridge, Parent Pages, and other supported surfaces.
-- **Protection by architecture** — identity, verification, permissions, safety events, and parent visibility are modeled centrally rather than patched into individual screens.
-- **Parents verify safety, not thoughts** — parent access is event-based and consent-based, never surveillance-based.
+## What the product is trying to protect
 
-## Core Product Areas
+The public Worker front door treats malformed rate-limiter results as a retryable
+503 protection outage. Only an explicit boolean success permits continuation;
+an explicit denial returns 429. Limiter exceptions emit a fixed event code
+without the raw exception payload. Deployment and real-account behavior require
+their own current evidence.
 
-### Teen experience
+Se’kret Bip is designed around a simple principle: connection should not require giving up privacy.
 
-- **Room / User Room** — personal emotional home with companion and time-of-day room scenes
-- **Pages** — private journal and scrapbook creation
-- **Voice Bip** — voice-first reflection and companion response flows
-- **Se'kret companions** — Raylene, Rylane, Cloud, Night, and Oracle experiences
-- **Calm / Comfort / MindBody Reset** — grounding and coping tools
-- **Cloud Thoughts** — quiet thought space
-- **Bippin 2** — growth, development, and identity support; Manhood/Womanhood concepts are being folded into this system
-- **Growth / Insights / History / Memories** — private progress and reflection systems
-- **Period Calendar** — private cycle tracking
-- **Points / Rewards** — positive habit and participation rewards
+- Private reflections stay private unless the product explicitly says otherwise.
+- Teens choose what they share through supported sharing and relationship flows.
+- Parent and trusted-adult access is relationship-based, permission-aware, and intentionally separated from a teen’s private space.
+- Identity and access rules are enforced by runtime and database boundaries, not only by hidden UI.
+- Operational evidence must remain metadata-safe and must not become a back door into private teen content.
+- Public discovery pages and authenticated account content are separate layers.
 
-### Social and trusted connection
+## Core experiences
 
-- **Circle** — anonymous or circle-safe community posting
-- **Bip Crew** — trusted mutual accountability relationships
-- **Connection Hub** — managed relationship and connection surfaces
-- **Bridge / Parent Bridge** — teen-controlled support sharing
-- **Parent Circle** — parent-to-parent support space
-- **Messages** — bounded app communication; the product does not support open stranger DMs
+### Teen
 
-### Safety
+The repository contains Teen experiences across reflection, journaling, voice, Se’kret companions, Daily Intentions, Calm / Comfort / Mind + Body Reset, Cloud Thoughts, Circle, Bip Crew, Growth / Insights / History / Memories, period tools, points, and rewards infrastructure.
 
-- **Age gate and trusted-adult verification**
-- **Limited Mode** before verification
-- **Report and block flows**
-- **Emergency shutoff and safety check-ins**
-- **Suspicious-behavior detection architecture**
-- **Parent Doorbell events** — safety and verification summaries without private teen content
-- **Account deletion request and grace-period flow**
-- **Row Level Security and private storage policies in Supabase**
+These features exist at different evidence levels. **Code present in the repository is not the same thing as production-verified behavior.**
 
-## Identity and Privacy Model
+### Parent and trusted relationships
 
-Bip keeps different identity contexts separate:
+Parent routes, linking, Bridge contracts, relationship-aware permissions, Parent Circle, and guarded parent surfaces are part of the product architecture. Parent launch readiness is independently gated by privacy, linking, revocation, unlink, deletion, notification, account, browser, and device evidence.
 
-- **Account identity** — private authenticated account facts
-- **Circle identity** — safe social display name and avatar per circle
-- **Crew identity** — trusted relationship presentation and support preferences
-- **Parent connection identity** — relationship and verification metadata only
+### Bip Jr
 
-Public Circle surfaces must never fall back to a teen's real account name.
+Bip Jr experiences are part of the broader family product direction and remain subject to the app’s age, account, relationship, and release rules. Their existence in source does not override the product’s age-gating or launch requirements.
 
-Parent-visible data must never include:
+## Character world
 
-- raw journal text
-- Voice Bip transcripts
-- AI companion chat content
-- private memories
-- private notes
-- private message bodies
+Se’kret Bip’s visual world is part of the experience, but character art is **not** the product architecture.
 
-## Current Architecture
+Cosmic and character art is visual DNA and atmosphere, not product architecture.
 
-- **Frontend:** React Native + Expo Router + TypeScript
-- **State:** local React state and AsyncStorage for offline/local experiences, with Supabase-backed sync for supported account data
-- **Backend:** Supabase Auth, Postgres, Row Level Security, Storage, migrations, and Edge Functions
-- **Worker/API layer:** Cloudflare Worker services for selected AI and app integrations
-- **Navigation:** Expo Router with ongoing migration toward domain route groups
-- **Styling:** React Native StyleSheet, design tokens, scrapbook/night visual system
-- **Assets:** companion art, room scenes, splash screens, stickers, and design references under `assets/` and `design-references/`
+The approved canonical character family currently includes:
 
-## Architecture Roadmap
+- **Night** — The Watcher
+- **Suhana** — The Center
+- **Sy** — The Mind
+- **Cloud** — The Calm
 
-The current roadmap is architecture-first so every new screen inherits the same privacy and trust rules.
+Character identity is governed by `sekret-bip-character-canon/registry.json`. Ensemble art, world art, prompts, and design descriptions cannot silently redefine a canonical character.
 
-1. **Identity foundation**
-   - `AccountIdentity`
-   - `CircleIdentity`
-   - `CrewIdentity`
-   - `ProfileMemory`
+The UX target is a living product: companions embedded into real flows, responsive emotional feedback, personalized home behavior, coherent Teen / Parent / Bip Jr journeys, accessible motion, and a consistent mobile design system.
 
-2. **Verification state machine**
-   - unverified
-   - pending parent/trusted adult
-   - limited mode
-   - verified teen
-   - expired
-   - manual review
-   - suspended
+## Architecture
 
-3. **Domain route groups**
-   - `(auth)`
-   - `(teen)`
-   - `(parent)`
-   - `(profile)`
-   - `(safety)`
-   - `(social)`
+| Layer | Source of truth |
+| --- | --- |
+| App | React Native + Expo Router + TypeScript |
+| Targets | Web, iOS, Android |
+| Client state | React state, context, hooks, AsyncStorage |
+| Auth + data | Supabase Auth, Postgres, RLS, Storage, Edge Functions |
+| Schema | `supabase/migrations/` |
+| Web deployment target | Cloudflare Pages project `sekret-bip` |
+| Public API origin | `https://api.sekretbip.net` |
+| Checked-in Worker target | `sekret-backend` in `wrangler.toml` |
+| Companion Worker lineage | `sekret`, with exact live routing/bindings requiring provider readback |
+| Operating / evidence layer | Founder Control Room |
 
-4. **Front door and onboarding**
-   - Welcome
-   - Sign up / Login
-   - Teen onboarding
-   - Parent onboarding
-   - Parent link verification
-   - Limited Mode
+### Worker purpose boundary
 
-5. **Shared safety services**
-   - Doorbell events
-   - report/block services
-   - emergency flow
-   - suspicious behavior signals
-   - parent-safe payload redaction
+The public client is intentionally single-homed to `api.sekretbip.net`.
 
-6. **Profile and identity platform**
-   - profile
-   - Circle identity management
-   - avatar customization
-   - room themes
-   - privacy settings
+The durable target split is:
 
-7. **Figma-led screen expansion**
-   - onboarding and verification screens first
-   - safety and Parent Doorbell screens next
-   - profile and parent platform screens after trust architecture is stable
-   - search, discover, post detail, and reply threads later
+- **`sekret`**: companion reply, voice, transcription, companion style/safety behavior, provider capability, and companion-scoped telemetry.
+- **`sekret-backend`**: public API/front-door work, authentication and rate-limit ingress, Bridge/data operations, privileged Supabase work, inbound email, and other backend business logic.
 
-## Project Structure
+A preferred future topology delegates companion requests from `sekret-backend` to `sekret` through a Cloudflare Service Binding while preserving one public API URL. **That service binding must not be described as live until provider and exact-release evidence prove it.**
+
+Privileged secrets such as `SUPABASE_SERVICE_ROLE_KEY` must not be duplicated into the companion Worker merely for convenience.
+
+## Live truth boundary
+
+This README documents **durable product and architecture contracts**, not a live deployment verdict.
+
+This README does **not** declare the live release SHA.
+
+Do not use README prose alone to claim the current production SHA, Cloudflare routing, Supabase runtime state, open/closed issue state, or launch readiness. Resolve current truth from fresh evidence:
+
+1. GitHub `main`, PRs, issues, checks, reviews, jobs, and logs;
+2. the newest marked exact-production receipt on issue #696;
+3. Cloudflare Pages / Workers / Access readback for the same target;
+4. the intended Supabase project and live migration/runtime evidence;
+5. production Playwright plus controlled-account or physical-device evidence where required.
+
+Use **State → Evidence → Claim**. Older successful evidence remains historical when a newer authority supersedes it.
+
+See `docs/TRUTH_AUTHORITY.md` and `docs/CURRENT_STATUS.md` for the full freshness and supersession rules.
+
+## Repository map
 
 ```text
-Bip/
-├── app/                       # Expo Router route entry points
-├── screens/                   # Full-page screen implementations
-├── src/
-│   ├── components/            # Shared UI and safety components
-│   ├── context/               # App context
-│   ├── features/              # Domain feature logic
-│   ├── hooks/                 # App hooks
-│   ├── services/              # AI, permissions, verification, safety, sync helpers
-│   ├── types/                 # Canonical TypeScript domain models
-│   └── utils/                 # Shared utilities and sync helpers
-├── components/                # Legacy/shared UI still being migrated
-├── constants/                 # Theme, images, voice, and design constants
-├── hooks/                     # Existing shared hooks
-├── utils/                     # Storage, API, Supabase, and compatibility utilities
-├── supabase/
-│   ├── functions/             # Edge Functions
-│   └── migrations/            # Database migrations and RLS changes
-├── assets/images/             # Companion, room, splash, and screen artwork
-├── design-references/         # Visual reference assets
-├── docs/                      # Implementation and asset guardrails
-├── .github/workflows/         # CI, regression, and deployment workflows
-├── .env.example               # Environment template
-└── app.json                   # Expo configuration
+app/                              Expo Router surfaces
+src/                              product features, contracts, services, utilities
+screens/                          retained screen implementations
+worker/                           Cloudflare Worker runtime
+supabase/migrations/              ordered database schema authority
+e2e/                              browser / journey proof
+test/                             unit and contract tests
+scripts/                          verification, audit, release, and operator tooling
+docs/                             architecture, truth, privacy, launch, and operating docs
+sekret-bip-character-canon/       canonical character identity registry
+implementation-ledger.json        machine-checked implementation state
 ```
 
-## Setup
-
-### GitHub Codespaces
-
-1. Open the repository in Codespaces.
-2. Allow the devcontainer to install dependencies.
-3. Copy `.env.example` to `.env.local` when needed.
-4. Run:
+## Local development
 
 ```bash
-npx expo start --web -c
-```
-
-### Local development
-
-Prerequisites: Node.js and npm.
-
-```bash
-gh repo clone jussray/Bip
-cd Bip
+gh repo clone jussray/Sekret-Bip
+cd Sekret-Bip
 npm install --legacy-peer-deps
-cp .env.example .env.local
-npx expo start --web -c
+cp .env.example .env
+git lfs pull
+npm run web
 ```
 
-Other targets:
+Use only local/development-safe values in `.env`. Never commit real provider secrets, service-role keys, or private credentials.
 
-```bash
-npm run ios
-npm run android
-```
-
-## Environment and Secret Safety
-
-Only `EXPO_PUBLIC_*` variables may be exposed to the client bundle.
-
-Never commit:
-
-- `.env.local`
-- Supabase `service_role` keys
-- Cloudflare API tokens
-- account deletion processing secrets
-- AI provider secret keys
-- webhook secrets
-
-Use the active Supabase project configured for this repository. Do not copy project references or keys from older Bip environments.
+Database migrations are authoritative under `supabase/migrations/`. Linking or pushing to a remote Supabase project is an explicit environment mutation and should only be done against the intended project with the appropriate authority and evidence.
 
 ## Validation
 
-Use the repository scripts and CI workflows before merging meaningful implementation changes.
-
-Typical checks include:
+Start with the cheapest relevant check and escalate only as needed.
 
 ```bash
 npm run type-check
 npm test
-npm run test:oracle
-npm run test:voice-intelligence
-npm run test:device-sync
-```
-
-When available, run:
-
-```bash
+npm run lint
+npm run verify:character-canon
+node scripts/audit-documentation-truth.mjs
+npm run verify:bundle
+npm run audit:control-room
+npm run validate:companions
+npm run test:e2e
+npm run test:e2e:production
 npm run verify:prepush
 ```
 
-Do not claim tests passed unless they were actually executed by a shell or CI run.
+A committed Playwright test is not proof that the deployed production path passed. Production claims require an executed run against the intended release plus the resulting evidence.
 
-## Guides
+## Canonical operating references
 
-- [Codespaces setup](docs/CODESPACES.md)
-- [Dependency audit](docs/DEPENDENCY_AUDIT.md)
-- [Room art guide](docs/ROOM_ART_GUIDE.md)
-- [Phase 2 room integration](docs/PHASE_2_ROOM_INTEGRATION.md)
-- [Asset backup rules](docs/ASSET_BACKUP_RULES.md)
+- `docs/TRUTH_AUTHORITY.md` — claim freshness, expiry, and supersession
+- `docs/CURRENT_STATUS.md` — current-status resolution protocol
+- `docs/DOCUMENTATION_MAP.md` — documentation authority and archive rules
+- `docs/CLOUDFLARE_OWNERSHIP.md` — Worker identity and provider authority
+- `docs/CLOUDFLARE_WORKER_CONSOLIDATION.md` — Worker preservation, migration, and rollback
+- `docs/LAUNCH_ROADMAP.md` — launch phases and exit evidence
+- `docs/legal/COPPA_POSITION.md` — age/privacy product constraints
+- `DEPLOYMENT.md` — deployment and exact-production verification contract
+- `implementation-ledger.json` and validated extensions — machine-checked feature state
+- issue #696 — exact-production release packet and marked receipts
 
-Additional vision, privacy, safety, and Figma documentation should live under `docs/` and be treated as implementation guardrails rather than disposable planning notes.
-
-## License
-
-Private project.
+Historical snapshots, old PR descriptions, and old issue comments remain evidence for their observation window only. When documentation and fresh runtime authority disagree, preserve the history and repair the stale present-tense claim.

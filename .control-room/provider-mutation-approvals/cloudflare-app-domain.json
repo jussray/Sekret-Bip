@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "operation": "restore-pages-ownership",
+  "hostname": "app.sekretbip.net",
+  "pagesProject": "sekret-bip",
+  "backendWorker": "sekret-backend",
+  "approved": true,
+  "approvedParentSha": "87e80c1e966a8ec5e996a65587546c6cb57dbfdf",
+  "authority": "founder-approved-chat",
+  "continuity": "one-shot-parent-bound",
+  "note": "Approved to execute the existing bounded Pages ownership repair only. This does not authorize API-route changes, Access weakening, secret changes, Supabase mutation, or broader traffic changes."
+}

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-13",
+  "projectRef": "tbsevonvegdnlyjgplmm",
+  "migration": {
+    "version": "20260713161055",
+    "name": "harden_push_token_ownership",
+    "repositoryPath": "supabase/migrations/20260713161055_harden_push_token_ownership.sql",
+    "applied": true,
+    "repositoryAndLiveMigrationParity": true
+  },
+  "productionInventoryBeforeAndAfter": {
+    "pushTokenRows": 0,
+    "legacyInvalidFormatRows": 0,
+    "retainedSyntheticUsers": 0,
+    "retainedSyntheticPushTokens": 0
+  },
+  "preDeployDefects": {
+    "transactionOutcome": "rolled_back",
+    "callerCouldSpoofCompletedAccountSide": true,
+    "enabledTokenCouldTransferAcrossUsers": true,
+    "ownerOnlyDisableAlreadyWorked": true,
+    "disabledTokenHandoffAlreadyWorked": true
+  },
+  "controls": {
+    "permanentSessionRequired": true,
+    "tokenFormats": [
+      "ExponentPushToken[...]",
+      "ExpoPushToken[...]",
+      "uuid"
+    ],
+    "platformValues": [
+      "ios",
+      "android"
+    ],
+    "appVariantValues": [
+      "teen",
+      "parent"
+    ],
+    "completedProfileSideOverridesCallerMetadata": true,
+    "sameOwnerRefreshAllowed": true,
+    "enabledCrossUserTransferDenied": true,
+    "disabledCrossUserHandoffAllowed": true,
+    "claimConflictRuleIsAtomic": true,
+    "disableIsOwnerScoped": true,
+    "disableIsIdempotent": true,
+    "clientDisablesBeforeAuthSignOut": true
+  },
+  "preDeployBehaviorProof": {
+    "probePath": "supabase/probes/authorization_push_token_phase1.sql",
+    "transactionOutcome": "rolled_back",
+    "passedChecks": 12,
+    "failedChecks": 0
+  },
+  "postDeployEvidence": {
+    "executableChecks": {
+      "passedChecks": 4,
+      "failedChecks": 0,
+      "checks": [
+        "profile_side_overrides_spoof",
+        "same_owner_refreshes",
+        "enabled_transfer_denied",
+        "denied_transfer_preserves_owner"
+      ]
+    },
+    "structuralChecks": {
+      "securityDefiner": true,
+      "fixedSearchPath": true,
+      "anonExecute": false,
+      "authenticatedExecute": true,
+      "serviceRoleExecute": true,
+      "sameOwnerConflictPredicate": true,
+      "disabledHandoffConflictPredicate": true,
+      "profileSideDerivation": true,
+      "ownerDisablePredicate": true,
+      "exponentWrapperValidation": true,
+      "expoWrapperValidation": true,
+      "uuidValidation": true
+    },
+    "toolingLimit": {
+      "encountered": true,
+      "description": "The SQL execution safety layer blocked rollback-only post-deploy simulations involving cross-account token handoff, non-owner disable, and additional token-format claims. No blocked statement reached PostgreSQL. These outcomes remain covered by the 12-check predeploy live-schema proof, exact deployed-function inspection, and client sign-out ordering contracts.",
+      "productionMutationFromBlockedCalls": false
+    },
+    "retainedSyntheticUsers": 0,
+    "retainedSyntheticPushTokens": 0,
+    "productionPushTokenRows": 0
+  },
+  "advisorClassification": {
+    "claimPushToken": "intentional_authenticated_security_definer_api_with_behavior_proof",
+    "disablePushToken": "intentional_authenticated_security_definer_api_with_behavior_proof",
+    "warningsExpectedToRemain": true,
+    "reason": "Both RPCs are intentional signed-in notification lifecycle APIs. They remain controlled through explicit grants, fixed search paths, validated inputs, account-derived metadata, atomic ownership predicates, owner-scoped disable behavior, predeploy live behavior proof, and postdeploy executable plus structural verification."
+  },
+  "releaseGate": {
+    "authenticatedFunctionBlockerComplete": false,
+    "reason": "Push-token ownership is hardened and evidenced, but additional authenticated SECURITY DEFINER function families remain before L4 activation."
+  }
+}

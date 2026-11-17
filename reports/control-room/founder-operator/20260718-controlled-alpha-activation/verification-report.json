@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "planId": "20260718-controlled-alpha-activation",
+  "reportedAt": "2026-07-18T05:38:00.000Z",
+  "repository": "jussray/Sekret-Bip",
+  "pullRequest": 495,
+  "branch": "launch/controlled-alpha-activation",
+  "sourceEvidenceHead": "9e71f66d077288c723ababe5e7b86e516c4e721c",
+  "evidenceLevel": "repository-and-live-catalog",
+  "verified": [
+    {
+      "id": "founder-room-artifacts",
+      "status": "verified",
+      "evidence": "Mission brief, ordered ledger, system map, red-team register, bottleneck map, repository boundary evidence, Supabase live baseline, function-compilation evidence, alpha runtime record, trust-journey plan, device matrix, and partial verification report exist on the branch."
+    },
+    {
+      "id": "controlled-beta-client-boundary",
+      "status": "verified",
+      "evidence": "Bridge and Crew are beta-scoped; Scrapbook is internal; L4 remains disabled; production audience is public and therefore denied by beta flags."
+    },
+    {
+      "id": "worker-fail-closed-boundary",
+      "status": "verified",
+      "evidence": "Dedicated alpha configuration exists, committed rollout is disabled, an allowlist is required at runtime, production rollout remains disabled, and no Worker credential is committed."
+    },
+    {
+      "id": "bridge-client-source-boundary",
+      "status": "verified",
+      "evidence": "Journal and Mood are the only controlled-alpha client source kinds; Goal and Scrapbook are rejected before the request RPC."
+    },
+    {
+      "id": "relationship-server-contract-integrated",
+      "status": "verified",
+      "evidence": "Three forward migrations define RPC-only Bridge/Crew mutations, teen-owned canonical Bridge sources with strict idempotency intent, private Crew owner enforcement, scoped revocation, caller-bound non-recursive recipient authorization, and stale Crew encouragement-read denial. This is repository integration evidence only."
+    },
+    {
+      "id": "relationship-live-baseline",
+      "status": "verified",
+      "evidence": "Catalog probe v2 executed on the active Se’kret Bip project using temporary rows and ROLLBACK. Two of twelve checks pass and ten fail exactly because the three forward migrations are not applied."
+    },
+    {
+      "id": "relationship-live-schema-compatibility",
+      "status": "verified",
+      "evidence": "Observed live column types and indexes match the migration assumptions. Aggregate drift is zero for malformed active Crew shares, active blocked-direction shares, unsupported Bridge source rows, and nonterminal unsupported Bridge requests."
+    },
+    {
+      "id": "relationship-function-compilation",
+      "status": "verified",
+      "evidence": "The final Bridge RPC, Crew owner trigger, Crew revoke RPC, and caller-bound Crew access helper compiled successfully as pg_temp functions inside rollback-only transactions. No function was retained or executed."
+    },
+    {
+      "id": "crew-access-test-syntax",
+      "status": "verified",
+      "evidence": "The exact new controlled-alpha Crew access hardening test content passed independent node --check syntax validation."
+    },
+    {
+      "id": "implementation-ledger-registration",
+      "status": "verified",
+      "evidence": "The controlled-alpha relationship boundary feature is registered as integrated with blocked live verification in an implementation-ledger extension."
+    }
+  ],
+  "blocked": [
+    {
+      "id": "github-actions-execution",
+      "classification": "runner_startup_failure",
+      "evidence": "Hosted jobs continue to be created without executed steps or logs. Exact latest-head workflow status must be refreshed after the current report commit.",
+      "nextAction": "Do not diagnose application code from these badges. Retain the classification while continuing approved provider-native verification."
+    },
+    {
+      "id": "complete-checkout-unavailable",
+      "classification": "environment_network_block",
+      "evidence": "The execution container cannot resolve GitHub archive or clone hosts, so a truthful complete exact-head checkout cannot be created in this environment.",
+      "nextAction": "Run the exact-head checkout gates from an environment with repository access or when GitHub-hosted runners recover. Do not relabel a reconstructed subset as a complete checkout."
+    },
+    {
+      "id": "authentication-security-decision",
+      "classification": "founder_required",
+      "evidence": "Supabase security advisors report leaked-password protection disabled.",
+      "nextAction": "Enable leaked-password protection before password-based controlled-alpha invitations, or record a founder accepted-risk decision and alternative authentication control."
+    }
+  ],
+  "unverified": [
+    "complete exact-head dependency installation",
+    "current complete controlled-alpha source-contract execution",
+    "TypeScript compilation",
+    "full unit test execution",
+    "implementation-ledger validator execution",
+    "full ordered migration and policy DDL dry run",
+    "application of the three forward relationship migrations",
+    "post-migration catalog probe v2 at 12 of 12",
+    "post-DDL Supabase security advisors",
+    "live anonymous, upgraded-account, blocked, revoked, unrelated, cross-user, source-ownership, and idempotency denial",
+    "Wrangler alpha dry-run bundle",
+    "Expo web export",
+    "Playwright browser execution",
+    "dedicated alpha Worker deployment",
+    "teen preview build",
+    "parent preview build",
+    "Bridge two-account journey",
+    "Crew two-account journey",
+    "account deletion and second-user isolation",
+    "iOS and Android device evidence",
+    "accessibility, offline, and provider-failure evidence"
+  ],
+  "nextOrderedAction": {
+    "phase": "execute",
+    "artifact": "relationship-authorization-contract",
+    "status": "partial-parse-complete-human-gate-remains",
+    "action": "Execute the complete-checkout tests, TypeScript, ledger validation, full isolated migration/policy dry run, and Wrangler alpha dry run. Review the live baseline and authentication advisor finding, then stop for founder approval before applying migrations, changing Auth settings, using credentials, deploying, consuming paid build capacity, or distributing builds."
+  },
+  "nonClaims": [
+    "Successful pg_temp compilation is not full migration application or policy verification.",
+    "The 2-of-12 live probe result is a before-state, not a failure of the repository migration design.",
+    "Repository-content and live-catalog verification are not user-journey verification.",
+    "Prepared migrations and probes are not applied database state.",
+    "A canonical Worker branch preview is not the dedicated alpha service.",
+    "No deployment, build, migration application, persistent database mutation, account operation, deletion, merge, or launch occurred."
+  ]
+}

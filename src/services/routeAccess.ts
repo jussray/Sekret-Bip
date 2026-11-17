@@ -1,5 +1,5 @@
 import type { VerificationState } from '@/types/verification';
-import { canUnlockSocial, getVerificationRouteTarget } from './verificationState';
+import { canUnlockSocial, getVerificationRouteTarget, isGuardianVerified } from './verificationState';
 import { getSupabase } from '@/utils/supabase';
 import { captureRuntimeError } from '@/services/runtimeAudit';
 
@@ -19,6 +19,7 @@ export interface RouteAccessDecision {
   reason?:
     | 'wrong_user_side'
     | 'verification_required'
+    | 'guardian_verification_required'
     | 'manual_review'
     | 'suspended';
 }
@@ -54,25 +55,7 @@ export function decideRouteAccess(options: {
     return { allowed: true };
   }
 
-  if (area === '(parent)') {
-    return options.userSide === 'parent'
-      ? { allowed: true }
-      : {
-          allowed: false,
-          redirectTo: '/(teen)/room',
-          reason: 'wrong_user_side',
-        };
-  }
-
-  if (options.userSide === 'parent' && (area === '(teen)' || area === '(social)')) {
-    return {
-      allowed: false,
-      redirectTo: '/(parent)/room',
-      reason: 'wrong_user_side',
-    };
-  }
-
-  if (options.verificationState === 'SUSPENDED') {
+  if (options.verificationState === 'SUSPENDED' || options.verificationState === 'GUARDIAN_SUSPENDED') {
     return {
       allowed: false,
       redirectTo: '/(auth)/suspended',
@@ -85,6 +68,40 @@ export function decideRouteAccess(options: {
       allowed: false,
       redirectTo: '/(safety)/manual-review',
       reason: 'manual_review',
+    };
+  }
+
+  if (area === '(parent)') {
+    if (options.userSide !== 'parent') {
+      return {
+        allowed: false,
+        redirectTo: '/(teen)/room',
+        reason: 'wrong_user_side',
+      };
+    }
+
+    // Guardian verification is account authorization. parent_links are a
+    // separate teen-controlled consent boundary and are intentionally absent.
+    if (!isGuardianVerified(options.verificationState)) {
+      return {
+        allowed: false,
+        redirectTo: '/(auth)/guardian-verification',
+        reason: 'guardian_verification_required',
+      };
+    }
+
+    return { allowed: true };
+  }
+
+  if (options.userSide === 'parent' && (area === '(teen)' || area === '(social)')) {
+    return {
+      allowed: false,
+      redirectTo: isGuardianVerified(options.verificationState)
+        ? '/(parent)/room'
+        : '/(auth)/guardian-verification',
+      reason: isGuardianVerified(options.verificationState)
+        ? 'wrong_user_side'
+        : 'guardian_verification_required',
     };
   }
 

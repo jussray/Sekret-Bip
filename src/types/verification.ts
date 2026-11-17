@@ -6,7 +6,11 @@ export type VerificationState =
   | 'VERIFIED_TEEN'
   | 'EXPIRED'
   | 'MANUAL_REVIEW'
-  | 'SUSPENDED';
+  | 'SUSPENDED'
+  | 'VERIFIED_GUARDIAN'
+  | 'PENDING_GUARDIAN_REVIEW'
+  | 'GUARDIAN_REJECTED'
+  | 'GUARDIAN_SUSPENDED';
 
 export type ParentLinkState =
   | 'none'
@@ -36,6 +40,10 @@ export type VerificationEvent =
   | 'SAFETY_REVIEW_OPENED'
   | 'SUSPEND_ACCOUNT'
   | 'APPEAL_OPENED'
+  | 'SUBMIT_GUARDIAN_REVIEW'
+  | 'GUARDIAN_APPROVED'
+  | 'GUARDIAN_REVIEW_REJECTED'
+  | 'GUARDIAN_REVIEW_SUSPENDED'
   | 'RESET';
 
 export interface VerificationSnapshot {

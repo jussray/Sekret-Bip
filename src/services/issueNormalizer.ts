@@ -30,10 +30,12 @@ export type IssueSource =
   | 'supabase_advisor'
   | 'cloudflare_log'
   | 'founder_idea'
-  | 'manual';
+  | 'manual'
+  | 'user_report';
 
 export type IssueStatus =
   | 'open'
+  | 'reported'
   | 'investigating'
   | 'planned'
   | 'building'
@@ -66,7 +68,7 @@ export interface NormalizedIssue {
   title: string;
   summary: string;
   suggested_fix: string | null;
-  affected_surface: string | null;
+  affected_surface: string | undefined;
   affected_users: number;
   occurrence_count: number;
   first_seen_at: string;
@@ -79,6 +81,10 @@ export interface NormalizedIssue {
   metadata: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  // 'unverified' = user-submitted (report_own_audit_event_issue), never
+  // independently confirmed; 'system' = derived from an audit_events row by
+  // upsert_control_room_issue; 'confirmed' = a founder has verified it.
+  trust_level: 'unverified' | 'system' | 'confirmed';
 }
 
 export interface IssueHistoryEntry {
@@ -319,7 +325,10 @@ export async function listNormalizedIssues(
     console.warn('[issueNormalizer] listNormalizedIssues error:', error.message);
     return [];
   }
-  return (data ?? []) as NormalizedIssue[];
+  return (data ?? []).map((issue) => ({
+    ...(issue as NormalizedIssue),
+    affected_surface: (issue as { affected_surface?: string | null }).affected_surface ?? undefined,
+  }));
 }
 
 /**
@@ -477,8 +486,12 @@ export async function getLinkedEvents(
     return [];
   }
 
-  return ((data ?? []) as Array<{ audit_events: AuditEvent }>)
-    .map((row) => row.audit_events)
+  type LinkedEventRow = { audit_events: AuditEvent | AuditEvent[] | null };
+  return ((data ?? []) as unknown as LinkedEventRow[])
+    .flatMap((row) => {
+      if (Array.isArray(row.audit_events)) return row.audit_events;
+      return row.audit_events ? [row.audit_events] : [];
+    })
     .filter(Boolean);
 }
 

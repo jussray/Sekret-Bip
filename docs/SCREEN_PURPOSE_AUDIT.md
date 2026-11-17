@@ -48,10 +48,13 @@ Primary screens are feature homes, not visual reskins of the same companion prom
 
 ## Next implementation order
 
-1. **Pages separation**
-   - keep entry-linked Se’kret replies
-   - remove full-chat behavior from Pages
-   - keep Comfort recommendations as a small handoff, not an embedded Calm experience
+1. **Pages separation — done.** Pages never embedded a full chat thread —
+   its only companion surface was already entry-linked (`SekretReplyBubble`,
+   one reply per saved entry) plus the scripted, non-chat Oracle Q&A panel;
+   full multi-turn chat lives solely on `app/(teen)/chat/[personalityId].tsx`.
+   What was missing was the Comfort handoff: teen Pages now has a small
+   "Need a moment? Try a Calm tool →" link in the Write tab that pushes to
+   Calm, rather than embedding any comfort experience directly.
 
 2. **Voice Bip separation**
    - teen: talk, hear companion, save voice note to Pages
@@ -61,12 +64,24 @@ Primary screens are feature homes, not visual reskins of the same companion prom
    - teen: comfort and regulation
    - parent: pause before replying and relationship reset
 
-4. **Room cleanup**
-   - remove dashboard duplication
-   - keep only home-base shortcuts and presence
+4. **Room cleanup — done.** Neither `RoomScreen.tsx` nor `ParentRoomScreen.tsx`
+   contains dashboard/stats content (`ParentRoomScreen.tsx` states outright:
+   "The room IS the interface. No cards. No grids. No dashboard."), and
+   `app/(parent)/dashboard.tsx` is only a hidden redirect alias into Bridge,
+   not a competing home. Removed one leftover: a dead `'dashboard'` member
+   of the `RoomTarget` union in `RoomScreen.tsx` that no hotspot ever routed to.
 
-5. **Circle separation**
-   - verify distinct data sources, identity rules, and moderation for teen versus parent
+5. **Circle separation — data sources done, moderation added.**
+   Teen Circle (`public_circle_posts`/`friends_circle_posts`/`crew_circle_posts`)
+   and Parent Circle (`parent_circle_posts`) were already fully separate
+   tables with no overlap, and every post already renders without an author
+   identity (by design — see `types/circle.ts`), which rules out a
+   client-side block-by-user feature without a larger identity-exposure
+   change. What was genuinely missing was moderation: added a `reported_posts`
+   table (`supabase/migrations/20260703200000_circle_moderation.sql`) and a
+   report action on both the teen (`app/(teen)/circle/feed.tsx`) and parent
+   (`screens/ParentCircleScreen.tsx`) feeds — reporting a post hides it from
+   that device immediately and records the report for founder/admin review.
 
 6. **Mobile layout pass**
    - safe areas

@@ -1,0 +1,84 @@
+name: Trigger Cloudflare Pages Deploy Hook
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-pages-deploy-hook-production
+  cancel-in-progress: false
+
+jobs:
+  trigger:
+    name: Trigger exact-current-main Pages fallback
+    runs-on: ubuntu-22.04
+    environment: Production
+    timeout-minutes: 10
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.sha }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: Verify dispatch target is exact current main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          current_main="$({
+            curl --fail-with-body --silent --show-error \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "https://api.github.com/repos/$REPOSITORY/commits/main"
+          } | node -e "let body='';process.stdin.on('data',c=>body+=c);process.stdin.on('end',()=>{const parsed=JSON.parse(body);if(!parsed.sha)process.exit(2);process.stdout.write(parsed.sha);});")"
+
+          printf 'requested=%s\ncurrent_main=%s\n' "$EXPECTED_HEAD_SHA" "$current_main"
+          test "$EXPECTED_HEAD_SHA" = "$current_main" || {
+            echo 'Refusing to trigger production Pages: workflow dispatch target is not current main.' >&2
+            exit 1
+          }
+
+      - name: Trigger Cloudflare Pages deploy hook
+        shell: bash
+        env:
+          CLOUDFLARE_DEPLOY_HOOK_URL: ${{ secrets.CLOUDFLARE_DEPLOY_HOOK_URL }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_DEPLOY_HOOK_URL" || {
+            echo 'CLOUDFLARE_DEPLOY_HOOK_URL is not configured.' >&2
+            exit 1
+          }
+
+          response_file="$RUNNER_TEMP/cloudflare-pages-deploy-hook-response.json"
+          http_code="$(
+            curl --silent --show-error \
+              --output "$response_file" \
+              --write-out '%{http_code}' \
+              --request POST \
+              "$CLOUDFLARE_DEPLOY_HOOK_URL"
+          )"
+
+          case "$http_code" in
+            2??)
+              printf 'Cloudflare Pages deploy hook accepted for exact current main %s (HTTP %s).\n' \
+                "$EXPECTED_HEAD_SHA" "$http_code"
+              ;;
+            *)
+              printf 'Cloudflare Pages deploy hook failed (HTTP %s).\n' "$http_code" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Record trigger boundary
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo '### Cloudflare Pages deploy hook trigger accepted'
+            echo
+            echo "- Requested repository SHA: \`$EXPECTED_HEAD_SHA\`"
+            echo '- Authority: explicit workflow_dispatch only'
+            echo '- This is trigger evidence, not deployed-runtime or Playwright proof.'
+          } >> "$GITHUB_STEP_SUMMARY"

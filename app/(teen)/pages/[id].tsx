@@ -24,19 +24,29 @@ import {
   fetchSekretBrainReply,
   fetchSekretVoice,
   type SekretCharacterId,
-  type SekretSurface,
+  type SekretHistoryTurn,
 } from '@/utils/api';
+import { buildReplyRequest } from '@/services/ai/buildReplyRequest';
+import { buildOracleContext } from '@/services/oracleDiscovery';
+import { saveContinuation } from '@/features/retention/savedContinuation';
 
-const COMPANION_META: Record<string, { label: string; accent: string; emoji: string; avatarId: SekretCharacterId }> = {
-  raylene: { label: 'Raylene', accent: '#f08bc5', emoji: '💜', avatarId: 'raylene' },
-  rylane:  { label: 'Rylane',  accent: '#76a7ff', emoji: '⚡',  avatarId: 'rylane'  },
-  cloud:   { label: 'Cloud',   accent: '#8ed9e7', emoji: '☁️', avatarId: 'cloud'   },
-  night:   { label: 'Night',   accent: '#9a8ee8', emoji: '🌙', avatarId: 'night'   },
-  me:      { label: 'Me',      accent: '#b8a9c9', emoji: '🪞', avatarId: 'raylene' },
-  oracle:  { label: 'Oracle',  accent: '#c7b87a', emoji: '🔮', avatarId: 'raylene' },
+type CompanionMeta = {
+  label: string;
+  accent: string;
+  emoji: string;
+  avatarId: SekretCharacterId | null;
 };
 
-const AI_COMPANIONS = new Set(['raylene', 'rylane', 'cloud', 'night']);
+const COMPANION_META: Record<string, CompanionMeta> = {
+  suhana: { label: 'Suhana', accent: '#f08bc5', emoji: '💜', avatarId: 'suhana' },
+  sy:     { label: 'Sy',     accent: '#76a7ff', emoji: '⚡', avatarId: 'sy'     },
+  cloud:   { label: 'Cloud',   accent: '#8ed9e7', emoji: '☁️', avatarId: 'cloud'   },
+  night:   { label: 'Night',   accent: '#9a8ee8', emoji: '🌙', avatarId: 'night'   },
+  me:      { label: 'Me',      accent: '#b8a9c9', emoji: '🪞', avatarId: null },
+  oracle:  { label: 'Joseema', accent: '#c7b87a', emoji: '🔮', avatarId: null },
+};
+
+const AI_COMPANIONS = new Set<SekretCharacterId>(['suhana', 'sy', 'cloud', 'night']);
 
 const CHECK_IN_MOODS = [
   { emoji: '😔', label: 'alone' },
@@ -67,12 +77,12 @@ function getSekretTip(moodTag?: string): string {
 
 export default function EntryDetailRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { entries, setEntries, patchJournalEntry } = useAppContext();
+  const { entries, setEntries, patchJournalEntry, oracleProfile } = useAppContext();
 
   const entry = entries.find(e => String(e.id) === id);
-  const companion = entry
+  const companion: CompanionMeta | null = entry
     ? (COMPANION_META[(entry.activeTab || entry.source) ?? ''] ?? {
-        label: 'Pages', accent: '#b8a9c9', emoji: '📄', avatarId: 'raylene' as SekretCharacterId,
+        label: 'Pages', accent: '#b8a9c9', emoji: '📄', avatarId: null,
       })
     : null;
 
@@ -80,10 +90,11 @@ export default function EntryDetailRoute() {
   const [checkInMood, setCheckInMood] = useState<string | null>(null);
   const [replyText, setReplyText] = useState('');
   const [replying, setReplying] = useState(false);
+  const [savedForLater, setSavedForLater] = useState(false);
   const audioCache = useRef<Record<string, string>>({});
 
   async function playReply() {
-    if (!entry?.sekretReply || !companion || voiceLoading) return;
+    if (!entry?.sekretReply || !companion?.avatarId || voiceLoading) return;
     setVoiceLoading(true);
     try {
       const key = String(entry.id);
@@ -107,6 +118,15 @@ export default function EntryDetailRoute() {
   function togglePin() {
     if (!entry) return;
     patchJournalEntry(entry.id, { pinned: !entry.pinned });
+  }
+
+  async function handleSaveForLater() {
+    if (!entry) return;
+    await saveContinuation({
+      entryId: entry.id,
+      companionKey: entry.activeTab || entry.source,
+    });
+    setSavedForLater(true);
   }
 
   async function handleReply() {
@@ -134,19 +154,30 @@ export default function EntryDetailRoute() {
     setReplyText('');
     router.push('/(teen)/pages' as any);
 
-    if (AI_COMPANIONS.has(companionKey ?? '')) {
+    const avatarId = companion.avatarId;
+    if (avatarId && AI_COMPANIONS.has(avatarId)) {
       try {
-        const result = await fetchSekretBrainReply({
-          characterId: companion.avatarId,
-          surface: 'journal' as SekretSurface,
-          userText: text,
+        const history: SekretHistoryTurn[] = [];
+        for (const e of entries
+          .filter(e => (e.activeTab || e.source) === companionKey)
+          .sort((a, b) => Number(a.id) - Number(b.id))) {
+          if (e.text) history.push({ role: 'user', content: e.text });
+          if (e.sekretReply) history.push({ role: 'assistant', content: e.sekretReply });
+        }
+
+        const { request } = await buildReplyRequest({
+          characterId: avatarId,
+          surface: 'journal',
+          text,
           mood: entry.moodTag ?? '',
           parentSharingEnabled: false,
-          history: [],
+          history,
+          oracleContext: buildOracleContext(oracleProfile, 'teen'),
         });
+        const result = await fetchSekretBrainReply(request);
         patchJournalEntry(newId, { sekretReply: result.reply });
       } catch {
-        // silent — companion thread will show entry without reply
+        // Silent: the entry remains available even if the companion reply fails.
       }
     }
     setReplying(false);
@@ -178,7 +209,6 @@ export default function EntryDetailRoute() {
       <LinearGradient colors={['#10091b', '#171024', '#090711']} style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
-        {/* Header */}
         <View style={s.header}>
           <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
             <Text style={s.backBtnText}>‹</Text>
@@ -195,7 +225,6 @@ export default function EntryDetailRoute() {
           </View>
         </View>
 
-        {/* Scrollable content */}
         <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
           <Text style={s.dateTime}>{entry.date} at {entry.time}</Text>
 
@@ -217,7 +246,20 @@ export default function EntryDetailRoute() {
             </View>
           ) : null}
 
-          {/* Se'kret reply */}
+          <TouchableOpacity
+            onPress={handleSaveForLater}
+            style={[s.saveLaterButton, { borderColor: `${companion.accent}35` }]}
+            accessibilityRole="button"
+            accessibilityLabel="Save this page so you can continue it later"
+          >
+            <Text style={[s.saveLaterText, { color: companion.accent }]}>
+              {savedForLater ? '✓ saved for later' : '↩ save for later'}
+            </Text>
+            <Text style={s.saveLaterSub}>
+              Room only remembers which page to reopen.
+            </Text>
+          </TouchableOpacity>
+
           {entry.sekretReply ? (
             <View style={[s.replyCard, { borderColor: `${companion.accent}25` }]}>
               <Text style={[s.replyLabel, { color: companion.accent }]}>
@@ -225,15 +267,17 @@ export default function EntryDetailRoute() {
               </Text>
               <Text style={s.replyText}>{entry.sekretReply}</Text>
               <View style={s.replyActions}>
-                <TouchableOpacity
-                  onPress={playReply}
-                  disabled={voiceLoading}
-                  style={[s.hearBtn, { borderColor: `${companion.accent}40` }]}
-                >
-                  <Text style={[s.hearBtnText, { color: companion.accent }]}>
-                    {voiceLoading ? 'loading…' : '▶ hear this'}
-                  </Text>
-                </TouchableOpacity>
+                {companion.avatarId ? (
+                  <TouchableOpacity
+                    onPress={playReply}
+                    disabled={voiceLoading}
+                    style={[s.hearBtn, { borderColor: `${companion.accent}40` }]}
+                  >
+                    <Text style={[s.hearBtnText, { color: companion.accent }]}>
+                      {voiceLoading ? 'loading…' : '▶ hear this'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity style={[s.quickReplyBtn, { borderColor: `${companion.accent}30` }]}>
                   <Text style={[s.quickReplyText, { color: companion.accent }]}>talk more</Text>
                 </TouchableOpacity>
@@ -244,7 +288,6 @@ export default function EntryDetailRoute() {
             </View>
           ) : null}
 
-          {/* Today's Check-In */}
           <View style={s.sectionCard}>
             <Text style={[s.sectionTitle, { color: companion.accent }]}>Today's Check-In ♡</Text>
             <Text style={s.sectionSub}>How are you feeling now?</Text>
@@ -270,7 +313,6 @@ export default function EntryDetailRoute() {
             </View>
           </View>
 
-          {/* Entry Insights */}
           <View style={s.sectionCard}>
             <Text style={[s.sectionTitle, { color: companion.accent }]}>Entry Insights</Text>
             <View style={s.insightRow}>
@@ -291,7 +333,6 @@ export default function EntryDetailRoute() {
             </View>
           </View>
 
-          {/* Pin toggle */}
           <TouchableOpacity onPress={togglePin} style={s.pinHint}>
             <Text style={s.pinHintText}>
               {entry.pinned ? '📌 Pinned — tap to unpin' : '📍 Tap to pin this entry'}
@@ -299,7 +340,6 @@ export default function EntryDetailRoute() {
           </TouchableOpacity>
         </ScrollView>
 
-        {/* Reply to Se'kret composer */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
@@ -335,7 +375,6 @@ export default function EntryDetailRoute() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#090711' },
   safe: { flex: 1 },
-
   header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 4, paddingBottom: 12 },
   backBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
   backBtnText: { color: '#fff', fontSize: 22, lineHeight: 26 },
@@ -346,19 +385,13 @@ const s = StyleSheet.create({
   lockIndicator: { fontSize: 16 },
   pinBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.06)', alignItems: 'center', justifyContent: 'center' },
   pinBtnText: { fontSize: 16 },
-
   scroll: { paddingHorizontal: 16, paddingBottom: 20 },
-
   dateTime: { color: '#6b607a', fontSize: 11, marginBottom: 10 },
-
   moodTagWrap: { marginBottom: 12 },
   moodTag: { alignSelf: 'flex-start', fontSize: 11, fontWeight: '800', borderRadius: 999, borderWidth: 1, paddingHorizontal: 10, paddingVertical: 4 },
-
   media: { width: '100%', height: 220, borderRadius: 18, marginBottom: 14 },
-
   textCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)', padding: 16, marginBottom: 14 },
   entryText: { color: '#f0eaf4', fontSize: 16, lineHeight: 26 },
-
   replyCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 18, borderWidth: 1, padding: 16, marginBottom: 14 },
   replyLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 0.6, marginBottom: 8 },
   replyText: { color: '#cfc5d5', fontSize: 15, lineHeight: 24, marginBottom: 12 },
@@ -367,30 +400,37 @@ const s = StyleSheet.create({
   hearBtnText: { fontSize: 10, fontWeight: '800' },
   quickReplyBtn: { borderRadius: 999, borderWidth: 1, paddingHorizontal: 12, paddingVertical: 6 },
   quickReplyText: { fontSize: 10, fontWeight: '700' },
-
   sectionCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.07)', padding: 14, marginBottom: 12 },
   sectionTitle: { fontSize: 12, fontWeight: '900', letterSpacing: 0.4, marginBottom: 4 },
   sectionSub: { color: '#6b607a', fontSize: 11, marginBottom: 12 },
-
   checkInRow: { flexDirection: 'row', gap: 8 },
   checkInChip: { flex: 1, alignItems: 'center', gap: 4, borderRadius: 14, borderWidth: 1, borderColor: '#ffffff14', backgroundColor: 'rgba(255,255,255,0.04)', paddingVertical: 10 },
   checkInEmoji: { fontSize: 20 },
   checkInLabel: { color: '#7a6e83', fontSize: 9, fontWeight: '700' },
-
   insightRow: { flexDirection: 'row', gap: 8 },
   insightItem: { flex: 1, alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, padding: 10 },
   insightKey: { color: '#6b607a', fontSize: 9, fontWeight: '700', marginBottom: 4, textAlign: 'center' },
   insightValue: { fontSize: 11, fontWeight: '900', textAlign: 'center' },
-
   pinHint: { alignSelf: 'center', paddingVertical: 10 },
   pinHintText: { color: '#504660', fontSize: 11 },
-
+  saveLaterButton: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.04)',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    marginBottom: 14,
+  },
+  saveLaterText: { fontSize: 12, fontWeight: '900', letterSpacing: 0.3 },
+  saveLaterSub: { color: '#6b607a', fontSize: 10, lineHeight: 15, marginTop: 4, textAlign: 'center' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, paddingHorizontal: 14, paddingTop: 10, paddingBottom: 24, borderTopWidth: 1 },
   composerInput: { flex: 1, color: '#f0eaf4', fontSize: 14, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.09)', paddingHorizontal: 14, paddingVertical: 10, maxHeight: 100 },
   composerSend: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
   composerSendText: { color: '#fff', fontSize: 20, fontWeight: '900' },
   composerSendDisabled: { opacity: 0.3 },
-
   notFound: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   notFoundText: { color: '#6b607a', fontSize: 15 },
 });

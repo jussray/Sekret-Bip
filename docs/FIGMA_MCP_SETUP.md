@@ -1,6 +1,8 @@
 # Se'kret Bip — Official Figma MCP Setup
 
-This setup lets an MCP-capable coding agent read a Se'kret Bip Figma frame while working inside the `jussray/Bip` repository.
+Last reviewed: 2026-07-13
+
+This setup lets an MCP-capable coding agent read a Se'kret Bip Figma frame while working inside the canonical `jussray/Sekret-Bip` repository.
 
 ## Architecture
 
@@ -8,16 +10,16 @@ This setup lets an MCP-capable coding agent read a Se'kret Bip Figma frame while
 Figma file
   -> official Figma MCP server
   -> coding agent / IDE
-  -> Bip React Native repository
+  -> Se'kret Bip React Native repository
 ```
 
-Figma remains the visual and handoff workspace. GitHub remains the production source of truth for code and assets.
+Figma remains the visual and handoff workspace. GitHub remains the production source of truth for code, assets, routing, privacy boundaries, and implementation evidence.
 
 ## Security
 
-The official remote MCP uses Figma authentication through the client connection. Do not place a Figma personal access token in this repository, `.env`, Expo config, or source code.
+The official remote MCP uses Figma authentication through the client connection. Do not place a Figma personal access token in this repository, `.env`, Expo config, source code, issues, or pull requests.
 
-Any Figma token that was pasted into chat or shared publicly should be revoked.
+Any Figma token pasted into chat or shared publicly must be revoked.
 
 ## Repository template
 
@@ -34,7 +36,7 @@ The repository includes `.mcp.example.json`:
 }
 ```
 
-Copy the server entry into the private MCP configuration used by your supported client.
+Copy the server entry into the private MCP configuration used by the supported client.
 
 ## Supported setup paths
 
@@ -83,26 +85,28 @@ Then authenticate inside Gemini CLI:
 /mcp auth figma
 ```
 
-## Use it with Bip
+## Use it with Se'kret Bip
 
-1. Open the local Bip repository in the MCP-capable coding client.
-2. Open the target frame in Figma.
-3. Copy the Figma frame URL, including its `node-id`.
-4. Paste the URL into the coding-agent prompt.
-5. Ask the agent to inspect the frame and implement it using existing Bip assets and components.
+1. Open the local `jussray/Sekret-Bip` checkout in the MCP-capable client.
+2. Verify the branch and current `main` architecture before editing.
+3. Open the target frame in Figma.
+4. Copy the Figma frame URL, including its `node-id`.
+5. Paste the URL into the coding-agent prompt.
+6. Ask the agent to inspect the frame and implement it using current Bip assets, routes, and shared components.
 
 Recommended prompt:
 
 ```text
-Use the linked Figma frame as the visual source and the current Bip repository as the implementation source.
+Use the linked Figma frame as the visual source and the current jussray/Sekret-Bip repository as the implementation source.
 
 Required flow:
 1. Get design context for the exact Figma node.
 2. Get the Figma screenshot for visual verification.
 3. Get variable definitions when the frame uses Figma variables.
-4. Inspect the existing Bip screen, shared components, routes, and image mappings before editing.
-5. Implement the frame in React Native and Expo.
-6. Validate the result against the Figma screenshot.
+4. Inspect the existing Bip screen, shared components, route group, state ownership, and image mappings before editing.
+5. Implement the frame in React Native and Expo without replacing working backend logic.
+6. Validate the result against the Figma screenshot and phone-width Playwright guardrails.
+7. Update implementation evidence when the design changes an architecture, status, or rollout claim.
 
 Rules:
 - Reuse existing assets from assets/images.
@@ -111,6 +115,7 @@ Rules:
 - Translate generated web or Tailwind context into React Native StyleSheet conventions.
 - Match layout, spacing, overlays, typography, and component states from Figma.
 - Preserve teen and parent privacy boundaries.
+- Do not move authorization into UI-only logic.
 - Do not replace working backend logic.
 - Report files changed and any design detail that could not be represented exactly.
 ```
@@ -121,26 +126,27 @@ Rules:
 - Use variables for color, spacing, radius, and typography.
 - Use Auto Layout to express responsive intent.
 - Name layers semantically.
-- Keep repo image filenames as Figma layer names.
+- Keep repository image filenames as Figma layer names.
 - Add annotations for privacy rules, navigation, state, and interaction behavior.
 
 ## What this connection does
 
 It lets the coding agent combine:
 
-- Figma frame structure and styling
-- Figma variables and components
-- Existing Bip React Native code
-- Existing production image assets
-- Route, state, and component context
+- Figma frame structure and styling;
+- Figma variables and components;
+- current Se'kret Bip React Native code;
+- production image assets;
+- route, state, privacy, and component context.
 
 ## What it does not do
 
 It does not automatically:
 
-- synchronize every GitHub asset into Figma
-- replace the workspace-building plugin
-- make Figma the production source of truth
-- publish code without review
+- synchronize every GitHub asset into Figma;
+- replace the workspace-building plugin;
+- make Figma the production source of truth;
+- create server authorization or database policies;
+- publish code without review and CI.
 
-Repo images must still be placed into Figma manually or through the local Bip Figma workspace plugin.
+Repository images must still be placed into Figma manually or through the local Bip Figma workspace plugin.

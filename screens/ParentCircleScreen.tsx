@@ -10,10 +10,12 @@ import {
   StyleSheet,
   Platform,
   Easing,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { SOFT_CONTENT_FLAGS, CRISIS_NUDGE, TONE } from '../constants/guardrails';
+import { reportPost } from '@/utils/circleModeration';
 
 type ParentCirclePost = {
   id: string | number;
@@ -168,6 +170,26 @@ export function ParentCircleScreen({
   const [activeReplyPostId, setActiveReplyPostId] = useState<string | null>(null);
   const [selectedQuietReply, setSelectedQuietReply] = useState('');
   const [feedTab, setFeedTab] = useState<FeedTab>('foryou');
+  const [reportedIds, setReportedIds] = useState<Set<string>>(new Set());
+
+  function handleReport(postId: string | number) {
+    Alert.alert(
+      'Report this post?',
+      "We'll take a look. It'll stop showing up in your feed right away.",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: () => {
+            setReportedIds(prev => new Set(prev).add(String(postId)));
+            const numericId = Number(postId);
+            if (Number.isFinite(numericId)) void reportPost(numericId, 'parent');
+          },
+        },
+      ],
+    );
+  }
 
   const currentType = PARENT_POST_TYPES.find(p => p.id === selectedType) || PARENT_POST_TYPES[0];
 
@@ -396,7 +418,7 @@ export function ParentCircleScreen({
               <Text style={styles.circlePromiseSub}>anonymous · no likes · no ranking</Text>
             </View>
 
-            {visiblePosts.map(post => (
+            {visiblePosts.filter(post => !reportedIds.has(String(post.id))).map(post => (
               <TouchableOpacity
                 key={post.id}
                 style={styles.postCard}
@@ -407,6 +429,15 @@ export function ParentCircleScreen({
                 <View style={styles.postMetaRow}>
                   <View style={styles.anonymousDot} />
                   <Text style={styles.anonymousName}>{post.anonymousName || 'anonymous parent'}</Text>
+                  {!String(post.id).startsWith('ps-') && (
+                    <TouchableOpacity
+                      style={styles.reportBtn}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      onPress={(e) => { e.stopPropagation?.(); handleReport(post.id); }}
+                    >
+                      <Text style={styles.reportBtnText}>⚑</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
                 {!!post.circleTag && (
                   <View style={styles.tagBadge}>
@@ -579,6 +610,8 @@ const styles = StyleSheet.create({
   postMetaRow:   { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
   anonymousDot:  { width: 8, height: 8, borderRadius: 4, backgroundColor: AMBER_GLOW, marginRight: 7 },
   anonymousName: { color: '#c9dfc2', fontSize: 11, fontWeight: '800', flex: 1 },
+  reportBtn:     { paddingHorizontal: 4 },
+  reportBtnText: { color: '#c9dfc2', fontSize: 13, opacity: 0.6 },
   postDate:      { color: '#6b7a5e', fontSize: 11, marginTop: 4, marginBottom: 6 },
   postText:      { color: '#f5f0e8', fontSize: 15, lineHeight: 22, marginBottom: 8 },
 

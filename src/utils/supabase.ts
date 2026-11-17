@@ -9,13 +9,35 @@
 // NEVER reference service_role keys in client code.
 
 import 'react-native-url-polyfill/auto';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { AppState, Platform } from 'react-native';
+import { createClient, processLock, type SupabaseClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PASSWORD_RECOVERY_PATH } from '@/features/auth/passwordRecovery';
 import { SUPABASE_URL, SUPABASE_ANON, isSupabaseReady } from './env';
 
 export const isSupabaseConfigured = isSupabaseReady;
 
 let _client: SupabaseClient | null = null;
+let _autoRefreshListenerInstalled = false;
+
+function installNativeAutoRefresh(client: SupabaseClient) {
+  if (Platform.OS === 'web' || _autoRefreshListenerInstalled) return;
+  _autoRefreshListenerInstalled = true;
+
+  AppState.addEventListener('change', (state) => {
+    if (state === 'active') client.auth.startAutoRefresh();
+    else client.auth.stopAutoRefresh();
+  });
+}
+
+function shouldDetectSessionInUrl(): boolean {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return false;
+
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  // Confirmation links may be consumed globally. Password recovery is handled by
+  // ResetPasswordScreen so its one-time PKCE code cannot be exchanged twice.
+  return !pathname.endsWith(PASSWORD_RECOVERY_PATH);
+}
 
 export function getSupabase(): SupabaseClient | null {
   if (!isSupabaseConfigured) return null;
@@ -25,13 +47,18 @@ export function getSupabase(): SupabaseClient | null {
       storage:            AsyncStorage,
       autoRefreshToken:   true,
       persistSession:     true,
-      detectSessionInUrl: false,
+      detectSessionInUrl: shouldDetectSessionInUrl(),
+      lock:               processLock,
     },
   });
+  installNativeAutoRefresh(_client);
   return _client;
 }
 
 export const TABLES = {
+  // ── Account identity + verification ────────────────────────────────────────
+  appProfiles:         'app_profiles',
+  accountVerification: 'account_verification',
   // ── Private per-user tables (0001_init.sql) ─────────────────────────────
   journalEntries:     'journal_entries',
   moodHistory:        'mood_history',
@@ -45,6 +72,7 @@ export const TABLES = {
   bipPoints:          'bip_points',
   circlePosts:        'circle_posts',
   parentCirclePosts:  'parent_circle_posts',
+  dailyIntentions:    'daily_intentions',
   // ── Shared Circle V1 tables (0002_circle_v1.sql) ────────────────────────
   publicCirclePosts:   'public_circle_posts',
   friendsCirclePosts:  'friends_circle_posts',

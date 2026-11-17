@@ -1,8 +1,8 @@
 /**
  * Compatibility re-export for legacy screen imports.
  *
- * Canonical API helpers live in src/utils/api.ts. Some older screens still
- * import from ../utils/api, so this file forwards those exports until the
- * route cleanup removes the legacy path.
+ * Canonical Se'kret API helpers, including the launch voice-cost policy, live
+ * in src/utils/api.ts. Keep this file logic-free so legacy and modern routes
+ * cannot drift into different paid/free voice behavior.
  */
 export * from '../src/utils/api';

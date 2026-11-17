@@ -7,7 +7,9 @@ function read(path) {
 }
 
 const oracleDiscovery = read('services/oracleDiscovery.ts');
-const teenChat = read('app/(teen)/chat/[personalityId].tsx');
+const companionChat = read('app/(teen)/companion-chat.tsx');
+const companionEngine = read('src/features/sekret/companionEngine.ts');
+const requestBuilder = read('src/services/ai/buildReplyRequest.ts');
 const chatService = read('src/services/ai/chat.ts');
 const worker = read('worker/sekret-reply.ts');
 
@@ -18,14 +20,19 @@ test('Oracle builds a bounded companion context from structured understandings',
   assert.match(oracleDiscovery, /item\.theory/);
 });
 
-test('every teen companion chat uses the same Oracle context path', () => {
-  for (const personality of ['raylene', 'rylane', 'cloud', 'night', 'oracle']) {
-    assert.ok(teenChat.includes(`'${personality}'`), `${personality} must remain a valid companion id`);
-  }
+test('the canonical companion route uses the shared reply request path', () => {
+  assert.match(companionChat, /sendCompanionMessage\(/);
+  assert.match(companionEngine, /buildReplyRequest\(/);
+  assert.match(companionEngine, /oracleContext:\s*input\.oracleContext/);
+  assert.match(requestBuilder, /resolveOracleContext/);
+  assert.match(requestBuilder, /AsyncStorage\.getItem\('oracleProfile'\)/);
+  assert.match(requestBuilder, /buildOracleContext\(profile, 'teen'\)/);
+});
 
-  assert.match(teenChat, /buildOracleContext\(oracleProfile, 'teen'\)/);
-  assert.match(teenChat, /sendMessage\([\s\S]*oracleContext/);
-  assert.match(teenChat, /oracleProfile/);
+test('explicit Oracle context is bounded and takes precedence', () => {
+  assert.match(requestBuilder, /if \(explicit\?\.length\)/);
+  assert.match(requestBuilder, /\.slice\(0, 8\)/);
+  assert.match(requestBuilder, /resolveOracleContext\(ctx\.oracleContext\)/);
 });
 
 test('chat transport sends Oracle context only inside the Worker memory payload', () => {
@@ -54,6 +61,7 @@ test('companion prompt treats Oracle knowledge as hidden guidance, not quoted co
 });
 
 test('Oracle context is omitted when there are no understandings', () => {
-  assert.match(chatService, /oracleContext && oracleContext\.length > 0 \? \{ oracleContext \} : \{\}/);
+  assert.match(requestBuilder, /if \(!raw\) return \[\]/);
+  assert.match(requestBuilder, /oracleContext\.length > 0 \? \{ oracleContext \} : \{\}/);
   assert.match(worker, /oracleInsights\.length > 0/);
 });

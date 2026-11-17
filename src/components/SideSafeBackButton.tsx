@@ -15,7 +15,7 @@ const ROOTS: Record<Side, string> = {
 
 function belongsToSide(pathname: string, side: Side) {
   if (side === 'teen') return pathname.startsWith('/room') || pathname.startsWith('/pages') || pathname.startsWith('/calm') || pathname.startsWith('/circle') || pathname.startsWith('/more') || pathname.startsWith('/sekret') || pathname.startsWith('/voicebip') || pathname.startsWith('/cloud') || pathname.startsWith('/comfort') || pathname.startsWith('/crew') || pathname.startsWith('/history') || pathname.startsWith('/bridge') || pathname.startsWith('/s2tell') || pathname.startsWith('/period-calendar') || pathname.startsWith('/discover') || pathname.startsWith('/profile') || pathname.startsWith('/chat') || pathname.startsWith('/user-room');
-  return pathname.startsWith('/room') || pathname.startsWith('/pages') || pathname.startsWith('/circle') || pathname.startsWith('/more') || pathname.startsWith('/bridge') || pathname.startsWith('/voicebip') || pathname.startsWith('/settings');
+  return pathname.startsWith('/room') || pathname.startsWith('/pages') || pathname.startsWith('/circle') || pathname.startsWith('/more') || pathname.startsWith('/bridge') || pathname.startsWith('/voicebip') || pathname.startsWith('/settings') || pathname.startsWith('/bip-jr');
 }
 
 export function SideSafeBackButton({ side }: Props) {

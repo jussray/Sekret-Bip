@@ -1,16 +1,23 @@
+import { sendBridgePushAlert } from '@/services/pushAlerts';
+import {
+  loadBridgeResponsePreference,
+  type BridgeResponsePreference,
+} from '@/features/bridge/responsePreference';
 import { getSupabase } from './supabase';
 import {
   generateInviteCode,
-  redeemInviteCode,
+  redeemInviteCodeResult,
   fetchLinkedTeenId as fetchLinkedTeenIdBase,
 } from './parentLink';
 
-async function uid(): Promise<string | null> {
+async function permanentUid(): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return null;
   try {
     const { data } = await sb.auth.getUser();
-    return data?.user?.id ?? null;
+    const user = data?.user;
+    if (!user || user.is_anonymous) return null;
+    return user.id;
   } catch {
     return null;
   }
@@ -20,9 +27,12 @@ export async function createParentLink(): Promise<string | null> {
   return generateInviteCode();
 }
 
-export async function redeemParentLink(code: string): Promise<'ok' | 'not_found' | 'error'> {
+export async function redeemParentLink(code: string): Promise<'pending' | 'not_found' | 'error'> {
   try {
-    return (await redeemInviteCode(code)) ? 'ok' : 'not_found';
+    const result = await redeemInviteCodeResult(code);
+    if (result.ok) return result.value.status === 'pending' ? 'pending' : 'error';
+    if (result.code === 'invalid_code' || result.code === 'expired_or_used') return 'not_found';
+    return 'error';
   } catch {
     return 'error';
   }
@@ -32,10 +42,13 @@ export async function fetchLinkedTeenId(): Promise<string | null> {
   return fetchLinkedTeenIdBase();
 }
 
+export type { BridgeResponsePreference } from '@/features/bridge/responsePreference';
+
 export interface BridgeSignal {
   id: number;
   share_type: string;
   conv_mode: string | null;
+  response_preference: BridgeResponsePreference | null;
   char_key: string;
   sent_at: string;
   created_at: string;
@@ -58,23 +71,30 @@ export interface ParentEngagement {
 export async function sendBridgeSignal(params: {
   shareType: string;
   convMode: string | null;
+  responsePreference?: BridgeResponsePreference | null;
   charKey: 'raylene' | 'rylane';
 }): Promise<void> {
   const sb = getSupabase();
-  const userId = await uid();
-  if (!sb || !userId) return;
-  await sb.from('bridge_signals').insert({
+  const userId = await permanentUid();
+  if (!sb || !userId) {
+    throw new Error('A permanent signed-in Teen account is required to send through Bridge.');
+  }
+
+  const responsePreference = params.responsePreference ?? await loadBridgeResponsePreference();
+  const { error } = await sb.from('bridge_signals').insert({
     teen_user_id: userId,
     char_key: params.charKey,
     share_type: params.shareType,
     conv_mode: params.convMode ?? null,
+    response_preference: responsePreference,
     sent_at: new Date().toISOString(),
   });
+  if (error) throw error;
 }
 
 export async function fetchParentNotes(): Promise<ParentNote[]> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) return [];
   const { data } = await sb
     .from('parent_notes')
@@ -87,7 +107,7 @@ export async function fetchParentNotes(): Promise<ParentNote[]> {
 
 export async function fetchParentSentNotes(): Promise<ParentNote[]> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) return [];
   const { data } = await sb
     .from('parent_notes')
@@ -100,7 +120,8 @@ export async function fetchParentSentNotes(): Promise<ParentNote[]> {
 
 export async function markParentNoteSeen(id: string): Promise<void> {
   const sb = getSupabase();
-  if (!sb) return;
+  const userId = await permanentUid();
+  if (!sb || !userId) return;
   await sb.from('parent_notes').update({ seen_by_teen: true }).eq('id', id);
 }
 
@@ -108,7 +129,7 @@ export async function subscribeToParentNotes(
   onNew: (note: ParentNote) => void,
 ): Promise<() => void> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) return () => {};
   const channel = sb.channel(`parent-notes-${userId}`).on(
     'postgres_changes',
@@ -120,10 +141,11 @@ export async function subscribeToParentNotes(
 
 export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]> {
   const sb = getSupabase();
-  if (!sb || !teenId) return [];
+  const userId = await permanentUid();
+  if (!sb || !userId || !teenId) return [];
   const { data } = await sb
     .from('bridge_signals')
-    .select('id, share_type, conv_mode, char_key, sent_at, created_at')
+    .select('id, share_type, conv_mode, response_preference, char_key, sent_at, created_at')
     .eq('teen_user_id', teenId)
     .order('sent_at', { ascending: false })
     .limit(30);
@@ -132,7 +154,7 @@ export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]
 
 export async function sendParentNote(teenId: string, content: string): Promise<boolean> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId || !teenId || !content.trim()) return false;
   const { error } = await sb.from('parent_notes').insert({
     teen_user_id: teenId,
@@ -140,12 +162,20 @@ export async function sendParentNote(teenId: string, content: string): Promise<b
     content: content.trim(),
     sent_at: new Date().toISOString(),
   });
-  return !error;
+
+  if (error) return false;
+
+  void sendBridgePushAlert({
+    event: 'parent_bridge_reply',
+    teenId,
+  });
+
+  return true;
 }
 
 export async function fetchParentEngagement(): Promise<ParentEngagement | null> {
   const sb = getSupabase();
-  const userId = await uid();
+  const userId = await permanentUid();
   if (!sb || !userId) return null;
   const [notesRes, engagementRes] = await Promise.all([
     sb.from('parent_notes').select('id', { count: 'exact', head: true }).eq('parent_user_id', userId),
@@ -164,7 +194,8 @@ export async function subscribeToBridgeSignals(
   onNew: (signal: BridgeSignal) => void,
 ): Promise<() => void> {
   const sb = getSupabase();
-  if (!sb || !teenId) return () => {};
+  const userId = await permanentUid();
+  if (!sb || !userId || !teenId) return () => {};
   const channel = sb.channel(`bridge-signals-${teenId}`).on(
     'postgres_changes',
     { event: 'INSERT', schema: 'public', table: 'bridge_signals', filter: `teen_user_id=eq.${teenId}` },

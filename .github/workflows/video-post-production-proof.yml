@@ -1,0 +1,100 @@
+name: Video Post-Production Proof
+
+on:
+  pull_request:
+    paths:
+      - 'season-01/01-the-bridge-that-listens.md'
+      - 'production/video-use/**'
+      - 'production/video-providers/**'
+      - 'scripts/verify-video-master.mjs'
+      - 'scripts/verify-video-playback.mjs'
+      - 'scripts/verify-video-provider-registry.mjs'
+      - 'test/video-post-production-contract.test.mjs'
+      - 'test/video-provider-registry.test.mjs'
+      - 'test/sekret-bip-story-canon-contract.test.mjs'
+      - 'sekret-bip-short-engine.md'
+      - 'docs/VIDEO_POST_PRODUCTION_CONTRACT.md'
+      - 'package.json'
+      - '.github/workflows/video-post-production-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+
+jobs:
+  proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'event=%s\nexpected=%s\nactual=%s\n' "$GITHUB_EVENT_NAME" "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version-file: '.node-version'
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
+      - name: Run source, story, and provider contracts
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/video-proof
+          npm run test:video:postproduction
+          node --test test/sekret-bip-story-canon-contract.test.mjs
+          node scripts/verify-video-provider-registry.mjs
+          node --test test/video-provider-registry.test.mjs
+          node scripts/verify-video-provider-registry.mjs --select-canary > artifacts/video-proof/provider-canary.json
+
+      - name: Generate deterministic synthetic master
+        run: |
+          ffmpeg -hide_banner -loglevel error \
+            -f lavfi -i color=c=black:s=1920x1080:r=30:d=64 \
+            -c:v libx264 -preset ultrafast -pix_fmt yuv420p -movflags +faststart \
+            artifacts/video-proof/synthetic-master.mp4
+
+      - name: Verify master metadata
+        run: |
+          npm run verify:video:master -- \
+            --manifest production/video-use/episode-001.json \
+            --media artifacts/video-proof/synthetic-master.mp4 \
+            --receipt artifacts/video-proof/master-proof.json
+
+      - name: Verify real Chromium playback
+        run: |
+          npm run verify:video:playback -- \
+            --manifest production/video-use/episode-001.json \
+            --media artifacts/video-proof/synthetic-master.mp4 \
+            --receipt artifacts/video-proof/playback-proof.json
+
+      - name: Upload exact-head video proof
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: video-post-production-proof-${{ env.EXPECTED_HEAD_SHA }}
+          path: artifacts/video-proof/
+          if-no-files-found: error

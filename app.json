@@ -14,10 +14,6 @@
     "updates": {
       "enabled": false
     },
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#160028"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.sekretbip.app"

@@ -3,35 +3,25 @@
  *
  * Strategy chain, tried in order against the `Authorization: Bearer <token>`
  * value:
- *   1. Supabase JWT  → per-user auth. When the bearer looks like a JWT and
- *      SUPABASE_URL is configured, verify it (asymmetric via the project JWKS,
- *      or HS256 when SUPABASE_JWT_SECRET is set) and return a `user` principal.
- *   2. Shared token  → coarse client auth matching the PIPER_TOKEN pattern.
- *      Constant-time compare against SEKRET_CLIENT_TOKEN.
+ *   1. Supabase JWT → per-user auth verified against the project issuer.
+ *      Anonymous Supabase sessions are rejected at this boundary.
+ *   2. Shared token → explicit guest/client credential matching
+ *      SEKRET_CLIENT_TOKEN with a constant-time comparison.
  *
- * The client contract never changed across the token→JWT rollout: callers
- * always send a bearer token. Authenticated users now send their Supabase
- * access token; guests/unauthenticated flows can still send the shared token.
- * When neither credential is configured server-side, auth fails open so local
- * dev and pre-rollout deployments keep working.
+ * Production is fail-closed by default. Token-less access exists only when
+ * SEKRET_AUTH_MODE=dev-open is explicitly set for local development.
  */
 import { createRemoteJWKSet, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from 'jose';
 
 export interface AuthEnv {
-  /**
-   * Shared client token. When unset (and JWT auth is not configured),
-   * authentication is DISABLED (fail-open). Set to enforce:
-   *   wrangler secret put SEKRET_CLIENT_TOKEN --name bip
-   */
+  /** Shared guest/client token. Must match EXPO_PUBLIC_BACKEND_TOKEN callers. */
   SEKRET_CLIENT_TOKEN?: string;
   /** Supabase project URL, used to derive the JWKS URL and expected issuer. */
   SUPABASE_URL?: string;
-  /**
-   * Optional HS256 signing secret for legacy (symmetric) Supabase projects.
-   * Leave unset for projects using asymmetric JWTs (the JWKS is used instead).
-   *   wrangler secret put SUPABASE_JWT_SECRET --name bip
-   */
+  /** Optional legacy HS256 signing secret. */
   SUPABASE_JWT_SECRET?: string;
+  /** Explicit local-development escape hatch. Secure default is `required`. */
+  SEKRET_AUTH_MODE?: 'required' | 'dev-open';
 }
 
 export type Principal =
@@ -40,13 +30,9 @@ export type Principal =
 
 export type AuthResult =
   | { ok: true; principal: Principal }
-  | { ok: false; status: 401 | 403; error: string };
+  | { ok: false; status: 401 | 403 | 503; error: string };
 
-/**
- * Constant-time comparison of two equal-length strings. Avoids leaking how
- * much of the token matched via response timing. (Length itself is not
- * secret-sensitive here, so an early length check is acceptable.)
- */
+/** Constant-time comparison of two equal-length strings. */
 export function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let mismatch = 0;
@@ -66,8 +52,6 @@ export function looksLikeJwt(token: string): boolean {
   return /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token);
 }
 
-// Cache the remote JWKS per issuer for the lifetime of the isolate. jose also
-// caches keys internally and handles rotation/cooldown on each resolver.
 const jwksCache = new Map<string, JWTVerifyGetKey>();
 
 function getJwks(supabaseUrl: string): JWTVerifyGetKey {
@@ -80,10 +64,6 @@ function getJwks(supabaseUrl: string): JWTVerifyGetKey {
   return jwks;
 }
 
-/**
- * Verify a Supabase-issued JWT. Returns its payload on success, or null when it
- * cannot be verified (bad signature, expired, wrong issuer/audience, etc.).
- */
 async function verifySupabaseJwt(token: string, env: AuthEnv): Promise<JWTPayload | null> {
   const supabaseUrl = env.SUPABASE_URL?.replace(/\/$/, '');
   if (!supabaseUrl) return null;
@@ -106,33 +86,45 @@ async function verifySupabaseJwt(token: string, env: AuthEnv): Promise<JWTPayloa
 }
 
 /**
- * Authenticate a request against the strategy chain (see file header).
+ * Authenticate an API request. Secure behavior is the default:
+ * - valid permanent-account Supabase JWT → user principal
+ * - valid anonymous Supabase JWT → 403
+ * - exact shared token → guest/client principal
+ * - missing credential → 401
+ * - invalid credential → 403
+ * - no server-side verification strategy → 503
  *
- * Enforcement is gated on SEKRET_CLIENT_TOKEN exactly as in the shared-token
- * release: while it is unset the Worker fails open so existing token-less
- * builds keep working (SUPABASE_URL being set for JWKS does NOT by itself turn
- * enforcement on). A valid Supabase JWT is always honored as a per-user
- * identity regardless of enforcement, which improves rate-limit keying.
+ * `dev-open` is intentionally explicit and only permits a missing token. An
+ * invalid token is never converted into an authenticated principal.
  */
 export async function authenticate(request: Request, env: AuthEnv): Promise<AuthResult> {
-  const enforced = Boolean(env.SEKRET_CLIENT_TOKEN?.trim());
   const token = extractBearer(request);
+  const sharedToken = env.SEKRET_CLIENT_TOKEN?.trim() ?? '';
+  const hasJwtVerifier = Boolean(env.SUPABASE_URL?.trim());
+  const devOpen = env.SEKRET_AUTH_MODE === 'dev-open';
 
-  // Prefer a verified Supabase JWT identity whenever one is presented.
-  if (token && env.SUPABASE_URL && looksLikeJwt(token)) {
+  if (token && hasJwtVerifier && looksLikeJwt(token)) {
     const payload = await verifySupabaseJwt(token, env);
+    if (payload?.is_anonymous === true) {
+      return { ok: false, status: 403, error: 'anonymous user token not permitted' };
+    }
     if (payload?.sub) return { ok: true, principal: { kind: 'user', userId: payload.sub } };
-    // JWT present but invalid: a hard reject when enforcing; otherwise fall
-    // through to fail-open so a stale token can't break the pre-rollout app.
-    if (enforced) return { ok: false, status: 403, error: 'invalid token' };
+    return { ok: false, status: 403, error: 'invalid token' };
+  }
+
+  if (token && sharedToken && timingSafeEqual(token, sharedToken)) {
     return { ok: true, principal: { kind: 'shared-token' } };
   }
 
-  // Not a (valid) JWT — shared-token path.
-  if (!enforced) return { ok: true, principal: { kind: 'shared-token' } };
-  if (!token) return { ok: false, status: 401, error: 'missing bearer token' };
+  if (!token && devOpen) {
+    return { ok: true, principal: { kind: 'shared-token' } };
+  }
 
-  const configured = env.SEKRET_CLIENT_TOKEN!.trim();
-  if (timingSafeEqual(token, configured)) return { ok: true, principal: { kind: 'shared-token' } };
+  if (!hasJwtVerifier && !sharedToken) {
+    console.error('[auth] no server-side verification strategy configured');
+    return { ok: false, status: 503, error: 'authentication unavailable' };
+  }
+
+  if (!token) return { ok: false, status: 401, error: 'missing bearer token' };
   return { ok: false, status: 403, error: 'invalid token' };
 }

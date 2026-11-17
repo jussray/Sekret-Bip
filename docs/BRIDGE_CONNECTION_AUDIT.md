@@ -23,7 +23,7 @@ Bridge is the private teen-parent connection system.
 - Doorbell is now defined as `signals` owned by Bridge.
 - The former parent Doorbell route redirects into Parent Bridge signals.
 - S2Tell continues to enter Teen Bridge through the Bridge route.
-- Added `bridge_messages`, a linked-account message model for S2Tell shares, parent replies, notes, and shared moments.
+- A dedicated `bridge_messages` table was considered but retired in favor of the existing product-specific tables (`supabase/migrations/20260630004000_bridge_linked_accounts.sql`): `bridge_signals` for Doorbell, `bridge_shares` for S2Tell, and `parent_notes` for parent replies.
 - Added RLS that permits only the active linked teen and parent to read or write the shared Bridge thread.
 - Added a Bridge client service that resolves the active parent link instead of relying on side-switch state.
 - Removed Doorbell as a separate item from Parent More.
@@ -54,4 +54,12 @@ Bridge may contain only content a participant intentionally sends into the linke
 
 ## Remaining UI pass
 
-The legacy `BridgeScreen` and `ParentBridgeScreen` still contain older presentation sections. The next UI pass should render the canonical tabs above using `bridge_signals` and `bridge_messages`, then remove the legacy activity-pulse and duplicate advice/dashboard sections without changing the linked-account data contract.
+Completed. `ParentBridgeScreen` no longer embeds the duplicate Se'kret Advice
+topic picker (that capability lives at its real home,
+`src/parent/features/sekret/ParentSekretCoachScreen.tsx`, linked from Bridge
+via a single CTA) or the legacy Activity Pulse card. Both `BridgeScreen`
+(teen) and `ParentBridgeScreen` (parent) now expose a chronological
+Connection history view built from the existing `bridge_signals`,
+`bridge_shares`, and `parent_notes` tables — no new `bridge_messages` table
+was introduced; the canonical structure above is realized entirely on the
+existing linked-account data contract.

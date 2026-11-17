@@ -10,6 +10,7 @@ import {
   normalizeRecentEvents,
   updateIssueNotes,
   updateIssueStatus,
+  type NormalizedIssue,
 } from '@/services/issueNormalizer';
 
 export type {
@@ -35,8 +36,28 @@ export {
   deriveIssueFields,
 };
 
+async function listAllIssues(limit = 300): Promise<NormalizedIssue[]> {
+  if (!isSupabaseConfigured) return [];
+  const sb = getSupabase();
+  if (!sb) return [];
+  const { data, error } = await sb
+    .from('control_room_issues')
+    .select('*')
+    .order('last_seen_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.warn('[controlRoomIssues] listAllIssues error:', error.message);
+    return [];
+  }
+  return (data ?? []).map((issue) => ({
+    ...(issue as NormalizedIssue),
+    affected_surface: (issue as { affected_surface?: string | null }).affected_surface ?? undefined,
+  }));
+}
+
 export const controlRoomIssuesService = {
   list: listNormalizedIssues,
+  listAll: listAllIssues,
   updateStatus: updateIssueStatus,
   async resolveAuditEvent(auditEventId: string): Promise<boolean> {
     if (!isSupabaseConfigured) return false;
