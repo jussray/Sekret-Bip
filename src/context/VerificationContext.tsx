@@ -62,10 +62,10 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
   const [authSession, setSession] = useState<Session | null>(null);
 
   const loadVerificationForSession = useCallback(async (session: Session | null) => {
-    const permanentSession = Boolean(session && !session.user.is_anonymous);
+    const permanentSession = Boolean(session && !session.user.is_anonymous && session.user.email_confirmed_at);
     const userId = permanentSession ? session?.user.id : undefined;
 
-    setSession(session);
+    setSession(permanentSession ? session : null);
     setAuthenticated(permanentSession);
     setAuthResolved(true);
 
@@ -130,8 +130,8 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
       } catch (error) {
         // Verification truth may fail closed, but it must never rewrite a
         // successfully restored permanent Supabase session into signed-out.
-        const permanentSession = Boolean(session && !session.user.is_anonymous);
-        setSession(session);
+        const permanentSession = Boolean(session && !session.user.is_anonymous && session.user.email_confirmed_at);
+        setSession(permanentSession ? session : null);
         setAuthenticated(permanentSession);
         setAuthResolved(true);
         setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);
@@ -195,8 +195,8 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
       if (!active) return;
 
       const user = session?.user;
-      const permanentSession = Boolean(session && !session.user.is_anonymous);
-      setSession(session);
+      const permanentSession = Boolean(session && !session.user.is_anonymous && session.user.email_confirmed_at);
+      setSession(permanentSession ? session : null);
       setAuthResolved(true);
       setAuthenticated(permanentSession);
       removeVerificationChannel();
@@ -218,7 +218,7 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
           if (!active) return;
           // The auth event already established a permanent session. Keep that
           // auth truth while verification falls back to its locked state.
-          setSession(session);
+          setSession(permanentSession ? session : null);
           setAuthenticated(permanentSession);
           setAuthResolved(true);
           setSnapshot(INITIAL_VERIFICATION_SNAPSHOT);

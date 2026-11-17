@@ -6,14 +6,16 @@
 // errors thrown. This lets us ship the UI now and add credentials later.
 //
 // Auth model: each row is scoped to auth.uid() via RLS. If there's no
-// signed-in user yet, writes are silently skipped (kept locally only).
-// ensureAnonymousSession() is called from useAppEffects on mount.
+// permanent signed-in account yet, writes are silently skipped (kept
+// locally only). No anonymous session is ever created here — account
+// authentication is permanent-account only, and anonymous participation
+// lives in Circle (public identity), never in sign-in.
 //
 // IMPORTANT: never throw. The user's local experience must never break
 // because the cloud is down. Errors are logged and swallowed.
 
 import { getSupabase, TABLES } from './supabase';
-import { ensureAnonymousSession as startAnonymousSession, getCurrentSessionUserId } from '@/services/session';
+import { getCurrentSessionUserId } from '@/services/session';
 import { loadState } from './storage';
 import { emitEvent } from '@/features/activity/events';
 import type {
@@ -90,10 +92,10 @@ async function safeUpsert(table: string, payload: SyncRow | SyncRow[]): Promise<
     const withUser = rows.map(r => ({ ...r, user_id: uid }));
     const { error } = await sb.from(table).upsert(withUser, { onConflict: 'id,user_id' });
     if (error) {
-      console.warn('[sync] safeUpsert failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SAFEUPSERT_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] upsert ${table} failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_UPSERT_FAILED');
   }
 }
 
@@ -105,24 +107,10 @@ async function safeDelete(table: string, id: number | string): Promise<void> {
   try {
     const { error } = await sb.from(table).delete().match({ id, user_id: uid });
     if (error) {
-      console.warn('[sync] safeDelete failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SAFEDELETE_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] delete ${table} failed`, e);
-  }
-}
-
-// ── Anonymous sign-in ────────────────────────────────────────────
-export async function ensureAnonymousSession(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  try {
-    const uid = await startAnonymousSession();
-    if (uid) return uid;
-    return null;
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] ensureAnonymousSession threw', e);
-    return null;
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_DELETE_FAILED');
   }
 }
 
@@ -202,8 +190,8 @@ export async function loadParentCircleFeed(
       reactions: r.reactions ?? EMPTY_PARENT_REACTIONS,
       circleTag: r.circle_tag ?? undefined,
     })) as ParentCirclePost[];
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadParentCircleFeed failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPARENTCIRCLEFEED_FAILED');
     return [];
   }
 }
@@ -276,8 +264,8 @@ export async function loadCircleFeed(
       })) as CircleParentPost[];
     }
     return null;
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] loadCircleFeed(${tab}) failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADCIRCLEFEED_FAILED');
     return null;
   }
 }
@@ -303,10 +291,10 @@ export async function syncCircleReaction(
         { onConflict: 'post_id,post_type,user_id', ignoreDuplicates: true },
       );
     if (error) {
-      console.warn('[sync] syncCircleReaction failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCCIRCLEREACTION_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncCircleReaction failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCCIRCLEREACTION_FAILED');
   }
 }
 
@@ -342,10 +330,10 @@ export async function writeCirclePost(
       created_at: new Date().toISOString(),
     });
     if (error) {
-      console.warn('[sync] writeCirclePost failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_WRITECIRCLEPOST_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] writeCirclePost(${tab}) failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_WRITECIRCLEPOST_FAILED');
   }
 }
 
@@ -411,10 +399,10 @@ export async function syncRoomMemory(rm: {
       { onConflict: 'user_id' },
     );
     if (error) {
-      console.warn('[sync] syncRoomMemory failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCROOMMEMORY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncRoomMemory failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCROOMMEMORY_FAILED');
   }
 }
 
@@ -429,10 +417,10 @@ export async function snapshotPoints(total: number): Promise<void> {
       user_id: uid, total, captured_at: new Date().toISOString(),
     });
     if (error) {
-      console.warn('[sync] snapshotPoints failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SNAPSHOTPOINTS_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] snapshotPoints failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SNAPSHOTPOINTS_FAILED');
   }
 }
 
@@ -450,10 +438,10 @@ export async function syncPeriodDay(day: string, note?: string): Promise<void> {
       { onConflict: 'user_id,day' },
     );
     if (error) {
-      console.warn('[sync] syncPeriodDay failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCPERIODDAY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncPeriodDay failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCPERIODDAY_FAILED');
   }
 }
 
@@ -466,10 +454,10 @@ export async function deletePeriodDay(day: string): Promise<void> {
   try {
     const { error } = await sb.from(TABLES.periodDays).delete().match({ user_id: uid, day });
     if (error) {
-      console.warn('[sync] deletePeriodDay failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_DELETEPERIODDAY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] deletePeriodDay failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_DELETEPERIODDAY_FAILED');
   }
 }
 
@@ -487,8 +475,8 @@ export async function loadPeriodDays(): Promise<string[]> {
       .order('day', { ascending: true });
     if (error) throw error;
     return (data ?? []).map((r: { day: string }) => r.day);
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadPeriodDays failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPERIODDAYS_FAILED');
     return [];
   }
 }
@@ -516,10 +504,10 @@ export async function syncOracleSession(
       { onConflict: 'user_id,personality_id' },
     );
     if (error) {
-      console.warn('[sync] syncOracleSession failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCORACLESESSION_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncOracleSession failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCORACLESESSION_FAILED');
   }
 }
 
@@ -543,8 +531,8 @@ export async function loadOracleSession(
       memory:       (data.memory) ?? {},
       sessionCount: (data.session_count) ?? 0,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadOracleSession failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADORACLESESSION_FAILED');
     return null;
   }
 }
@@ -591,10 +579,10 @@ export async function syncTeenActivitySummary(): Promise<void> {
       { onConflict: 'user_id' },
     );
     if (error) {
-      console.warn('[sync] syncTeenActivitySummary failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCTEENACTIVITYSUMMARY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncTeenActivitySummary failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCTEENACTIVITYSUMMARY_FAILED');
   }
 }
 
@@ -624,8 +612,8 @@ export async function fetchTeenActivitySummary(
       session_count: data.session_count,
       points_tier:   data.points_tier,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchTeenActivitySummary failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_FETCHTEENACTIVITYSUMMARY_FAILED');
     return null;
   }
 }
@@ -669,7 +657,7 @@ export async function pullAll(): Promise<{
 
     function settled<T>(res: PromiseSettledResult<SupabaseDataResult<T>>): T | null {
       if (res.status === 'rejected') return null;
-      if (res.value.error) { console.warn('[sync] pullAll partial error:', res.value.error.message); return null; }
+      if (res.value.error) { console.warn('SEKRET_SYNC_PULLALL_PARTIAL_ERROR'); return null; }
       return res.value.data;
     }
 
@@ -694,8 +682,8 @@ export async function pullAll(): Promise<{
       parentCirclePosts: parentPosts.map(r => ({ id: r.id, text: r.text, date: r.date, time: r.time, reactions: r.reactions ?? {}, circleTag: r.circle_tag ?? undefined })) as ParentCirclePost[],
       roomMemory: room ? { character: room.character, lastVisit: room.last_visit ?? '', lastHotspot: room.last_hotspot ?? '', lastSummon: room.last_summon ?? '', visitCount: room.visit_count ?? 0 } : null,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] pullAll failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_PULLALL_FAILED');
     return null;
   }
 }
