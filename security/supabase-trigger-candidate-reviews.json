@@ -12,6 +12,16 @@
       "deployedLive": false,
       "deploymentStatus": "PR #1099 candidate only. Production migration ledger has not applied 20260919190000; repository structure and rollback-contained replay are the current evidence.",
       "behaviorVerified": false
+    },
+    {
+      "signature": "public.touch_user_profile_updated_at()",
+      "searchPath": "public, pg_catalog",
+      "risk": "low",
+      "rationale": "Maintains updated_at timestamp on user_profiles rows on UPDATE; no cross-user data access or external effects.",
+      "clientExecuteRevokedLive": false,
+      "deployedLive": false,
+      "deploymentStatus": "Function is live from production history migration 20261004215523 without EXECUTE revocation. Migration 20261117040000 adds the missing REVOKE from PUBLIC; that migration has not yet been applied to production.",
+      "behaviorVerified": false
     }
   ],
   "attachments": [
@@ -27,6 +37,13 @@
       "table": "auth.users",
       "function": "public.initialize_onboarding_state_from_auth()",
       "timing": "AFTER",
+      "events": ["UPDATE"]
+    },
+    {
+      "trigger": "user_profiles_updated_at",
+      "table": "public.user_profiles",
+      "function": "public.touch_user_profile_updated_at()",
+      "timing": "BEFORE",
       "events": ["UPDATE"]
     }
   ]
