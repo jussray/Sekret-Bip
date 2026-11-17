@@ -4,7 +4,7 @@
  * Replaces `actions: any` in RouteRenderer props.
  */
 import type { RoomMemory } from './roomMemory';
-import type { JournalEntry } from '../../types/index';
+import type { JournalEntry } from '@/types';
 import type { SavePageInput } from '../../screens/PagesScreen';
 import type { OracleProfile, OracleSessionSummary } from '../../services/oracleDiscovery';
 

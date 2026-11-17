@@ -1,0 +1,27 @@
+{
+  "id": "control-room-executable-core",
+  "name": "Founder Control Room executable local core",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/603",
+  "acceptanceCriteria": [
+    "The authenticated loopback server binds only to 127.0.0.1, accepts only fixed allowlisted missions, and never converts free-form browser input into a shell command.",
+    "Mission timeout terminates the complete process tree and retains the one-mission lock until descendants are no longer alive.",
+    "Frontend verification retains timestamped Playwright evidence while non-browser fallback remains explicitly labeled and cannot satisfy browser proof."
+  ],
+  "contractPaths": [
+    "batches/481/01-control-room-core.md",
+    "docs/CONTROL_ROOM_GITHUB_ROUTE.md",
+    "src/config/controlRoomOs.ts"
+  ],
+  "testPaths": [
+    "test/control-room-core-contract.test.mjs",
+    "test/control-room-server-process-tree.test.mjs",
+    "test/control-room-verify-frontend.test.mjs",
+    "test/control-room-github-route.test.mjs",
+    "test/control-room-os.test.mjs"
+  ],
+  "verification": {
+    "state": "partial",
+    "evidence": "Local focused evidence on July 24, 2026: 7/7 core contract and process-tree tests passed; exact-head repository and browser checks remain required before merge."
+  }
+}

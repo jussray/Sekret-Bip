@@ -1,4 +1,4 @@
-import type { JournalEntry } from './index';
+import type { JournalEntry } from '../src/types';
 import type { VoiceBipAvatarKey } from '../constants/voiceBip';
 import type { OracleProfile, OracleSide } from '../services/oracleDiscovery';
 

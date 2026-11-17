@@ -29,15 +29,33 @@ const REFLECT_PROMPTS = [
   "If I responded from love instead of fear, what would I say?",
   "What do I wish someone had said to me at their age?",
   "Am I reacting to what they did, or what I am afraid it means?",
+  "What do I actually know versus what am I assuming?",
+  "What's the worst case I'm bracing for? Is that what's actually happening?",
+  "How would I want them to tell this story about me in 10 years?",
+  "What's under the anger? Usually there's something softer.",
+  "What do I need before I can show up the way I actually want to?",
+  "If a close friend was going through this with their teen, what would I tell them?",
+  "What's the one thing I actually want them to feel after this conversation?",
+  "Am I trying to fix this or control it? There's a difference.",
+  "What would staying curious look like right now instead of staying certain?",
+  "What's my real fear here — about them, or about myself as a parent?",
+  "What would I do right now if I trusted them more?",
 ];
 
 // ── Approach starters ────────────────────────────────────────────────────────
 const APPROACH_STARTERS = [
-  { label: 'Stay curious', text: '"Help me understand what is going on for you."' },
-  { label: 'Stay soft',    text: '"I love you. I am not going anywhere. Can we talk?"' },
-  { label: 'Acknowledge',  text: '"That sounds really hard. I hear you."' },
-  { label: 'Own it',       text: '"I overreacted. Can we start over?"' },
-  { label: 'Ask first',    text: '"Do you want advice, or do you just need me to listen?"' },
+  { label: 'Stay curious',  text: '"Help me understand what is going on for you."' },
+  { label: 'Stay soft',     text: '"I love you. I am not going anywhere. Can we talk?"' },
+  { label: 'Acknowledge',   text: '"That sounds really hard. I hear you."' },
+  { label: 'Own it',        text: '"I overreacted. Can we start over?"' },
+  { label: 'Ask first',     text: '"Do you want advice, or do you just need me to listen?"' },
+  { label: 'Make space',    text: '"You don\'t have to explain anything right now. I\'m just here."' },
+  { label: 'No agenda',     text: '"I\'m not coming in to lecture. I just miss talking to you."' },
+  { label: 'Be honest',     text: '"I don\'t know what to say. But I didn\'t want to say nothing."' },
+  { label: 'Repair first',  text: '"Before anything else — I love you. That\'s not conditional on any of this."' },
+  { label: 'Invite',        text: '"Whenever you\'re ready — today, tonight, tomorrow — I\'m not going anywhere."' },
+  { label: 'Name it',       text: '"Things have been off between us and I don\'t want to pretend they haven\'t."' },
+  { label: 'Collaborate',   text: '"I want to figure this out with you. Not at you."' },
 ];
 
 // ── Se'kret presence lines ────────────────────────────────────────────────────
@@ -48,6 +66,15 @@ const PRESENCE = [
   "breathe. then speak. in that order.",
   "you do not have to have the right answer. showing up is enough.",
   "regulation first. conversation second.",
+  "they need your presence more than your perfection.",
+  "the best thing you can do for your teen right now is take care of yourself for one minute.",
+  "whatever just happened — you're still their parent. that doesn't change.",
+  "anger is information. so is fear. so is love. breathe until you know which one is loudest.",
+  "you don't have to resolve it tonight. you just have to stay in relationship.",
+  "your teen is watching how you handle hard things. right now, they're watching.",
+  "you can be honest about being triggered and still choose how you respond.",
+  "soften before you speak. a soft opening changes everything.",
+  "come back with love first. everything else is secondary.",
 ];
 
 function pick<T>(arr: T[]): T {
@@ -63,12 +90,13 @@ interface ParentCalmScreenProps {
 type Phase = 'pause' | 'breathe' | 'reflect' | 'approach';
 
 export function ParentCalmScreen({ setScreen, BottomNav }: ParentCalmScreenProps) {
-  const [phase, setPhase]           = useState<Phase>('pause');
-  const [stepIdx, setStepIdx]       = useState(0);
-  const [counter, setCounter]       = useState(BREATHE_STEPS[0].count);
-  const [running, setRunning]       = useState(false);
-  const [promptIdx, setPromptIdx]   = useState(() => Math.floor(Math.random() * REFLECT_PROMPTS.length));
-  const [presenceLine]              = useState(() => pick(PRESENCE));
+  const [phase, setPhase]         = useState<Phase>('pause');
+  const [stepIdx, setStepIdx]     = useState(0);
+  const [counter, setCounter]     = useState(BREATHE_STEPS[0].count);
+  const [running, setRunning]     = useState(false);
+  const [promptIdx, setPromptIdx] = useState(() => Math.floor(Math.random() * REFLECT_PROMPTS.length));
+  const [starterIdx, setStarterIdx] = useState(0);
+  const [presenceLine]            = useState(() => pick(PRESENCE));
 
   const circleScale = useRef(new Animated.Value(1)).current;
   const fadeIn      = useRef(new Animated.Value(0)).current;
@@ -130,7 +158,7 @@ export function ParentCalmScreen({ setScreen, BottomNav }: ParentCalmScreenProps
 
         {/* ── Presence line ── */}
         <View style={s.presenceRow}>
-          <Text style={s.presenceText}>{'“'}{presenceLine}{'”'}</Text>
+          <Text style={s.presenceText}>{'"'}{presenceLine}{'"'}</Text>
         </View>
 
         {/* ── Phase tabs ── */}
@@ -153,7 +181,7 @@ export function ParentCalmScreen({ setScreen, BottomNav }: ParentCalmScreenProps
           <Animated.View style={[s.phaseCard, { opacity: fadeIn }]}>
             <Text style={s.phaseTitle}>Before you respond{'…'}</Text>
             <Text style={s.phaseBody}>
-              {'Something happened. You have a feeling. That’s real.\n\n'}
+              {"Something happened. You have a feeling. That's real.\n\n"}
               {'Before you react, give yourself 60 seconds.\n'}
               {'Not to plan what to say.\n'}
               {'Just to land back in your body.'}
@@ -207,7 +235,7 @@ export function ParentCalmScreen({ setScreen, BottomNav }: ParentCalmScreenProps
               style={s.ghostBtn}
               onPress={() => setPromptIdx(i => (i + 1) % REFLECT_PROMPTS.length)}
             >
-              <Text style={s.ghostBtnText}>Different question</Text>
+              <Text style={s.ghostBtnText}>Different question ({promptIdx + 1}/{REFLECT_PROMPTS.length})</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[s.primaryBtn, { marginTop: 12 }]} onPress={() => switchPhase('approach')}>
               <Text style={s.primaryBtnText}>Ready to approach</Text>
@@ -220,12 +248,28 @@ export function ParentCalmScreen({ setScreen, BottomNav }: ParentCalmScreenProps
           <Animated.View style={[s.phaseCard, { opacity: fadeIn }]}>
             <Text style={s.phaseTitle}>How to open the conversation</Text>
             <Text style={s.phaseSub}>Pick the one that fits right now. No script is perfect.</Text>
-            {APPROACH_STARTERS.map(a => (
-              <View key={a.label} style={s.approachCard}>
-                <Text style={s.approachLabel}>{a.label}</Text>
-                <Text style={s.approachText}>{a.text}</Text>
-              </View>
-            ))}
+            <View style={s.approachCard}>
+              <Text style={s.approachLabel}>{APPROACH_STARTERS[starterIdx].label}</Text>
+              <Text style={s.approachText}>{APPROACH_STARTERS[starterIdx].text}</Text>
+            </View>
+            <TouchableOpacity
+              style={s.ghostBtn}
+              onPress={() => setStarterIdx(i => (i + 1) % APPROACH_STARTERS.length)}
+            >
+              <Text style={s.ghostBtnText}>Different opener ({starterIdx + 1}/{APPROACH_STARTERS.length})</Text>
+            </TouchableOpacity>
+            <View style={s.allApproachWrap}>
+              {APPROACH_STARTERS.filter((_, i) => i !== starterIdx).map(a => (
+                <TouchableOpacity
+                  key={a.label}
+                  style={s.approachCardSmall}
+                  onPress={() => setStarterIdx(APPROACH_STARTERS.indexOf(a))}
+                >
+                  <Text style={s.approachLabelSmall}>{a.label}</Text>
+                  <Text style={s.approachTextSmall}>{a.text}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
             <TouchableOpacity style={[s.primaryBtn, { marginTop: 12 }]} onPress={() => setScreen('home')}>
               <Text style={s.primaryBtnText}>Back to the room</Text>
             </TouchableOpacity>
@@ -252,12 +296,13 @@ const s = StyleSheet.create({
   sub:    { color: '#94A3B8', fontSize: 12, marginTop: 2 },
 
   presenceRow: {
-    marginHorizontal: 20, marginBottom: 16,
+    marginHorizontal: 20, marginBottom: 12,
     backgroundColor: 'rgba(192,132,252,0.08)',
     borderLeftWidth: 2, borderLeftColor: '#c084fc',
     borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10,
   },
   presenceText: { color: '#e9d5ff', fontSize: 13, fontStyle: 'italic', lineHeight: 20 },
+
 
   tabs: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 8,
@@ -285,8 +330,8 @@ const s = StyleSheet.create({
   ghostBtn:     { alignItems: 'center', paddingVertical: 10 },
   ghostBtnText: { color: '#64748B', fontSize: 13 },
 
-  breatheWrap:    { marginHorizontal: 20, alignItems: 'center' },
-  circle:         {
+  breatheWrap: { marginHorizontal: 20, alignItems: 'center' },
+  circle:      {
     width: 180, height: 180, borderRadius: 90,
     backgroundColor: 'rgba(192,132,252,0.15)',
     borderWidth: 1.5, borderColor: '#c084fc',
@@ -309,10 +354,18 @@ const s = StyleSheet.create({
   promptText: { color: '#fff', fontSize: 17, lineHeight: 28, fontWeight: '600' },
 
   approachCard: {
+    backgroundColor: 'rgba(192,132,252,0.08)',
+    borderWidth: 1, borderColor: 'rgba(192,132,252,0.3)',
+    borderRadius: 14, padding: 16, marginBottom: 8,
+  },
+  approachLabel:     { color: '#c084fc', fontSize: 11, fontWeight: '700', marginBottom: 6, letterSpacing: 0.5, textTransform: 'uppercase' },
+  approachText:      { color: '#e2e8f0', fontSize: 15, lineHeight: 24, fontStyle: 'italic' },
+  allApproachWrap:   { gap: 8, marginTop: 8 },
+  approachCardSmall: {
     backgroundColor: 'rgba(255,255,255,0.04)',
     borderWidth: 1, borderColor: '#1e293b',
-    borderRadius: 14, padding: 14, marginBottom: 10,
+    borderRadius: 14, padding: 12,
   },
-  approachLabel: { color: '#c084fc', fontSize: 11, fontWeight: '700', marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' },
-  approachText:  { color: '#e2e8f0', fontSize: 14, lineHeight: 22, fontStyle: 'italic' },
+  approachLabelSmall: { color: '#64748B', fontSize: 10, fontWeight: '700', marginBottom: 4, letterSpacing: 0.5, textTransform: 'uppercase' },
+  approachTextSmall:  { color: '#94A3B8', fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
 });

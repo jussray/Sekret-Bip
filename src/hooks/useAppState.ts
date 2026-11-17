@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { loadState, saveState } from '../utils/storage';
+import { loadState, saveState } from '@/utils/storage';
 import { normalizeVibeKey } from '../constants/theme';
 import {
   createOracleProfile,

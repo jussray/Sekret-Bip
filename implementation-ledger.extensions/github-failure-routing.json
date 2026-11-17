@@ -1,0 +1,22 @@
+{
+  "id": "github-failure-routing",
+  "name": "Automatic GitHub Actions failure routing through Founder Control Room",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/607",
+  "acceptanceCriteria": [
+    "The scanner captures exact workflow-run, job, pull-request or main-branch, and head-SHA evidence without mutating source code or workflow state.",
+    "Failed jobs with no executed steps or logs are classified as runner_startup_failure or workflow_no_jobs rather than application regressions.",
+    "Scan-only reporting works without Supabase credentials and all credentials remain environment-only and absent from reports."
+  ],
+  "contractPaths": [
+    "batches/481/03-github-failure-routing.md",
+    "docs/CONTROL_ROOM_GITHUB_FAILURES.md"
+  ],
+  "testPaths": [
+    "test/control-room-github-failure-routing.test.mjs"
+  ],
+  "verification": {
+    "state": "partial",
+    "evidence": "Focused source contract covers exact-run, open-PR, main-push, failed-job-only classification, CI routing, and credential boundaries; exact-head workflow execution remains required before merge."
+  }
+}

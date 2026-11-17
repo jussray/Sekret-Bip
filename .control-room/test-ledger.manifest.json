@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0",
+  "repository": "jussray/Sekret-Bip",
+  "controlRoom": {
+    "scope": "repository-local",
+    "portfolioHub": "jussray/founder-control-room",
+    "authority": "read-only-test-evidence"
+  },
+  "source": {
+    "provider": "github-check-runs",
+    "exactRef": "commit-sha",
+    "includeAllDiscoveredChecks": true,
+    "dedupe": "latest-by-app-and-name",
+    "excludeObserverCheck": true,
+    "excludedChecks": [
+      {
+        "checkName": "Workers Builds: sekret-backend",
+        "reason": "pre-existing Cloudflare build infrastructure failure — wrangler deploy --dry-run succeeds; excluded pending Cloudflare CI environment reconciliation"
+      }
+    ]
+  },
+  "workflow": ".github/workflows/control-room-test-ledger.yml",
+  "artifact": {
+    "namePattern": "control-room-test-ledger-{sha}",
+    "reportPath": "artifacts/control-room-test-ledger.json",
+    "retentionDays": 14
+  },
+  "policy": {
+    "failed": "block",
+    "pending": "block",
+    "unknown": "block",
+    "skippedOrNeutral": "warning",
+    "requiredCheckAuthority": "repository-native-ruleset",
+    "productionMutation": false,
+    "secretMaterialAllowed": false,
+    "privateUserContentAllowed": false
+  }
+}

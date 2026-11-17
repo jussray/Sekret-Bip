@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "planId": "20260718-controlled-alpha-activation",
+  "status": "planned-blocked-by-preview-builds",
+  "evidenceLevel": "plan-only",
+  "buildRequirements": [
+    "Teen and parent builds come from one exact approved repository head.",
+    "Teen build uses the preview profile and teen app variant.",
+    "Parent build uses the parent-preview profile and parent app variant.",
+    "Both builds target the dedicated alpha Worker and beta audience.",
+    "Build identifiers, platform, creation time, expiration, distribution list, and installation results are retained.",
+    "No production profile or production backend target is used."
+  ],
+  "matrix": [
+    {
+      "id": "ios-teen",
+      "platform": "iOS",
+      "appVariant": "teen",
+      "status": "not-run",
+      "criticalRoutes": [
+        "onboarding and authentication",
+        "Teen Room",
+        "Pages",
+        "Calm",
+        "Circle",
+        "Crew",
+        "Bridge share setup",
+        "More and settings",
+        "account deletion request"
+      ]
+    },
+    {
+      "id": "ios-parent",
+      "platform": "iOS",
+      "appVariant": "parent",
+      "status": "not-run",
+      "criticalRoutes": [
+        "onboarding and authentication",
+        "parent entry and relationship state",
+        "Bridge summary inbox",
+        "parent coaching surfaces",
+        "More and settings",
+        "account deletion request"
+      ]
+    },
+    {
+      "id": "android-teen",
+      "platform": "Android",
+      "appVariant": "teen",
+      "status": "not-run",
+      "criticalRoutes": [
+        "onboarding and authentication",
+        "Teen Room",
+        "Pages",
+        "Calm",
+        "Circle",
+        "Crew",
+        "Bridge share setup",
+        "More and settings",
+        "account deletion request"
+      ]
+    },
+    {
+      "id": "android-parent",
+      "platform": "Android",
+      "appVariant": "parent",
+      "status": "not-run",
+      "criticalRoutes": [
+        "onboarding and authentication",
+        "parent entry and relationship state",
+        "Bridge summary inbox",
+        "parent coaching surfaces",
+        "More and settings",
+        "account deletion request"
+      ]
+    }
+  ],
+  "crossCuttingChecks": [
+    {
+      "id": "accessibility",
+      "status": "not-run",
+      "checks": [
+        "screen-reader labels and reading order",
+        "dynamic text and layout resilience",
+        "touch target size",
+        "focus visibility on web when applicable",
+        "contrast and non-color status cues",
+        "motion reduction",
+        "error announcement and recovery"
+      ]
+    },
+    {
+      "id": "offline-and-poor-network",
+      "status": "not-run",
+      "checks": [
+        "cold start offline",
+        "session refresh failure",
+        "Bridge request timeout",
+        "Crew feed timeout",
+        "revoke retry",
+        "deletion request failure",
+        "reconnect and idempotent recovery",
+        "no silent success"
+      ]
+    },
+    {
+      "id": "provider-and-runtime-failure",
+      "status": "not-run",
+      "checks": [
+        "AI reply fallback",
+        "voice unavailable state",
+        "Bridge safe fallback labeling",
+        "malformed Bridge model output",
+        "non-allowlisted Bridge denial",
+        "rate-limit response",
+        "dedicated runtime unavailable state"
+      ]
+    },
+    {
+      "id": "privacy-and-session-isolation",
+      "status": "not-run",
+      "checks": [
+        "screenshots and app switcher do not reveal unnecessary private content",
+        "notifications reveal no raw private teen content",
+        "sign-out clears protected in-memory state",
+        "second-user sign-in reveals no first-user cache",
+        "deep links cannot bypass role, relationship, or auth gates"
+      ]
+    },
+    {
+      "id": "installation-and-update",
+      "status": "not-run",
+      "checks": [
+        "fresh install",
+        "upgrade from prior preview when applicable",
+        "app variant and backend identity visible in retained evidence",
+        "build expiration and revocation",
+        "uninstall and reinstall cache behavior"
+      ]
+    }
+  ],
+  "requiredEvidencePerRun": [
+    "exact repository head",
+    "build identifier and profile",
+    "device model and operating-system version",
+    "app variant and backend target",
+    "start and completion timestamps",
+    "route checklist",
+    "screenshots or recording using synthetic data",
+    "failure logs without private content",
+    "result and blocker classification",
+    "rollback or cleanup result"
+  ],
+  "stopConditions": [
+    "Wrong app variant or backend target is installed.",
+    "A role or relationship gate can be bypassed.",
+    "Raw teen content appears in a parent surface, notification, log, or artifact.",
+    "Revocation, sign-out, deletion, or second-user isolation fails.",
+    "The app reports success during an unconfirmed network or mutation failure.",
+    "A crash, inaccessible critical route, or unrecoverable state blocks the journey.",
+    "Production routing or public distribution is used."
+  ],
+  "approvalGate": "Founder approval is required before consuming paid build capacity, distributing preview builds, using controlled accounts, or collecting live device evidence.",
+  "nonClaims": [
+    "This matrix is preparation, not a build or device result.",
+    "No device, operating system, installation, accessibility, or failure-state proof has executed."
+  ]
+}

@@ -17,16 +17,16 @@ import type {
   VoiceNote,
   MoodEntry,
   ComfortSession,
-} from '../../types/index';
+} from '@/types';
 import type { OracleProfile, OracleSessionSummary } from '../../services/oracleDiscovery';
-import type { SavePageInput } from '../types/index';
+import type { SavePageInput } from '../../screens/PagesScreen';
 import {
   syncMood,
   syncJournal,
   syncCirclePost,
   syncParentCirclePost,
   syncComfortSession,
-} from '../../utils/sync';
+} from '@/utils/sync';
 import type { RoomMemory } from '../types/roomMemory';
 
 type SetState = Dispatch<SetStateAction<AppState>>;

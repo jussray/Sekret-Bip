@@ -16,7 +16,7 @@ import type {
   ComfortSession,
   CrewMember,
   CrewCheckIn,
-} from '../../types/index';
+} from '@/types';
 import type { OracleProfile, OracleSessionSummary } from '../../services/oracleDiscovery';
 import type { ParentRoomStyle } from '../../screens/ParentRoomScreen';
 import type { OracleJournalEntry } from '../../types/voiceIntelligence';
