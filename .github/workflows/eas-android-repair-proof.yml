@@ -1,0 +1,76 @@
+name: EAS Android repair provider proof
+
+# One-time proof on the isolated repair branch. The provider build checks the
+# already-verified source commit, not this trigger-only workflow commit.
+on:
+  push:
+    branches:
+      - repair/eas-android-bundle-44159812926
+    paths:
+      - .github/workflows/eas-android-repair-proof.yml
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  EXPECTED_SHA: 879db03b200d9bc91040a7d97c315fe3554b44e1
+
+jobs:
+  android-preview:
+    name: Provider Android preview @ 879db03
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      APP_VARIANT: teen
+      EXPO_PUBLIC_APP_VARIANT: teen
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - name: Check out exact repaired candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_SHA }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact source identity
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Verify prerequisite authentication
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN"
+          test -n "$EXPO_PUBLIC_SUPABASE_URL"
+          test -n "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+
+      - name: Run real hosted Expo Android preview build
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@24.7.0 build \
+            --profile preview \
+            --platform android \
+            --non-interactive \
+            --wait \
+            --json \
+            | tee eas-build-result.json
+          test -s eas-build-result.json
+
+      - name: Preserve hosted build receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-android-repair-proof-879db03
+          path: eas-build-result.json
+          if-no-files-found: ignore
+          retention-days: 30
