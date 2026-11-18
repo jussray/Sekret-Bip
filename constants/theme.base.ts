@@ -3,36 +3,39 @@ import type { ImageSourcePropType } from "react-native";
 // constants/theme.ts
 // Se'kret Bip — Design Tokens + IMAGES Map
 //
-// IMPORTANT: every require() below points at a file that ACTUALLY EXISTS in
-// assets/images/. When the original asset name is missing or still a 2-byte
-// placeholder, we fall back to the closest matching real image so the bundle
-// never crashes. Replace the fallback with the real asset later — the variable
-// name stays the same so no screen code has to change.
+// Legacy pose keys are compatibility aliases, never old reference PNG imports.
+// Reuse the existing canonical identity asset until a distinct approved pose
+// is available; corrupted historical artwork must not enter native builds.
 
-// ── Suhana (updated look — new portraits match Night/Sy art style) ───
-const rayleneNeutral    = require("../assets/images/raylene-neutral-new.png");
-const rayleneHappy      = require("../assets/images/raylene-happy-new.png");
-const rayleneWriting    = require("../assets/images/raylene-writing.png");       // old style kept
-const rayleneWindow     = require("../assets/images/raylene-window-new.png");
-const rayleneFullbody   = require("../assets/images/raylene-confident-new.png"); // arms-crossed fullbody
-const rayleneHappyV3    = require("../assets/images/raylene-happy-v3.png");      // old style kept
+// Canonical identities already used by the runtime. Preserve legacy key names.
+const suhanaCanonical = require("../assets/images/companions/raylene/raylene-master.png");
+const syCanonical = require("../assets/images/companions/rylane/rylane-master.png");
+const nightCanonical = require("../assets/images/companions/teen/night/neutral.png");
+
+// ── Suhana compatibility pose keys ───
+const rayleneNeutral    = suhanaCanonical;
+const rayleneHappy      = suhanaCanonical;
+const rayleneWriting    = suhanaCanonical;      
+const rayleneWindow     = suhanaCanonical;
+const rayleneFullbody   = suhanaCanonical; // arms-crossed fullbody
+const rayleneHappyV3    = suhanaCanonical;     
 const rayleneNeutralV3  = rayleneNeutral;
 
-// ── Suhana (new emotions) ─────────────────────────────────────────────────
-const rayleneConfident  = require("../assets/images/raylene-confident-new.png");
-const raylenePlayful    = require("../assets/images/raylene-playful-new.png");
-const rayleeneSad       = require("../assets/images/raylene-sad-new.png");
-const rayleeneMad       = require("../assets/images/raylene-mad-new.png");
-const rayleeneSurprised = require("../assets/images/raylene-surprised-new.png");
-const rayleeneCrouching = require("../assets/images/raylene-crouching-new.png");
+// ── Suhana emotions: await distinct, approved art ─────────────────────────
+const rayleneConfident  = suhanaCanonical;
+const raylenePlayful    = suhanaCanonical;
+const rayleeneSad       = suhanaCanonical;
+const rayleeneMad       = suhanaCanonical;
+const rayleeneSurprised = suhanaCanonical;
+const rayleeneCrouching = suhanaCanonical;
 
-// ── Suhana (pose variants; voice/window-rainy now have real assets) ──────
-const rayleneThinking    = require("../assets/images/raylene-thinking-new.png");
-const rayleneWindowRainy = require("../assets/images/raylene-window-rainy.png");
+// ── Suhana pose and voice aliases ────────────────────────────────────────
+const rayleneThinking    = suhanaCanonical;
+const rayleneWindowRainy = suhanaCanonical;
 const rayleneNightWindow = rayleneWindowRainy; // night window → rainy window (closer semantic)
 const rayleneNightDoodle = rayleneWriting; // fallback → writing
-const rayleneVoiceDay    = require("../assets/images/raylene-voice-day.png");
-const rayleneVoiceNight  = require("../assets/images/raylene-voice-night.png");
+const rayleneVoiceDay    = suhanaCanonical;
+const rayleneVoiceNight  = suhanaCanonical;
 const raylene_Bippin2Day = rayleneWriting; // fallback → writing
 const raylene_Bippin2Night = rayleneWriting; // fallback → writing
 const raylene_PeriodCalendar = rayleneWriting; // fallback → writing
@@ -41,20 +44,20 @@ const rayleneHappyV2 = rayleneHappy; // fallback → happy
 const rayleneWindowV2 = rayleneWindow; // fallback → window
 const rayleneWindowV3 = rayleneWindow; // fallback → window
 
-// ── Sy (real assets) ───────────────────────────────────────────────────
-const rylaneNeutral = require("../assets/images/rylane-neutral.png");
-const rylaneHappy = require("../assets/images/rylane-happy.png");
-const rylaneWriting = require("../assets/images/rylane-writing.png");
-const rylaneWindow = require("../assets/images/rylane-window.png");
-const rylaneFullbody = require("../assets/images/rylane-fullbody.png");
-const rylaneNeutralV2 = require("../assets/images/rylane-neutral-v2.png");
+// ── Sy compatibility pose keys ──────────────────────────────────────────
+const rylaneNeutral = syCanonical;
+const rylaneHappy = syCanonical;
+const rylaneWriting = syCanonical;
+const rylaneWindow = syCanonical;
+const rylaneFullbody = syCanonical;
+const rylaneNeutralV2 = syCanonical;
 
-// ── Sy (thinking now has real asset; voice assets real) ──────────────
-const rylaneThinking   = require("../assets/images/rylane-thinking.png");
+// ── Sy thinking and voice aliases ───────────────────────────────────────
+const rylaneThinking   = syCanonical;
 const rylaneProfile    = rylaneFullbody; // fallback → fullbody portrait
-const rylaneVoiceDay   = require("../assets/images/rylane-voice-day.png");
-const rylaneVoiceNight = require("../assets/images/rylane-voice-night.png");
-const rylaneWindowDay  = require("../assets/images/rylane-window-day.png");
+const rylaneVoiceDay   = syCanonical;
+const rylaneVoiceNight = syCanonical;
+const rylaneWindowDay  = syCanonical;
 
 // ── Room Backgrounds ───────────────────────────────────────────────────────
 const bgRayleneRoomDay       = require("../assets/images/resized-bg/bg-raylene-room-day.jpg");
@@ -97,27 +100,27 @@ const bgNightRoomNight     = require("../assets/images/resized-bg/bg-night-room-
 const bgNightRoomDeepNight = require("../assets/images/resized-bg/bg-night-room-deep-night.jpg");
 const bgNightRoomRain      = require("../assets/images/resized-bg/bg-night-room-rain.jpg");
 
-// ── Night Avatar ───────────────────────────────────────────────────────────
-const nightFullbody    = require("../assets/images/night-fullbody.png");
-const nightNeutral     = require("../assets/images/night-neutral.png");
-const nightSoftsmile   = require("../assets/images/night-softsmile.png");
-const nightHappy       = require("../assets/images/night-happy.png");
-const nightThinking    = require("../assets/images/night-thinking.png");
-const nightTired       = require("../assets/images/night-tired.png");
-const nightAnnoyed     = require("../assets/images/night-annoyed.png");
-const nightSad         = require("../assets/images/night-sad.png");
-const nightOverwhelmed = require("../assets/images/night-overwhelmed.png");
-const nightProtective  = require("../assets/images/night-protective.png");
-const nightLonely      = require("../assets/images/night-lonely.png");
-const nightHopeful     = require("../assets/images/night-hopeful.png");
-const nightRelaxed     = require("../assets/images/night-relaxed.png");
-const nightListening   = require("../assets/images/night-listening.png");
-const nightWriting     = require("../assets/images/night-writing.png");
-const nightWindow      = require("../assets/images/night-window.png");
-const nightPlayful     = require("../assets/images/night-playful.png");
-const nightHurting     = require("../assets/images/night-hurting.png");
-const nightInHisHead   = require("../assets/images/night-inhishead.png");
-const nightInLove      = require("../assets/images/night-in-love.png");
+// ── Night compatibility pose keys ────────────────────────────────────────
+const nightFullbody    = nightCanonical;
+const nightNeutral     = nightCanonical;
+const nightSoftsmile   = nightCanonical;
+const nightHappy       = nightCanonical;
+const nightThinking    = nightCanonical;
+const nightTired       = nightCanonical;
+const nightAnnoyed     = nightCanonical;
+const nightSad         = nightCanonical;
+const nightOverwhelmed = nightCanonical;
+const nightProtective  = nightCanonical;
+const nightLonely      = nightCanonical;
+const nightHopeful     = nightCanonical;
+const nightRelaxed     = nightCanonical;
+const nightListening   = nightCanonical;
+const nightWriting     = nightCanonical;
+const nightWindow      = nightCanonical;
+const nightPlayful     = nightCanonical;
+const nightHurting     = nightCanonical;
+const nightInHisHead   = nightCanonical;
+const nightInLove      = nightCanonical;
 
 const nightAvatarNeutral  = nightNeutral;
 const nightAvatarHappy    = nightSoftsmile;
