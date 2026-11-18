@@ -78,3 +78,7 @@ design-references/
 
 # EAS-only: reference documentation is not part of the native runtime.
 /docs/
+
+# Explicit EAS inclusion for room backgrounds that are required by Metro.
+!assets/images/archive/
+!assets/images/archive/**
