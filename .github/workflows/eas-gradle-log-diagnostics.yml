@@ -28,12 +28,12 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$EXPO_TOKEN"
-          echo "Target source 9c9db82e698d3f7430289b3148463821d57f9e68; EAS build 25a5390b-44e0-4633-b42b-5b2bcb579ab6"
+          echo "Target source de29db7597b2ff09d6e5f2b8a9510eae1365cdf7; EAS build f2954321-dc4f-4771-94a5-05cc521468cc"
       - name: Fetch fresh signed logs from Expo and print sanitized failure context
         shell: bash
         run: |
           set -euo pipefail
-          npx --yes eas-cli@24.7.0 build:view 25a5390b-44e0-4633-b42b-5b2bcb579ab6 --json > /tmp/eas-build-view.json
+          npx --yes eas-cli@24.7.0 build:view f2954321-dc4f-4771-94a5-05cc521468cc --json > /tmp/eas-build-view.json
           node <<'NODE'
           const fs = require('node:fs');
           const data = JSON.parse(fs.readFileSync('/tmp/eas-build-view.json', 'utf8'));
