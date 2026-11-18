@@ -154,7 +154,7 @@ const bgVoiceBip        = require('../assets/images/resized-bg/voice-bip-bg.jpg'
 // Circle is assembled from React Native controls over a generic atmosphere asset.
 // Design mockups live outside assets/ and are never loaded by the application.
 const bgCircle          = require('../assets/images/resized-bg/room-bg-dark.jpg');
-const bgWindow          = require('../assets/images/window.png');
+const bgWindow          = require('../assets/images/window.jpg');
 const bgCalmHero        = rayleneWindow; // hero on Calm = Suhana at the window
 
 // ── Cloud / Mascot (all real) ──────────────────────────────────────────────

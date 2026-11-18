@@ -26,3 +26,14 @@ test('all 53 runtime stickers match their file extensions and metadata', () => {
       id + ' metadata path differs from the runtime file');
   }
 });
+
+test('native runtime window image uses the JPEG extension matching its bytes', () => {
+  const theme = fs.readFileSync(path.join(root, 'constants/theme.base.ts'), 'utf8');
+  assert.ok(
+    theme.includes("const bgWindow          = require('../assets/images/window.jpg');"),
+    'Window reference must import the valid JPEG alias, not its historical PNG filename',
+  );
+  const bytes = fs.readFileSync(path.join(root, 'assets/images/window.jpg'));
+  assert.ok(bytes.subarray(0, 3).equals(Buffer.from('ffd8ff', 'hex')));
+  assert.ok(!theme.includes("require('../assets/images/window.png')"));
+});
