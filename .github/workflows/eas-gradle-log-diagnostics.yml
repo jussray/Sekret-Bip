@@ -21,13 +21,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Inventory sticker MIME signatures without changing images
+      - name: Inventory all image MIME signatures without changing images
         shell: bash
         run: |
           node <<'NODE'
           const fs = require('node:fs');
           const path = require('node:path');
-          const root = 'assets/images/stickers';
+          const root = 'assets/images';
           const visit = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
             const file = path.join(dir, entry.name);
             return entry.isDirectory() ? visit(file) : [file];
@@ -47,8 +47,8 @@ jobs:
             const actual = classify(fs.readFileSync(file).subarray(0, 16));
             if (actual !== expected) mismatches.push({ file, expected, actual });
           }
-          for (const row of mismatches) console.log('STICKER_MIME_MISMATCH ' + JSON.stringify(row));
-          console.log('STICKER_MIME_INVENTORY ' + JSON.stringify({ files: files.length, mismatches: mismatches.length }));
+          for (const row of mismatches) console.log('ASSET_MIME_MISMATCH ' + JSON.stringify(row));
+          console.log('ASSET_MIME_INVENTORY ' + JSON.stringify({ files: files.length, mismatches: mismatches.length }));
           NODE
 
       - name: Install repository dependencies for Expo project config
