@@ -60,7 +60,7 @@ design-references/
 # ── Archived / duplicate binary assets ───────────────────────────────────
 # UUID-named PNGs in assets/images/ are duplicates of named files.
 # Run the BFG cleanup in docs/REPO_HYGIENE.md to purge from history.
-assets/images/archive/
+# EAS and Git must retain assets/images/archive/: runtime room screens require it.
 
 # ── macOS ─────────────────────────────────────────────────────────────────
 .DS_Store
