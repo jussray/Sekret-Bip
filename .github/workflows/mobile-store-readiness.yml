@@ -126,13 +126,25 @@ jobs:
           set -euo pipefail
           test -n "$EXPO_TOKEN"
           npx --yes eas-cli@24.7.0 build:inspect --platform android --stage archive --output /tmp/eas-archive --profile preview --force
-          test -f /tmp/eas-archive/assets/images/archive/bg-raylene-room-day.png
-          test -f /tmp/eas-archive/assets/images/archive/bg-rylane-room-night.png
-          test -f /tmp/eas-archive/assets/images/archive/bg-cloud-room-day.png
-          test ! -d /tmp/eas-archive/docs
-          test ! -f /tmp/eas-archive/.env
-          test ! -f /tmp/eas-archive/.mcp.json
+          status=0
+          for path in assets/images/archive/bg-raylene-room-day.png assets/images/archive/bg-rylane-room-night.png assets/images/archive/bg-cloud-room-day.png; do
+            if test -f "/tmp/eas-archive/$path"; then
+              echo "PRESENT: $path"
+            else
+              echo "::error::EAS archive missing runtime asset: $path"
+              status=1
+            fi
+          done
+          for path in docs .env .mcp.json; do
+            if test -e "/tmp/eas-archive/$path"; then
+              echo "::error::EAS archive contains excluded item: $path"
+              status=1
+            else
+              echo "EXCLUDED: $path"
+            fi
+          done
           du -sh /tmp/eas-archive
+          test "$status" -eq 0
           echo "EAS archive passed runtime asset and exclusion checks."
 
   playwright-regression:
