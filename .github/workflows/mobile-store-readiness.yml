@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - chore/eas-build-config
+      - repair/eas-android-bundle-44159812926
     paths:
       - app.json
       - app.config.ts
@@ -62,6 +63,44 @@ jobs:
       - run: node --check scripts/verify-mobile-store-release.mjs
       - run: node scripts/verify-mobile-store-release.mjs
       - run: npm run type-check
+
+  android-bundle-preflight:
+    name: Android production JavaScript bundle (teen preview)
+    runs-on: ubuntu-latest
+    env:
+      APP_VARIANT: teen
+      EXPO_PUBLIC_APP_VARIANT: teen
+      EXPO_PUBLIC_RELEASE_AUDIENCE: beta
+      EXPO_PUBLIC_BACKEND_URL: https://sekret-backend-alpha.mcgill-raylene.workers.dev
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Export Android production bundle
+        id: android-export
+        shell: bash
+        run: |
+          set +e
+          npx --no-install expo export --platform android --clear > android-bundle.log 2>&1
+          status=$?
+          set -e
+          tail -n 200 android-bundle.log
+          exit "$status"
+      - name: Upload Android bundling diagnostics
+        if: failure() && steps.android-export.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-bundle-diagnostics-${{ github.sha }}
+          path: android-bundle.log
+          retention-days: 7
+          if-no-files-found: error
 
   playwright-regression:
     name: Playwright front-door regression
