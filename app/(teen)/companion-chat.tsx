@@ -44,6 +44,7 @@ import {
   type Character,
 } from '../../constants/theme';
 import { syncOracleSession, loadOracleSession } from '../../src/utils/sync';
+import { useAppContext } from '@/context/AppContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────────────────
 export type ChatMsg = {
@@ -84,6 +85,7 @@ async function persistHistory(key: string, msgs: ChatMsg[]): Promise<void> {
 // ── Route ────────────────────────────────────────────────────────────────────────────────
 export default function CompanionChatScreen() {
   const router = useRouter();
+  const { mood } = useAppContext();
 
   const params = useLocalSearchParams<{
     companion?: string;
@@ -177,7 +179,7 @@ export default function CompanionChatScreen() {
       const replyText = await fetchSekretReply(
         userMsg.text,
         surface,
-        undefined,    // mood — wire from global state later if needed
+        mood ?? undefined,
         profileKey,   // avatarKey → raylene | rylane | cloud | night
       );
 
