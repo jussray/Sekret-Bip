@@ -31,6 +31,12 @@
       "expo-router",
       "expo-secure-store",
       "expo-notifications"
-    ]
+    ],
+    "owner": "sekret-bip",
+    "extra": {
+      "eas": {
+        "projectId": "15b932c6-e556-4f4f-9c01-edf90fa81736"
+      }
+    }
   }
 }
