@@ -21,6 +21,10 @@ on:
       - constants/theme.base.ts
       - test/companion-runtime-contracts.test.mjs
       - test/room-intentions-hierarchy-contract.test.mjs
+      - constants/stickerImages.ts
+      - constants/characterStickers.ts
+      - assets/images/stickers/**
+      - test/sticker-asset-signature-contract.test.mjs
       - .easignore
   pull_request:
     paths:
@@ -38,6 +42,10 @@ on:
       - constants/theme.base.ts
       - test/companion-runtime-contracts.test.mjs
       - test/room-intentions-hierarchy-contract.test.mjs
+      - constants/stickerImages.ts
+      - constants/characterStickers.ts
+      - assets/images/stickers/**
+      - test/sticker-asset-signature-contract.test.mjs
       - .easignore
   workflow_dispatch:
 
@@ -70,7 +78,7 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: node --test test/companion-runtime-contracts.test.mjs test/room-intentions-hierarchy-contract.test.mjs
+      - run: node --test test/companion-runtime-contracts.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/sticker-asset-signature-contract.test.mjs
       - run: node --check scripts/verify-mobile-store-release.mjs
       - run: node scripts/verify-mobile-store-release.mjs
       - run: npm run type-check
