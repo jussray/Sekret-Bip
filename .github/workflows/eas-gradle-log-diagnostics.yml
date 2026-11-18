@@ -1,0 +1,74 @@
+name: EAS Gradle failure diagnostics
+on:
+  push:
+    branches: [repair/eas-android-bundle-44159812926]
+    paths: [.github/workflows/eas-gradle-log-diagnostics.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-failed-build:
+    name: Read failed Gradle phase without rebuilding
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Confirm exact target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN"
+          echo "Target source 879db03b200d9bc91040a7d97c315fe3554b44e1; EAS build 98b7f2c0-1712-45ba-8b45-ba14615d6c72"
+      - name: Fetch fresh signed logs from Expo and print sanitized failure context
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx --yes eas-cli@24.7.0 build:view 98b7f2c0-1712-45ba-8b45-ba14615d6c72 --json > /tmp/eas-build-view.json
+          node <<'NODE'
+          const fs = require('node:fs');
+          const data = JSON.parse(fs.readFileSync('/tmp/eas-build-view.json', 'utf8'));
+          const raw = data.logFiles || data.build?.logFiles || [];
+          const urls = raw.map(v => typeof v === 'string' ? v : v?.url).filter(Boolean);
+          if (!urls.length) {
+            console.log('No Expo logFiles found. Build fields:', Object.keys(data).join(', '));
+            process.exitCode = 1;
+            return;
+          }
+          const redact = s => s
+            .replace(/https?:\/\/\S+/g, '[URL]')
+            .replace(/(token|api_key|secret|password|authorization)(\s*[:=]\s*)[^\s,}]+/gi, '$1$2[REDACTED]')
+            .replace(/(eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_.-]{15,})/g, '[REDACTED_TOKEN]');
+          (async () => {
+            let matched = false;
+            for (let k = 0; k < urls.length; k++) {
+              const res = await fetch(urls[k]);
+              if (!res.ok) { console.log('Expo log fetch HTTP', res.status); continue; }
+              const body = await res.text();
+              const lines = body.split(/\r?\n/);
+              console.log('Log file', k+1, 'lines', lines.length);
+              const hits = [];
+              for (let i = 0; i < lines.length; i++) {
+                if (/FAILURE:|What went wrong|Execution failed for task|A problem occurred|Could not resolve|Could not find|error:|BUILD FAILED|Compilation failed|Exception:|No matching variant|Duplicate class|Manifest merger failed|Caused by:/i.test(lines[i])) hits.push(i);
+              }
+              const idx = new Set();
+              for (const i of hits.slice(-35)) for (let j = Math.max(0, i-3); j <= Math.min(lines.length-1, i+8); j++) idx.add(j);
+              if (hits.length) {
+                matched = true;
+                console.log('Gradle failure-context matches:', hits.length);
+                for (const i of [...idx].sort((a,b)=>a-b).slice(-180)) console.log(String(i+1).padStart(5), redact(lines[i]).slice(0,900));
+              } else {
+                console.log('No recognized Gradle failure anchors; sanitized final 80 lines:');
+                for (const line of lines.slice(-80)) console.log(redact(line).slice(0,900));
+              }
+            }
+            if (!matched) process.exitCode = 1;
+          })().catch(e => { console.error('Failed reading Expo logs:', e.message); process.exitCode = 1; });
+          NODE
