@@ -21,6 +21,36 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Inventory sticker MIME signatures without changing images
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const root = 'assets/images/stickers';
+          const visit = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+            const file = path.join(dir, entry.name);
+            return entry.isDirectory() ? visit(file) : [file];
+          });
+          const classify = (buf) => {
+            if (buf.subarray(0, 8).toString('hex') === '89504e470d0a1a0a') return 'png';
+            if (buf.subarray(0, 3).toString('hex') === 'ffd8ff') return 'jpeg';
+            if (buf.subarray(0, 4).toString() === 'RIFF' && buf.subarray(8, 12).toString() === 'WEBP') return 'webp';
+            if (buf.subarray(0, 4).toString() === 'GIF8') return 'gif';
+            return 'unknown';
+          };
+          const files = visit(root).filter((p) => /\.(png|jpe?g|webp)$/i.test(p)).sort();
+          const mismatches = [];
+          for (const file of files) {
+            const ext = path.extname(file).slice(1).toLowerCase();
+            const expected = ext === 'jpg' ? 'jpeg' : ext;
+            const actual = classify(fs.readFileSync(file).subarray(0, 16));
+            if (actual !== expected) mismatches.push({ file, expected, actual });
+          }
+          for (const row of mismatches) console.log('STICKER_MIME_MISMATCH ' + JSON.stringify(row));
+          console.log('STICKER_MIME_INVENTORY ' + JSON.stringify({ files: files.length, mismatches: mismatches.length }));
+          NODE
+
       - name: Install repository dependencies for Expo project config
         run: npm ci
       - name: Confirm exact target
