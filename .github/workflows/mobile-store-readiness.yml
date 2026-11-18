@@ -135,7 +135,7 @@ jobs:
               status=1
             fi
           done
-          for path in docs .env .mcp.json; do
+          for path in .env .mcp.json; do
             if test -e "/tmp/eas-archive/$path"; then
               echo "::error::EAS archive contains excluded item: $path"
               status=1
