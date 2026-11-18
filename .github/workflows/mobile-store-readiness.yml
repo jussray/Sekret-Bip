@@ -17,6 +17,7 @@ on:
       - scripts/verify-mobile-store-release.mjs
       - .github/workflows/eas-build.yml
       - .github/workflows/mobile-store-readiness.yml
+      - .easignore
   pull_request:
     paths:
       - app.json
@@ -29,6 +30,7 @@ on:
       - scripts/verify-mobile-store-release.mjs
       - .github/workflows/eas-build.yml
       - .github/workflows/mobile-store-readiness.yml
+      - .easignore
   workflow_dispatch:
 
 concurrency:
@@ -101,6 +103,37 @@ jobs:
           path: android-bundle.log
           retention-days: 7
           if-no-files-found: error
+
+  eas-archive-contract:
+    name: EAS archive retains room assets
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      APP_VARIANT: teen
+      EXPO_PUBLIC_APP_VARIANT: teen
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - name: Inspect exact EAS project archive without starting a build
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$EXPO_TOKEN"
+          npx --yes eas-cli@24.7.0 build:inspect --platform android --stage archive --output /tmp/eas-archive --profile preview --force
+          test -f /tmp/eas-archive/assets/images/archive/bg-raylene-room-day.png
+          test -f /tmp/eas-archive/assets/images/archive/bg-rylane-room-night.png
+          test -f /tmp/eas-archive/assets/images/archive/bg-cloud-room-day.png
+          test ! -d /tmp/eas-archive/docs
+          test ! -f /tmp/eas-archive/.env
+          test ! -f /tmp/eas-archive/.mcp.json
+          du -sh /tmp/eas-archive
+          echo "EAS archive passed runtime asset and exclusion checks."
 
   playwright-regression:
     name: Playwright front-door regression
