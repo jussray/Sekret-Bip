@@ -17,6 +17,10 @@ on:
       - scripts/verify-mobile-store-release.mjs
       - .github/workflows/eas-build.yml
       - .github/workflows/mobile-store-readiness.yml
+      - constants/theme.ts
+      - constants/theme.base.ts
+      - test/companion-runtime-contracts.test.mjs
+      - test/room-intentions-hierarchy-contract.test.mjs
       - .easignore
   pull_request:
     paths:
@@ -30,6 +34,10 @@ on:
       - scripts/verify-mobile-store-release.mjs
       - .github/workflows/eas-build.yml
       - .github/workflows/mobile-store-readiness.yml
+      - constants/theme.ts
+      - constants/theme.base.ts
+      - test/companion-runtime-contracts.test.mjs
+      - test/room-intentions-hierarchy-contract.test.mjs
       - .easignore
   workflow_dispatch:
 
@@ -62,6 +70,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: node --test test/companion-runtime-contracts.test.mjs test/room-intentions-hierarchy-contract.test.mjs
       - run: node --check scripts/verify-mobile-store-release.mjs
       - run: node scripts/verify-mobile-store-release.mjs
       - run: npm run type-check
