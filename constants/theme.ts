@@ -13,13 +13,11 @@ export * from './theme.base';
 const sekretSplashTeen = require('../assets/images/splash-teen.jpeg');
 const sekretSplashParent = require('../assets/images/splash-parent.png');
 
-// Browser evidence proved the teen/raylene neutral carries a pale card into the
-// furnished Room. Suhana therefore uses the existing production avatar-layer
-// asset documented as already separate from room backgrounds. Sy and Night
-// remain on their existing production companion assets until their own visual
-// receipts prove a change is necessary.
-const suhanaRoomSprite = require('../assets/images/raylene-neutral-new.png');
-const syRoomSprite = require('../assets/images/companions/teen/rylane/neutral.png');
+// Resolve room avatars from the same canonical Suhana/Sy masters as the
+// companion runtime. Old raylene-/rylane- reference images must not be
+// packaged as production expressions. Night retains its approved teen neutral.
+const suhanaRoomSprite = require('../assets/images/companions/raylene/raylene-master.png');
+const syRoomSprite = require('../assets/images/companions/rylane/rylane-master.png');
 const nightRoomSprite = require('../assets/images/companions/teen/night/neutral.png');
 
 export const IMAGES = {
