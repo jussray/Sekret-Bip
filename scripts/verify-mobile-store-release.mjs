@@ -65,6 +65,7 @@ function assertAsset(path, label) {
 }
 
 assert(Number.isFinite(expoMajor()) && expoMajor() >= 56, 'Expo SDK must be 56 or newer for the current Android API 36 / iOS 26 SDK release lane.');
+assert(!pkg.dependencies?.['@expo/log-box'], 'The app must not directly depend on @expo/log-box; Expo owns native LogBox version compatibility.');
 assert(/^\d+\.\d+\.\d+$/.test(eas.cli?.version ?? ''), 'eas.json cli.version must be an exact x.y.z version, not a floating range.');
 assert(eas.cli?.appVersionSource === 'remote', 'eas.json must use remote app version authority so store build numbers stay monotonic.');
 
