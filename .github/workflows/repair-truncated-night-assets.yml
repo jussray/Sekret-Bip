@@ -1,0 +1,52 @@
+name: Repair corrupted Night PNG source assets
+on:
+  push:
+    branches: [repair/eas-android-bundle-44159812926]
+    paths: [.github/workflows/repair-truncated-night-assets.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - name: Restore damaged Night artwork paths using canonical Night fallback
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_art=assets/images/companions/teen/night/neutral.png
+          test -s "$source_art"
+          mapfile -t damaged < <(
+            git ls-files 'assets/images/night-*.png' |
+              while IFS= read -r file; do
+                if [ "$(git hash-object "$file")" = bc1bbfb91119285abd448c53ac718198ad9dc967 ]; then
+                  printf '%s\n' "$file"
+                fi
+              done
+          )
+          printf 'Found %s damaged Night PNG paths.\n' "${#damaged[@]}"
+          test "${#damaged[@]}" -eq 20
+          for file in "${damaged[@]}"; do
+            cp -- "$source_art" "$file"
+            cmp -s "$source_art" "$file"
+            echo "RESTORED: $file"
+          done
+          test "$(git diff --name-only -- assets/images | wc -l | tr -d ' ')" -eq 20
+          git diff --check
+      - name: Commit only the 20 restored PNGs on the isolated repair branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- assets/images/night-*.png
+          git diff --cached --stat
+          git commit -m 'fix(android): restore 20 truncated Night PNGs from canonical art'
+          git push origin HEAD:repair/eas-android-bundle-44159812926
+          git log -1 --format='%H %s'
