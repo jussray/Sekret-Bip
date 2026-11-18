@@ -37,7 +37,7 @@ test('standalone builds declare the Expo speech dependency', () => {
   const pkg = JSON.parse(read('package.json'));
   const lock = JSON.parse(read('package-lock.json'));
 
-  assert.equal(pkg.dependencies?.['expo-speech'], '~58.0.4');
-  assert.equal(lock.packages?.['']?.dependencies?.['expo-speech'], '~58.0.4');
-  assert.equal(lock.packages?.['node_modules/expo-speech']?.version, '58.0.4');
+  assert.equal(pkg.dependencies?.['expo-speech'], '~56.0.3');
+  assert.equal(lock.packages?.['']?.dependencies?.['expo-speech'], '~56.0.3');
+  assert.equal(lock.packages?.['node_modules/expo-speech']?.version, '56.0.3');
 });
