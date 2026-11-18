@@ -1,0 +1,54 @@
+name: Repair Expo LogBox version mismatch
+on:
+  push:
+    branches: [repair/eas-android-bundle-44159812926]
+    paths: [.github/workflows/eas-logbox-dependency-repair.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Regenerate lockfile without obsolete direct LogBox
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm uninstall @expo/log-box --save --ignore-scripts
+          npm ci
+          node <<'NODE'
+          const pkg = require('./package.json');
+          const lock = require('./package-lock.json');
+          const direct = pkg.dependencies?.['@expo/log-box'];
+          const installed = lock.packages?.['node_modules/@expo/log-box']?.version;
+          if (direct) throw new Error('Old direct @expo/log-box dependency remains');
+          if (!installed || !installed.startsWith('58.')) throw new Error('Root @expo/log-box must resolve to Expo 58; got '+installed);
+          if (!lock.packages?.['node_modules/expo']?.version?.startsWith('58.')) throw new Error('Expo SDK drift detected');
+          console.log('Verified Expo SDK',lock.packages['node_modules/expo'].version,'and root @expo/log-box',installed);
+          NODE
+          git diff --check
+          git diff --stat -- package.json package-lock.json
+          if git diff --quiet -- package.json package-lock.json; then
+            echo 'No dependency change to commit.'
+            exit 1
+          fi
+      - name: Commit only dependency repair to isolated branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package.json package-lock.json
+          git commit -m 'fix(android): drop Expo 56 log-box dependency from SDK 58 app'
+          git push origin HEAD:repair/eas-android-bundle-44159812926
+          git log -1 --format='%H %s'
