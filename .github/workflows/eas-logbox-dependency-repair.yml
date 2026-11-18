@@ -30,11 +30,11 @@ jobs:
           const pkg = require('./package.json');
           const lock = require('./package-lock.json');
           const direct = pkg.dependencies?.['@expo/log-box'];
-          const installed = lock.packages?.['node_modules/@expo/log-box']?.version;
-          if (direct) throw new Error('Old direct @expo/log-box dependency remains');
-          if (!installed || !installed.startsWith('58.')) throw new Error('Root @expo/log-box must resolve to Expo 58; got '+installed);
+          const instances = Object.entries(lock.packages || {}).filter(([path]) => path.endsWith('node_modules/@expo/log-box'));
+          if (direct || lock.packages?.['']?.dependencies?.['@expo/log-box']) throw new Error('Old direct @expo/log-box dependency remains');
+          if (!instances.length || instances.some(([,entry]) => !entry.version.startsWith('58.'))) throw new Error('LogBox must resolve only to Expo 58: '+JSON.stringify(instances.map(([path,entry])=>[path,entry.version])));
           if (!lock.packages?.['node_modules/expo']?.version?.startsWith('58.')) throw new Error('Expo SDK drift detected');
-          console.log('Verified Expo SDK',lock.packages['node_modules/expo'].version,'and root @expo/log-box',installed);
+          console.log('Verified Expo SDK',lock.packages['node_modules/expo'].version,'and compatible LogBox installs',instances.map(([path,entry])=>path+'@'+entry.version));
           NODE
           git diff --check
           git diff --stat -- package.json package-lock.json
