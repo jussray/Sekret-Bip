@@ -103,7 +103,13 @@ test('Parent Circle does not re-upload local history or double-save a new post',
   const route = read('app/(parent)/circle/feed.tsx');
   assert.equal(route.includes('parentCirclePosts.forEach'), false);
   assert.equal(route.includes('syncParentCirclePost'), false);
-  assert.equal(route.includes('saveParentCirclePost={saveParentCirclePost}'), true);
+  // Parent Circle is wired to the real Parent Community RPCs (see
+  // src/utils/sync.ts); the composer prop now points at this route's own
+  // handler rather than passing AppContext's local-only saveParentCirclePost
+  // straight through. "Does not double-save" means exactly one call site to
+  // the create RPC - not zero calls to createParentCommunityPost in a loop.
+  assert.equal(route.includes('saveParentCirclePost={handleSavePost}'), true);
+  assert.equal((route.match(/createParentCommunityPost\(/g) ?? []).length, 1);
 });
 
 test('navigation exposes Bridge and canonicalizes duplicate Room paths', () => {
