@@ -25,6 +25,16 @@ on:
       - constants/characterStickers.ts
       - assets/images/stickers/**
       - test/sticker-asset-signature-contract.test.mjs
+      - hooks/useAudioPlayer.ts
+      - hooks/useVoiceRecorder.ts
+      - services/audio/audioPlayback.ts
+      - components/audio/RecordingPermissionGate.tsx
+      - screens/PagesScreen.tsx
+      - screens/VoiceBipScreen.tsx
+      - app/(teen)/pages/index.tsx
+      - app/(teen)/pages/[id].tsx
+      - test/voice-bip-metadata-lifecycle.test.mjs
+      - test/expo58-audio-contract.test.mjs
       - .easignore
   pull_request:
     paths:
@@ -46,6 +56,16 @@ on:
       - constants/characterStickers.ts
       - assets/images/stickers/**
       - test/sticker-asset-signature-contract.test.mjs
+      - hooks/useAudioPlayer.ts
+      - hooks/useVoiceRecorder.ts
+      - services/audio/audioPlayback.ts
+      - components/audio/RecordingPermissionGate.tsx
+      - screens/PagesScreen.tsx
+      - screens/VoiceBipScreen.tsx
+      - app/(teen)/pages/index.tsx
+      - app/(teen)/pages/[id].tsx
+      - test/voice-bip-metadata-lifecycle.test.mjs
+      - test/expo58-audio-contract.test.mjs
       - .easignore
   workflow_dispatch:
 
@@ -78,7 +98,7 @@ jobs:
           cache: npm
 
       - run: npm ci
-      - run: node --test test/companion-runtime-contracts.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/sticker-asset-signature-contract.test.mjs
+      - run: node --test test/companion-runtime-contracts.test.mjs test/room-intentions-hierarchy-contract.test.mjs test/sticker-asset-signature-contract.test.mjs test/voice-bip-metadata-lifecycle.test.mjs test/expo58-audio-contract.test.mjs
       - run: node --check scripts/verify-mobile-store-release.mjs
       - run: node scripts/verify-mobile-store-release.mjs
       - run: npm run type-check
