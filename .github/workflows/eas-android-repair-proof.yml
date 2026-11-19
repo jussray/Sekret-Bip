@@ -14,11 +14,11 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  EXPECTED_SHA: 03388b5f5a105f0e9d80fe554de5166ea9a2fe87
+  EXPECTED_SHA: 74237992a2be4ad8440556a1c48b0d96970038d6
 
 jobs:
   android-preview:
-    name: Provider Android preview @ 03388b5
+    name: Provider Android preview @ 7423799
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
@@ -70,7 +70,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eas-android-repair-proof-03388b5
+          name: eas-android-repair-proof-7423799
           path: eas-build-result.json
           if-no-files-found: ignore
           retention-days: 30
