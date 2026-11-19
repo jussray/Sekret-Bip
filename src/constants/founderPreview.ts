@@ -78,6 +78,8 @@ export const FOUNDER_PREVIEW_FEATURES: readonly FounderPreviewFeature[] = [
   { key: 'points', title: 'Bip Points & Energy', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Private point receipts, tiers, and the server-owned Bip Energy balance. Founder preview points are display-only.', route: '/(teen)/points' },
   { key: 'growth', title: 'Growth Tools', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Goals, reflection, and growth progress.', route: '/(teen)/growth' },
   { key: 'bippin2', title: 'Bippin 2', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Body, emotions, puberty education, and growth at the teen’s pace.', route: '/(teen)/bippin2' },
+  { key: 'manhood', title: 'Manhood', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Puberty guide, body changes, hygiene, and confidence content for teen boys.', route: '/(teen)/bippin2/manhood' },
+  { key: 'womanhood', title: 'Womanhood', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'First period, mood and body check-ins, and cycle tracking content for teen girls.', route: '/(teen)/bippin2/womanhood' },
   { key: 'mind-reset', title: 'Mind Reset', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Mind-focused reset flow.', route: '/(teen)/mind-body-reset?mode=mindReset' },
   { key: 'body-reset', title: 'Body Reset', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Body-focused reset flow.', route: '/(teen)/mind-body-reset?mode=bodyReset' },
   { key: 'body-workout', title: 'Body Workout', group: 'Teen · Growth', side: 'teen', status: 'live', detail: 'Guided movement and workout screen.', route: '/(teen)/body-workout' },

@@ -69,7 +69,16 @@ test('welcome delivery uses a cancellable 4-second platform timeout', () => {
 test('the standard timeout signal aborts without evaluating text', async () => {
   assert.equal(typeof AbortSignal.timeout, 'function');
   const signal = AbortSignal.timeout(10);
-  await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }));
+  // AbortSignal.timeout()'s internal timer does not keep the event loop
+  // referenced on its own, so without another referenced timer pending the
+  // runner can see the loop as drained and cancel this test before the
+  // abort fires. This interval keeps the loop alive until it does.
+  const keepAlive = setInterval(() => {}, 5);
+  try {
+    await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }));
+  } finally {
+    clearInterval(keepAlive);
+  }
   assert.equal(signal.aborted, true);
 });
 
