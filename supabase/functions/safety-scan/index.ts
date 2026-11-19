@@ -157,7 +157,7 @@ async function notifyParentIfLinked(
     .eq('id', alertId);
 
   // Deliberately content-free. Actual delivery remains separate work.
-  console.log(`[safety-scan] public-source parent notify queued severity=${severity}`);
+  console.log('SAFETY_SCAN_PARENT_NOTIFY_QUEUED');
 }
 
 Deno.serve(async (req: Request) => {
@@ -229,7 +229,7 @@ Deno.serve(async (req: Request) => {
     .single();
 
   if (alertError || !alert) {
-    console.error('[safety-scan] public-source alert insert failed');
+    console.error('SAFETY_SCAN_ALERT_INSERT_FAILED');
     return new Response('db error', { status: 500 });
   }
 
