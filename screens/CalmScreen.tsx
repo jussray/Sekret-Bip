@@ -456,6 +456,10 @@ export function CalmScreen({
                     if (onOpenBreathe) { onOpenBreathe(); return; }
                     setShowBreathe(true); return;
                   }
+                  if (tool.action === 'sleep') {
+                    Alert.alert('Sleep Better 🌙', 'Sleep stories and sounds are coming soon. 💜');
+                    return;
+                  }
                   if (tool.action) setScreen(tool.action);
                 }}
               >
