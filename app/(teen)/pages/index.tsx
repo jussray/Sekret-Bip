@@ -40,7 +40,8 @@ import {
   View,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio, ResizeMode, Video } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { playOnce } from '../../../services/audio/audioPlayback';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -257,6 +258,11 @@ const UNIVERSE_TILE_STYLES = ['polaroid', 'lined', 'notebook'] as const;
 const UNIVERSE_TILE_TILT = ['-3deg', '2deg', '-1.5deg', '2.5deg', '-2deg', '1.5deg'];
 
 // ─── Component ────────────────────────────────────────────────────────────────
+function JournalVideoPreview({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri);
+  return <VideoView player={player} style={s.mediaPreview} contentFit="cover" nativeControls={false} />;
+}
+
 export default function TeenPagesRoute() {
   const {
     mood,
@@ -492,8 +498,7 @@ export default function TeenPagesRoute() {
         uri = `data:${audio.contentType};base64,${audio.audioBase64}`;
         audioCache.current[key] = uri;
       }
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      await sound.playAsync();
+      await playOnce(uri);
     } finally {
       setVoiceLoading(false);
     }
@@ -763,7 +768,7 @@ export default function TeenPagesRoute() {
           style={s.mediaPreviewWrap}
         >
           {mediaType === 'video' ? (
-            <Video source={{ uri: mediaUri }} style={s.mediaPreview} resizeMode={ResizeMode.COVER} shouldPlay={false} isMuted />
+            <JournalVideoPreview uri={mediaUri} />
           ) : (
             <Image source={{ uri: mediaUri }} style={s.mediaPreview} />
           )}

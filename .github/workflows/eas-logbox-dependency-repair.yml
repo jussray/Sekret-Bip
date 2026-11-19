@@ -1,4 +1,4 @@
-name: Repair Expo LogBox version mismatch
+name: Repair obsolete Expo AV on SDK 58
 on:
   push:
     branches: [repair/eas-android-bundle-44159812926]
@@ -20,21 +20,25 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-      - name: Regenerate lockfile without obsolete direct LogBox
+      - name: Migrate audio and video modules to Expo SDK 58
         shell: bash
         run: |
           set -euo pipefail
-          npm uninstall @expo/log-box --save --ignore-scripts
+          npm uninstall expo-av --save --ignore-scripts
+          npm install 'expo-audio@~58.0.12' 'expo-video@~58.0.14' --save --ignore-scripts
           npm ci
+          node --test test/voice-bip-metadata-lifecycle.test.mjs test/expo58-audio-contract.test.mjs
+          npm run type-check
           node <<'NODE'
           const pkg = require('./package.json');
           const lock = require('./package-lock.json');
-          const direct = pkg.dependencies?.['@expo/log-box'];
-          const instances = Object.entries(lock.packages || {}).filter(([path]) => path.endsWith('node_modules/@expo/log-box'));
-          if (direct || lock.packages?.['']?.dependencies?.['@expo/log-box']) throw new Error('Old direct @expo/log-box dependency remains');
-          if (!instances.length || instances.some(([,entry]) => !entry.version.startsWith('58.'))) throw new Error('LogBox must resolve only to Expo 58: '+JSON.stringify(instances.map(([path,entry])=>[path,entry.version])));
+          if (pkg.dependencies?.['expo-av'] || lock.packages?.['']?.dependencies?.['expo-av'] || lock.packages?.['node_modules/expo-av']) throw new Error('Obsolete expo-av remains');
+          for (const name of ['expo-audio', 'expo-video']) {
+            if (!pkg.dependencies?.[name]?.startsWith('~58.')) throw new Error('SDK 58 dependency not declared: ' + name);
+            if (!lock.packages?.['node_modules/' + name]?.version?.startsWith('58.')) throw new Error('SDK 58 dependency not locked: ' + name);
+          }
           if (!lock.packages?.['node_modules/expo']?.version?.startsWith('58.')) throw new Error('Expo SDK drift detected');
-          console.log('Verified Expo SDK',lock.packages['node_modules/expo'].version,'and compatible LogBox installs',instances.map(([path,entry])=>path+'@'+entry.version));
+          console.log('Expo 58 audio/video dependency contract passed');
           NODE
           git diff --check
           git diff --stat -- package.json package-lock.json
@@ -49,6 +53,6 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add package.json package-lock.json
-          git commit -m 'fix(android): drop Expo 56 log-box dependency from SDK 58 app'
+          git commit -m 'fix(android): replace unsupported expo-av with SDK 58 audio/video modules'
           git push origin HEAD:repair/eas-android-bundle-44159812926
           git log -1 --format='%H %s'

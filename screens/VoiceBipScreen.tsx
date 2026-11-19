@@ -31,7 +31,8 @@ import {
 import { useVoiceCompanion } from '../hooks/useVoiceCompanion';
 import { SyncBadge, type SyncStatus } from '../components/SyncBadge';
 import type { VoiceNote } from '../types/bridge';
-import { Audio } from 'expo-av';
+import { AudioModule, RecordingPresets, useAudioRecorder, setAudioModeAsync, type AudioRecorder } from 'expo-audio';
+import { startAudioPlayback, type PlaybackHandle } from '../services/audio/audioPlayback';
 import * as ImagePicker from 'expo-image-picker';
 import { fetchSekretReply, fetchSekretVoice, fetchSekretTranscribe, type SekretVoiceResponse } from '../utils/api';
 import { useVoiceBipIntelligence } from '../hooks/useVoiceBipIntelligence';
@@ -141,9 +142,11 @@ export function VoiceBipScreen({
   const [selectedBipType,  setSelectedBipType]   = useState<string | null>(null);
   const [transcriptFailed, setTranscriptFailed]  = useState(false);
 
-  const recordingRef    = useRef<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recordingRef    = useRef<AudioRecorder | null>(null);
   const stopRecordingRef = useRef<() => Promise<void>>(async () => {});
-  const replySoundRef   = useRef<Audio.Sound | null>(null);
+  const replySoundRef   = useRef<PlaybackHandle | null>(null);
+  const replyPlaybackRequestRef = useRef(0);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -244,7 +247,7 @@ export function VoiceBipScreen({
   };
 
   const startRecording = async () => {
-    const { granted } = await Audio.requestPermissionsAsync();
+    const { granted } = await AudioModule.requestRecordingPermissionsAsync();
     if (!granted) return;
 
     setIsRecordingStarting(true);
@@ -299,9 +302,10 @@ export function VoiceBipScreen({
       setRecordingTime(t => t + 1);
     }, 1000);
 
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-    const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-    recordingRef.current = recording;
+    await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+    await audioRecorder.prepareToRecordAsync();
+    audioRecorder.record();
+    recordingRef.current = audioRecorder;
     setIsRecordingStarting(false);
   };
 
@@ -324,12 +328,12 @@ export function VoiceBipScreen({
     recordingRef.current = null;
     if (recording) {
       try {
-        await recording.stopAndUnloadAsync();
+        await recording.stop();
       } catch {
         // Android E_AUDIO_NODATA: Stop tapped before any audio data was captured
       }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-      const uri = recording.getURI();
+      await setAudioModeAsync({ allowsRecording: false });
+      const uri = recording.uri;
       if (uri) {
         try {
           const fetchRes = await fetch(uri);
@@ -448,40 +452,32 @@ export function VoiceBipScreen({
       glowLoop.current?.stop();
       waveLoop.current?.stop();
       if (timerRef.current) clearInterval(timerRef.current);
-      recordingRef.current?.stopAndUnloadAsync().catch(() => null);
-      replySoundRef.current?.unloadAsync().catch(() => null);
+      recordingRef.current?.stop().catch(() => null);
+      replyPlaybackRequestRef.current += 1;
+      replySoundRef.current?.stop().catch(() => null);
     };
   }, []);
 
 
   const playReplyAudio = async () => {
     if (!replyAudioUri) return;
-    if (replySoundRef.current) {
-      const prior = replySoundRef.current;
-      replySoundRef.current = null;
-      await prior.unloadAsync().catch(() => null);
-    }
-    const { sound } = await Audio.Sound.createAsync({ uri: replyAudioUri });
-    if (replySoundRef.current) {
-      // A later overlapping tap already claimed the ref while this one was
-      // still loading (createAsync decodes a data URI and can take a beat) —
-      // discard this redundant instance instead of leaking or stomping it.
-      await sound.unloadAsync().catch(() => null);
-      return;
-    }
-    replySoundRef.current = sound;
-    sound.setOnPlaybackStatusUpdate(status => {
-      if ('didJustFinish' in status && status.didJustFinish) {
-        sound.unloadAsync().catch(() => null);
-        if (replySoundRef.current === sound) replySoundRef.current = null;
+    const request = ++replyPlaybackRequestRef.current;
+    const prior = replySoundRef.current;
+    replySoundRef.current = null;
+    if (prior) await prior.stop().catch(() => null);
+
+    try {
+      const playback = await startAudioPlayback(replyAudioUri);
+      // Only the newest request can retain the player. A superseded player
+      // must release its native resources and temporary private audio file.
+      if (request !== replyPlaybackRequestRef.current) {
+        await playback.stop();
+        return;
       }
-    });
-    // A newer overlapping tap can unload this exact sound while playAsync()
-    // is still in flight (e.g. it was mid-start when the next tap's teardown
-    // ran) — that rejects the promise. Swallow it the same way every other
-    // op in this function does: the newer tap's sound is what should end up
-    // playing, not an unhandled rejection from the one it replaced.
-    await sound.playAsync().catch(() => null);
+      replySoundRef.current = playback;
+    } catch {
+      // The prior instance is already released; do not leak a failed player.
+    }
   };
 
   const prompts = avatar.prompts;

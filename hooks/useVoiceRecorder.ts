@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Audio } from 'expo-av';
+import { useAudioRecorder, RecordingPresets, setAudioModeAsync } from 'expo-audio';
 import { requestMicrophonePermission } from '../components/audio/RecordingPermissionGate';
 import { saveRecordingLocally } from '../services/audio/audioStorage';
 
@@ -29,7 +29,8 @@ export function useVoiceRecorder(): VoiceRecorderResult {
   const [localUri, setLocalUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recordingRef = useRef<ReturnType<typeof useAudioRecorder> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const clearTimer = useCallback(() => {
@@ -43,7 +44,7 @@ export function useVoiceRecorder(): VoiceRecorderResult {
     return () => {
       clearTimer();
       if (recordingRef.current) {
-        recordingRef.current.stopAndUnloadAsync().catch(() => {});
+        recordingRef.current.stop().catch(() => {});
       }
     };
   }, [clearTimer]);
@@ -62,15 +63,11 @@ export function useVoiceRecorder(): VoiceRecorderResult {
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
+      await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
 
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      recordingRef.current = recording;
+      await audioRecorder.prepareToRecordAsync();
+      audioRecorder.record();
+      recordingRef.current = audioRecorder;
       setState('recording');
 
       timerRef.current = setInterval(() => {
@@ -85,7 +82,7 @@ export function useVoiceRecorder(): VoiceRecorderResult {
   const pause = useCallback(async () => {
     if (!recordingRef.current || state !== 'recording') return;
     try {
-      await recordingRef.current.pauseAsync();
+      recordingRef.current.pause();
       clearTimer();
       setState('paused');
     } catch (e: unknown) {
@@ -96,7 +93,7 @@ export function useVoiceRecorder(): VoiceRecorderResult {
   const resume = useCallback(async () => {
     if (!recordingRef.current || state !== 'paused') return;
     try {
-      await recordingRef.current.startAsync();
+      recordingRef.current.record();
       setState('recording');
       timerRef.current = setInterval(() => {
         setDurationMs((d) => d + 100);
@@ -110,8 +107,8 @@ export function useVoiceRecorder(): VoiceRecorderResult {
     if (!recordingRef.current) return null;
     try {
       clearTimer();
-      await recordingRef.current.stopAndUnloadAsync();
-      const uri = recordingRef.current.getURI();
+      await recordingRef.current.stop();
+      const uri = recordingRef.current.uri;
       recordingRef.current = null;
       setState('stopped');
 
@@ -123,7 +120,7 @@ export function useVoiceRecorder(): VoiceRecorderResult {
       const savedUri = await saveRecordingLocally(uri);
       setLocalUri(savedUri);
 
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+      await setAudioModeAsync({ allowsRecording: false });
       return savedUri;
     } catch (e: unknown) {
       setState('error');
@@ -135,14 +132,14 @@ export function useVoiceRecorder(): VoiceRecorderResult {
   const discard = useCallback(async () => {
     clearTimer();
     if (recordingRef.current) {
-      await recordingRef.current.stopAndUnloadAsync().catch(() => {});
+      await recordingRef.current.stop().catch(() => {});
       recordingRef.current = null;
     }
     setLocalUri(null);
     setDurationMs(0);
     setError(null);
     setState('idle');
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: false }).catch(() => {});
+    await setAudioModeAsync({ allowsRecording: false }).catch(() => {});
   }, [clearTimer]);
 
   return { state, durationMs, localUri, error, start, pause, resume, stop, discard };

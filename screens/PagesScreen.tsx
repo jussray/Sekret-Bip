@@ -29,7 +29,7 @@ import {
 } from 'react-native';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import * as ImagePicker from 'expo-image-picker';
-import { Audio } from 'expo-av';
+import { playOnce } from '../services/audio/audioPlayback';
 import { IMAGES } from '../constants/theme';
 import type { JournalEntry, MoodEntry, VoiceNote } from '@/types';
 import { OracleDiscoveryPanel } from '../components/OracleDiscoveryPanel';
@@ -297,12 +297,10 @@ function SekretReplyBubble({ tab, reply, typing, accent }: SekretReplyBubbleProp
       if (!audio) return;
       const uri = `data:${audio.contentType};base64,${audio.audioBase64}`;
       setAudioUri(uri);
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      await sound.playAsync();
+      await playOnce(uri);
       return;
     }
-    const { sound } = await Audio.Sound.createAsync({ uri: audioUri });
-    await sound.playAsync();
+    await playOnce(audioUri);
   };
 
   return (

@@ -34,40 +34,22 @@ test('VoiceBipScreen never logs voice metadata, timing or otherwise', () => {
   assert.doesNotMatch(source, /console\.log\('\[VoiceBipScreen\] voice metadata'/);
 });
 
-test('VoiceBipScreen unloads the reply Audio.Sound instead of leaking playback instances', () => {
+test('VoiceBipScreen releases Expo Audio players and retains latest-request wins', () => {
   const source = read('screens/VoiceBipScreen.tsx');
-
-  assert.match(source, /const replySoundRef\s*=\s*useRef<Audio\.Sound \| null>\(null\)/);
-
-  // playReplyAudio unloads any prior sound before creating a new one.
-  assert.match(
-    source,
-    /const playReplyAudio = async \(\) => \{[\s\S]*?prior\.unloadAsync\(\)[\s\S]*?Audio\.Sound\.createAsync/,
-  );
-  // ...and unloads itself once playback finishes.
-  assert.match(source, /didJustFinish[\s\S]*?sound\.unloadAsync\(\)/);
-
-  // Two overlapping taps can both pass the "no prior sound" check before
-  // either finishes createAsync (it decodes a data URI, which isn't instant).
-  // Whichever call's Sound loses the race for the ref must unload itself
-  // instead of leaking.
-  assert.match(
-    source,
-    /const \{ sound \} = await Audio\.Sound\.createAsync\(\{ uri: replyAudioUri \}\);\s*\n\s*if \(replySoundRef\.current\) \{[\s\S]*?sound\.unloadAsync\(\)[\s\S]*?return;\s*\n\s*\}/,
-  );
-
-  // Unmount cleanup also unloads any sound left playing.
-  assert.match(
-    source,
-    /recordingRef\.current\?\.stopAndUnloadAsync\(\)\.catch\(\(\) => null\);\s*\n\s*replySoundRef\.current\?\.unloadAsync\(\)\.catch\(\(\) => null\);/,
-  );
-
-  // A newer tap's teardown can unload this exact sound while its own
-  // playAsync() is still in flight, rejecting that promise. Nothing catches
-  // the awaited call in the async press handler, so an uncaught rejection
-  // must not be possible here.
-  assert.match(source, /await sound\.playAsync\(\)\.catch\(\(\) => null\);/);
+  const playback = read('services/audio/audioPlayback.ts');
+  assert.match(source, /const replySoundRef\s*=\s*useRef<PlaybackHandle \| null>\(null\)/);
+  assert.match(source, /const request = \+\+replyPlaybackRequestRef\.current/);
+  assert.match(source, /await prior\.stop\(\)/);
+  assert.match(source, /await startAudioPlayback\(replyAudioUri\)/);
+  assert.match(source, /request !== replyPlaybackRequestRef\.current/);
+  assert.match(source, /await playback\.stop\(\)/);
+  assert.match(source, /replySoundRef\.current\?\.stop\(\)/);
+  assert.match(playback, /player\.addListener\('playbackStatusUpdate'/);
+  assert.match(playback, /status\.didJustFinish \|\| status\.error/);
+  assert.match(playback, /player\.release\(\)/);
+  assert.match(playback, /await source\.cleanup\(\)/);
 });
+
 
 test('the canonical voice contract already carries provider, model, and timing metadata (residual-zero check)', () => {
   const contract = read('src/contracts/sekretApi.ts');

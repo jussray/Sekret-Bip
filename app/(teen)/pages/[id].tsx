@@ -15,7 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Audio } from 'expo-av';
+import { playOnce } from '../../../services/audio/audioPlayback';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -108,8 +108,7 @@ export default function EntryDetailRoute() {
         uri = `data:${audio.contentType};base64,${audio.audioBase64}`;
         audioCache.current[key] = uri;
       }
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      await sound.playAsync();
+      await playOnce(uri);
     } finally {
       setVoiceLoading(false);
     }

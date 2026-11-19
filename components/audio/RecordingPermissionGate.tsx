@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Audio } from 'expo-av';
+import { AudioModule } from 'expo-audio';
 
 /**
  * Requests microphone permission imperatively.
  * Returns true if granted, false otherwise.
  */
 export async function requestMicrophonePermission(): Promise<boolean> {
-  const { status, canAskAgain } = await Audio.requestPermissionsAsync();
+  const { status } = await AudioModule.requestRecordingPermissionsAsync();
   if (status === 'granted') return true;
   return false;
 }
@@ -25,7 +25,7 @@ export default function RecordingPermissionGate({ children, fallback }: Props) {
   const [status, setStatus] = useState<'unknown' | 'granted' | 'denied'>('unknown');
 
   useEffect(() => {
-    Audio.getPermissionsAsync().then(({ status: s }) => {
+    AudioModule.getRecordingPermissionsAsync().then(({ status: s }) => {
       setStatus(s === 'granted' ? 'granted' : 'denied');
     });
   }, []);

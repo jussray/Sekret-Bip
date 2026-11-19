@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Audio, AVPlaybackStatus } from 'expo-av';
+import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { prepareAudioSource, type PreparedAudioSource } from '../services/audio/audioPlayback';
 
 export type PlaybackState = 'idle' | 'loading' | 'playing' | 'paused' | 'finished' | 'error';
 
@@ -21,13 +22,19 @@ export function useAudioPlayer(): AudioPlayerResult {
   const [positionMs, setPositionMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const subscriptionRef = useRef<{ remove: () => void } | null>(null);
+  const sourceRef = useRef<PreparedAudioSource | null>(null);
 
   const unload = useCallback(async () => {
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync().catch(() => {});
-      soundRef.current = null;
-    }
+    const player = playerRef.current;
+    playerRef.current = null;
+    subscriptionRef.current?.remove();
+    subscriptionRef.current = null;
+    player?.release();
+    const source = sourceRef.current;
+    sourceRef.current = null;
+    await source?.cleanup();
     setState('idle');
     setPositionMs(0);
     setDurationMs(0);
@@ -35,71 +42,60 @@ export function useAudioPlayer(): AudioPlayerResult {
   }, []);
 
   useEffect(() => {
-    return () => {
-      unload();
-    };
+    return () => { void unload(); };
   }, [unload]);
 
   const load = useCallback(async (uri: string) => {
     await unload();
     try {
       setState('loading');
-      setError(null);
-
-      const onPlaybackStatus = (s: AVPlaybackStatus) => {
-        if (!s.isLoaded) return;
-        setPositionMs(s.positionMillis);
-        setDurationMs(s.durationMillis ?? 0);
-        if (s.didJustFinish) setState('finished');
-      };
-
-      const { sound, status } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: false },
-        onPlaybackStatus
-      );
-      soundRef.current = sound;
-      if (status.isLoaded) {
-        setDurationMs(status.durationMillis ?? 0);
+      const source = await prepareAudioSource(uri);
+      let player: AudioPlayer;
+      try {
+        player = createAudioPlayer({ uri: source.uri });
+      } catch (err) {
+        await source.cleanup();
+        throw err;
       }
-      setState('paused');
-    } catch (e: unknown) {
+      playerRef.current = player;
+      sourceRef.current = source;
+      subscriptionRef.current = player.addListener('playbackStatusUpdate', (status) => {
+        if (playerRef.current !== player) return;
+        setPositionMs(Math.round(status.currentTime * 1000));
+        setDurationMs(Math.round(status.duration * 1000));
+        if (status.error) {
+          setError(status.error);
+          setState('error');
+        } else if (status.didJustFinish) {
+          setState('finished');
+        } else if (status.isLoaded) {
+          setState((previous) => previous === 'loading' ? 'paused' : previous);
+        }
+      });
+    } catch (err) {
       setState('error');
-      setError(e instanceof Error ? e.message : 'Failed to load audio.');
+      setError(err instanceof Error ? err.message : 'Failed to load audio.');
     }
   }, [unload]);
 
   const play = useCallback(async () => {
-    if (!soundRef.current) return;
-    try {
-      await soundRef.current.playAsync();
-      setState('playing');
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Playback failed.');
-    }
+    if (!playerRef.current) return;
+    try { playerRef.current.play(); setState('playing'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Playback failed.'); }
   }, []);
 
   const pause = useCallback(async () => {
-    if (!soundRef.current) return;
-    try {
-      await soundRef.current.pauseAsync();
-      setState('paused');
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Pause failed.');
-    }
+    if (!playerRef.current) return;
+    try { playerRef.current.pause(); setState('paused'); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Pause failed.'); }
   }, []);
 
   const seek = useCallback(async (ms: number) => {
-    if (!soundRef.current) return;
-    try {
-      await soundRef.current.setPositionAsync(ms);
-      setPositionMs(ms);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Seek failed.');
-    }
+    if (!playerRef.current) return;
+    try { await playerRef.current.seekTo(ms / 1000); setPositionMs(ms); }
+    catch (err) { setError(err instanceof Error ? err.message : 'Seek failed.'); }
   }, []);
 
   const progress = durationMs > 0 ? positionMs / durationMs : 0;
-
   return { state, positionMs, durationMs, progress, error, load, play, pause, seek, unload };
 }
