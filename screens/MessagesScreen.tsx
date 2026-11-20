@@ -6,7 +6,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, ScrollView, type ScrollViewInstance,
+  View, Text, TouchableOpacity, ScrollView,
   Animated, Easing, StyleSheet, Platform, Alert, TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,7 +35,7 @@ export function MessagesScreen({ side, setScreen, BottomNav }: MessagesScreenPro
   const [notes,    setNotes]    = useState<ParentNote[]>([]);
   const [loading,  setLoading]  = useState(true);
 
-  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const fade1  = useRef(new Animated.Value(0)).current;
   const breath = useRef(new Animated.Value(0)).current;
 
