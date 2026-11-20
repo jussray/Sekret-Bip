@@ -59,8 +59,10 @@ test('database witness observes only metadata and all 14 live guarded targets', 
   assert.match(witness, /from pg_policies/i);
   assert.match(witness, /from supabase_migrations\.schema_migrations/i);
   assert.match(witness, /p\.permissive = 'RESTRICTIVE'/);
-  assert.match(witness, /p\.qual like '%IS FALSE%'/);
-  assert.match(witness, /p\.with_check like '%IS FALSE%'/);
+  assert.match(witness, /p\.roles = ARRAY\['authenticated'\]::name\[\]/);
+  assert.match(witness, /p\.qual = g\.expression/);
+  assert.match(witness, /p\.with_check = g\.expression/);
+  assert.doesNotMatch(witness, /p\.(qual|with_check) like/);
   assert.match(witness, /sha256\(convert_to/);
   assert.doesNotMatch(witness, /\bmd5\s*\(/i);
   assert.match(witness, /20261006040000/);
@@ -98,4 +100,31 @@ test('provider target identity helper never leaks raw output to Actions logs', (
   assert.equal(pass.status, 0, 'successful identity verification must proceed');
   assert.equal(pass.stdout, '');
   assert.equal(pass.stderr, '');
+});
+
+test('all Supabase and PostgreSQL diagnostics remain out of Actions logs', () => {
+  const checks = [
+    /if ! supabase link --project-ref "\$SUPABASE_PROJECT_REF" >\/dev\/null 2>&1; then/,
+    /if ! psql -X -q -v ON_ERROR_STOP=1 -f "\$MIGRATION_FILE" >\/dev\/null 2>&1; then/,
+    /if ! supabase migration repair "\$MIGRATION_VERSION" --status applied --linked >\/dev\/null 2>&1; then/,
+  ];
+  for (const pattern of checks) assert.match(workflow, pattern);
+  const witnessCalls = workflow.match(/if ! snapshot="\$\(psql -X -q -A -t -F '\|' -v ON_ERROR_STOP=1 -f "\$WITNESS_FILE" 2>\/dev\/null\)"; then/g) ?? [];
+  assert.equal(witnessCalls.length, 4, 'all four metadata-only witness queries must suppress raw stderr');
+  for (const code of [
+    'SUPABASE_PROJECT_LINK_FAILED', 'SOCIAL_RLS_PREFLIGHT_QUERY_FAILED',
+    'SOCIAL_RLS_PREWRITE_QUERY_FAILED', 'SOCIAL_RLS_POST_DDL_QUERY_FAILED',
+    'SOCIAL_RLS_FINAL_QUERY_FAILED', 'SOCIAL_RLS_SINGLE_MIGRATION_EXECUTION_FAILED',
+    'SUPABASE_MIGRATION_RECEIPT_FAILED',
+  ]) assert.ok(workflow.includes("echo '" + code + "' >&2"), code);
+});
+
+test('policy witness uses complete expression equality, not substring checks', () => {
+  const canonical = "(COALESCE(((( SELECT auth.jwt() AS jwt) ->> 'is_anonymous'::text))::boolean, false) IS FALSE)";
+  const sqlLiteral = canonical.replaceAll("'", "''");
+  assert.ok(witness.includes("values ('" + sqlLiteral + "')"));
+  assert.ok(witness.includes('p.qual = g.expression'));
+  assert.ok(witness.includes('p.with_check = g.expression'));
+  const permissiveBypass = canonical + ' OR (auth.uid() IS NOT NULL)';
+  assert.notEqual(permissiveBypass, canonical);
 });

@@ -17,6 +17,10 @@ with expected(tablename) as (
     ('scrapbook_entries'),
     ('parent_mood_summaries'),
     ('parent_notes')
+), expected_guard(expression) as (
+  -- Pinned PostgreSQL 17 pg_policies output for the reviewed anonymous-denial predicate.
+  -- Complete-expression equality prevents a malicious OR branch from passing a substring check.
+  values ('(COALESCE(((( SELECT auth.jwt() AS jwt) ->> ''is_anonymous''::text))::boolean, false) IS FALSE)')
 )
 select
   (select count(*) from expected e
@@ -25,13 +29,12 @@ select
      where c.relrowsecurity) as rls_enabled_tables,
   (select count(*) from expected e
      join pg_policies p on p.schemaname = 'public' and p.tablename = e.tablename
+     cross join expected_guard g
      where p.policyname = e.tablename || '_permanent_accounts_only'
        and p.permissive = 'RESTRICTIVE' and p.cmd = 'ALL'
-       and 'authenticated' = any(p.roles)
-       and p.qual like '%is_anonymous%'
-       and p.with_check like '%is_anonymous%'
-       and p.qual like '%IS FALSE%'
-       and p.with_check like '%IS FALSE%') as effective_guard_policies,
+       and p.roles = ARRAY['authenticated']::name[]
+       and p.qual = g.expression
+       and p.with_check = g.expression) as effective_guard_policies,
   (select count(*) from expected e
      join pg_policies p on p.schemaname = 'public' and p.tablename = e.tablename
      where p.policyname = e.tablename || '_permanent_accounts_only') as named_guard_policies,

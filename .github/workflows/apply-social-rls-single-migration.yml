@@ -128,7 +128,10 @@ jobs:
           set -euo pipefail
           command -v psql >/dev/null || { echo 'PSQL_UNAVAILABLE'; exit 1; }
           test -n "$SUPABASE_DB_PASSWORD" || { echo 'MISSING_DATABASE_CREDENTIAL'; exit 1; }
-          supabase link --project-ref "$SUPABASE_PROJECT_REF"
+          if ! supabase link --project-ref "$SUPABASE_PROJECT_REF" >/dev/null 2>&1; then
+            echo 'SUPABASE_PROJECT_LINK_FAILED' >&2
+            exit 1
+          fi
 
       - name: Metadata-only RLS and migration history preflight
         shell: bash
@@ -136,7 +139,10 @@ jobs:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          if ! snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE" 2>/dev/null)"; then
+            echo 'SOCIAL_RLS_PREFLIGHT_QUERY_FAILED' >&2
+            exit 1
+          fi
           IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
           [[ "$enabled" == 14 && "$fingerprint" =~ ^[0-9a-f]{64}$ ]] || {
             echo 'TARGET_TABLES_RLS_OR_FINGERPRINT_MISMATCH'
@@ -165,7 +171,10 @@ jobs:
           set -euo pipefail
           git fetch --no-tags --depth=1 origin main
           test "$(git rev-parse FETCH_HEAD)" = "$TARGET_SHA" || { echo 'SOURCE_DRIFT_BEFORE_WRITE'; exit 1; }
-          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          if ! snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE" 2>/dev/null)"; then
+            echo 'SOCIAL_RLS_PREWRITE_QUERY_FAILED' >&2
+            exit 1
+          fi
           test "$snapshot" = "$BASELINE_SNAPSHOT" || { echo 'DATABASE_DRIFT_BEFORE_WRITE'; exit 1; }
 
       - name: Execute only reviewed canonical SQL
@@ -177,7 +186,10 @@ jobs:
           set -euo pipefail
           # The reviewed migration has an explicit BEGIN/COMMIT and changes policies only.
           # No supabase db push, extra migrations, or application data.
-          psql -X -q -v ON_ERROR_STOP=1 -f "$MIGRATION_FILE"
+          if ! psql -X -q -v ON_ERROR_STOP=1 -f "$MIGRATION_FILE" >/dev/null 2>&1; then
+            echo 'SOCIAL_RLS_SINGLE_MIGRATION_EXECUTION_FAILED' >&2
+            exit 1
+          fi
           echo 'canonical_sql_executed=yes' >> artifacts/social-rls-single-migration-receipt.txt
 
       - name: Verify all guards before recording migration identity
@@ -187,7 +199,10 @@ jobs:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          if ! snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE" 2>/dev/null)"; then
+            echo 'SOCIAL_RLS_POST_DDL_QUERY_FAILED' >&2
+            exit 1
+          fi
           IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
           IFS='|' read -r original_enabled original_effective original_named original_ledger baseline_hash <<< "$BASELINE_SNAPSHOT"
           [[ "$enabled" == 14 && "$effective" == 14 && "$named" == 14 && "$ledger" == 0 &&
@@ -205,7 +220,10 @@ jobs:
         run: |
           set -euo pipefail
           # Only after the effective RLS policies were checked. The CLI records history, not SQL.
-          supabase migration repair "$MIGRATION_VERSION" --status applied --linked
+          if ! supabase migration repair "$MIGRATION_VERSION" --status applied --linked >/dev/null 2>&1; then
+            echo 'SUPABASE_MIGRATION_RECEIPT_FAILED' >&2
+            exit 1
+          fi
           echo 'canonical_migration_receipt_recorded=yes' >> artifacts/social-rls-single-migration-receipt.txt
 
       - name: Verify exact post-apply RLS state and migration ledger
@@ -215,7 +233,10 @@ jobs:
           PGPASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE")"
+          if ! snapshot="$(psql -X -q -A -t -F '|' -v ON_ERROR_STOP=1 -f "$WITNESS_FILE" 2>/dev/null)"; then
+            echo 'SOCIAL_RLS_FINAL_QUERY_FAILED' >&2
+            exit 1
+          fi
           IFS='|' read -r enabled effective named ledger fingerprint <<< "$snapshot"
           IFS='|' read -r original_enabled original_effective original_named original_ledger baseline_hash <<< "$BASELINE_SNAPSHOT"
           [[ "$enabled" == 14 && "$effective" == 14 && "$named" == 14 && "$ledger" == 1 &&
