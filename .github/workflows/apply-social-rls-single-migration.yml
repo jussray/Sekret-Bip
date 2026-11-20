@@ -109,7 +109,10 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$SUPABASE_ACCESS_TOKEN" || { echo 'MISSING_PROVIDER_TARGET_CREDENTIAL'; exit 1; }
-          node scripts/supabase-target-identity.mjs
+          if ! node scripts/supabase-target-identity.mjs >/dev/null 2>&1; then
+            echo 'SUPABASE_TARGET_IDENTITY_VERIFICATION_FAILED' >&2
+            exit 1
+          fi
 
       - name: Set up pinned Supabase CLI
         uses: supabase/setup-cli@ab058987d8d6c725971f6cf9d0b5c98467e30bd1

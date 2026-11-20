@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
 
 const workflow = fs.readFileSync('.github/workflows/apply-social-rls-single-migration.yml', 'utf8');
@@ -75,4 +76,26 @@ test('operator rejects mixed or changed authorization state and never unguards o
   assert.match(workflow, /fingerprint.*baseline_hash/);
   assert.doesNotMatch(workflow, /^\s+drop policy\b/im);
   assert.doesNotMatch(workflow, /^\s+supabase db reset\b/im);
+});
+
+test('provider target identity helper never leaks raw output to Actions logs', () => {
+  const block = workflow.match(
+    /      - name: Verify provider target identity\n[\s\S]*?        run: \|\n([\s\S]*?)\n      - name: Set up pinned Supabase CLI/,
+  );
+  assert.ok(block, 'target identity verification step exists');
+  const script = block[1].split('\n').map((line) => line.replace(/^ {10}/, '')).join('\n');
+  const fakeEnv = { ...process.env, SUPABASE_ACCESS_TOKEN: 'test-only' };
+  const fail = spawnSync('bash', ['-c',
+    "node() { printf 'UNTRUSTED_PROVIDER_ID\\n'; printf 'UNTRUSTED_SECRET\\n' >&2; return 42; }\n" + script,
+  ], { env: fakeEnv, encoding: 'utf8' });
+  assert.equal(fail.status, 1, 'failed identity verification must block execution');
+  assert.equal(fail.stdout, '');
+  assert.equal(fail.stderr, 'SUPABASE_TARGET_IDENTITY_VERIFICATION_FAILED\n');
+
+  const pass = spawnSync('bash', ['-c',
+    "node() { printf 'UNTRUSTED_PROVIDER_ID\\n'; printf 'UNTRUSTED_SECRET\\n' >&2; return 0; }\n" + script,
+  ], { env: fakeEnv, encoding: 'utf8' });
+  assert.equal(pass.status, 0, 'successful identity verification must proceed');
+  assert.equal(pass.stdout, '');
+  assert.equal(pass.stderr, '');
 });
