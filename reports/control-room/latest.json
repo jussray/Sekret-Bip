@@ -1,0 +1,204 @@
+{
+  "generatedAt": "2026-07-10T03:40:16.104Z",
+  "mode": "local-control-room",
+  "purpose": "Free local verification when GitHub Actions minutes are unavailable.",
+  "registry": "src/config/controlRoomVerificationRegistry.json",
+  "summary": {
+    "status": "green",
+    "pushSafe": true,
+    "demoReady": true,
+    "score": 100,
+    "passed": 10,
+    "warnings": 0,
+    "failed": 0,
+    "total": 10,
+    "requiredFailures": []
+  },
+  "checks": [
+    {
+      "id": "runtime-assets",
+      "label": "Runtime assets",
+      "command": "npm",
+      "args": [
+        "run",
+        "audit:runtime-assets"
+      ],
+      "area": "app",
+      "required": true,
+      "commandText": "npm run audit:runtime-assets",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 313,
+      "stdoutTail": "> sekret-bip@1.0.0 audit:runtime-assets\n> node scripts/audit-runtime-assets.mjs\n\nRuntime asset audit passed: mockups, references, and sheets are isolated.",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "control-room-structure",
+      "label": "Control Room structure",
+      "command": "npm",
+      "args": [
+        "run",
+        "audit:control-room:structure"
+      ],
+      "area": "control-room",
+      "required": true,
+      "commandText": "npm run audit:control-room:structure",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 221,
+      "stdoutTail": "> sekret-bip@1.0.0 audit:control-room:structure\n> node scripts/control-room-structural-scan.mjs\n\n{\n  \"scanner\": \"control-room-structural-scan\",\n  \"scanned_at\": \"2026-07-10T03:39:32.953Z\",\n  \"ok\": true,\n  \"finding_count\": 0,\n  \"findings\": []\n}",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "control-room-rls",
+      "label": "Supabase RLS scan",
+      "command": "npm",
+      "args": [
+        "run",
+        "audit:control-room:rls"
+      ],
+      "area": "supabase",
+      "required": true,
+      "commandText": "npm run audit:control-room:rls",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 277,
+      "stdoutTail": "> sekret-bip@1.0.0 audit:control-room:rls\n> node scripts/control-room-rls-scan.mjs\n\n{\n  \"scanner\": \"control-room-rls-scan\",\n  \"scanned_at\": \"2026-07-10T03:39:33.236Z\",\n  \"ok\": true,\n  \"finding_count\": 1,\n  \"findings\": [\n    {\n      \"source\": \"rls_scan\",\n      \"severity\": \"warning\",\n      \"event_type\": \"rls_policy_missing\",\n      \"screen\": \"notification_deliveries\",\n      \"message\": \"No RLS policy was found for notification_deliveries.\",\n      \"metadata\": {\n        \"table\": \"notification_deliveries\"\n      }\n    }\n  ]\n}",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "companions",
+      "label": "Companion assets",
+      "command": "npm",
+      "args": [
+        "run",
+        "validate:companions"
+      ],
+      "area": "companions",
+      "required": true,
+      "commandText": "npm run validate:companions",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 298,
+      "stdoutTail": "> sekret-bip@1.0.0 validate:companions\n> node scripts/validate-companion-assets.mjs\n\nCompanion asset validation (Export Contract v2.0)\n\nASSET                 STATE                         DETAIL\n------------------------------------------------------------------------------\nraylene/neutral       PASS                          512x1024 — waived (phone-optimized Batch 0)\nraylene/happy         pending                       \nraylene/listening     pending                       \nraylene/thinking      pending                       \nraylene/writing       pending                       \nraylene/encouraging   pending                       \nraylene/sleepy        pending                       \nrylane/neutral        PASS                          512x1024 — waived (phone-optimized Batch 0)\nrylane/happy          pending                       \nrylane/listening      pending                       \nrylane/thinking       pending                       \nrylane/writing        pending                       \nrylane/encouraging    pending                       \nrylane/calm           pending                       \nnight/neutral         PASS                          512x1024 — waived (phone-optimized Batch 0)\nnight/happy           pending                       \nnight/headphones      pending                       \nnight/thinking        pending                       \nnight/listening       pending                       \nnight/writing         pending                       \nnight/comfort         pending                       \nnight/window          pending                       \nnight/rain            pending                       \n\n3 production asset(s) checked, 0 warning(s), 0 error(s).\n\nExport Contract: PASS",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "type-check",
+      "label": "TypeScript",
+      "command": "npm",
+      "args": [
+        "run",
+        "type-check"
+      ],
+      "area": "code-quality",
+      "required": true,
+      "commandText": "npm run type-check",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 21894,
+      "stdoutTail": "> sekret-bip@1.0.0 type-check\n> tsc --noEmit",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "lint",
+      "label": "Lint",
+      "command": "npm",
+      "args": [
+        "run",
+        "lint"
+      ],
+      "area": "code-quality",
+      "required": true,
+      "commandText": "npm run lint",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 8353,
+      "stdoutTail": "> sekret-bip@1.0.0 lint\n> eslint .",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "unit-tests",
+      "label": "Unit tests",
+      "command": "npm",
+      "args": [
+        "test"
+      ],
+      "area": "tests",
+      "required": true,
+      "commandText": "npm test",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 3386,
+      "stdoutTail": "# Subtest: CRISIS_RE.test() is also called as a guard independent of detectIntent\nok 323 - CRISIS_RE.test() is also called as a guard independent of detectIntent\n  ---\n  duration_ms: 0.171961\n  ...\n# Subtest: normalizeCharacter handles all valid CharacterIds\nok 324 - normalizeCharacter handles all valid CharacterIds\n  ---\n  duration_ms: 0.412148\n  ...\n# Subtest: normalizeCharacter returns null for unknown input\nok 325 - normalizeCharacter returns null for unknown input\n  ---\n  duration_ms: 0.285823\n  ...\n# Subtest: detectIntent checks CRISIS_RE first before any other intent\nok 326 - detectIntent checks CRISIS_RE first before any other intent\n  ---\n  duration_ms: 0.311852\n  ...\n# Subtest: parentCoach surface always sets parentShareSummary to null\nok 327 - parentCoach surface always sets parentShareSummary to null\n  ---\n  duration_ms: 0.304999\n  ...\n# Subtest: CompanionReply interface defines safetyFlag and parentShareSummary\nok 328 - CompanionReply interface defines safetyFlag and parentShareSummary\n  ---\n  duration_ms: 0.298246\n  ...\n1..328\n# tests 328\n# suites 0\n# pass 327\n# fail 0\n# cancelled 0\n# skipped 1\n# todo 0\n# duration_ms 3103.502601",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "voice-intelligence",
+      "label": "Voice intelligence",
+      "command": "npm",
+      "args": [
+        "run",
+        "test:voice-intelligence"
+      ],
+      "area": "voice",
+      "required": true,
+      "commandText": "npm run test:voice-intelligence",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 4360,
+      "stdoutTail": "> sekret-bip@1.0.0 test:voice-intelligence\n> node scripts/test-voice-intelligence.mjs\n\nVoice Bip intelligence audit passed.",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "oracle",
+      "label": "Oracle discovery",
+      "command": "npm",
+      "args": [
+        "run",
+        "test:oracle"
+      ],
+      "area": "oracle",
+      "required": true,
+      "commandText": "npm run test:oracle",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 3227,
+      "stdoutTail": "> sekret-bip@1.0.0 test:oracle\n> node scripts/test-oracle-discovery.mjs\n\nOracle Discovery audit passed.",
+      "stderrTail": "",
+      "recommendation": null
+    },
+    {
+      "id": "room-archives",
+      "label": "Room archives",
+      "command": "npm",
+      "args": [
+        "run",
+        "verify:room-archives"
+      ],
+      "area": "assets",
+      "required": true,
+      "commandText": "npm run verify:room-archives",
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 1334,
+      "stdoutTail": "✅ bg-cloud-room-evening.png                      2.38 MB  pre-composite (matches original)\n✅ bg-cloud-room-midday.png                       2.71 MB  pre-composite (matches original)\n✅ bg-cloud-room-night.png                        2.22 MB  pre-composite (matches original)\n✅ bg-cloud-room-rain.png                         2.34 MB  pre-composite (matches original)\n✅ bg-dad-room-day.png                            2.40 MB  pre-composite (matches original)\n✅ bg-dad-room-deep-night.png                     2.22 MB  pre-composite (matches original)\n✅ bg-dad-room-evening.png                        2.54 MB  pre-composite (matches original)\n✅ bg-dad-room-night.png                          2.18 MB  pre-composite (matches original)\n✅ bg-dad-room-rain.png                           2.35 MB  pre-composite (matches original)\n✅ bg-mom-room-day.png                            2.58 MB  pre-composite (matches original)\n✅ bg-mom-room-deep-night.png                     2.13 MB  pre-composite (matches original)\n✅ bg-mom-room-evening.png                        2.36 MB  pre-composite (matches original)\n✅ bg-mom-room-night.png                          2.39 MB  pre-composite (matches original)\n✅ bg-mom-room-rain.png                           2.30 MB  pre-composite (matches original)\n✅ bg-night-room-afternoon.png                    2.62 MB  pre-composite (matches original)\n✅ bg-night-room-day.png                          2.46 MB  pre-composite (matches original)\n✅ bg-night-room-deep-night.png                   2.12 MB  pre-composite (matches original)\n✅ bg-night-room-evening.png                      2.34 MB  pre-composite (matches original)\n✅ bg-night-room-midday.png                       2.75 MB  pre-composite (matches original)\n✅ bg-night-room-night.png                        2.12 MB  pre-composite (matches original)\n✅ bg-night-room-rain.png                         2.38 MB  pre-composite (matches original)\n✅ bg-raylene-room-afternoon.png                  2.60 MB  pre-composite (matches original)\n✅ bg-raylene-room-day.png                        2.74 MB  pre-composite (matches original)\n✅ bg-raylene-room-deep-night.png                 2.26 MB  pre-composite (matches original)\n✅ bg-raylene-room-evening.png                    2.79 MB  pre-composite (matches original)\n✅ bg-raylene-room-midday.png                     2.68 MB  pre-composite (matches original)\n✅ bg-raylene-room-night.png                      2.52 MB  pre-composite (matches original)\n✅ bg-raylene-room-rain.png                       2.40 MB  pre-composite (matches original)\n✅ bg-rylane-room-afternoon.png                   2.54 MB  pre-composite (matches original)\n✅ bg-rylane-room-day.png                         2.73 MB  pre-composite (matches original)\n✅ bg-rylane-room-deep-night.png                  2.27 MB  pre-composite (matches original)\n✅ bg-rylane-room-evening.png                     2.43 MB  pre-composite (matches original)\n✅ bg-rylane-room-midday.png                      2.37 MB  pre-composite (matches original)\n✅ bg-rylane-room-night.png                       2.74 MB  pre-composite (matches original)\n✅ bg-rylane-room-rain.png                        2.15 MB  pre-composite (matches original)\n\n✅ 38 of 38 archive files verified.  All real PNGs >= 1 MB.\n   All 38 files are pre-composite originals.\n✅ Phase 2 may proceed.",
+      "stderrTail": "",
+      "recommendation": null
+    }
+  ],
+  "guardrails": [
+    "No GitHub PAT is required or read by this script.",
+    "No OpenAI key is required or read by this script.",
+    "Do not run fixture audits on real teen private content.",
+    "Use GitHub Actions only as a release/PR backup while minutes are constrained."
+  ]
+}

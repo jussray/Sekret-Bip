@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "verifiedAt": "2026-07-13",
+  "projectRef": "tbsevonvegdnlyjgplmm",
+  "migration": {
+    "version": "20260713162809",
+    "name": "lock_completed_account_profile_identity",
+    "repositoryPath": "supabase/migrations/20260713162809_lock_completed_account_profile_identity.sql",
+    "applied": true,
+    "repositoryAndLiveMigrationParity": true
+  },
+  "productionInventory": {
+    "totalProfilesBefore": 1,
+    "completedProfilesBefore": 0,
+    "completedWithoutSideBefore": 0,
+    "malformedCompletedTeensBefore": 0,
+    "malformedCompletedParentsBefore": 0,
+    "totalProfilesAfter": 1,
+    "completedProfilesAfter": 0,
+    "backfillRequired": false
+  },
+  "preDeployDefects": {
+    "transactionOutcome": "rolled_back",
+    "completedTeenCouldFlipToParent": {
+      "executed": true,
+      "confirmed": true
+    },
+    "completedProfileCouldReturnToOnboardingAndClearFields": {
+      "executed": true,
+      "confirmed": true
+    },
+    "nullableRequiredParentFieldBypassedValidation": {
+      "executed": true,
+      "confirmed": true,
+      "example": "parent_focus"
+    },
+    "nullableAccountSideBypassRisk": {
+      "executed": false,
+      "structurallyConfirmed": true,
+      "executionBlockedBySqlSafetyLayer": true,
+      "reason": "The prior guard used NOT IN without an explicit IS NULL rejection. SQL three-valued logic makes the predicate NULL rather than true for a NULL operand."
+    }
+  },
+  "controls": {
+    "permanentSessionRequired": true,
+    "selfScopedToAuthUid": true,
+    "currentProfileRowLockedBeforeTransition": true,
+    "preCompletionSidePivotAllowed": true,
+    "completedSideImmutable": true,
+    "completionMonotonic": true,
+    "sameSideCompletedEditsAllowed": true,
+    "nullAccountSideRejected": true,
+    "nullTeenAgeRejectedForCompletion": true,
+    "nullTeenGenderRejectedForCompletion": true,
+    "nullTeenCompanionRejectedForCompletion": true,
+    "nullParentRoomStyleRejectedForCompletion": true,
+    "nullParentFocusRejectedForCompletion": true,
+    "roleOutsideWriteSet": true,
+    "auditCapabilityOutsideWriteSet": true,
+    "managementCapabilityOutsideWriteSet": true,
+    "analyticsCapabilityOutsideWriteSet": true
+  },
+  "postDeployEvidence": {
+    "probePath": "supabase/probes/authorization_account_profile_identity_phase1.sql",
+    "transactionOutcome": "rolled_back",
+    "executableChecks": {
+      "passedChecks": 6,
+      "failedChecks": 0,
+      "checks": [
+        "precompletion_pivot_completion_and_same_side_update",
+        "completed_side_flip_denied_and_intact",
+        "completed_downgrade_denied_and_intact",
+        "null_required_field_denied_without_mutation",
+        "null_account_side_denied_without_mutation",
+        "anonymous_session_denied_without_mutation"
+      ]
+    },
+    "structuralChecks": {
+      "securityDefiner": true,
+      "fixedSearchPath": true,
+      "anonExecute": false,
+      "authenticatedExecute": true,
+      "serviceRoleExecute": true,
+      "allNullGuardsPresent": true,
+      "completedSideLockPresent": true,
+      "completionMonotonicGuardPresent": true,
+      "rowLockPresent": true,
+      "capabilityColumnsOutsideWriteSet": true
+    },
+    "toolingLimit": {
+      "encountered": true,
+      "description": "Before deployment, the SQL execution safety layer blocked temporary replacement of the public identity function followed by candidate transition calls, and separately blocked the crafted NULL account-side call. No blocked statement reached PostgreSQL. After reviewed deployment, the NULL account-side denial and all other transition outcomes were executed successfully in rollback transactions.",
+      "productionMutationFromBlockedCalls": false
+    },
+    "retainedSyntheticUsers": 0,
+    "retainedSyntheticProfiles": 0,
+    "productionProfiles": 1,
+    "productionCompletedProfiles": 0
+  },
+  "advisorClassification": {
+    "classification": "intentional_authenticated_security_definer_api_with_behavior_proof",
+    "warningExpectedToRemain": true,
+    "reason": "The profile writer is an intentional signed-in onboarding and settings API. It remains controlled by explicit grants, fixed search path, auth.uid self-scoping, permanent-session checks, row locking, monotonic identity transitions, explicit nullable-input validation, capability-column exclusion, and rollback-contained live proof."
+  },
+  "releaseGate": {
+    "authenticatedFunctionBlockerComplete": false,
+    "reason": "Account identity is now hardened and behavior-proved, but additional authenticated SECURITY DEFINER function families remain before L4 activation."
+  }
+}

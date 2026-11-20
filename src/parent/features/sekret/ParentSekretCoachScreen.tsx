@@ -50,7 +50,6 @@ const WISDOM = [
   "showing up imperfectly is still showing up.",
 ];
 
-// ── Mood-specific wisdom ──────────────────────────────────────────────────────
 const MOOD_WISDOM: Record<string, string[]> = {
   heavy: [
     "heavy is real. you don't have to perform okay right now.",
@@ -78,7 +77,6 @@ const MOOD_WISDOM: Record<string, string[]> = {
   ],
 };
 
-// ── Mood → featured module ────────────────────────────────────────────────────
 const MOOD_MODULE: Record<string, string> = {
   heavy:   'regulate',
   hopeful: 'connect',
@@ -86,7 +84,6 @@ const MOOD_MODULE: Record<string, string> = {
   okay:    'connect',
 };
 
-// ── Coaching modules ─────────────────────────────────────────────────────────
 const MODULES = [
   {
     id: 'listen',
@@ -216,7 +213,6 @@ const MODULES = [
   },
 ];
 
-// ── Conversation starters ─────────────────────────────────────────────────────
 const CONVERSATION_STARTERS = [
   { situation: "After a bad day",         starter: "\"That looked rough. You want company or space?\"" },
   { situation: "They seem off",           starter: "\"Hey. Not fishing. Just checking. You good?\"" },
@@ -244,7 +240,6 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
 interface ParentSekretCoachScreenProps {
   setScreen:    (s: string) => void;
   parentMood?:  string;
@@ -257,7 +252,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
     return moodPool ? pick(moodPool) : pick(WISDOM);
   });
 
-  // ── AI Chat state ────────────────────────────────────────────────────────
   const [chatMessages, setChatMessages]   = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput]         = useState('');
   const [chatLoading, setChatLoading]     = useState(false);
@@ -291,7 +285,7 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
     setChatLoading(true);
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
     try {
-      const reply = await sendMessage(
+      const result = await sendMessage(
         'parentCoach',
         text,
         'parentCoach',
@@ -301,7 +295,7 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
           surface: 'parentCoach',
         },
       );
-      setChatMessages(prev => [...prev, makeAssistantMessage(reply)]);
+      setChatMessages(prev => [...prev, makeAssistantMessage(result.reply)]);
     } catch {
       setChatMessages(prev => [...prev, makeAssistantMessage("Something got in the way. Try again.")]);
     } finally {
@@ -315,7 +309,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
     ? [...MODULES.filter(m => m.id === suggestedModuleId), ...MODULES.filter(m => m.id !== suggestedModuleId)]
     : MODULES;
 
-  // ── Module detail view ───────────────────────────────────────────────────
   const currentModule = MODULES.find(m => m.id === activeModule);
   if (currentModule) {
     return (
@@ -343,7 +336,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
     );
   }
 
-  // ── Main view ────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={s.root}
@@ -357,8 +349,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
         style={{ opacity: fadeIn }}
         keyboardShouldPersistTaps="handled"
       >
-
-        {/* ── Header ── */}
         <View style={s.header}>
           <TouchableOpacity onPress={() => setScreen('home')} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Text style={s.back}>←</Text>
@@ -369,7 +359,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
           </View>
         </View>
 
-        {/* ── Se'kret cloud + wisdom ── */}
         <View style={s.cloudBlock}>
           <Animated.View style={{ transform: [{ scale: cloudScale }] }}>
             <Image source={IMAGES.cloudHeadphones} style={s.cloudImg} resizeMode="contain" />
@@ -385,7 +374,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
           </View>
         </View>
 
-        {/* ── AI Chat ── */}
         <Text style={s.sectionLabel}>Talk to Se'kret</Text>
         <View style={s.chatArea}>
           {chatMessages.length === 0 && (
@@ -408,7 +396,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
           )}
         </View>
 
-        {/* ── Chat input ── */}
         <View style={s.inputRow}>
           <TextInput
             style={s.chatInput}
@@ -431,7 +418,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
           </TouchableOpacity>
         </View>
 
-        {/* ── Coaching guides (collapsible) ── */}
         <TouchableOpacity style={s.guidesToggle} onPress={() => setShowGuides(v => !v)} activeOpacity={0.8}>
           <Text style={s.sectionLabel} numberOfLines={1}>Coaching Guides</Text>
           <Text style={s.guidesChevron}>{showGuides ? '↑' : '↓'}</Text>
@@ -457,7 +443,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
           );
         })}
 
-        {/* ── Conversation starters ── */}
         <Text style={[s.sectionLabel, { marginTop: 24 }]}>When you don't know what to say</Text>
         <View style={s.starterCard}>
           <Text style={s.starterSituation}>{CONVERSATION_STARTERS[starterIdx].situation}</Text>
@@ -470,7 +455,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
           </TouchableOpacity>
         </View>
 
-        {/* ── Calm shortcut ── */}
         <TouchableOpacity style={s.calmShortcut} onPress={() => setScreen('calm')} activeOpacity={0.8}>
           <Text style={s.calmShortcutEmoji}>🌬️</Text>
           <View style={{ flex: 1 }}>
@@ -487,7 +471,6 @@ export function ParentSekretCoachScreen({ setScreen, parentMood, BottomNav }: Pa
   );
 }
 
-// ── Styles ────────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
   root:   { flex: 1, backgroundColor: '#06030f' },
   scroll: { paddingBottom: 100 },
@@ -515,7 +498,6 @@ const s = StyleSheet.create({
     textTransform: 'uppercase', marginHorizontal: 20, marginBottom: 10,
   },
 
-  // ── Chat ──
   chatArea: {
     marginHorizontal: 20, marginBottom: 8, gap: 10,
   },
@@ -559,7 +541,6 @@ const s = StyleSheet.create({
   sendBtnDisabled: { opacity: 0.35 },
   sendBtnText:     { color: '#e9d5ff', fontSize: 18, fontWeight: '700' },
 
-  // ── Guides ──
   guidesToggle: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     marginHorizontal: 20, marginBottom: 10,

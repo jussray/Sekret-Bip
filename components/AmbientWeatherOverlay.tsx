@@ -78,7 +78,7 @@ function SunRaysLayer({ palette }: { palette: 'cool' | 'warm' | 'amber' }) {
   }, []);
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeIn }]} pointerEvents="none">
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeIn }]} pointerEvents="none">
       {RAY_DEFS.map((ray, i) => (
         <Animated.View
           key={i}
@@ -103,7 +103,7 @@ function SunRaysLayer({ palette }: { palette: 'cool' | 'warm' | 'amber' }) {
             colors={p.colors}
             start={{ x: 0.5, y: 0 }}
             end={{ x: 0.5, y: 1 }}
-            style={StyleSheet.absoluteFillObject}
+            style={StyleSheet.absoluteFill}
           />
         </Animated.View>
       ))}
@@ -175,7 +175,7 @@ function RainLayer() {
       ))}
       <Animated.View
         pointerEvents="none"
-        style={[StyleSheet.absoluteFillObject, { backgroundColor: '#ddeeff', opacity: lightning }]}
+        style={[StyleSheet.absoluteFill, { backgroundColor: '#ddeeff', opacity: lightning }]}
       />
     </>
   );
@@ -221,7 +221,7 @@ function NightStarsLayer({ dim }: { dim: boolean }) {
   const maxStar = dim ? 0.65 : 0.95;
 
   return (
-    <Animated.View style={[StyleSheet.absoluteFillObject, { opacity: fadeIn }]} pointerEvents="none">
+    <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeIn }]} pointerEvents="none">
       {/* Moon glow — upper right halo */}
       <Animated.View
         pointerEvents="none"
@@ -263,7 +263,7 @@ export function AmbientWeatherOverlay({ phase }: AmbientWeatherOverlayProps) {
   if (!mode) return null;
 
   return (
-    <View style={StyleSheet.absoluteFillObject} pointerEvents="none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {mode === 'sunRays'    && <SunRaysLayer palette="cool"  />}
       {mode === 'goldenHour' && <SunRaysLayer palette="warm"  />}
       {mode === 'eveningGlow'&& <SunRaysLayer palette="amber" />}

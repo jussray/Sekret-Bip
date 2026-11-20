@@ -1,0 +1,79 @@
+name: Calm Controls Exact-Head Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/screens/CalmScreen.tsx'
+      - 'app/(teen)/calm/**'
+      - 'test/calm-plan-controls.test.mjs'
+      - 'docs/CALM_CONTROLS_STRIDE.md'
+      - '.github/workflows/calm-controls-exact-head.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'src/screens/CalmScreen.tsx'
+      - 'app/(teen)/calm/**'
+      - 'test/calm-plan-controls.test.mjs'
+      - 'docs/CALM_CONTROLS_STRIDE.md'
+      - '.github/workflows/calm-controls-exact-head.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-calm-controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact event head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'event=%s\nexpected=%s\nactual=%s\n' "$GITHUB_EVENT_NAME" "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Run focused Calm contracts
+        run: node --test test/calm-plan-controls.test.mjs
+
+      - name: Type-check exact head
+        run: npm run type-check
+
+      - name: Run complete unit suite
+        run: npm test
+
+      - name: Run repository lint
+        run: npm run lint
+
+      - name: Upload exact-head evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: calm-controls-evidence-${{ env.EXPECTED_HEAD_SHA }}
+          path: |
+            docs/CALM_CONTROLS_STRIDE.md
+            test/calm-plan-controls.test.mjs
+          if-no-files-found: error
+          retention-days: 30

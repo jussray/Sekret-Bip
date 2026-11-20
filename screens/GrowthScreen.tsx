@@ -1,5 +1,5 @@
 // screens/GrowthScreen.tsx
-// Se'kret Bip — Growth (Rylane-led life skills hub)
+// Se'kret Bip — Growth (Sy-led life skills hub)
 //
 // Phase 2 build: separates pure "life skills" Growth from Bippin2 (which stays
 // as the Womanhood/Manhood content layer). Same voice and polish patterns as
@@ -19,11 +19,14 @@
 // to onMilestone() so progress can count toward streaks once Supabase lands.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Text, TouchableOpacity, ScrollView, View,
   ImageBackground, Animated, Easing, StyleSheet, Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+
+const GROWTH_COMPLETED_KEY = 'bip_growth_completed';
 import { getRoomBg, TimeOfDay } from '../constants/theme';
 import { glowForMood as glowFor } from '../constants/moodGlow';
 
@@ -169,7 +172,7 @@ export function GrowthScreen({
 
   const isRylane = selectedSekret === 'rylane';
   const charKey: 'raylene' | 'rylane' = isRylane ? 'rylane' : 'raylene';
-  const charName = isRylane ? 'Rylane' : 'Raylene';
+  const charName = isRylane ? 'Sy' : 'Suhana';
 
   const time     = useMemo(() => timeOfDay(), []);
   const bgSource = useMemo(() => getRoomBg(charKey, time), [charKey, time]);
@@ -180,6 +183,20 @@ export function GrowthScreen({
     focus: false, confidence: false, mindset: false,
     money: false, school: false, social: false, habits: false,
   });
+
+  useEffect(() => {
+    AsyncStorage.getItem(GROWTH_COMPLETED_KEY).then(raw => {
+      if (!raw) return;
+      try {
+        const keys = JSON.parse(raw) as TrackKey[];
+        setCompleted(prev => {
+          const next = { ...prev };
+          keys.forEach(k => { if (k in next) next[k] = true; });
+          return next;
+        });
+      } catch {}
+    });
+  }, []);
 
   // ── Animations ──────────────────────────────────────────────────────────
   const fadeHero   = useRef(new Animated.Value(0)).current;
@@ -217,7 +234,12 @@ export function GrowthScreen({
   const breathOpacity = breath.interpolate({ inputRange: [0, 1], outputRange: [0.82, 1   ] });
 
   const markComplete = (key: TrackKey) => {
-    setCompleted(prev => ({ ...prev, [key]: true }));
+    setCompleted(prev => {
+      const next = { ...prev, [key]: true };
+      const done = (Object.keys(next) as TrackKey[]).filter(k => next[k]);
+      AsyncStorage.setItem(GROWTH_COMPLETED_KEY, JSON.stringify(done)).catch(() => {});
+      return next;
+    });
     onMilestone?.(key);
   };
 
@@ -376,7 +398,7 @@ export function GrowthScreen({
 
 // ── Styles ───────────────────────────────────────────────────────────────────
 const styles = StyleSheet.create({
-  root:         { flex: 1 },
+  root:         { flex: 1, width: '100%', height: '100%' },
   container:    { padding: 20, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: 100, ...(Platform.OS === 'web' ? { maxWidth: 520, width: '100%', alignSelf: 'center' as const } : {}) },
 
   headerRow:    { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },

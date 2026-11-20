@@ -18,7 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { useAudioPlayer } from '../../../hooks/useAudioPlayer';
+import { emitEvent } from '../../../src/features/activity/events';
 
 // ── Breathing patterns ────────────────────────────────────────────────────────
 type BreathPhase = 'in' | 'hold' | 'out';
@@ -76,29 +76,21 @@ const PHASE_COLORS: Record<BreathPhase, string> = {
   out:  '#7c3aed',
 };
 
-// Playlist — replace URIs with real CDN audio before shipping
-const CALM_PLAYLIST = [
-  { id: 'rain',   emoji: '🌧️', label: 'night rain',  sub: 'soothing rain sounds', duration: '20:00', uri: '' },
-  { id: 'lofi',   emoji: '🎵', label: 'soft lo-fi',  sub: 'focus + unwind',       duration: '30:00', uri: '' },
-  { id: 'ocean',  emoji: '🌊', label: 'ocean waves', sub: 'reset your mind',      duration: '25:00', uri: '' },
-  { id: 'piano',  emoji: '🎹', label: 'soft piano',  sub: 'ease into stillness',  duration: '15:00', uri: '' },
-];
-
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function BreatheScreen() {
   const [patternKey, setPatternKey]   = useState<string>('box');
   const [stepIdx,    setStepIdx]      = useState(0);
   const [counter,    setCounter]      = useState(4);
   const [running,    setRunning]      = useState(false);
-  const [activeSong, setActiveSong]   = useState<string | null>(null);
   const [reminderSet, setReminderSet] = useState(false);
+  const [showNudge,   setShowNudge]   = useState(false);
+  const hasStartedRef  = useRef(false);
+  const startTimeRef   = useRef<number>(0);
 
   const circleScale  = useRef(new Animated.Value(1)).current;
   const glowOpacity  = useRef(new Animated.Value(0.4)).current;
   const glowScale    = useRef(new Animated.Value(1)).current;
   const animRef      = useRef<Animated.CompositeAnimation | null>(null);
-
-  const audio = useAudioPlayer();
 
   const pattern = PATTERNS[patternKey];
   const step    = pattern.steps[stepIdx % pattern.steps.length];
@@ -167,12 +159,20 @@ export default function BreatheScreen() {
 
   function toggleRunning() {
     if (!running) {
+      hasStartedRef.current = true;
+      startTimeRef.current  = Date.now();
+      setShowNudge(false);
       setStepIdx(0);
       setCounter(PATTERNS[patternKey].steps[0].count);
       circleScale.setValue(1);
       glowScale.setValue(1);
     } else {
       animRef.current?.stop();
+      if (hasStartedRef.current) {
+        const durationSecs = Math.round((Date.now() - startTimeRef.current) / 1000);
+        emitEvent('breathe_completed', { durationSecs });
+        setShowNudge(true);
+      }
     }
     setRunning(r => !r);
   }
@@ -180,28 +180,14 @@ export default function BreatheScreen() {
   function switchPattern(key: string) {
     animRef.current?.stop();
     setRunning(false);
+    setShowNudge(false);
+    hasStartedRef.current = false;
     setPatternKey(key);
     setStepIdx(0);
     setCounter(PATTERNS[key].steps[0].count);
     circleScale.setValue(1);
     glowScale.setValue(1);
     glowOpacity.setValue(0.4);
-  }
-
-  // ── Audio ─────────────────────────────────────────────────────────────────
-  async function handleSongPress(song: typeof CALM_PLAYLIST[number]) {
-    if (!song.uri) {
-      Alert.alert('Coming soon', 'Audio tracks will be available in the next update. 💜');
-      return;
-    }
-    if (activeSong === song.id) {
-      if (audio.state === 'playing') await audio.pause();
-      else await audio.play();
-      return;
-    }
-    setActiveSong(song.id);
-    await audio.load(song.uri);
-    await audio.play();
   }
 
   // ── Reminder ─────────────────────────────────────────────────────────────
@@ -225,9 +211,13 @@ export default function BreatheScreen() {
       });
       setReminderSet(true);
       Alert.alert('Reminder set 💜', 'You\'ll get a gentle nudge every hour to breathe.');
-    } catch {
-      Alert.alert('Breathe Reminder', 'Reminder set. You\'ll get a gentle nudge to breathe. 💜');
-      setReminderSet(true);
+    } catch (error) {
+      setReminderSet(false);
+      console.warn('Failed to schedule breathing reminder', error);
+      Alert.alert(
+        'Reminder not set',
+        'We could not schedule the reminder. Check notification settings and try again.'
+      );
     }
   }
 
@@ -328,39 +318,31 @@ export default function BreatheScreen() {
             <Text style={s.startBtnText}>{running ? '⏸  pause' : '▶  start'}</Text>
           </TouchableOpacity>
 
-          {/* Calm Playlist */}
-          <Text style={s.sectionTitle}>Calm Playlist ✦</Text>
-          <Text style={s.sectionSub}>let the sound hold you</Text>
-          {CALM_PLAYLIST.map(song => {
-            const isActive = activeSong === song.id;
-            const isPlaying = isActive && audio.state === 'playing';
-            const isLoading = isActive && audio.state === 'loading';
-            return (
-              <TouchableOpacity
-                key={song.id}
-                style={[s.songRow, isActive && s.songRowActive]}
-                onPress={() => handleSongPress(song)}
-                activeOpacity={0.8}
-              >
-                <Text style={s.songEmoji}>{song.emoji}</Text>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={s.songLabel}>{song.label}</Text>
-                  <Text style={s.songSub}>{song.sub}</Text>
-                  {isActive && audio.durationMs > 0 && (
-                    <View style={s.progressTrack}>
-                      <View style={[s.progressFill, { width: `${audio.progress * 100}%` as any }]} />
-                    </View>
-                  )}
-                </View>
-                <Text style={s.songDur}>{song.duration}</Text>
-                <View style={s.playBtn}>
-                  <Text style={s.playBtnIcon}>
-                    {isLoading ? '⏳' : isPlaying ? '⏸' : '▶'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
+          {/* Loop nudge — shown after a breathing session ends */}
+          {showNudge && !running && (
+            <View style={s.nudgeWrap}>
+              <Text style={s.nudgeText}>nice work. want to capture how you feel?</Text>
+              <View style={s.nudgeRow}>
+                <TouchableOpacity
+                  style={s.nudgeBtn}
+                  onPress={() => { setShowNudge(false); router.push('/(teen)/pages' as any); }}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open Pages journal"
+                >
+                  <Text style={s.nudgeBtnText}>write in Pages</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => setShowNudge(false)}
+                  style={s.nudgeDismiss}
+                  accessibilityRole="button"
+                  accessibilityLabel="Dismiss"
+                >
+                  <Text style={s.nudgeDismissText}>not now</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Breathe Reminder */}
           <View style={s.reminderCard}>
@@ -436,20 +418,6 @@ const s = StyleSheet.create({
   startBtnRunning: { backgroundColor: '#7c3aed' },
   startBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 
-  sectionTitle: { color: '#a855f7', fontSize: 16, fontWeight: '800', marginHorizontal: 16, marginBottom: 4 },
-  sectionSub: { color: '#5a3e72', fontSize: 12, marginHorizontal: 16, marginBottom: 12 },
-
-  songRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginHorizontal: 16, marginBottom: 8, backgroundColor: 'rgba(168,85,247,0.06)', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(168,85,247,0.18)', padding: 12 },
-  songRowActive: { backgroundColor: 'rgba(168,85,247,0.14)', borderColor: 'rgba(168,85,247,0.5)' },
-  songEmoji: { fontSize: 28, width: 36, textAlign: 'center' },
-  songLabel: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  songSub: { color: '#7c5a9e', fontSize: 11 },
-  songDur: { color: '#5a3e72', fontSize: 11, marginRight: 4 },
-  playBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(168,85,247,0.25)', alignItems: 'center', justifyContent: 'center' },
-  playBtnIcon: { color: '#fff', fontSize: 14 },
-  progressTrack: { height: 3, backgroundColor: 'rgba(168,85,247,0.2)', borderRadius: 2, marginTop: 4, overflow: 'hidden' },
-  progressFill: { height: 3, backgroundColor: '#a855f7', borderRadius: 2 },
-
   reminderCard: { marginHorizontal: 16, marginTop: 20, marginBottom: 12, backgroundColor: 'rgba(168,85,247,0.08)', borderRadius: 18, borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)', padding: 18 },
   reminderTitle: { color: '#a855f7', fontSize: 16, fontWeight: '800', marginBottom: 4 },
   reminderSub: { color: '#7c5a9e', fontSize: 12, marginBottom: 14 },
@@ -461,4 +429,12 @@ const s = StyleSheet.create({
   quoteStrip: { margin: 16, borderWidth: 1, borderColor: 'rgba(168,85,247,0.2)', borderRadius: 14, padding: 18 },
   quoteOpen: { color: '#4a2e6a', fontSize: 32, lineHeight: 28, marginBottom: 4 },
   quoteText: { color: '#c4b5fd', fontSize: 14, lineHeight: 22, textAlign: 'center' },
+
+  nudgeWrap:        { marginHorizontal: 16, marginBottom: 20, backgroundColor: 'rgba(168,85,247,0.10)', borderWidth: 1, borderColor: 'rgba(168,85,247,0.28)', borderRadius: 16, padding: 14 },
+  nudgeText:        { color: '#c4b5fd', fontSize: 13, fontWeight: '600', marginBottom: 10 },
+  nudgeRow:         { flexDirection: 'row', gap: 10 },
+  nudgeBtn:         { flex: 1, backgroundColor: 'rgba(168,85,247,0.20)', borderRadius: 12, paddingVertical: 9, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(168,85,247,0.45)' },
+  nudgeBtnText:     { color: '#f0ebff', fontSize: 13, fontWeight: '700' },
+  nudgeDismiss:     { justifyContent: 'center', paddingHorizontal: 12 },
+  nudgeDismissText: { color: '#5a3e72', fontSize: 12 },
 });

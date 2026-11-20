@@ -2,6 +2,9 @@
  * Core chat message function.
  * Sends a message to the Cloudflare Worker with companion and Oracle context.
  */
+import type { CompanionReplyRequest } from '@/contracts/sekretApi';
+import { sekretClient, WORKER_BASE_URL } from '@/services/backend/sekretClient';
+import { logRuntimeAuditEvent } from '@/services/runtimeAudit';
 import type { PersonalityId } from '@/types';
 import {
   learnTeenRelationshipStyle,
@@ -11,14 +14,17 @@ import {
   type TeenRelationshipProfile,
 } from '../../../services/oracleRelationship';
 import {
-  getArrivalReply,
   getConversationPhase,
   isArrivalMessage,
-  keepSekretReply,
+  guardSekretReply,
   getSekretFallback,
   buildConversationPhaseInstruction,
   type ConversationPhase,
 } from '../../../services/sekretVoice';
+import {
+  getLocalSafetyFallback,
+  shouldBypassReplyGuard,
+} from '../../../services/sekretSafety';
 
 export interface ChatMessage {
   id: string;
@@ -35,6 +41,7 @@ export interface SendMessageOptions {
   profileName?: string;
   surface?: 'journal' | 'voiceBip' | 'comfort' | 'circle' | 'parentBridge' | 'selfDiscovery' | 'parentCoach';
   parentSharingEnabled?: boolean;
+  oracleContext?: string[];
 }
 
 export interface WorkerReplyMeta {
@@ -47,22 +54,34 @@ export interface WorkerReplyMeta {
   parentShareSummary?: string | null;
 }
 
-const BASE_URL = ((process.env as Record<string, string | undefined>).EXPO_PUBLIC_BACKEND_URL ?? '').replace(/\/$/, '');
+/**
+ * The structured result returned by sendMessage.
+ * All callers that previously received a bare string can access `.reply`.
+ */
+export interface SendMessageResult {
+  reply: string;
+  /** Where the reply actually came from. */
+  replySource: 'worker' | 'local-fallback' | 'safety';
+  /** True when either the Worker or the client had to use fallback behavior. */
+  fallbackUsed: boolean;
+  /** Human-readable reason a fallback was used, or null when Worker succeeded. */
+  fallbackReason: string | null;
+}
 
 function mayMirrorProfanity(profile: TeenRelationshipProfile): boolean {
   return profile.profanityPreference === 'light-mirroring';
 }
 
+/**
+ * Local fallback reply — used ONLY when the Worker is unreachable or returns
+ * a non-OK status. Greeting messages still travel to the Worker so the Worker
+ * can shape the opening tone with full phaseInstruction context.
+ */
 function localFallback(
   personalityId: PersonalityId,
   text: string,
   relationship: TeenRelationshipProfile,
-  historyLength = 0,
 ): string {
-  if (personalityId !== 'parentCoach' && isArrivalMessage(text, historyLength)) {
-    return getArrivalReply(personalityId);
-  }
-
   const lower = text.toLowerCase();
   const isShortContinuation = /^(idk|nothing|lol|lmao|ok|okay|yeah|nah|sure|random|fine|k+)\s*[!?.]*$/i.test(lower);
   const sad = /\b(sad|cry|lonely|alone|hurt|heavy|depressed|overwhelmed)\b/.test(lower);
@@ -71,94 +90,93 @@ function localFallback(
   const reset = /\b(failed|fell off|gave up|stopped|missed|behind|procrastinat)\w*\b/.test(lower);
   const mirror = mayMirrorProfanity(relationship);
 
-  if (isShortContinuation) {
-    if (personalityId === 'rylane') return "Aight, I'm here. Talk.";
-    if (personalityId === 'cloud') return "Hey. No pressure — whatever you want to say, or nothing at all.";
-    if (personalityId === 'night') return "Still here. No rush.";
-    return "Hey! Random or did something actually happen?";
+  if (personalityId === 'parentCoach') {
+    if (angry) return "Let's slow this down before anyone reacts. What happened right before things escalated?";
+    if (sad) return "That sounds hard for both of you. What happened, and what have you already tried?";
+    return 'Start with what happened at home and what you want to handle differently.';
   }
 
-  if (personalityId === 'rylane') {
+  if (isShortContinuation) {
+    if (personalityId === 'rylane' || (personalityId as string) === 'sy') return "Aight, I'm here. Talk.";
+    if (personalityId === 'cloud') return "Hey. No pressure — whatever you want to say, or nothing at all.";
+    if (personalityId === 'night') return 'Still here. No rush.';
+    return 'Hey! Random or did something actually happen?';
+  }
+
+  if (personalityId === 'rylane' || (personalityId as string) === 'sy') {
     if (angry) return mirror
-      ? "Yeah, that shit would set anybody off. Before you move on it, what line got crossed?"
-      : "Yeah, that would set anybody off. Before you move on it, what line got crossed?";
-    if (sad) return "That sounds heavy for real. You do not have to dress it up — what part is hitting hardest?";
+      ? 'Yeah, that shit would set anybody off. Before you move on it, what line got crossed?'
+      : 'Yeah, that would set anybody off. Before you move on it, what line got crossed?';
+    if (sad) return 'That sounds heavy for real. You do not have to dress it up — what part is hitting hardest?';
     return relationship.nicknameComfort === 'dislikes'
-      ? "Say the real version. What is going on?"
-      : "Aight, say the real version. What is going on?";
+      ? 'Say the real version. What is going on?'
+      : 'Aight, say the real version. What is going on?';
   }
 
   if (personalityId === 'cloud') {
-    if (sad) return "We can make this smaller first. One breath, then one sentence — or no sentence yet.";
-    return "No rush. Start with the smallest piece that feels safe to say.";
+    if (sad) return 'We can make this smaller first. One breath, then one sentence — or no sentence yet.';
+    return 'No rush. Start with the smallest piece that feels safe to say.';
   }
 
   if (personalityId === 'night') {
-    if (planning) return "Hold up — that idea has something. What is the goal, and what is one step you can set up tonight?";
-    if (reset) return "One off day is not your identity. What made the plan fall apart, and what changes this time?";
-    if (sad) return "We can sit with it for a minute. Then we decide whether tonight needs rest, reflection, or one small move forward.";
-    return "Are we trying to understand this, plan it, create something, or finish one small part?";
+    if (planning) return 'Hold up — that idea has something. What is the goal, and what is one step you can set up tonight?';
+    if (reset) return 'One off day is not your identity. What made the plan fall apart, and what changes this time?';
+    if (sad) return 'We can sit with it for a minute. Then we decide whether tonight needs rest, reflection, or one small move forward.';
+    return 'Are we trying to understand this, plan it, create something, or finish one small part?';
   }
 
   if (personalityId === 'oracle') {
-    return "What does this keep revealing about who you are, what you value, or what you are trying to become?";
+    return 'What does this keep revealing about who you are, what you value, or what you are trying to become?';
   }
 
   if (angry) return mirror
-    ? "Okay, that shit really got under your skin. What happened right before it shifted?"
-    : "Okay, that really got under your skin. What happened right before it shifted?";
-  if (sad) return "Tell me the part you keep trying to make sound smaller.";
+    ? 'Okay, that shit really got under your skin. What happened right before it shifted?'
+    : 'Okay, that really got under your skin. What happened right before it shifted?';
+  if (sad) return 'Tell me the part you keep trying to make sound smaller.';
   return relationship.nicknameComfort === 'dislikes'
-    ? "Okay. What really happened?"
-    : "Girl, okay. What really happened?";
+    ? 'Okay. What really happened?'
+    : 'Girl, okay. What really happened?';
 }
+
+// ── Overload signatures (keep public API backward-compatible) ─────────────
 
 export async function sendMessage(
   personalityId: PersonalityId,
   text: string,
   context: string,
   options: SendMessageOptions,
-): Promise<string>;
+): Promise<SendMessageResult>;
 export async function sendMessage(
   personalityId: PersonalityId,
   text: string,
   context: string,
   mood?: string,
   history?: ChatMessage[],
-): Promise<string>;
+): Promise<SendMessageResult>;
+
+// ── Implementation ────────────────────────────────────────────────────────
+
 export async function sendMessage(
   personalityId: PersonalityId,
   text: string,
   context: string = 'chat',
   moodOrOptions?: string | SendMessageOptions,
   legacyHistory?: ChatMessage[],
-): Promise<string> {
+): Promise<SendMessageResult> {
   const options: SendMessageOptions = typeof moodOrOptions === 'object' && moodOrOptions !== null
     ? moodOrOptions
     : { mood: moodOrOptions as string | undefined, history: legacyHistory };
 
-  const { mood, history = [], userName, displayName, profileName, surface, parentSharingEnabled } = options;
+  const { mood, history = [], userName, displayName, profileName, surface, parentSharingEnabled, oracleContext } = options;
   const historyLength = history.length;
 
   const currentRelationship = await loadTeenRelationshipProfile();
   const learnedRelationship = learnTeenRelationshipStyle(text, currentRelationship);
   await saveTeenRelationshipProfile(learnedRelationship);
 
-  // Pure greeting on first touch: return immediately with no Worker latency.
-  if (personalityId !== 'parentCoach' && isArrivalMessage(text, historyLength)) {
-    return getArrivalReply(personalityId);
-  }
-
-  if (!BASE_URL && personalityId !== 'parentCoach') {
-    return localFallback(personalityId, text, learnedRelationship, historyLength);
-  }
-
-  if (!BASE_URL) {
-    return "Hey. Glad you're here. What's going on at home?";
-  }
-
   const phase: ConversationPhase = getConversationPhase(historyLength);
   const phaseInstruction = buildConversationPhaseInstruction(phase, historyLength, personalityId);
+  const isArrival = isArrivalMessage(text, historyLength);
 
   const normalizedSurface: SendMessageOptions['surface'] =
     surface ??
@@ -170,53 +188,154 @@ export async function sendMessage(
               : context === 'selfDiscovery' ? 'selfDiscovery'
                 : context === 'parentCoach' ? 'parentCoach'
                   : 'journal');
+  const localSafetyFallback = getLocalSafetyFallback(text);
 
-  const workerHistory = history.map((m) => ({
-    role: m.role === 'assistant' ? 'assistant' as const : 'user' as const,
-    content: m.text,
+  if (!WORKER_BASE_URL) {
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
+    if (__DEV__) {
+      console.warn(
+        '[sendMessage] No EXPO_PUBLIC_BACKEND_URL set — using local fallback.',
+        { companion: personalityId, surface: normalizedSurface, userTextLength: text.length },
+      );
+    }
+    return {
+      reply: fallbackText,
+      replySource: 'local-fallback',
+      fallbackUsed: true,
+      fallbackReason: 'EXPO_PUBLIC_BACKEND_URL is not configured',
+    };
+  }
+
+  const workerHistory = history.map((message) => ({
+    role: message.role === 'assistant' ? 'assistant' as const : 'user' as const,
+    content: message.text,
   }));
 
-  try {
-    const res = await fetch(`${BASE_URL}/api/sekret/reply`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        userText: text,
-        characterId: personalityId,
-        surface: normalizedSurface,
-        mood,
-        history: workerHistory,
-        parentSharingEnabled: parentSharingEnabled ?? false,
-        userName,
-        displayName,
-        profileName,
-        conversationPhase: phase,
-        phaseInstruction,
-        memory: {
-          relationshipStyle: relationshipProfileToOracleNote(learnedRelationship),
-        },
-      }),
+  const payload: CompanionReplyRequest = {
+    userText: text,
+    characterId: personalityId === 'oracle' ? 'sekret' : personalityId === 'raylene' ? 'suhana' : personalityId === 'rylane' ? 'sy' : personalityId,
+    surface: normalizedSurface ?? 'journal',
+    mood,
+    history: workerHistory,
+    parentSharingEnabled: parentSharingEnabled ?? false,
+    userName,
+    displayName,
+    profileName,
+    conversationPhase: phase,
+    phaseInstruction,
+    isArrival,
+    memory: {
+      relationshipStyle: relationshipProfileToOracleNote(learnedRelationship),
+      ...(oracleContext && oracleContext.length > 0 ? { oracleContext } : {}),
+    },
+  };
+
+  if (__DEV__) {
+    console.log('[sendMessage] → Worker', {
+      companion: payload.characterId,
+      surface: payload.surface,
+      url: `${WORKER_BASE_URL}/api/sekret/reply`,
+      isArrival,
+      phase,
+      payloadBytes: JSON.stringify(payload).length,
+      historyLength,
+      hasMood: Boolean(mood),
+      hasOracleContext: Boolean(oracleContext?.length),
     });
-
-    if (!res.ok) {
-      console.error(`[sendMessage] Worker responded ${res.status}`);
-      return localFallback(personalityId, text, learnedRelationship, historyLength);
-    }
-
-    const data = await res.json() as { reply?: string; replySource?: string; detectedIntent?: string };
-    const rawReply = data.reply ?? '';
-
-    if (!rawReply) {
-      console.error('[sendMessage] Worker returned empty reply, using fallback');
-      return localFallback(personalityId, text, learnedRelationship, historyLength);
-    }
-
-    const fallback = getSekretFallback(personalityId, text);
-    return keepSekretReply(rawReply, fallback);
-  } catch (err) {
-    console.error('[sendMessage] Worker fetch failed:', err);
-    return localFallback(personalityId, text, learnedRelationship, historyLength);
   }
+
+  const result = await sekretClient.sendReply(payload);
+  if (!result.ok) {
+    const reason = `${result.error.code}${result.error.status ? ` (${result.error.status})` : ''}`;
+    console.error('[sendMessage] Worker request failed:', reason, result.error.traceId ?? 'no-trace');
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
+    return {
+      reply: fallbackText,
+      replySource: 'local-fallback',
+      fallbackUsed: true,
+      fallbackReason: reason,
+    };
+  }
+
+  const data = result.data;
+  const rawReply = data.reply ?? '';
+  if (!rawReply) {
+    const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
+    return {
+      reply: fallbackText,
+      replySource: 'local-fallback',
+      fallbackUsed: true,
+      fallbackReason: 'Worker returned empty reply',
+    };
+  }
+
+  const isParentCoach = personalityId === 'parentCoach';
+  const sekretFallback = localSafetyFallback ?? (isParentCoach
+    ? localFallback(personalityId, text, learnedRelationship)
+    : getSekretFallback(personalityId, text));
+
+  // Teen-companion voices reject em/en dashes as an AI tell. Parent Coach may
+  // use those marks naturally, so remove dash separators only for evaluation.
+  // Collapsing them to whitespace keeps blocked word sequences contiguous;
+  // inserting a hyphen here could let a phrase such as “I'm here to support
+  // you” evade the shared guard.
+  const guardInput = isParentCoach
+    ? rawReply.replace(/\s*(?:—|–|--)\s*/g, ' ').replace(/\s+/g, ' ').trim()
+    : rawReply;
+  const guardBypass = shouldBypassReplyGuard(rawReply, data.safetyFlag);
+  const { reply: guardedCandidate, blocked: guardBlocked } = guardBypass.bypass
+    ? { reply: rawReply.trim(), blocked: false }
+    : guardSekretReply(guardInput, sekretFallback);
+  const guardedReply = guardBypass.bypass
+    ? rawReply.trim()
+    : isParentCoach && !guardBlocked
+      ? rawReply.trim()
+      : guardedCandidate;
+  const guardSubstituted = guardBlocked && !guardBypass.bypass;
+  const safetyBackstopTriggered = guardBypass.reason === 'crisis-resource-backstop';
+
+  if (__DEV__ && guardSubstituted) {
+    console.warn('[sendMessage] keepSekretReply blocked Worker reply — substituted character fallback.', {
+      companion: personalityId,
+      blockedReplyLength: rawReply.length,
+      substitutedReplyLength: guardedReply.length,
+      traceId: data.traceId ?? result.meta.traceId,
+    });
+  }
+
+  if (__DEV__ && safetyBackstopTriggered) {
+    console.warn('[sendMessage] crisis-resource backstop bypassed reply guard because safetyFlag was missing.', {
+      companion: personalityId,
+      surface: normalizedSurface,
+      traceId: data.traceId ?? result.meta.traceId,
+    });
+  }
+
+  logRuntimeAuditEvent('manual', {
+    event_type: 'companion_chat_sent',
+    screen: normalizedSurface ?? 'chat',
+    severity: 'info',
+    metadata: {
+      companion: personalityId,
+      surface: normalizedSurface,
+      reply_source: data.replySource ?? 'worker',
+      history_length: historyLength,
+      fallback_used: result.meta.fallbackUsed || guardSubstituted,
+      reply_guard_substituted: guardSubstituted,
+      safety_resource_backstop: safetyBackstopTriggered,
+      trace_id: data.traceId ?? result.meta.traceId ?? null,
+      avatar_state: data.avatarState ?? null,
+    },
+  }).catch(() => {/* silent — never block the reply */});
+
+  return {
+    reply: guardedReply,
+    replySource: guardBypass.bypass ? 'safety' : guardSubstituted ? 'local-fallback' : 'worker',
+    fallbackUsed: result.meta.fallbackUsed || guardSubstituted,
+    fallbackReason: guardSubstituted
+      ? 'Reply guard replaced Worker reply with character fallback'
+      : result.meta.fallbackUsed ? 'Worker served fallback response' : null,
+  };
 }
 
 function makeMessageId(role: ChatMessage['role']): string {

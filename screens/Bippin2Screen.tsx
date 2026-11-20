@@ -1,7 +1,7 @@
 // screens/Bippin2Screen.tsx
 // Phase 1 polish: time-of-day backdrop, mood-tinted glow, char-aware greeting,
 // staggered entrance, breath loop on cloud + streak. Also fixes inverted
-// gender-polarity: Raylene → Womanhood content, Rylane → Manhood content
+// gender-polarity: Suhana → Womanhood content, Sy → Manhood content
 // (was swapped). No screens removed, no new features.
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sendParentNote, fetchLinkedTeenId, fetchParentEngagement, ParentEngagement } from '@/utils/sync';
+import { usePoints, TIERS, tierFor, type Tier } from '@/features/activity/ledger';
 
 const ART: Record<string, Record<string, any>> = {
   raylene: {
@@ -36,7 +37,7 @@ const ART: Record<string, Record<string, any>> = {
   },
 };
 
-// ─── Static data — Womanhood (Raylene) ─────────────────────────────────────────
+// ─── Static data — Womanhood (Suhana) ─────────────────────────────────────────
 const W_CHIPS = [
   { key: 'period',   emoji: '🩸', label: 'First Period\nSupport' },
   { key: 'cycle',    emoji: '🫶', label: 'Cycle\nWellness' },
@@ -63,7 +64,7 @@ const W_BIP_FLOW = [
   { icon: '🕊️', step: 'grow',     sub: 'keep bippin' },
 ];
 
-// ─── Static data — Manhood (Rylane) ───────────────────────────────────────────
+// ─── Static data — Manhood (Sy) ───────────────────────────────────────────
 const M_CHIPS = [
   { key: 'puberty',    emoji: '🪱', label: 'Puberty\nGuide' },
   { key: 'body',       emoji: '🧠', label: 'Body\nChanges' },
@@ -130,6 +131,14 @@ const PARENT_STARTERS = [
   "I see you working on yourself. That matters.",
 ];
 
+// ─── Compact mood history for progress card (top moods shown inline) ──────────
+const BIP2_MOOD_HISTORY = [
+  { label: 'calm',   emoji: '😌' },
+  { label: 'happy',  emoji: '😊' },
+  { label: 'tired',  emoji: '😴' },
+  { label: 'okay',   emoji: '🤍' },
+];
+
 const getTimeOfDay = (): TimeOfDay => {
   const h = new Date().getHours();
   if (h >= 5 && h < 11) return 'morning';
@@ -192,7 +201,7 @@ export function Bippin2Screen({
   const isRylane      = selectedSekret === 'rylane';
   const isNight       = selectedSekret === 'night';
   const isManhoodChar = isRylane || isNight;
-  const charName      = isRylane ? 'Rylane' : isNight ? 'Night' : 'Raylene';
+  const charName      = isRylane ? 'Sy' : isNight ? 'Night' : 'Suhana';
   const charEmoji     = isRylane ? '🪱' : isNight ? '🌙' : '🫶';
   const artKey        = isNight ? 'night' : (isRylane ? 'rylane' : 'raylene');
   const art           = ART[artKey];
@@ -201,10 +210,20 @@ export function Bippin2Screen({
   const time = useMemo(() => getTimeOfDay(), []);
   const bg   = useMemo(() => getRoomBg(charKey, time), [charKey, time]);
 
-  // Manhood chars (Rylane/Night): cool electric blue. Raylene: warm purple.
+  // Manhood chars (Sy/Night): cool electric blue. Suhana: warm purple.
   const idAccent   = isManhoodChar ? '#4DA3FF' : t.accent;
   const idSoft     = isManhoodChar ? '#B6DCFF' : t.soft;
   const glow       = useMemo(() => moodGlow(mood), [mood]);
+
+  // ─── Bip Points ledger (live, teen-only) ──────────────────────────────────
+  const ledger     = usePoints();
+  const bipTier: Tier   = ledger.isLoaded ? ledger.tier : tierFor(0);
+  const bipTierIdx      = TIERS.findIndex(t2 => t2.key === bipTier.key);
+  const bipNextTier     = TIERS[bipTierIdx + 1];
+  const bipTotal        = ledger.isLoaded ? ledger.total : 0;
+  const bipProgress     = bipNextTier
+    ? Math.min(1, Math.max(0, (bipTotal - bipTier.min) / (bipNextTier.min - bipTier.min)))
+    : 1;
 
   // ─── Animations ───────────────────────────────────────────────────────────
   const fadeIn   = useRef(new Animated.Value(0)).current;
@@ -584,7 +603,7 @@ export function Bippin2Screen({
           </ScrollView>
         </Animated.View>
 
-        {/* WOMANHOOD CARDS (Raylene only — no boy avatars here). */}
+        {/* WOMANHOOD CARDS (Suhana only — no boy avatars here). */}
         <Animated.View style={cardStyle(card3)}>
           {!isManhoodChar && (
             <>
@@ -664,7 +683,7 @@ export function Bippin2Screen({
             </>
           )}
 
-          {/* MANHOOD CARDS (Rylane or Night). */}
+          {/* MANHOOD CARDS (Sy or Night). */}
           {isManhoodChar && (
             <>
               <View style={styles.threeColRow}>
@@ -760,6 +779,54 @@ export function Bippin2Screen({
         </Animated.View>
 
         <Animated.View style={cardStyle(card4)}>
+          {/* ── Bip Progress + Insights ──────────────────────────────────────── */}
+          <View style={scrapCard()}>
+            <Text style={[styles.cardLabel, { color: idAccent }]}>bip progress ✨</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+              <Animated.Text style={[{ fontSize: 30 }, { transform: [{ scale: breathScale }] }]}>
+                {bipTier.emoji}
+              </Animated.Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#fff', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>{bipTotal}</Text>
+                <Text style={{ color: bipTier.color, fontSize: 13, fontWeight: '800' }}>{bipTier.label}</Text>
+              </View>
+              <View style={{ backgroundColor: idAccent + '22', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
+                <Text style={{ color: idAccent, fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>pts</Text>
+              </View>
+            </View>
+            <View style={{ height: 8, width: '100%', borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.12)', overflow: 'hidden', marginBottom: 6 }}>
+              <View style={{ height: '100%', width: `${bipProgress * 100}%` as any, backgroundColor: bipTier.color, borderRadius: 999 }} />
+            </View>
+            <Text style={{ color: 'rgba(255,255,255,0.52)', fontSize: 11, fontWeight: '600', marginBottom: 14 }}>
+              {bipNextTier ? `${Math.max(0, bipNextTier.min - bipTotal)} until ${bipNextTier.label}` : 'you filled the whole sky ✨'}
+            </Text>
+            <Text style={[styles.cardBodySmall, { marginBottom: 8 }]}>your recent moods</Text>
+            <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+              {BIP2_MOOD_HISTORY.map(m => (
+                <View key={m.label} style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(20,12,40,0.65)', borderWidth: 1, borderColor: idAccent + '44', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 6 }}>
+                  <Text style={{ fontSize: 14 }}>{m.emoji}</Text>
+                  <Text style={{ color: idSoft, fontSize: 11, fontWeight: '600' }}>{m.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            {ledger.isLoaded && ledger.breakdown.some(row => row.count > 0) && (
+              <>
+                <Text style={[styles.cardBodySmall, { marginTop: 14, marginBottom: 8 }]}>where your points came from</Text>
+                <View style={{ gap: 6 }}>
+                  {ledger.breakdown.filter(row => row.count > 0).map(row => (
+                    <View key={row.key} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ fontSize: 14 }}>{row.emoji}</Text>
+                      <Text style={{ flex: 1, color: idSoft, fontSize: 12, fontWeight: '600' }}>{row.label}</Text>
+                      <Text style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>{row.count}×</Text>
+                      <Text style={{ color: idAccent, fontSize: 12, fontWeight: '800', minWidth: 34, textAlign: 'right' }}>{row.pts}pt</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+
           <View style={scrapCard()}>
             <Text style={[styles.cardLabel, { color: idAccent }]}>
               BIP FLOW {isManhoodChar ? (isRylane ? '🪱' : '🌙') : '🫶'}

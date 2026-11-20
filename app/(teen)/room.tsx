@@ -1,94 +1,96 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+// app/(teen)/room.tsx
+//
+// ROUTING RULE:
+//   Sekret hotspot tap → /(teen)/pages (with companion param)
+//   companion-chat.tsx is backend/service logic — NOT a user-facing destination.
+//   Do not push to /(teen)/companion-chat from this file.
+
+import { useEffect } from 'react';
+import { View } from 'react-native';
 import { router } from 'expo-router';
-import { RoomScreen } from '@screens/RoomScreen';
+import { UserRoomScreen } from '@screens/UserRoomScreen';
+import { VisualCanonAtmosphere } from '../../components/rooms/VisualCanonAtmosphere';
+import { BipReturnOverlay } from '../../components/retention/BipReturnOverlay';
+import { DailyIntentionsCard } from '../../components/intentions/DailyIntentionsCard';
 import { useAppContext } from '@/context/AppContext';
 import { THEME_PACKS } from '@/constants/theme';
+import { TEEN_ROUTES } from '@/teen/routes';
 import { routeForSide } from '@/shared/routes';
-import { loadSekretMemory } from '../../services/sekretMemory';
-import { syncRoomMemory } from '@/utils/sync';
+
+const ROOM_VIBES = ['rylane', 'cloud', 'night', 'rain', 'sunset'] as const;
+
+type RoomVibe = (typeof ROOM_VIBES)[number];
+
+function resolveRoomVibe(theme: string): RoomVibe | 'raylene' {
+  return ROOM_VIBES.includes(theme as RoomVibe) ? (theme as RoomVibe) : 'raylene';
+}
+
+function resolveCompanionKey(selectedSekret: string | null | undefined): string {
+  return selectedSekret === 'soft' || !selectedSekret ? 'raylene' : selectedSekret;
+}
 
 export default function TeenRoomRoute() {
-  const { mood, selectedSekret, setSelectedSekret, theme, entries, moodHistory } = useAppContext();
-  const t = THEME_PACKS[theme] ?? THEME_PACKS.neon;
-
-  const [streakDays, setStreakDays] = useState(0);
-
-  // Room memory — merged locally, synced to Supabase on each interaction
-  const roomMemRef = useRef({
-    character: selectedSekret ?? 'raylene',
-    lastVisit: new Date().toISOString(),
-    lastHotspot: '',
-    lastSummon: '',
-    visitCount: 0,
-  });
+  const {
+    mood,
+    selectedSekret,
+    setSelectedSekret,
+    theme,
+    updateRoomMemory,
+    entries,
+    comfortSessions,
+    voiceNotes,
+    isLoading,
+  } = useAppContext();
+  const t = THEME_PACKS[theme] ?? THEME_PACKS.raylene;
+  const vibe = resolveRoomVibe(theme);
+  const companionKey = resolveCompanionKey(selectedSekret);
 
   useEffect(() => {
-    loadSekretMemory().then(mem => setStreakDays(mem.streaks.current));
-    // Count this visit
-    roomMemRef.current.visitCount += 1;
-    roomMemRef.current.lastVisit = new Date().toISOString();
-    syncRoomMemory({ ...roomMemRef.current });
+    updateRoomMemory({
+      character: companionKey,
+      lastVisit: new Date().toISOString(),
+    });
+    // A Room mount is one visit. Hotspot and companion taps update their own
+    // fields without incrementing the visit counter.
   }, []);
 
-  const lastActivity = useMemo(() => {
-    const lastEntry = entries?.[entries.length - 1];
-    if (lastEntry?.text?.trim()) {
-      const text = lastEntry.text.trim();
-      return {
-        label: 'Continue your last page',
-        snippet: text.slice(0, 65) + (text.length > 65 ? '…' : ''),
-        route: 'pages',
-      };
+  const handleScreen = (screen: string) => {
+    if (screen === 'sekret') {
+      // Land on Pages with the current companion pre-selected.
+      // companion-chat.tsx is service logic — not a user destination.
+      router.push({
+        pathname: TEEN_ROUTES.pages,
+        params: { companion: companionKey },
+      } as never);
+      return;
     }
-    if (streakDays >= 2) {
-      return {
-        label: `${streakDays}-day streak — keep it going`,
-        route: 'pages',
-      };
-    }
-    const lastMood = moodHistory?.[moodHistory.length - 1];
-    if (lastMood?.mood) {
-      return {
-        label: `You checked in feeling ${lastMood.mood}`,
-        route: 'pages',
-      };
-    }
-    return null;
-  }, [entries, moodHistory, streakDays]);
 
-  const handleUpdateRoomMemory = useCallback((patch: Record<string, any>) => {
-    Object.assign(roomMemRef.current, patch);
-    syncRoomMemory({ ...roomMemRef.current });
-  }, []);
-
-  const companionKey = selectedSekret === 'soft' ? 'raylene' : selectedSekret;
-
-  const handleTalkToSekret = () => {
-    router.push({
-      pathname: '/(teen)/companion-chat',
-      params: { companion: companionKey, surface: 'home' },
-    } as any);
+    router.push(routeForSide('teen', screen) as never);
   };
 
-  const vibe =
-    theme === 'rylane' || theme === 'cloud' || theme === 'night' ||
-    theme === 'rain'   || theme === 'sunset'
-      ? theme
-      : 'raylene';
-
   return (
-    <RoomScreen
-      mood={mood}
-      selectedSekret={selectedSekret}
-      setSelectedSekret={setSelectedSekret}
-      setScreen={(screen: string) => router.push(routeForSide('teen', screen) as any)}
-      t={t}
-      vibe={vibe}
-      BottomNav={null}
-      sekretMode={selectedSekret}
-      onTalkToSekret={handleTalkToSekret}
-      lastActivity={lastActivity}
-      updateRoomMemory={handleUpdateRoomMemory}
-    />
+    <View style={{ flex: 1, backgroundColor: '#09031c' }}>
+      <UserRoomScreen
+        mood={mood}
+        selectedSekret={selectedSekret}
+        setSelectedSekret={setSelectedSekret}
+        setScreen={handleScreen}
+        t={t}
+        vibe={vibe}
+        BottomNav={null}
+        sekretMode={selectedSekret}
+        updateRoomMemory={updateRoomMemory}
+      />
+      <VisualCanonAtmosphere />
+      <DailyIntentionsCard
+        mood={mood}
+        companionKey={companionKey}
+        entries={entries}
+        comfortSessions={comfortSessions}
+        voiceNotes={voiceNotes}
+        isLoading={isLoading}
+      />
+      <BipReturnOverlay onNavigate={handleScreen} />
+    </View>
   );
 }

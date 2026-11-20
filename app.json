@@ -11,9 +11,8 @@
       "android",
       "web"
     ],
-    "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#160028"
+    "updates": {
+      "enabled": false
     },
     "ios": {
       "supportsTablet": false,

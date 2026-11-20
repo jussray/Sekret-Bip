@@ -2,17 +2,22 @@
 // Se'kret Bip — Cloud sync layer (Phase 2 + Phase 3 backend)
 //
 // All cloud writes go through here. Every helper is a SAFE NO-OP when
-// Supabase isn’t configured — the app keeps working off AsyncStorage, no
+// Supabase isn't configured — the app keeps working off AsyncStorage, no
 // errors thrown. This lets us ship the UI now and add credentials later.
 //
-// Auth model: each row is scoped to auth.uid() via RLS. If there’s no
-// signed-in user yet, writes are silently skipped (kept locally only).
-// ensureAnonymousSession() is called from useAppEffects on mount.
+// Auth model: each row is scoped to auth.uid() via RLS. If there's no
+// permanent signed-in account yet, writes are silently skipped (kept
+// locally only). No anonymous session is ever created here — account
+// authentication is permanent-account only, and anonymous participation
+// lives in Circle (public identity), never in sign-in.
 //
-// IMPORTANT: never throw. The user’s local experience must never break
+// IMPORTANT: never throw. The user's local experience must never break
 // because the cloud is down. Errors are logged and swallowed.
 
 import { getSupabase, TABLES } from './supabase';
+import { getCurrentSessionUserId } from '@/services/session';
+import { loadState } from './storage';
+import { emitEvent } from '@/features/activity/events';
 import type {
   JournalEntry, MoodEntry, CirclePost, ParentCirclePost, VoiceNote,
   ComfortSession, CrewMember, CrewCheckIn,
@@ -25,19 +30,59 @@ import type {
   ParentCirclePost as CircleParentPost,
 } from '../../types/circle';
 
+
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+type SyncRow = Record<string, JsonValue | undefined>;
+type ReactionCounts = Record<string, number>;
+const EMPTY_PARENT_REACTIONS: ReactionCounts = {
+  beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0,
+};
+function compactReactions(reactions: Record<string, number | undefined> | undefined): ReactionCounts {
+  if (!reactions) return {};
+  return Object.fromEntries(
+    Object.entries(reactions).filter((entry): entry is [string, number] => typeof entry[1] === 'number'),
+  );
+}
+type SupabaseErrorLike = { message?: string; code?: string };
+type SupabaseDataResult<T> = { data: T | null; error: SupabaseErrorLike | null };
+type ParentCirclePostRow = {
+  id: number; text: string; date: string; time: string;
+  reactions: ReactionCounts | null; circle_tag: string | null;
+};
+type PublicCirclePostRow = {
+  id: string | number; text: string; post_mood: string | null; media_kind: string | null;
+  reactions: ReactionCounts | null; created_at: string;
+};
+type SharedCirclePostRow = PublicCirclePostRow & { user_id: string };
+type CircleProfileRow = { user_id: string; nickname: string; avatar_emoji: string };
+type RoomMemoryRow = {
+  character: string; last_visit: string | null; last_hotspot: string | null;
+  last_summon: string | null; visit_count: number | null;
+};
+type MoodHistoryRow = Pick<MoodEntry, 'id' | 'mood' | 'date' | 'time'>;
+type JournalEntryRow = Pick<JournalEntry, 'id' | 'text' | 'mood' | 'date' | 'time'> & { sekret_reply: string | null };
+type CirclePostRow = Pick<CirclePost, 'id' | 'text' | 'date' | 'time' | 'reactions'> & { circle_tag: string | null; post_mood: string | null; media_kind: string | null };
+type VoiceNoteRow = Pick<VoiceNote, 'id' | 'title' | 'date' | 'time' | 'duration'>;
+type ComfortSessionRow = Pick<ComfortSession, 'id' | 'type' | 'date' | 'time'> & { mood: string | null };
+type CrewMemberRow = Pick<CrewMember, 'id' | 'name' | 'emoji' | 'commitment' | 'cadence'> & {
+  invite_code: string | null | undefined; added_at: string | null;
+};
+type CrewCheckInRow = {
+  id: number; member_id: string | number; note: string | undefined;
+  mood: string | null; date: string; time: string;
+};
+
 // ── Internal helpers ──────────────────────────────────────────────
 async function currentUserId(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
   try {
-    const { data } = await sb.auth.getUser();
-    return data?.user?.id ?? null;
+    return await getCurrentSessionUserId();
   } catch {
     return null;
   }
 }
 
-async function safeUpsert(table: string, payload: any | any[]): Promise<void> {
+async function safeUpsert(table: string, payload: SyncRow | SyncRow[]): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
   const uid = await currentUserId();
@@ -47,10 +92,10 @@ async function safeUpsert(table: string, payload: any | any[]): Promise<void> {
     const withUser = rows.map(r => ({ ...r, user_id: uid }));
     const { error } = await sb.from(table).upsert(withUser, { onConflict: 'id,user_id' });
     if (error) {
-      console.warn('[sync] safeUpsert failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SAFEUPSERT_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] upsert ${table} failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_UPSERT_FAILED');
   }
 }
 
@@ -62,34 +107,16 @@ async function safeDelete(table: string, id: number | string): Promise<void> {
   try {
     const { error } = await sb.from(table).delete().match({ id, user_id: uid });
     if (error) {
-      console.warn('[sync] safeDelete failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SAFEDELETE_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] delete ${table} failed`, e);
-  }
-}
-
-// ── Anonymous sign-in ────────────────────────────────────────────
-export async function ensureAnonymousSession(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  try {
-    const { data } = await sb.auth.getUser();
-    if (data?.user?.id) return data.user.id;
-    const { data: signed, error } = await sb.auth.signInAnonymously();
-    if (error) {
-      if (__DEV__) console.warn('[sync] anon sign-in failed', error);
-      return null;
-    }
-    return signed?.user?.id ?? null;
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] ensureAnonymousSession threw', e);
-    return null;
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_DELETE_FAILED');
   }
 }
 
 // ── Mood ───────────────────────────────────────────────────────────
 export function syncMood(entry: MoodEntry): void {
+  emitEvent('mood_logged', { mood: entry.mood });
   void safeUpsert(TABLES.moodHistory, {
     id:   entry.id,
     mood: entry.mood,
@@ -100,6 +127,10 @@ export function syncMood(entry: MoodEntry): void {
 
 // ── Journal ─────────────────────────────────────────────────────────
 export function syncJournal(entry: JournalEntry): void {
+  emitEvent('journal_saved', {
+    mood:      entry.mood,
+    wordCount: entry.text ? entry.text.trim().split(/\s+/).filter(Boolean).length : 0,
+  });
   void safeUpsert(TABLES.journalEntries, {
     id:           entry.id,
     text:         entry.text,
@@ -117,7 +148,7 @@ export function syncCirclePost(post: CirclePost): void {
     text:       post.text,
     date:       post.date,
     time:       post.time,
-    reactions:  post.reactions,
+    reactions:  compactReactions(post.reactions),
     circle_tag: post.circleTag ?? null,
     post_mood:  post.postMood  ?? null,
     media_kind: post.mediaKind ?? null,
@@ -130,7 +161,7 @@ export function syncParentCirclePost(post: ParentCirclePost): void {
     text:       post.text,
     date:       post.date,
     time:       post.time,
-    reactions:  post.reactions,
+    reactions:  compactReactions(post.reactions),
     circle_tag: post.circleTag ?? null,
   });
 }
@@ -151,16 +182,16 @@ export async function loadParentCircleFeed(
       .order('id', { ascending: false })
       .limit(limit);
     if (error) throw error;
-    return (data ?? []).map((r: any) => ({
+    return (data ?? []).map((r: ParentCirclePostRow) => ({
       id:        r.id,
       text:      r.text,
       date:      r.date,
       time:      r.time,
-      reactions: r.reactions ?? { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
+      reactions: r.reactions ?? EMPTY_PARENT_REACTIONS,
       circleTag: r.circle_tag ?? undefined,
     })) as ParentCirclePost[];
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadParentCircleFeed failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPARENTCIRCLEFEED_FAILED');
     return [];
   }
 }
@@ -180,7 +211,7 @@ export async function loadCircleFeed(
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data ?? []).map((r: any) => ({
+      return (data ?? []).map((r: PublicCirclePostRow) => ({
         id: r.id, text: r.text, post_mood: r.post_mood ?? null,
         media_kind: r.media_kind ?? null, reactions: r.reactions ?? {},
         created_at: r.created_at,
@@ -195,19 +226,18 @@ export async function loadCircleFeed(
         .limit(limit);
       if (error) throw error;
       const rows = posts ?? [];
-      // Fetch display names for each author (two-step; no FK from post→circle_profiles)
       let profileMap: Record<string, { nickname: string; avatar_emoji: string }> = {};
-      const userIds = [...new Set(rows.map((r: any) => r.user_id as string))];
+      const userIds = [...new Set(rows.map((r: SharedCirclePostRow) => r.user_id))];
       if (userIds.length > 0) {
         const { data: profiles } = await sb
           .from(TABLES.circleProfiles)
           .select('user_id, nickname, avatar_emoji')
           .in('user_id', userIds);
         profileMap = Object.fromEntries(
-          (profiles ?? []).map((p: any) => [p.user_id, { nickname: p.nickname, avatar_emoji: p.avatar_emoji }]),
+          (profiles ?? []).map((p: CircleProfileRow) => [p.user_id, { nickname: p.nickname, avatar_emoji: p.avatar_emoji }]),
         );
       }
-      return rows.map((r: any) => ({
+      return rows.map((r: SharedCirclePostRow) => ({
         id: r.id, user_id: r.user_id,
         nickname:     profileMap[r.user_id]?.nickname     ?? 'Anonymous',
         avatar_emoji: profileMap[r.user_id]?.avatar_emoji ?? '🌙',
@@ -223,26 +253,24 @@ export async function loadCircleFeed(
         .order('created_at', { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return (data ?? []).map((r: any) => ({
+      return (data ?? []).map((r: Pick<ParentCirclePostRow, 'id' | 'text' | 'reactions' | 'circle_tag'> & { created_at: string }) => ({
         id:               r.id,
         user_id:          '',
         text:             r.text,
-        reactions:        r.reactions ?? { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
+        reactions:        r.reactions ?? EMPTY_PARENT_REACTIONS,
         circle_tag:       r.circle_tag ?? null,
         created_at:       r.created_at,
         identity_revealed: false,
       })) as CircleParentPost[];
     }
     return null;
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] loadCircleFeed(${tab}) failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADCIRCLEFEED_FAILED');
     return null;
   }
 }
 
 // ── Circle V1: Reaction sync ──────────────────────────────────────────────────
-// Call signature: syncCircleReaction(postId, postType, emoji)
-// Back-compat 2-arg form: syncCircleReaction(postId, emoji) — defaults postType to 'public'.
 export async function syncCircleReaction(
   postId: string | number,
   tabOrReaction: string,
@@ -250,6 +278,7 @@ export async function syncCircleReaction(
 ): Promise<void> {
   const postType = reaction != null ? tabOrReaction : 'public';
   const emoji    = reaction ?? tabOrReaction;
+  emitEvent('circle_reaction', { reactionKey: emoji });
   const sb = getSupabase();
   if (!sb) return;
   const uid = await currentUserId();
@@ -262,10 +291,10 @@ export async function syncCircleReaction(
         { onConflict: 'post_id,post_type,user_id', ignoreDuplicates: true },
       );
     if (error) {
-      console.warn('[sync] syncCircleReaction failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCCIRCLEREACTION_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncCircleReaction failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCCIRCLEREACTION_FAILED');
   }
 }
 
@@ -275,6 +304,7 @@ export async function writeCirclePost(
   text: string,
   opts: { postMood?: string; circleTag?: string; mediaKind?: string; mediaUrl?: string; revealIdentity?: boolean } = {},
 ): Promise<void> {
+  emitEvent('circle_post');
   const sb = getSupabase();
   if (!sb) return;
   const uid = await currentUserId();
@@ -301,74 +331,16 @@ export async function writeCirclePost(
       created_at: new Date().toISOString(),
     });
     if (error) {
-      console.warn('[sync] writeCirclePost failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_WRITECIRCLEPOST_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] writeCirclePost(${tab}) failed`, e);
-  }
-}
-
-// ── Circle replies ────────────────────────────────────────────────────
-export async function writeCircleReply(
-  postId: number,
-  postType: 'public' | 'friends' | 'crew' | 'parent',
-  replyMode: 'comfort' | 'voice' | 'support' | 'stay',
-  opts: { text?: string; voiceUrl?: string; durationSecs?: number } = {},
-): Promise<void> {
-  const sb = getSupabase();
-  if (!sb) return;
-  const uid = await currentUserId();
-  if (!uid) return;
-  try {
-    const { error } = await sb.from(TABLES.circleReplies).insert({
-      post_id:      postId,
-      post_type:    postType,
-      user_id:      uid,
-      reply_mode:   replyMode,
-      text:         opts.text        ?? null,
-      voice_url:    opts.voiceUrl    ?? null,
-      duration_secs: opts.durationSecs ?? null,
-      created_at:   new Date().toISOString(),
-    });
-    if (error) console.warn('[sync] writeCircleReply failed:', error.message, error.code);
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] writeCircleReply failed', e);
-  }
-}
-
-import type { CirclePostReply } from '../types/index';
-
-export async function loadCircleReplies(
-  postId: number,
-  postType: string,
-): Promise<CirclePostReply[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  try {
-    const { data, error } = await sb
-      .from(TABLES.circleReplies)
-      .select('id, post_id, post_type, reply_mode, text, voice_url, duration_secs, created_at')
-      .eq('post_id', postId)
-      .eq('post_type', postType)
-      .order('created_at', { ascending: true });
-    if (error) { console.warn('[sync] loadCircleReplies failed:', error.message); return []; }
-    return (data ?? []).map(r => ({
-      id:           r.id,
-      postId:       r.post_id,
-      postType:     r.post_type,
-      replyMode:    r.reply_mode as CirclePostReply['replyMode'],
-      text:         r.text         ?? undefined,
-      voiceUrl:     r.voice_url    ?? undefined,
-      durationSecs: r.duration_secs ?? undefined,
-      createdAt:    r.created_at,
-    }));
   } catch {
-    return [];
+    if (__DEV__) console.warn('SEKRET_SYNC_WRITECIRCLEPOST_FAILED');
   }
 }
 
 // ── Voice ─────────────────────────────────────────────────────────────
 export function syncVoiceNote(note: VoiceNote): void {
+  emitEvent('voice_completed', { durationSecs: note.duration ? Number(note.duration) : undefined });
   void safeUpsert(TABLES.voiceNotes, {
     id:         note.id,
     title:      note.title,
@@ -383,6 +355,7 @@ export function syncVoiceNote(note: VoiceNote): void {
 
 // ── Comfort sessions ─────────────────────────────────────────────────────
 export function syncComfortSession(session: ComfortSession): void {
+  emitEvent(session.type === 'breathe' ? 'breathe_completed' : 'comfort_completed');
   void safeUpsert(TABLES.comfortSessions, {
     id: session.id, type: session.type,
     mood: session.mood ?? null, date: session.date, time: session.time,
@@ -403,6 +376,7 @@ export function deleteCrewMember(id: number | string): void {
 }
 
 export function syncCrewCheckIn(c: CrewCheckIn): void {
+  emitEvent('crew_checkin');
   void safeUpsert(TABLES.crewCheckIns, {
     id: c.id, member_id: c.memberId, note: c.note,
     mood: c.mood ?? null, date: c.date, time: c.time,
@@ -432,10 +406,10 @@ export async function syncRoomMemory(rm: {
       { onConflict: 'user_id' },
     );
     if (error) {
-      console.warn('[sync] syncRoomMemory failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCROOMMEMORY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncRoomMemory failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCROOMMEMORY_FAILED');
   }
 }
 
@@ -450,16 +424,16 @@ export async function snapshotPoints(total: number): Promise<void> {
       user_id: uid, total, captured_at: new Date().toISOString(),
     });
     if (error) {
-      console.warn('[sync] snapshotPoints failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SNAPSHOTPOINTS_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] snapshotPoints failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SNAPSHOTPOINTS_FAILED');
   }
 }
 
 // ── Period calendar ──────────────────────────────────────────────────────
 
-/** Upsert a single period day (ISO date string, e.g. ‘2026-06-17’). */
+/** Upsert a single period day (ISO date string, e.g. '2026-06-17'). */
 export async function syncPeriodDay(day: string, note?: string): Promise<void> {
   const sb = getSupabase();
   if (!sb) return;
@@ -471,10 +445,10 @@ export async function syncPeriodDay(day: string, note?: string): Promise<void> {
       { onConflict: 'user_id,day' },
     );
     if (error) {
-      console.warn('[sync] syncPeriodDay failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCPERIODDAY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncPeriodDay failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCPERIODDAY_FAILED');
   }
 }
 
@@ -487,10 +461,10 @@ export async function deletePeriodDay(day: string): Promise<void> {
   try {
     const { error } = await sb.from(TABLES.periodDays).delete().match({ user_id: uid, day });
     if (error) {
-      console.warn('[sync] deletePeriodDay failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_DELETEPERIODDAY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] deletePeriodDay failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_DELETEPERIODDAY_FAILED');
   }
 }
 
@@ -507,19 +481,15 @@ export async function loadPeriodDays(): Promise<string[]> {
       .eq('user_id', uid)
       .order('day', { ascending: true });
     if (error) throw error;
-    return (data ?? []).map((r: any) => r.day as string);
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadPeriodDays failed', e);
+    return (data ?? []).map((r: { day: string }) => r.day);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPERIODDAYS_FAILED');
     return [];
   }
 }
 
 // ── Oracle / companion memory ───────────────────────────────────────────────
 
-/**
- * Upsert the full oracle memory snapshot for a personality.
- * personality_id: ‘teen’ | ‘parent’
- */
 export async function syncOracleSession(
   personalityId: string,
   memory: Record<string, unknown>,
@@ -541,17 +511,13 @@ export async function syncOracleSession(
       { onConflict: 'user_id,personality_id' },
     );
     if (error) {
-      console.warn('[sync] syncOracleSession failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCORACLESESSION_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncOracleSession failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCORACLESESSION_FAILED');
   }
 }
 
-/**
- * Load the latest oracle memory snapshot for a personality.
- * Returns null if not found or Supabase not configured.
- */
 export async function loadOracleSession(
   personalityId: string,
 ): Promise<{ memory: Record<string, unknown>; sessionCount: number } | null> {
@@ -569,16 +535,98 @@ export async function loadOracleSession(
     if (error) throw error;
     if (!data) return null;
     return {
-      memory:       (data.memory as Record<string, unknown>) ?? {},
-      sessionCount: (data.session_count as number) ?? 0,
+      memory:       (data.memory) ?? {},
+      sessionCount: (data.session_count) ?? 0,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadOracleSession failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADORACLESESSION_FAILED');
+    return null;
+  }
+}
+
+// ── Teen activity summary — parent-facing snapshot ─────────────────────────
+
+export interface TeenActivitySummary {
+  streak_days: number;
+  session_count: number;
+  points_tier: string;
+}
+
+function deriveTier(sessionCount: number): string {
+  if (sessionCount >= 50) return 't4';
+  if (sessionCount >= 25) return 't3';
+  if (sessionCount >= 10) return 't2';
+  if (sessionCount >= 3)  return 't1';
+  return 't0';
+}
+
+export async function syncTeenActivitySummary(): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  try {
+    const state = await loadState();
+    const streakDays: number = parseInt(state.streakDays ?? '0', 10) || 0;
+    const comfortSessions: ComfortSession[] = Array.isArray(state.comfortSessions)
+      ? state.comfortSessions
+      : [];
+    const sessionCount = comfortSessions.length;
+    const pointsTier = deriveTier(sessionCount);
+
+    const { error } = await sb.from('teen_activity_summary').upsert(
+      {
+        user_id:       uid,
+        streak_days:   streakDays,
+        session_count: sessionCount,
+        points_tier:   pointsTier,
+        last_active_at: new Date().toISOString(),
+        updated_at:    new Date().toISOString(),
+      },
+      { onConflict: 'user_id' },
+    );
+    if (error) {
+      console.warn('SEKRET_SYNC_SYNCTEENACTIVITYSUMMARY_FAILED');
+    }
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCTEENACTIVITYSUMMARY_FAILED');
+  }
+}
+
+export function initTeenActivitySync(): () => void {
+  void syncTeenActivitySummary();
+  const interval = setInterval(() => {
+    void syncTeenActivitySummary();
+  }, 10 * 60 * 1000);
+  return () => clearInterval(interval);
+}
+
+export async function fetchTeenActivitySummary(
+  teenId: string,
+): Promise<TeenActivitySummary | null> {
+  const sb = getSupabase();
+  if (!sb) return null;
+  try {
+    const { data, error } = await sb
+      .from('parent_teen_activity_snapshot')
+      .select('streak_days, session_count, points_tier')
+      .eq('user_id', teenId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    return {
+      streak_days:   data.streak_days,
+      session_count: data.session_count,
+      points_tier:   data.points_tier,
+    };
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_FETCHTEENACTIVITYSUMMARY_FAILED');
     return null;
   }
 }
 
 // ── Bulk pull ──────────────────────────────────────────────────────────────
+
 export async function pullAll(): Promise<{
   moodHistory:       MoodEntry[];
   journalEntries:    JournalEntry[];
@@ -597,258 +645,57 @@ export async function pullAll(): Promise<{
   if (!sb) return null;
   const uid = await currentUserId();
   if (!uid) return null;
+
   try {
-    const tables = [
-      TABLES.moodHistory, TABLES.journalEntries, TABLES.circlePosts,
-      TABLES.voiceNotes, TABLES.comfortSessions, TABLES.crewMembers,
-      TABLES.crewCheckIns, TABLES.parentCirclePosts,
-    ];
-    const results = await Promise.all(
-      tables.map(t => sb.from(t).select('*').eq('user_id', uid).order('id', { ascending: false })),
-    );
-    const [mood, journal, circle, voice, comfort, crew, check, parentCircle] =
-      results.map(r => r.data || []);
-    const { data: roomRow } = await sb
-      .from(TABLES.roomMemory).select('*').eq('user_id', uid).maybeSingle();
+    const [
+      moodRes, journalRes, circleRes, voiceRes, comfortRes,
+      crewMemberRes, crewCheckInRes, parentCircleRes, roomRes,
+    ] = await Promise.allSettled([
+      sb.from(TABLES.moodHistory).select('id, mood, date, time').eq('user_id', uid).order('id'),
+      sb.from(TABLES.journalEntries).select('id, text, mood, date, time, sekret_reply').eq('user_id', uid).order('id'),
+      sb.from(TABLES.circlePosts).select('id, text, date, time, reactions, circle_tag, post_mood, media_kind').eq('user_id', uid).order('id'),
+      sb.from(TABLES.voiceNotes).select('id, title, date, time, duration').eq('user_id', uid).order('id'),
+      sb.from(TABLES.comfortSessions).select('id, type, mood, date, time').eq('user_id', uid).order('id'),
+      sb.from(TABLES.crewMembers).select('id, name, emoji, commitment, cadence, invite_code, added_at').eq('user_id', uid),
+      sb.from(TABLES.crewCheckIns).select('id, member_id, note, mood, date, time').eq('user_id', uid).order('id'),
+      sb.from(TABLES.parentCirclePosts).select('id, text, date, time, reactions, circle_tag').eq('user_id', uid).order('id'),
+      sb.from(TABLES.roomMemory).select('character, last_visit, last_hotspot, last_summon, visit_count').eq('user_id', uid).maybeSingle(),
+    ]);
+
+    function settled<T>(res: PromiseSettledResult<SupabaseDataResult<T>>): T | null {
+      if (res.status === 'rejected') return null;
+      if (res.value.error) { console.warn('SEKRET_SYNC_PULLALL_PARTIAL_ERROR'); return null; }
+      return res.value.data;
+    }
+
+    const moods       = settled<MoodHistoryRow[]>(moodRes as PromiseSettledResult<SupabaseDataResult<MoodHistoryRow[]>>)         ?? [];
+    const journals    = settled<JournalEntryRow[]>(journalRes as PromiseSettledResult<SupabaseDataResult<JournalEntryRow[]>>)      ?? [];
+    const circles     = settled<CirclePostRow[]>(circleRes as PromiseSettledResult<SupabaseDataResult<CirclePostRow[]>>)       ?? [];
+    const voices      = settled<VoiceNoteRow[]>(voiceRes as PromiseSettledResult<SupabaseDataResult<VoiceNoteRow[]>>)        ?? [];
+    const comforts    = settled<ComfortSessionRow[]>(comfortRes as PromiseSettledResult<SupabaseDataResult<ComfortSessionRow[]>>)      ?? [];
+    const crewMs      = settled<CrewMemberRow[]>(crewMemberRes as PromiseSettledResult<SupabaseDataResult<CrewMemberRow[]>>)   ?? [];
+    const crewCIs     = settled<CrewCheckInRow[]>(crewCheckInRes as PromiseSettledResult<SupabaseDataResult<CrewCheckInRow[]>>)  ?? [];
+    const parentPosts = settled<ParentCirclePostRow[]>(parentCircleRes as PromiseSettledResult<SupabaseDataResult<ParentCirclePostRow[]>>) ?? [];
+    const room        = settled<RoomMemoryRow>(roomRes as PromiseSettledResult<SupabaseDataResult<RoomMemoryRow>>);
+
     return {
-      moodHistory:    mood as MoodEntry[],
-      journalEntries: (journal as any[]).map(r => ({
-        ...r, sekretReply: r.sekret_reply ?? undefined,
-      })) as JournalEntry[],
-      circlePosts:     circle  as CirclePost[],
-      voiceNotes:      voice   as VoiceNote[],
-      comfortSessions: comfort as ComfortSession[],
-      crewMembers: (crew as any[]).map(r => ({
-        id: String(r.id), name: r.name, emoji: r.emoji, relation: r.relation ?? '',
-        commitment: r.commitment, cadence: r.cadence, inviteCode: r.invite_code, addedAt: r.added_at,
-      })),
-      crewCheckIns: (check as any[]).map(r => ({
-        id: r.id, memberId: r.member_id, note: r.note,
-        mood: r.mood, date: r.date, time: r.time,
-      })),
-      parentCirclePosts: (parentCircle as any[]).map(r => ({
-        id: r.id, text: r.text, date: r.date, time: r.time,
-        reactions: r.reactions ?? { beenThere: 0, solidarity: 0, reminder: 0, needed: 0, strength: 0 },
-        circleTag: r.circle_tag ?? undefined,
-        mood: r.mood ?? undefined,
-      })) as ParentCirclePost[],
-      roomMemory: roomRow ? {
-        character:   roomRow.character    ?? 'raylene',
-        lastVisit:   roomRow.last_visit   ?? '',
-        lastHotspot: roomRow.last_hotspot ?? '',
-        lastSummon:  roomRow.last_summon  ?? '',
-        visitCount:  roomRow.visit_count  ?? 0,
-      } : null,
+      moodHistory: moods.map(r => ({ id: r.id, mood: r.mood, date: r.date, time: r.time })) as MoodEntry[],
+      journalEntries: journals.map(r => ({ id: r.id, text: r.text, mood: r.mood, date: r.date, time: r.time, sekretReply: r.sekret_reply ?? undefined })) as JournalEntry[],
+      circlePosts: circles.map(r => ({ id: r.id, text: r.text, date: r.date, time: r.time, reactions: r.reactions ?? {}, circleTag: r.circle_tag ?? undefined, postMood: r.post_mood ?? undefined, mediaKind: r.media_kind ?? undefined })) as CirclePost[],
+      voiceNotes: voices.map(r => ({ id: r.id, title: r.title, date: r.date, time: r.time, duration: r.duration })) as VoiceNote[],
+      comfortSessions: comforts.map(r => ({ id: r.id, type: r.type, mood: r.mood ?? undefined, date: r.date, time: r.time })) as ComfortSession[],
+      crewMembers: crewMs.map(r => ({ id: r.id, name: r.name, emoji: r.emoji, commitment: r.commitment, cadence: r.cadence, inviteCode: r.invite_code, addedAt: r.added_at ? new Date(r.added_at).getTime() : undefined })) as CrewMember[],
+      crewCheckIns: crewCIs.map(r => ({ id: r.id, memberId: r.member_id, note: r.note, mood: r.mood ?? undefined, date: r.date, time: r.time })) as CrewCheckIn[],
+      parentCirclePosts: parentPosts.map(r => ({ id: r.id, text: r.text, date: r.date, time: r.time, reactions: r.reactions ?? {}, circleTag: r.circle_tag ?? undefined })) as ParentCirclePost[],
+      roomMemory: room ? { character: room.character, lastVisit: room.last_visit ?? '', lastHotspot: room.last_hotspot ?? '', lastSummon: room.last_summon ?? '', visitCount: room.visit_count ?? 0 } : null,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] pullAll failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_PULLALL_FAILED');
     return null;
   }
 }
 
-// ── Parent ↔ Teen Link ────────────────────────────────────────────────────────
-
-function generateInviteCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
-
-export async function createParentLink(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  const uid = await currentUserId();
-  if (!uid) return null;
-  try {
-    const { data: existing } = await sb
-      .from('parent_links')
-      .select('invite_code')
-      .eq('teen_user_id', uid)
-      .eq('status', 'pending')
-      .maybeSingle();
-    if (existing?.invite_code) return existing.invite_code as string;
-    const code = generateInviteCode();
-    const { error } = await sb.from('parent_links').insert({ teen_user_id: uid, invite_code: code });
-    if (error) throw error;
-    return code;
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] createParentLink failed', e);
-    return null;
-  }
-}
-
-export async function redeemParentLink(
-  code: string,
-): Promise<'ok' | 'not_found' | 'error'> {
-  const sb = getSupabase();
-  if (!sb) return 'error';
-  const uid = await currentUserId();
-  if (!uid) return 'error';
-  try {
-    const { data, error } = await sb
-      .from('parent_links')
-      .update({ parent_user_id: uid, status: 'active', linked_at: new Date().toISOString() })
-      .eq('invite_code', code.toUpperCase().trim())
-      .eq('status', 'pending')
-      .select('id')
-      .single();
-    if (error || !data) return 'not_found';
-    return 'ok';
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] redeemParentLink failed', e);
-    return 'error';
-  }
-}
-
-// ── Bridge: signal + notes ────────────────────────────────────────────────────
-
-export interface BridgeSignal {
-  id:          number;
-  share_type:  string;
-  conv_mode:   string | null;
-  char_key:    string;
-  sent_at:     string;
-  created_at:  string;
-}
-
-export interface ParentNote {
-  id:           string;
-  content:      string;
-  sent_at:      string;
-  seen_by_teen: boolean;
-}
-
-/** Teen sends metadata signal — message content stays local. */
-export async function sendBridgeSignal(params: {
-  shareType: string;
-  convMode:  string | null;
-  charKey:   'raylene' | 'rylane';
-}): Promise<void> {
-  const sb = getSupabase();
-  if (!sb) return;
-  const uid = await currentUserId();
-  if (!uid) return;
-  try {
-    await sb.from('bridge_signals').insert({
-      teen_user_id: uid,
-      char_key:     params.charKey,
-      share_type:   params.shareType,
-      conv_mode:    params.convMode ?? null,
-      sent_at:      new Date().toISOString(),
-    });
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] sendBridgeSignal failed', e);
-  }
-}
-
-/** Teen fetches parent warm notes addressed to them. */
-export async function fetchParentNotes(): Promise<ParentNote[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const uid = await currentUserId();
-  if (!uid) return [];
-  try {
-    const { data } = await sb
-      .from('parent_notes')
-      .select('id, content, sent_at, seen_by_teen')
-      .eq('teen_user_id', uid)
-      .order('sent_at', { ascending: false })
-      .limit(20);
-    return (data ?? []) as ParentNote[];
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchParentNotes failed', e);
-    return [];
-  }
-}
-
-/** Parent fetches the notes they have sent to their linked teen. */
-export async function fetchParentSentNotes(): Promise<ParentNote[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  const uid = await currentUserId();
-  if (!uid) return [];
-  try {
-    const { data } = await sb
-      .from('parent_notes')
-      .select('id, content, sent_at, seen_by_teen')
-      .eq('parent_user_id', uid)
-      .order('sent_at', { ascending: false })
-      .limit(30);
-    return (data ?? []) as ParentNote[];
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchParentSentNotes failed', e);
-    return [];
-  }
-}
-
-/** Teen marks a parent note as seen. */
-export async function markParentNoteSeen(id: string): Promise<void> {
-  const sb = getSupabase();
-  if (!sb) return;
-  try {
-    await sb.from('parent_notes').update({ seen_by_teen: true }).eq('id', id);
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] markParentNoteSeen failed', e);
-  }
-}
-
-/** Teen subscribes to new parent notes via Realtime. Returns unsubscribe fn. */
-export async function subscribeToParentNotes(
-  onNew: (note: ParentNote) => void,
-): Promise<() => void> {
-  const sb = getSupabase();
-  if (!sb) return () => {};
-  const uid = await currentUserId();
-  if (!uid) return () => {};
-
-  const channel = sb
-    .channel('parent-notes-' + uid)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'parent_notes', filter: `teen_user_id=eq.${uid}` },
-      (payload) => onNew(payload.new as ParentNote),
-    )
-    .subscribe();
-
-  return () => { sb.removeChannel(channel); };
-}
-
-/** Parent gets the linked teen's user_id (null if not linked). */
-export async function fetchLinkedTeenId(): Promise<string | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  const uid = await currentUserId();
-  if (!uid) return null;
-  try {
-    const { data } = await sb
-      .from('parent_links')
-      .select('teen_user_id')
-      .eq('parent_user_id', uid)
-      .eq('status', 'active')
-      .maybeSingle();
-    return data?.teen_user_id ?? null;
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchLinkedTeenId failed', e);
-    return null;
-  }
-}
-
-/** Parent fetches bridge signals from their linked teen. */
-export async function fetchBridgeSignals(teenId: string): Promise<BridgeSignal[]> {
-  const sb = getSupabase();
-  if (!sb) return [];
-  try {
-    const { data } = await sb
-      .from('bridge_signals')
-      .select('id, share_type, conv_mode, char_key, sent_at, created_at')
-      .eq('teen_user_id', teenId)
-      .order('sent_at', { ascending: false })
-      .limit(30);
-    return (data ?? []) as BridgeSignal[];
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchBridgeSignals failed', e);
-    return [];
-  }
-}
+// ── Parent repair, voice reflection, S2Tell ─────────────────────────────────
 
 export function syncRepairWin(entry: { id: number; text: string; date: string; ritual?: string }): void {
   void safeUpsert(TABLES.parentRepairWins, {
@@ -878,9 +725,10 @@ export async function shareS2Tell(entry: {
       .select('parent_user_id')
       .eq('teen_user_id', uid)
       .eq('status', 'active')
+      .eq('is_active', true)
       .maybeSingle();
     if (!link?.parent_user_id) return;
-    const { error } = await sb.from(TABLES.s2tellShares).upsert(
+    const { error } = await sb.from(TABLES.parentTellShares).upsert(
       {
         teen_user_id:   uid,
         parent_user_id: link.parent_user_id,
@@ -891,9 +739,9 @@ export async function shareS2Tell(entry: {
       },
       { onConflict: 'teen_user_id,id' },
     );
-    if (error) console.warn('[sync] shareS2Tell failed:', error.message);
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] shareS2Tell failed', e);
+    if (error) console.warn('SEKRET_SYNC_SHARES2TELL_FAILED');
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SHARES2TELL_FAILED');
   }
 }
 
@@ -907,7 +755,7 @@ export async function fetchS2TellShares(): Promise<Array<{
   if (!uid) return [];
   try {
     const { data, error } = await sb
-      .from(TABLES.s2tellShares)
+      .from(TABLES.parentTellShares)
       .select('id, rewrite, tone, saved_at')
       .eq('parent_user_id', uid)
       .order('created_at', { ascending: false })
@@ -919,59 +767,9 @@ export async function fetchS2TellShares(): Promise<Array<{
       tone:    r.tone,
       savedAt: r.saved_at,
     }));
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchS2TellShares failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_FETCHS2TELLSHARES_FAILED');
     return [];
-  }
-}
-
-/** Parent sends a warm note to their linked teen. */
-export async function sendParentNote(teenId: string, content: string): Promise<boolean> {
-  const sb = getSupabase();
-  if (!sb) return false;
-  const uid = await currentUserId();
-  if (!uid) return false;
-  try {
-    const { error } = await sb.from('parent_notes').insert({
-      teen_user_id:   teenId,
-      parent_user_id: uid,
-      content,
-      sent_at: new Date().toISOString(),
-    });
-    return !error;
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] sendParentNote failed', e);
-    return false;
-  }
-}
-
-export interface ParentEngagement {
-  notesSent:  number;
-  tipsRead:   number;
-  daysActive: number;
-  bridgeUsed: boolean;
-}
-
-/** Fetch the parent's own engagement stats within Bip. */
-export async function fetchParentEngagement(): Promise<ParentEngagement | null> {
-  const sb = getSupabase();
-  if (!sb) return null;
-  const uid = await currentUserId();
-  if (!uid) return null;
-  try {
-    const [notesRes, engRes] = await Promise.all([
-      sb.from('parent_notes').select('id', { count: 'exact', head: true }).eq('parent_user_id', uid),
-      sb.from('parent_engagement').select('*').eq('parent_user_id', uid).maybeSingle(),
-    ]);
-    return {
-      notesSent:  notesRes.count ?? 0,
-      tipsRead:   (engRes.data as any)?.tips_read ?? 0,
-      daysActive: (engRes.data as any)?.days_active ?? 0,
-      bridgeUsed: (engRes.data as any)?.bridge_used ?? false,
-    };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchParentEngagement failed', e);
-    return null;
   }
 }
 
@@ -989,28 +787,12 @@ export async function syncGrowthMilestone(trackKey: string): Promise<void> {
       track_key:    trackKey,
       completed_at: new Date().toISOString(),
     });
-    if (error) console.warn('[sync] syncGrowthMilestone failed:', error.message);
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncGrowthMilestone failed', e);
+    if (error) console.warn('SEKRET_SYNC_SYNCGROWTHMILESTONE_FAILED');
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCGROWTHMILESTONE_FAILED');
   }
 }
 
-/** Parent subscribes to new bridge signals from their teen via Realtime. */
-export async function subscribeToBridgeSignals(
-  teenId:  string,
-  onNew:   (signal: BridgeSignal) => void,
-): Promise<() => void> {
-  const sb = getSupabase();
-  if (!sb) return () => {};
-
-  const channel = sb
-    .channel('bridge-signals-' + teenId)
-    .on(
-      'postgres_changes',
-      { event: 'INSERT', schema: 'public', table: 'bridge_signals', filter: `teen_user_id=eq.${teenId}` },
-      (payload) => onNew(payload.new as BridgeSignal),
-    )
-    .subscribe();
-
-  return () => { sb.removeChannel(channel); };
-}
+// ── Re-export compat modules so all @/utils/sync imports keep working ────────
+export * from './parentBridgeCompat';
+export * from './pointsCompat';

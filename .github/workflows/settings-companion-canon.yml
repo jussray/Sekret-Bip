@@ -1,0 +1,58 @@
+name: Settings Companion Canon Gate
+
+on:
+  pull_request:
+    paths:
+      - 'app/(teen)/settings.tsx'
+      - 'app/(parent)/settings.tsx'
+      - 'test/settings-companion-canon.test.mjs'
+      - '.github/workflows/settings-companion-canon.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-settings-companion-canon:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 'true'
+      EXPO_NO_TELEMETRY: '1'
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Check out exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          fetch-depth: 1
+
+      - name: Record and verify exact head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          test "$actual" = "$EXPECTED_HEAD_SHA"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Run focused settings canon contracts
+        run: node --test test/settings-companion-canon.test.mjs
+
+      - name: Type-check exact head
+        run: npm run type-check
+
+      - name: Run complete unit suite
+        run: npm test
+
+      - name: Run repository lint
+        run: npm run lint

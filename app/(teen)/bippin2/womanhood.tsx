@@ -77,9 +77,9 @@ const SECTIONS = [
       '"What if it hurts a lot?" -- Some cramping is normal, but severe pain deserves medical attention.',
       '"Do I have to tell anyone?" -- No. But having one trusted person who knows can help.',
     ],
-    tip: "Raylene has answered thousands of questions just like yours. You can always ask.",
+    tip: "Suhana has answered thousands of questions just like yours. You can always ask.",
     route: 'sekret',
-    routeLabel: 'ask Raylene ->',
+    routeLabel: 'ask Suhana ->',
   },
 ] as const;
 
@@ -180,14 +180,14 @@ export default function WomanhoodGuide() {
           <Text style={[s.quoteText, { color: soft }]}>
             "you are not behind. you are not too much. you are exactly where you need to be."
           </Text>
-          <Text style={[s.quoteSig, { color: accent }]}>{'-- Raylene 🫆'}</Text>
+          <Text style={[s.quoteSig, { color: accent }]}>{'-- Suhana 🫆'}</Text>
         </View>
 
         <TouchableOpacity
           style={[s.primaryBtn, { backgroundColor: accent }]}
           onPress={() => router.push(routeForSide('teen', 'sekret') as any)}
         >
-          <Text style={s.primaryBtnText}>{'talk to Raylene 🫆'}</Text>
+          <Text style={s.primaryBtnText}>{'talk to Suhana 🫆'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={s.ghostBtn} onPress={() => router.back()}>

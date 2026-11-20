@@ -61,7 +61,7 @@ const MOCK_FRIENDS: FriendsCirclePost[] = [
   { id: 1, user_id: 'u1', nickname: 'MoonGirl_17', avatar_emoji: '🌙', text: "today felt like a lot but i\'m okay", post_mood: 'okay', media_kind: null, reactions: { felt: 4, comfort: 2, proud: 0, stay: 3 }, created_at: new Date().toISOString() },
 ];
 const MOCK_CREW: CrewCirclePost[] = [
-  { id: 1, user_id: 'u2', nickname: 'Raylene 💜', avatar_emoji: '💜', text: "crew check-in: what\'s one thing we're each holding right now?", post_mood: null, media_kind: null, reactions: { felt: 3, comfort: 5, proud: 1, stay: 2 }, created_at: new Date().toISOString() },
+  { id: 1, user_id: 'u2', nickname: 'Suhana 💜', avatar_emoji: '💜', text: "crew check-in: what\'s one thing we're each holding right now?", post_mood: null, media_kind: null, reactions: { felt: 3, comfort: 5, proud: 1, stay: 2 }, created_at: new Date().toISOString() },
 ];
 const MOCK_PARENT: ParentCirclePost[] = [
   { id: 1, user_id: 'p1', text: "does anyone else feel like they don't know how to help without making it worse?", reactions: { beenThere: 9, solidarity: 7, reminder: 2, needed: 5, strength: 4 }, circle_tag: null, created_at: new Date().toISOString(), identity_revealed: false },

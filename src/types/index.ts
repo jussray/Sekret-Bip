@@ -5,6 +5,13 @@
  * Import via: import type { JournalEntry } from '@/types';
  */
 
+export * from './identity';
+export * from './verification';
+export * from './safety';
+export * from './doorbell';
+export * from './notifications';
+export * from './companions';
+
 export interface JournalEntry {
   id: number;
   text: string;
@@ -17,6 +24,7 @@ export interface JournalEntry {
   imageUri?: string;
   mediaType?: 'photo' | 'video';
   sekretReply?: string;
+  sekretAvatarState?: string;
   locked?: boolean;
   pinned?: boolean;
   activeTab?: string;
@@ -36,7 +44,6 @@ export interface CirclePost {
   };
   bipType?: string;
   mediaKind?: string;
-  voiceUrl?: string;
   circleTag?: string;
   postMood?: string;
 }
@@ -164,17 +171,6 @@ export interface SavePageInput {
   entryMode?: string;
   locked?: boolean;
   imageUri?: string;
-}
-
-export interface CirclePostReply {
-  id: number;
-  postId: number;
-  postType: string;
-  replyMode: 'comfort' | 'voice' | 'support' | 'stay';
-  text?: string;
-  voiceUrl?: string;
-  durationSecs?: number;
-  createdAt: string;
 }
 
 export interface BridgePayload {
