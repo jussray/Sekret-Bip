@@ -31,8 +31,10 @@ import {
 import { useVoiceCompanion } from '../hooks/useVoiceCompanion';
 import { SyncBadge, type SyncStatus } from '../components/SyncBadge';
 import type { VoiceNote } from '../types/bridge';
-import { Audio } from 'expo-av';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadVideoToSupabase } from '../services/video/videoUpload';
+import { getSupabase } from '@/utils/supabase';
 import { fetchSekretReply, fetchSekretVoice, fetchSekretTranscribe, type SekretVoiceResponse } from '../utils/api';
 import { useVoiceBipIntelligence } from '../hooks/useVoiceBipIntelligence';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -40,7 +42,7 @@ import type { OracleJournalEntry } from '../types/voiceIntelligence';
 import type { OracleProfile, OracleSide } from '../services/oracleDiscovery';
 import {
   Text, TouchableOpacity, ScrollView, View,
-  Animated, Image, StyleSheet, Easing,
+  Animated, Image, StyleSheet, Easing, Modal,
   type DimensionValue, Platform,
 } from 'react-native';
 import { PresenceAvatar } from '../components/PresenceAvatar';
@@ -139,6 +141,9 @@ export function VoiceBipScreen({
   const [isThinking,       setIsThinking]        = useState(false);
   const [recordingTime,    setRecordingTime]     = useState(0);
   const [selectedBipType,  setSelectedBipType]   = useState<string | null>(null);
+  const [videoPreviewUri,  setVideoPreviewUri]   = useState<string | null>(null);
+  const [playingVideoUri,  setPlayingVideoUri]   = useState<string | null>(null);
+  const [videoUploading,   setVideoUploading]    = useState(false);
   const [transcriptFailed, setTranscriptFailed]  = useState(false);
 
   const recordingRef    = useRef<Audio.Recording | null>(null);
@@ -427,8 +432,9 @@ export function VoiceBipScreen({
     }
     const asset = result.assets[0];
     const secs = typeof asset.duration === 'number' ? Math.floor(asset.duration) : 0;
+    const noteId = Date.now();
     const note: VoiceNote = {
-      id: Date.now(),
+      id: noteId,
       title: 'Video Bip',
       date: new Date().toLocaleDateString(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -439,7 +445,30 @@ export function VoiceBipScreen({
     };
     (onSave ?? ((n: VoiceNote) => setVoiceNotes(prev => [n, ...prev])))(note);
     setRecorded(true);
+    setVideoPreviewUri(asset.uri);
     setSelectedBipType(null);
+
+    // Background upload — patches local state + DB with remote URL when done
+    void (async () => {
+      setVideoUploading(true);
+      try {
+        const sb = getSupabase();
+        const userId = (await sb?.auth.getUser())?.data?.user?.id;
+        if (!userId) return;
+        const { publicUrl } = await uploadVideoToSupabase(asset.uri, userId);
+        setVoiceNotes(prev =>
+          prev.map(n => n.id === noteId ? { ...n, videoUrl: publicUrl } : n)
+        );
+        await sb!.from('voice_notes')
+          .update({ video_url: publicUrl })
+          .eq('id', noteId)
+          .eq('user_id', userId);
+      } catch {
+        // local URI stays as fallback — not user-facing
+      } finally {
+        setVideoUploading(false);
+      }
+    })();
   };
 
   useEffect(() => {
@@ -704,13 +733,27 @@ export function VoiceBipScreen({
         )}
 
         {/* ── Saved confirmation ── */}
-        {recorded && !isRecording && (
+        {recorded && !isRecording && videoPreviewUri ? (
+          <View style={[styles.floatCard, { borderColor: '#a855f7', backgroundColor: 'rgba(13,9,20,0.92)' }]}>
+            <Text style={[styles.savedLabel, { color: '#c4b5fd', marginBottom: 10 }]}>
+              📹 Video Bip saved {videoUploading ? '· uploading…' : ''}
+            </Text>
+            <TouchableOpacity
+              style={styles.videoThumbBtn}
+              onPress={() => setPlayingVideoUri(videoPreviewUri)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.videoThumbPlay}>▶</Text>
+              <Text style={styles.videoThumbLabel}>tap to preview</Text>
+            </TouchableOpacity>
+          </View>
+        ) : recorded && !isRecording ? (
           <View style={[styles.floatCard, { borderColor: theme.accent, backgroundColor: 'rgba(13,9,20,0.88)' }]}>
             <Text style={[styles.savedLabel, { color: theme.soft }]}>
               Saved to your journal {avatar.emoji}
             </Text>
           </View>
-        )}
+        ) : null}
 
         {/* ── Transcript failed badge ── */}
         {recorded && transcriptFailed && !isThinking && (
@@ -786,6 +829,27 @@ export function VoiceBipScreen({
 
       {BottomNav}
 
+      {/* ── Video player modal ── */}
+      {playingVideoUri ? (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setPlayingVideoUri(null)}>
+          <View style={styles.videoModalOverlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setPlayingVideoUri(null)} />
+            <View style={styles.videoModalCard}>
+              <Video
+                source={{ uri: playingVideoUri }}
+                style={styles.videoPlayer}
+                useNativeControls
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay
+              />
+              <TouchableOpacity style={styles.videoCloseBtn} onPress={() => setPlayingVideoUri(null)}>
+                <Text style={styles.videoCloseBtnText}>✕ close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+
       {/* ── Bip type menu ── */}
       {showBipMenu && (
         <View style={styles.overlayWrap}>
@@ -844,7 +908,15 @@ export function VoiceBipScreen({
                       <Text style={[styles.noteTitle, { color: '#fff' }]}>{n.title}</Text>
                       <Text style={[styles.noteMeta, { color: '#7c6899' }]}>{n.date} · {n.duration}</Text>
                     </View>
-                    <TouchableOpacity style={[styles.playBtn, { backgroundColor: 'rgba(124,58,237,0.25)' }]}>
+                    <TouchableOpacity
+                      style={[styles.playBtn, { backgroundColor: 'rgba(124,58,237,0.25)' }]}
+                      onPress={() => {
+                        if (n.type === 'video') {
+                          const uri = (n.videoUrl as string | undefined) ?? (n.videoUri as string | undefined);
+                          if (uri) setPlayingVideoUri(uri);
+                        }
+                      }}
+                    >
                       <Text style={[styles.playBtnText, { color: '#c4b5fd' }]}>▶</Text>
                     </TouchableOpacity>
                   </View>
@@ -966,4 +1038,16 @@ const styles = StyleSheet.create({
   playBtn:            { borderRadius: 10, padding: 8 },
   playBtnText:        { fontSize: 14 },
   emptyText:          { fontSize: 13, textAlign: 'center', fontStyle: 'italic' },
+
+  // Video preview tap-target (inside saved confirmation card)
+  videoThumbBtn:      { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(124,58,237,0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(168,85,247,0.4)' },
+  videoThumbPlay:     { fontSize: 22, color: '#a855f7' },
+  videoThumbLabel:    { color: '#c4b5fd', fontSize: 13, fontWeight: '700' },
+
+  // Video player modal
+  videoModalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.88)', alignItems: 'center', justifyContent: 'center' },
+  videoModalCard:     { width: '92%', borderRadius: 20, overflow: 'hidden', backgroundColor: '#0d0914', borderWidth: 1, borderColor: '#3d1a5e' },
+  videoPlayer:        { width: '100%', height: 320 },
+  videoCloseBtn:      { alignItems: 'center', paddingVertical: 14 },
+  videoCloseBtnText:  { color: '#7c5a9e', fontSize: 14, fontWeight: '700' },
 });

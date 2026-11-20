@@ -107,6 +107,13 @@ export const TABLES = {
   // ── Compliance tables (20260724_compliance_foundation.sql) ──────────────
   userProfiles:        'user_profiles',
   consentLog:          'consent_log',
+  // ── Parent repair + voice reflection (20261120 migration) ───────────────
+  parentRepairWins:       'parent_repair_wins',
+  parentVoiceReflections: 'parent_voice_reflections',
+  // ── S2Tell cross-device delivery (20261120 migration) ───────────────────
+  parentTellShares:       'parent_tell_shares',
+  // Growth milestones (20261120 migration)
+  growthMilestones:       'growth_milestones',
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

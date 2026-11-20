@@ -62,9 +62,12 @@ interface AppContextValue {
 
   voiceNotes: VoiceNote[];
   setVoiceNotes: React.Dispatch<React.SetStateAction<VoiceNote[]>>;
+
+  // Teen circle
   circlePosts: CirclePost[];
   setCirclePosts: React.Dispatch<React.SetStateAction<CirclePost[]>>;
   comfortSessions: ComfortSession[];
+  setComfortSessions: React.Dispatch<React.SetStateAction<ComfortSession[]>>;
   periodDays: string[];
   roomMemory: RoomMemory;
   updateRoomMemory: (patch: Partial<RoomMemory>) => void;
@@ -375,6 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     circlePosts: state.circlePosts,
     setCirclePosts: state.setCirclePosts,
     comfortSessions: state.comfortSessions,
+    setComfortSessions: state.setComfortSessions,
     periodDays: state.periodDays,
     roomMemory: state.roomMemory,
     updateRoomMemory,
