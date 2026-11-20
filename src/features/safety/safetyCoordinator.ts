@@ -163,7 +163,7 @@ const PRE_FLIGHT_RULES: { re: RegExp; tier: SafetyTier }[] = [
   // immediate_danger (high)
   {
     // Terms mirror server CRISIS_RE (worker/sekret-reply.ts) so the sheet and the reply agree.
-    re:   /\b(kill myself|end my life|want to die|suicid(?:e|al)|cut myself|self[- ]?harm|hurt myself|disappear forever|run away|abuse|abused|being abused|assault|unsafe|not safe|danger|emergency|he hits|she hits)\b/i,
+    re:   /\b(kill myself|killing myself|end my life|want to die|suicid(?:e|al)|cut myself|cutting myself|self[- ]?harm|hurt myself|hurting myself|disappear forever|run away|abuse|abused|being abused|assault|unsafe|not safe|danger|emergency|he hits|she hits)\b/i,
     tier: 'immediate_danger',
   },
   // concerning_pattern (medium)
