@@ -128,7 +128,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
     }
     if (process.argv.includes('--execute')) console.log('BIP_OPENAI_STILL_CREATED_REVIEW_REQUIRED');
     else console.log('BIP_OPENAI_PREFLIGHT_OK');
-  }catch(error){
+  }catch{
     console.error('BIP_OPENAI_KEYFRAME_BLOCKED');
     process.exitCode=1;
   }
