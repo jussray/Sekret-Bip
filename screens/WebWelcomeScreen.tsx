@@ -4,6 +4,7 @@ import {
   Animated,
   Easing,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -564,6 +565,16 @@ export function WebWelcomeScreen({
           >
             <Text style={styles.audienceSwitchText}>{copy.switchText}</Text>
           </Pressable>
+
+          <Pressable
+            testID="web-welcome-site-map"
+            accessibilityRole="link"
+            accessibilityLabel="Open the public Se'kret Bip site map"
+            onPress={() => { void Linking.openURL('https://sekretbip.net/site-map/'); }}
+            style={({ pressed }) => [styles.publicSiteMapLink, pressed && styles.controlPressed]}
+          >
+            <Text style={styles.publicSiteMapLinkText}>Public site map</Text>
+          </Pressable>
         </ScrollView>
       </View>
     </View>
@@ -986,5 +997,18 @@ const styles = StyleSheet.create({
     color: color.textMid,
     fontSize: TYPE.sm,
     fontWeight: '700',
+  },
+  publicSiteMapLink: {
+    minHeight: 36,
+    marginHorizontal: SPACE[5],
+    marginTop: SPACE[1],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  publicSiteMapLinkText: {
+    color: color.textLow,
+    fontSize: TYPE.sm,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 });
