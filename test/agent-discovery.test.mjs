@@ -66,7 +66,7 @@ test('auth.md does not advertise external-agent user delegation', () => {
 
   assert.match(auth, /^# .*auth\.md$/m);
   assert.match(auth, /Agent audience/);
-  assert.match(auth, /https:\/\/sekretbip\.net\/signup/);
+  assert.match(auth, /^- Human user registration URI: `https:\/\/sekretbip\.net\/signup`$/m);
   assert.match(auth, /Agent registration endpoint: none/);
   assert.match(auth, /Agent provisioning method: none/);
   assert.match(auth, /No public agent credential is currently issued/);
