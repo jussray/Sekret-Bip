@@ -13,6 +13,7 @@ test('Control Room Test Ledger workflow is exact-head, credential-minimal, and a
     'actions/checkout@11d5960a326750d5838078e36cf38b85af677262',
     'actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020',
     'actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+    'actions: read',
     'GITHUB_TOKEN: ${{ github.token }}',
     'name: control-room-test-ledger-${{ env.EXPECTED_HEAD_SHA }}',
   ]) {

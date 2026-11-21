@@ -341,10 +341,10 @@ export function WebWelcomeScreen({
         nextAudience: 'teen' as WelcomeAudience,
       }
     : {
-        eyebrow: 'PUBLIC PREVIEW',
-        title: 'Your people.\nYour peace.',
-        lead: 'A safe little world where kids, teens, and parents can stay close—without losing their own space.',
-        subtitle: 'Come on in.',
+        eyebrow: 'YOUR PEOPLE. YOUR PEACE.',
+        title: 'Come on in.',
+        lead: 'A safe little world where teens and parents can stay close—without losing their own space.',
+        subtitle: 'stay awhile.',
         hero: TEEN_HERO,
         heroLabel: 'Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together',
         cues: [
@@ -353,7 +353,7 @@ export function WebWelcomeScreen({
           { symbol: '✦', label: 'keep your space' },
         ],
         cueLabel: "Se'kret Bip world cues: start quiet, stay close, keep your space",
-        note: 'YOUR PEOPLE. YOUR PEACE.',
+        note: 'MAKE IT YOURS.',
         enterText: 'Enter Se’kret Bip',
         enterLabel: "Se'kret Bip teen welcome — continue to age setup",
         switchText: 'Looking for Bip Jr. + Family? →',

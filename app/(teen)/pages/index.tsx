@@ -13,7 +13,7 @@
 //   ✓ AI reply voice playback via fetchSekretVoice
 //   ✓ Supabase sync via onSave / patchJournalEntry
 //   ✓ sekretReply persisted via patchJournalEntry(id, { sekretReply })
-//   ✓ Me = private non-AI journaling, Joseema = guided discovery (legacy id: oracle)
+//   ✓ Me = private non-AI journaling, Ja = guided discovery (legacy id: oracle)
 //   ✗ NO sekret:chat:history:* storage — entries are the only truth
 
 import React, {
@@ -41,7 +41,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 import { Audio, ResizeMode, Video } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AmbientWeatherOverlay } from '../../../components/AmbientWeatherOverlay';
 import { useAppContext } from '@/context/AppContext';
@@ -85,15 +85,21 @@ const ACTIVE_BRIDGE_SHARE_STATUSES = new Set(['pending', 'processing', 'ready', 
 // (raylene/rylane, DB-constrained — see constants/voiceBip.ts); name is the
 // current canonical display text.
 const COMPANIONS = [
-  { id: 'raylene', name: 'Suhana', accent: '#f08bc5', vibe: 'warm + protective' },
-  { id: 'rylane',  name: 'Sy',     accent: '#76a7ff', vibe: 'direct + loyal'    },
-  { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure' },
-  { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady'    },
-  { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages'     },
-  { id: 'oracle',  name: 'Joseema', accent: '#c7b87a', vibe: 'guided discovery'  },
+  { id: 'raylene', name: 'Suhana', accent: '#f08bc5', vibe: 'warm + protective', cardCaption: 'Real Talk' },
+  // Sy is the boy companion. The visual source must remain the approved rylane actor.
+  { id: 'rylane',  name: 'Sy',     accent: '#76a7ff', vibe: 'direct + loyal', cardCaption: 'Big Bro Vibes' },
+  // Cloud is the glowing cloud mascot, never a replacement human portrait.
+  { id: 'cloud',   name: 'Cloud',   accent: '#8ed9e7', vibe: 'soft + no pressure', cardCaption: 'Glowing Cloud' },
+  { id: 'night',   name: 'Night',   accent: '#9a8ee8', vibe: 'quiet + steady', cardCaption: 'Deep Talks' },
+  { id: 'me',      name: 'Me',      accent: '#b8a9c9', vibe: 'private pages', cardCaption: 'My Diary' },
+  { id: 'oracle',  name: 'Ja', accent: '#c7b87a', vibe: 'guided discovery', cardCaption: 'Guidance' },
 ] as const;
 
 type CompanionId = (typeof COMPANIONS)[number]['id'];
+
+// Portrait strip matches the five-companion order of the approved Pages image.
+// "Me" remains available as a separate private journaling tab at the end.
+const PAGES_VISUAL_COMPANION_ORDER: CompanionId[] = ['rylane', 'raylene', 'cloud', 'night', 'oracle', 'me'];
 
 // Companions that map directly to SekretCharacterId (excludes 'me' and 'oracle')
 type AiCompanionId = 'raylene' | 'rylane' | 'cloud' | 'night';
@@ -271,11 +277,28 @@ export default function TeenPagesRoute() {
   } = useAppContext();
 
   // ── Companion state ────────────────────────────────────────────────────────
+  const { companion: entryCompanion } = useLocalSearchParams<{ companion?: string | string[] }>();
+  const requested = Array.isArray(entryCompanion) ? entryCompanion[0] : entryCompanion;
+  const requestedTab = requested === 'ja' ? 'oracle' : requested;
   const [activeTab, setActiveTab] = useState<CompanionId>(() =>
-    (COMPANIONS.some(c => c.id === selectedSekret) ? selectedSekret : 'raylene') as CompanionId,
+    (COMPANIONS.some(c => c.id === requestedTab) ? requestedTab
+      : COMPANIONS.some(c => c.id === selectedSekret) ? selectedSekret : 'raylene') as CompanionId,
   );
   const [avatarState, setAvatarState] = useState<SekretAvatarState>('neutral');
   const { total: totalPoints } = usePoints();
+
+  // A Pages screen can stay mounted while navigation changes its companion
+  // query. Apply a new explicit deep link without overriding subsequent
+  // manual tab choices when the query stays unchanged.
+  useEffect(() => {
+    if (!requestedTab) return;
+    const incoming = COMPANIONS.find(c => c.id === requestedTab)?.id;
+    if (!incoming) return;
+    setActiveTab(incoming);
+    setAvatarState(isAiTab(incoming) ? 'listening' : 'neutral');
+  }, [requestedTab]);
+
+
 
   // ── Composer state ─────────────────────────────────────────────────────────
   const [locked, setLocked]     = useState(false);
@@ -667,27 +690,45 @@ export default function TeenPagesRoute() {
 
   // ── Top avatar strip ───────────────────────────────────────────────────────
   const renderAvatarStrip = () => (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tabRail}>
-      {COMPANIONS.map(c => {
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.tabRailViewport} contentContainerStyle={s.tabRail}>
+      {PAGES_VISUAL_COMPANION_ORDER.map(id => {
+        const c = COMPANIONS.find(entry => entry.id === id)!;
         const active = c.id === activeTab;
         const unlocked = totalPoints >= COMPANION_UNLOCK_PTS[c.id as CompanionId];
         return (
           <TouchableOpacity
             key={c.id}
+            testID={`pages-companion-card-${c.id}`}
             onPress={() => unlocked ? chooseTab(c.id as CompanionId) : undefined}
             activeOpacity={unlocked ? 0.7 : 1}
             style={[s.tab, active && { borderColor: c.accent, backgroundColor: `${c.accent}18` }, !unlocked && s.tabLocked]}
           >
-            {c.id !== 'me' && c.id !== 'oracle' ? (
-              <Image
-                source={avatarImage(c.id as SekretCharacterId, active ? avatarState : 'neutral')}
-                style={[s.tabImg, !unlocked && { opacity: 0.3 }]}
-              />
-            ) : (
-              <Text style={[s.tabEmoji, !unlocked && { opacity: 0.3 }]}>{c.id === 'me' ? '🪞' : '🔮'}</Text>
-            )}
+            <View style={s.tabArtwork}>
+              {c.id === 'cloud' ? (
+                <View pointerEvents="none" style={s.cloudCardAura} testID="pages-cloud-aura" />
+              ) : null}
+              {c.id !== 'me' && c.id !== 'oracle' ? (
+                <Image
+                  source={avatarImage(c.id as SekretCharacterId, active ? avatarState : 'neutral')}
+                  style={[s.tabImg, !unlocked && { opacity: 0.3 }]}
+                  accessibilityLabel={c.id === 'cloud' ? 'Cloud, the glowing cloud'
+                    : c.id === 'rylane' ? 'Sy, boy companion' : `${c.name} companion`}
+                  testID={c.id === 'cloud' ? 'pages-cloud-sprite'
+                    : c.id === 'rylane' ? 'pages-sy-boy-portrait' : undefined}
+                />
+              ) : (
+                <Text
+                  style={[s.tabEmoji, c.id === 'oracle' && s.jaCardStar, !unlocked && { opacity: 0.3 }]}
+                  accessibilityLabel={c.id === 'oracle' ? 'Ja, gold star' : 'My private diary'}
+                  testID={c.id === 'oracle' ? 'pages-ja-card-star' : undefined}
+                >{c.id === 'me' ? '🪞' : '☆'}</Text>
+              )}
+            </View>
             {unlocked ? (
-              <Text style={[s.tabName, active && { color: c.accent }]}>{c.name}</Text>
+              <>
+                <Text style={[s.tabName, active && { color: c.accent }]}>{c.name}</Text>
+                <Text style={s.tabCaption} numberOfLines={1}>{c.cardCaption}</Text>
+              </>
             ) : (
               <Text style={s.tabLockBadge}>{COMPANION_UNLOCK_PTS[c.id as CompanionId]} pts</Text>
             )}
@@ -858,12 +899,15 @@ export default function TeenPagesRoute() {
         <View style={s.titlePaper}>
           <View style={[s.tape, s.tapeLeft]} />
           <View style={[s.tape, s.tapeRight]} />
-          <Text style={s.titleHand} accessibilityRole="header">Se&apos;kret Pages ♡</Text>
+          <Text style={s.titleHand} accessibilityRole="header">Se’kret Pages ♡</Text>
         </View>
         <View style={s.subtitlePaper}>
           <Text style={s.subtitleHand}>your thoughts live here ♡</Text>
         </View>
       </View>
+
+      {/* Keep the approved five companion portraits visible before the journal cards. */}
+      {renderAvatarStrip()}
 
       <View style={s.dearCard}>
         <Text style={s.dearHeart}>♡</Text>
@@ -938,8 +982,6 @@ export default function TeenPagesRoute() {
         </View>
       </View>
 
-      {renderAvatarStrip()}
-
       <View style={s.companionRow}>
         {companionAvatarId ? (
           <Animated.Image
@@ -979,6 +1021,7 @@ export default function TeenPagesRoute() {
         source={PAGES_BACKDROP[activeTab]}
         style={StyleSheet.absoluteFill}
         resizeMode="cover"
+        testID="pages-night-journal-backdrop"
         accessibilityIgnoresInvertColors
       />
       <LinearGradient
@@ -989,6 +1032,7 @@ export default function TeenPagesRoute() {
 
       <SafeAreaView style={s.safe} edges={['top', 'left', 'right']}>
         {/* Scrapbook home + companion conversation */}
+
         <FlatList
           ref={flatListRef}
           data={threadEntries}
@@ -1144,13 +1188,37 @@ const s = StyleSheet.create({
   headerAvatar: { width: 54, height: 54 },
   headerModeIcon: { width: 54, textAlign: 'center', fontSize: 34 },
 
-  tabRail: { gap: 8, paddingBottom: 12 },
-  tab: { width: 72, minHeight: 70, borderRadius: 4, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(243,234,217,0.10)', alignItems: 'center', justifyContent: 'center', padding: 6 },
-  tabImg: { width: 38, height: 38, resizeMode: 'contain' },
-  tabEmoji: { fontSize: 24 },
-  tabName: { fontFamily: HAND_FONT, color: '#e8dcef', fontSize: 13, marginTop: 3 },
+  tabRail: { gap: 4, paddingHorizontal: 7, paddingBottom: 6, paddingTop: 3, alignItems: 'flex-start' },
+  tab: {
+    width: 68, height: 132, minHeight: 132, borderRadius: 16, borderWidth: 1,
+    borderColor: 'rgba(255, 235, 255, 0.36)',
+    backgroundColor: 'rgba(35, 20, 54, 0.47)', alignItems: 'center',
+    justifyContent: 'flex-start', paddingHorizontal: 3, paddingTop: 5, paddingBottom: 6,
+    shadowColor: '#ec9dfb', shadowOpacity: 0.25, shadowRadius: 9,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  tabImg: { width: 62, height: 78, resizeMode: 'contain' },
+  tabEmoji: { fontSize: 29 },
+  tabName: { color: '#fff6ff', fontSize: 11, fontWeight: '800', marginTop: 1 },
   tabLocked: { opacity: 0.55 },
-  tabLockBadge: { color: '#b3a6bd', fontSize: 8, fontWeight: '800', marginTop: 3 },
+  tabLockBadge: { color: '#c2b2cd', fontSize: 8, fontWeight: '800', marginTop: 3 },
+  tabRailViewport: { flexGrow: 0, flexShrink: 0, height: 146, maxHeight: 146 },
+  tabArtwork: {
+    width: 62, height: 82, alignItems: 'center', justifyContent: 'center',
+    position: 'relative', overflow: 'visible',
+  },
+  cloudCardAura: {
+    position: 'absolute', top: 12, bottom: 7, left: 4, right: 4,
+    borderRadius: 48, backgroundColor: 'rgba(139, 222, 255, 0.34)',
+    shadowColor: '#aeefff', shadowOpacity: 0.92, shadowRadius: 25,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  jaCardStar: {
+    color: '#ffe6a4', fontSize: 50,
+    textShadowColor: 'rgba(255, 201, 101, 0.96)', textShadowRadius: 24,
+  },
+  tabCaption: { color: '#e4d4e9', fontSize: 7.7, marginTop: 2, textAlign: 'center' },
+
 
   thread: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 20 },
 

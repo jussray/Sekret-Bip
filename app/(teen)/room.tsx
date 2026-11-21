@@ -10,6 +10,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { UserRoomScreen } from '@screens/UserRoomScreen';
 import { VisualCanonAtmosphere } from '../../components/rooms/VisualCanonAtmosphere';
+import { ScrapbookCheckInLauncher } from '../../components/rooms/ScrapbookCompanionScene';
 import { BipReturnOverlay } from '../../components/retention/BipReturnOverlay';
 import { DailyIntentionsCard } from '../../components/intentions/DailyIntentionsCard';
 import { useAppContext } from '@/context/AppContext';
@@ -89,6 +90,10 @@ export default function TeenRoomRoute() {
         comfortSessions={comfortSessions}
         voiceNotes={voiceNotes}
         isLoading={isLoading}
+      />
+      <ScrapbookCheckInLauncher
+        companion={selectedSekret}
+        onPress={() => router.push(TEEN_ROUTES.scrapbookCheckIn as never)}
       />
       <BipReturnOverlay onNavigate={handleScreen} />
     </View>

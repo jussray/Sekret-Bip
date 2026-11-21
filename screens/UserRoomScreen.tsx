@@ -30,6 +30,7 @@ import {
 import STICKER_IMAGES from '../constants/stickerImages';
 import { FURNISH_CATALOG, type FurnishCategory } from '../constants/furnishingCatalog';
 import { BareRoomRenderer } from '../components/rooms/BareRoomRenderer';
+import { RoomWallScrapbook } from '../components/rooms/RoomWallScrapbook';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
 import { getCompanionRuntime } from '@/config/companionRuntimeRegistry';
 
@@ -233,8 +234,6 @@ const ROOM_PREVIEWS: Record<Character, ImageSourcePropType> = {
   night:   IMAGES.bgNightRoomEvening,
 };
 
-type QuotePos = { top?: DimensionValue; bottom?: DimensionValue; left?: DimensionValue; right?: DimensionValue; rotation: string };
-
 const VIBE_OVERLAYS: { label: string; emoji: string; color: string }[] = [
   { label: 'none',     emoji: '✦',  color: 'none' },
   { label: 'lavender', emoji: '💜', color: 'rgba(140,90,240,0.20)' },
@@ -256,13 +255,6 @@ const GLOW_COLORS: { label: string; color: string }[] = [
   { label: 'rose',    color: '#fb7185' },
   { label: 'cream',   color: '#fef3c7' },
 ];
-
-const QUOTE_POSITIONS: Record<Character, QuotePos> = {
-  raylene: { top: '12%',   right: '4%',  rotation: '2deg'    },
-  rylane:  { top: '14%',   right: '6%',  rotation: '-1.5deg' },
-  cloud:   { bottom: '38%', left: '6%',  rotation: '3deg'    },
-  night:   { bottom: '34%', right: '6%', rotation: '-2deg'   },
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -863,22 +855,12 @@ export function UserRoomScreen({
         </View>
       )}
 
-      {/* Room quote sticky note */}
-      {userRoom.roomQuote.length > 0 && (() => {
-        const qp = QUOTE_POSITIONS[userRoom.baseRoomId];
-        return (
-          <Animated.View
-            pointerEvents="none"
-            style={[
-              s.stickyNote,
-              { top: qp.top, bottom: qp.bottom, left: qp.left, right: qp.right },
-              { opacity: fadeAnim, transform: [{ rotate: qp.rotation }] },
-            ]}
-          >
-            <Text style={s.stickyNoteText}>{userRoom.roomQuote}</Text>
-          </Animated.View>
-        );
-      })()}
+      {/* The room art IS the screen. This note lives on its wall and never catches hotspot taps. */}
+      <RoomWallScrapbook
+        character={userRoom.baseRoomId}
+        phase={roomPhase}
+        customMessage={userRoom.roomQuote}
+      />
 
       {/* ── LAYER 2: Hotspots ─────────────────────────────────────────── */}
       <Animated.View style={[StyleSheet.absoluteFill, { opacity: fadeAnim }]}>
@@ -1162,26 +1144,7 @@ const s = StyleSheet.create({
 
   bottomSlot: { position: 'absolute', bottom: 0, left: 0, right: 0 },
 
-  stickyNote: {
-    position: 'absolute',
-    backgroundColor: 'rgba(253,247,236,0.93)',
-    borderRadius: 4,
-    padding: 10,
-    maxWidth: 140,
-    zIndex: 7,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    shadowOffset: { width: 1, height: 2 },
-    elevation: 4,
-  },
-  stickyNoteText: {
-    color: '#3b0764',
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 16,
-    fontStyle: 'italic',
-  },
+
 });
 
 // ─── VibeLab styles ───────────────────────────────────────────────────────────

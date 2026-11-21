@@ -115,7 +115,7 @@ test('unauthenticated visitor cannot reach a protected parent route from a blank
 
   await page.goto('/approvals');
 
-  await expect(page.getByText('sign in to continue')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
   await expect(page.getByText('To Review')).not.toBeVisible();
   await expect(page.getByText('Bridge')).toHaveCount(0);
@@ -170,8 +170,8 @@ test('signup recovers from an ambiguous Supabase timeout without creating a real
 
   await page.goto('/signup?side=teen');
   await expect(page.getByText('How old are you?')).toBeVisible({ timeout: 30_000 });
-  await page.getByRole('button', { name: /13\s*[–-]\s*15 Teen mode starts/i }).click();
-  await page.getByRole('button', { name: /Continue with teen setup/i }).click();
+  await page.getByRole('button', { name: /13\s*[–-]\s*15/i }).click();
+  await page.getByRole('button', { name: /Continue to sign up/i }).click();
   await page.getByPlaceholder('email').fill('playwright-signup-timeout@example.invalid');
   await page.getByPlaceholder('password (8+ characters)').fill('PlaywrightOnly-123!');
   await page.getByPlaceholder('confirm password').fill('PlaywrightOnly-123!');

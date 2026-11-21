@@ -160,7 +160,7 @@ export interface PagesScreenProps {
 
 const TEEN_TABS: TabDefinition[] = [
   { id: 'me', label: 'Me', icon: '\u25cc', title: '', accent: '#c4b5fd' },
-  { id: 'oracle', label: 'Se\u2019kret', icon: '\u25c7', title: 'Se\u2019kret Discovery', accent: '#8b7bb8' },
+  { id: 'oracle', label: 'Ja', icon: '\u25c7', title: 'Ja — Guided Discovery', accent: '#c7b87a' },
   {
     id: 'suhana', label: 'Suhana', icon: '\u2726', eyebrow: 'Suhana pulled up',
     title: 'You been a little too quiet. What happened?',
@@ -388,7 +388,7 @@ function SekretRepliesPanel({ entries, onOpenCompanion }: SekretRepliesPanelProp
           >
             <Text style={sekretPanelStyles.emoji}>{p.emoji}</Text>
             <View style={sekretPanelStyles.cardBody}>
-              <Text style={[sekretPanelStyles.name, { color: p.accentColor }]}>{p.name}</Text>
+              <Text style={[sekretPanelStyles.name, { color: p.accentColor }]}>{id === 'oracle' ? 'Ja' : p.name}</Text>
               <Text style={sekretPanelStyles.title}>{p.title}</Text>
               <Text style={sekretPanelStyles.vibe}>{p.vibe}</Text>
             </View>
