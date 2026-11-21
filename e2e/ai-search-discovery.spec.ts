@@ -356,9 +356,10 @@ test('privacy-and-safety page states product guardrails without presenting an un
 });
 
 
-test('public site map is discoverable, structured, and mobile-safe', async ({ page, request }, testInfo) => {
+test('public site map and AI summary are discoverable without exposing private routes', async ({ page, request }, testInfo) => {
   const llmsResponse = await request.get('/llms.txt');
   expect(llmsResponse.ok()).toBe(true);
+  expect(llmsResponse.headers()['content-type']).toContain('text/plain');
   const llms = await llmsResponse.text();
   expect(llms).toContain("Se'kret Bip");
   expect(llms).toContain('https://sekretbip.net/privacy-and-safety/');
@@ -375,7 +376,7 @@ test('public site map is discoverable, structured, and mobile-safe', async ({ pa
   expect(agentPolicy.ok()).toBe(true);
   expect(agentPolicy.headers()['content-signal']).toContain('ai-input=no');
 
-  await page.goto('/site-map/index.html', { waitUntil: 'domcontentloaded' });
+  await page.goto('/site-map/', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveTitle("Se'kret Bip site map | Public product information");
   await expect(page.getByRole('heading', { level: 1, name: "Se'kret Bip site map" })).toBeVisible();
   for (const label of ["What is Se'kret Bip?", "How Se'kret Bip works", "Privacy and safety at Se'kret Bip", 'XML sitemap', 'Crawler policy', 'AI-readable product summary']) {
@@ -397,8 +398,7 @@ test('public site map is discoverable, structured, and mobile-safe', async ({ pa
   });
 });
 
-
-test('welcome screen exposes a public site map link', async ({ page }) => {
+test('welcome screen exposes the public site map link', async ({ page }) => {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('web-welcome-site-map')).toBeVisible();
 });
