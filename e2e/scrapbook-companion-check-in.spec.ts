@@ -136,14 +136,18 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 1440, height: 900 
     await expect(scene).toBeVisible({ timeout: 15_000 });
     await expect(actor).toBeVisible();
     await expect(action).toBeVisible();
+    // The Polaroid is intentionally rotated. boundingBox() includes that rotation
+    // and is ~14px taller than the actual photo well at desktop width.
+    // Measure layout height separately; keep screen-level visibility checks below.
     const photoBox = await portrait.boundingBox();
+    const photoLayoutHeight = await portrait.evaluate(element => element.clientHeight);
     const actorBox = await actor.boundingBox();
     const actionBox = await action.boundingBox();
     expect(photoBox).not.toBeNull();
     expect(actorBox).not.toBeNull();
     expect(actionBox).not.toBeNull();
-    expect(photoBox!.height).toBeGreaterThanOrEqual(190);
-    expect(photoBox!.height).toBeLessThanOrEqual(345);
+    expect(photoLayoutHeight).toBeGreaterThanOrEqual(190);
+    expect(photoLayoutHeight).toBeLessThanOrEqual(345);
     expect(actorBox!.width).toBeGreaterThan(0);
     expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(viewport.height + 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1);
