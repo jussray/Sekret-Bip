@@ -1,4 +1,19 @@
 <!-- truth-mode: durable -->
+
+<!-- public-summary:start -->
+## Product overview
+
+**Se’kret Bip is a privacy-centered companion for teen reflection, self-expression, and healthier family communication.** It is designed to offer supportive creative experiences while treating private teen content, parent relationships, safety, and consent as explicit product boundaries.
+
+**What to show today:** approved character/world visuals and clearly labeled source-backed features using fictional demonstration profiles. No real teen reflections, personal information, private messages, or guardian-linked records belong in public demos.
+
+**Evidence boundary (21 November 2026):** `main` at `cfe55e9` recorded passing public-front-door and deployment checks but also failed Worker-build, database-preview, and release-proof checks. End-to-end onboarding, privacy, age/guardian flows, and real-account safety **must not** be represented as production-verified from these results.
+
+**Safety boundary:** this is not a medical, therapy, crisis, or emergency service. Launch claims require direct testing of account, permissions, privacy, deletion, and mobile/web experiences.
+
+---
+<!-- public-summary:end -->
+
 # Se’kret Bip 💜
 
 **A private, age-aware space for reflection, self-expression, emotional growth, and healthier family communication.**
