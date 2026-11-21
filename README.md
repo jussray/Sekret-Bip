@@ -1,5 +1,7 @@
 <!-- truth-mode: durable -->
 
+# Se’kret Bip 💜
+
 <!-- public-summary:start -->
 ## Product overview
 
@@ -14,7 +16,6 @@
 ---
 <!-- public-summary:end -->
 
-# Se’kret Bip 💜
 
 **A private, age-aware space for reflection, self-expression, emotional growth, and healthier family communication.**
 
