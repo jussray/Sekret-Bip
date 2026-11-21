@@ -17,13 +17,29 @@
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebSite",
+        "@id": "https://sekretbip.net/#website",
+        "url": "https://sekretbip.net/",
+        "name": "Se'kret Bip",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://sekretbip.net/#software",
+        "name": "Se'kret Bip",
+        "url": "https://sekretbip.net/",
+        "applicationCategory": "LifestyleApplication",
+        "operatingSystem": "Web, iOS, Android",
+        "description": "A private, age-aware digital space for young people and families to reflect, express feelings, and communicate through separate teen and family experiences."
+      },
+      {
         "@type": "WebPage",
         "@id": "https://sekretbip.net/how-it-works/#page",
         "url": "https://sekretbip.net/how-it-works/",
         "name": "How Se'kret Bip works",
         "description": "A plain-language guide to Se'kret Bip's Teen and Bip Jr + Family entry paths and age-aware setup.",
         "isPartOf": { "@id": "https://sekretbip.net/#website" },
-        "about": { "@id": "https://sekretbip.net/what-is-sekret-bip/#app" }
+        "about": { "@id": "https://sekretbip.net/#software" }
       },
       {
         "@type": "HowTo",
@@ -227,6 +243,8 @@
     <footer>
       <p>Need the definition first? <a class="cta" href="/what-is-sekret-bip/">Read “What is Se'kret Bip?”</a></p>
     </footer>
+      <p><a href="/site-map/">Public site map</a> · <a href="/llms.txt">AI-readable product summary</a></p>
+
   </main>
 </body>
 </html>
