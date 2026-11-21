@@ -207,7 +207,7 @@ test('public site map and AI summary are discoverable without exposing private r
   await expect(page).toHaveTitle("Se'kret Bip site map | Public product information");
   await expect(page.getByRole('heading', { level: 1, name: "Se'kret Bip site map" })).toBeVisible();
   for (const label of ["What is Se'kret Bip?", "How Se'kret Bip works", "Privacy and safety at Se'kret Bip", 'XML sitemap', 'Crawler policy', 'AI-readable product summary']) {
-    await expect(page.getByRole('link', { name: label })).toBeVisible();
+    await expect(page.getByRole('link', { name: label }).first()).toBeVisible();
   }
   await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://sekretbip.net/site-map/');
   const jsonLdText = await page.locator('script[type="application/ld+json"]').textContent();
