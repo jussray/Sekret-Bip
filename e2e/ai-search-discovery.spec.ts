@@ -396,3 +396,9 @@ test('public site map is discoverable, structured, and mobile-safe', async ({ pa
     contentType: 'image/png',
   });
 });
+
+
+test('welcome screen exposes a public site map link', async ({ page }) => {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('web-welcome-site-map')).toBeVisible();
+});
