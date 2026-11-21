@@ -84,6 +84,7 @@ jobs:
             test/dual-front-door-contract.test.mjs \
             test/front-door-motion-contract.test.mjs \
             test/mobile-entry-performance-contract.test.mjs \
+            test/agent-discovery.test.mjs \
             2>&1 | tee gate-evidence/front-door-contracts.log
 
       - name: Compare TypeScript diagnostics with base
