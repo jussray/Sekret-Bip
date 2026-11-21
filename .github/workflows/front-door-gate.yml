@@ -22,6 +22,7 @@ on:
       - assets/images/parent-space-splash.png
       - e2e/smoke.spec.ts
       - e2e/front-door-scene-arrival.spec.ts
+      - e2e/ai-search-discovery.spec.ts
       - playwright.config.ts
       - package.json
       - package-lock.json
@@ -147,6 +148,7 @@ jobs:
           npx playwright test \
             e2e/smoke.spec.ts \
             e2e/front-door-scene-arrival.spec.ts \
+          npx playwright test e2e/ai-search-discovery.spec.ts --trace on 2>&1 | tee gate-evidence/ai-search-discovery-playwright.log
             --grep "teen front door|parent front door|rollback front door|web welcome|frontend entry|canonical teen front door|reduced motion renders" \
             --trace on 2>&1 | tee gate-evidence/playwright.log
 
