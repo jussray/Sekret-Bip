@@ -87,6 +87,7 @@ function TeenTabs({
         <Tabs.Screen name="circle/weather" options={{ href: null }} />
         <Tabs.Screen name="resources" options={{ href: null }} />
         <Tabs.Screen name="quiet" options={{ href: null }} />
+        <Tabs.Screen name="meaning" options={{ href: null }} />
       </Tabs>
       {!hideGlobalChrome && <SideSafeBackButton side="teen" />}
       {!hideGlobalChrome && <GlobalMoodButton />}
@@ -112,6 +113,10 @@ export default function TeenLayout() {
   const immersiveScrapbook = pathname.includes('scrapbook-check-in');
 
   useEffect(() => {
+    if (devSideOverride != null) {
+      setProfileChecked(true);
+      return;
+    }
     let active = true;
     hydrateAccountProfile('teen')
       .then(profile => {
@@ -130,7 +135,7 @@ export default function TeenLayout() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [devSideOverride]);
 
   const effectiveUserSide = devSideOverride ?? userSide;
   const isTeenActive = founderPreview || (
@@ -150,13 +155,13 @@ export default function TeenLayout() {
   // Split View and exact-head browser proof can land on the teen copy of a
   // duplicate web URL first. Honor the explicit side before Founder Preview
   // renders so /(teen) and /(parent) remain deterministic in development.
-  if (founderPreview && devSideOverride === 'parent') {
+  if (devSideOverride === 'parent') {
     return <Redirect href={`/(parent)${pathname}` as never} />;
   }
 
-  // Founder Preview bypasses only route/onboarding visibility in development.
-  // Quiet Bip remains a product boundary, so preview still honors Sleep Guard.
-  if (founderPreview) {
+  // Founder Preview or an explicit teen-side Split View override bypasses
+  // route/onboarding visibility. Quiet Bip remains a product boundary.
+  if (founderPreview || devSideOverride === 'teen') {
     if (!sleepLoaded) return <TeenLoadingSurface />;
     if (sleepActive && !quietRouteAllowed) return <Redirect href="/(teen)/quiet" />;
     return (

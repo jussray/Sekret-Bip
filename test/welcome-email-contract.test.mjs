@@ -1,0 +1,89 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import test from 'node:test';
+
+const signup = fs.readFileSync('app/(auth)/signup.tsx', 'utf8');
+const bootstrap = fs.readFileSync('src/services/auth/postAuthBootstrap.ts', 'utf8');
+const client = fs.readFileSync('src/services/auth/welcomeEmail.ts', 'utf8');
+const edge = fs.readFileSync('supabase/functions/send-welcome-email/index.ts', 'utf8');
+
+test('new signups are explicitly marked eligible for welcome email v1', () => {
+  assert.match(signup, /welcome_email_version:\s*1/);
+  assert.match(signup, /options:\s*\{\s*emailRedirectTo:\s*redirectTo,\s*data:\s*metadata\s*\}/);
+  assert.match(signup, /auth\.updateUser\([\s\S]*data:\s*metadata/);
+});
+
+test('post-auth bootstrap invokes welcome delivery only after founder routing is excluded', () => {
+  assert.match(bootstrap, /ensureWelcomeEmail/);
+  const founderIndex = bootstrap.indexOf('if (isFounderProfile(founderProfile))');
+  const welcomeIndex = bootstrap.indexOf('void ensureWelcomeEmail()');
+  assert.ok(founderIndex >= 0);
+  assert.ok(welcomeIndex > founderIndex);
+});
+
+test('welcome delivery never blocks post-auth routing', () => {
+  assert.doesNotMatch(bootstrap, /await\s+ensureWelcomeEmail\(/);
+});
+
+test('client never supplies recipient identity or personalization fields', () => {
+  assert.match(client, /functions\.invoke\('send-welcome-email',\s*\{\s*body:\s*\{\},\s*signal:\s*AbortSignal\.timeout\(WELCOME_EMAIL_TIMEOUT_MS\),?\s*\}\)/);
+  assert.doesNotMatch(client, /email\s*:/);
+  assert.doesNotMatch(client, /displayName\s*:/);
+  assert.doesNotMatch(client, /accountSide\s*:/);
+});
+
+test('server requires confirmed permanent auth and derives recipient from authenticated user', () => {
+  assert.match(edge, /authClient\.auth\.getUser\(\)/);
+  assert.match(edge, /user\.is_anonymous/);
+  assert.match(edge, /user\.email_confirmed_at/);
+  assert.match(edge, /to:\s*user\.email/);
+  assert.match(edge, /user\.user_metadata\?\.welcome_email_version/);
+});
+
+test('welcome delivery is durable and duplicate-resistant', () => {
+  assert.match(edge, /user\.app_metadata\?\.welcome_email/);
+  assert.match(edge, /Idempotency-Key/);
+  assert.match(edge, /sekret-bip-welcome-v\$\{WELCOME_EMAIL_VERSION\}:\$\{user\.id\}/);
+  assert.match(edge, /admin\.auth\.admin\.updateUserById/);
+  assert.match(edge, /status:\s*"already_sent"/);
+});
+
+test('welcome email includes onboarding and public documentation links', () => {
+  assert.match(edge, /what-is-sekret-bip/);
+  assert.match(edge, /how-it-works/);
+  assert.match(edge, /privacy-and-safety/);
+  assert.match(edge, /WELCOME_PUBLIC_ORIGIN/);
+  assert.match(edge, /WELCOME_APP_ORIGIN/);
+  assert.match(edge, /Se'kret Bip is not a diagnosis/);
+});
+
+
+test('welcome delivery uses a cancellable 4-second platform timeout', () => {
+  assert.match(client, /WELCOME_EMAIL_TIMEOUT_MS = 4_000/);
+  assert.match(client, /signal:\s*AbortSignal\.timeout\(WELCOME_EMAIL_TIMEOUT_MS\)/);
+  assert.doesNotMatch(client, /Promise\.race\(/);
+  assert.doesNotMatch(client, /\bsetTimeout\s*\(/);
+  assert.doesNotMatch(client, /new AbortController\(/);
+});
+
+test('the standard timeout signal aborts without evaluating text', async () => {
+  assert.equal(typeof AbortSignal.timeout, 'function');
+  const signal = AbortSignal.timeout(10);
+  await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }));
+  assert.equal(signal.aborted, true);
+});
+
+test('HTML welcome copy contains only fixed text and canonical HTTPS links', () => {
+  assert.doesNotMatch(edge, /function escapeHtml\(/);
+  assert.match(edge, /const allowed = new URL\(fallback\)/);
+  assert.match(edge, /candidate\.protocol !== "https:"/);
+  assert.match(edge, /candidate\.hostname !== allowed\.hostname/);
+  assert.match(edge, /candidate\.pathname !== "\/"/);
+  const htmlStart = edge.indexOf('  const htmlTips = ');
+  const htmlEnd = edge.indexOf('  return { text, html };', htmlStart);
+  assert.ok(htmlStart >= 0 && htmlEnd > htmlStart);
+  const markup = edge.slice(htmlStart, htmlEnd);
+  assert.doesNotMatch(markup, /displayName|user_metadata|profile/);
+  assert.match(markup, /Hi there/);
+  assert.match(edge, /Hi \${displayName}/);
+});

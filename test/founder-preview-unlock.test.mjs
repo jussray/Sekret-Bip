@@ -72,8 +72,8 @@ test('route visibility opens in development while side and Quiet Bip safety boun
   const teenLayout = read('app/(teen)/_layout.tsx');
   const parentLayout = read('app/(parent)/_layout.tsx');
 
-  assert.match(teenLayout, /if \(founderPreview && devSideOverride === 'parent'\)/);
-  assert.match(teenLayout, /if \(founderPreview\) \{/);
+  assert.match(teenLayout, /if \(devSideOverride === 'parent'\)/);
+  assert.match(teenLayout, /if \(founderPreview \|\| devSideOverride === 'teen'\) \{/);
   assert.match(teenLayout, /if \(!sleepLoaded\) return <TeenLoadingSurface \/>/);
   assert.match(teenLayout, /if \(sleepActive && !quietRouteAllowed\) return <Redirect href="\/\(teen\)\/quiet" \/>/);
   // Both preview and verified-teen entry points must use the current guarded

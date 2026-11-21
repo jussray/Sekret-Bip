@@ -123,13 +123,30 @@ export function mapCheckState(run) {
   return 'unknown';
 }
 
-export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '') {
+function loadManifestExcludedChecks() {
+  try {
+    const manifestPath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      '../.control-room/test-ledger.manifest.json',
+    );
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const excluded = Array.isArray(manifest?.source?.excludedChecks)
+      ? manifest.source.excludedChecks
+      : [];
+    return new Set(excluded.map((entry) => clean(entry?.checkName)).filter(Boolean));
+  } catch {
+    return new Set();
+  }
+}
+
+export function selectLatestChecks(checkRuns, expectedSha, observerCheckName = '', excludedCheckNames = new Set()) {
   const exactSha = normalizeSha(expectedSha);
   const selected = new Map();
 
   for (const run of Array.isArray(checkRuns) ? checkRuns : []) {
     if (!run || normalizeSha(run.head_sha) !== exactSha) continue;
     if (observerCheckName && clean(run.name) === observerCheckName) continue;
+    if (excludedCheckNames.size > 0 && excludedCheckNames.has(clean(run.name))) continue;
     if (!clean(run.name)) continue;
 
     const key = checkKey(run);
@@ -452,11 +469,13 @@ export async function observeExactHeadChecks(env = process.env) {
   let previousFingerprint = '';
   let checks = [];
   let observerState = 'observing';
+  const excludedCheckNames = loadManifestExcludedChecks();
 
   while (Date.now() - startedAt < timeoutMs) {
     const runs = await fetchAllCheckRuns({repository, sha, token});
+    // Reconcile real provider job status, then apply the canonical exclusion list.
     const reconciledRuns = await reconcileGithubActionsCheckRuns(runs, {repository, token});
-    checks = selectLatestChecks(reconciledRuns, sha, observerCheckName);
+    checks = selectLatestChecks(reconciledRuns, sha, observerCheckName, excludedCheckNames);
     writeLedger(outputPath, buildTestLedger({runtimeState, repository, sha, branch, runId, checks}));
 
     const fingerprint = JSON.stringify(checks.map((check) => [

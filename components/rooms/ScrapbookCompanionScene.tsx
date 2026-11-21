@@ -10,7 +10,11 @@ import { RoomWallScrapbook, getRoomWallCopy, type RoomWallIdentity } from './Roo
 export type ScrapbookIdentity = RoomWallIdentity;
 
 const NAMES: Record<ScrapbookIdentity, string> = {
-  raylene: 'Suhana', rylane: 'Sy', cloud: 'Cloud', night: 'Night', ja: 'Ja',
+  raylene: 'Suhana',
+  rylane: 'Sy',
+  cloud: 'Cloud',
+  night: 'Night',
+  ja: 'Ja',
 };
 
 const AVATARS = {

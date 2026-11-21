@@ -28,6 +28,43 @@ jobs:
       - name: Run DevSkim scanner
         uses: microsoft/DevSkim-Action@734c6ed89671b1c7a5211ed334c79db261e3f221 # v1
 
+      # Read-only proof: no source snippets, messages, credentials, or SARIF payload exported.
+      - name: Record DevSkim finding locations without source content
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          const sarif = JSON.parse(readFileSync('devskim-results.sarif', 'utf8'));
+          const references = [];
+          for (const run of sarif.runs ?? []) {
+            for (const result of run.results ?? []) {
+              const location = result.locations?.[0]?.physicalLocation;
+              const path = String(location?.artifactLocation?.uri ?? '');
+              const rule = String(result.ruleId ?? '');
+              const line = Number(location?.region?.startLine);
+              if (!/^[a-zA-Z0-9_./() -]{1,250}$/.test(path) || path.includes('..')) continue;
+              if (!/^[a-zA-Z0-9_.-]{1,120}$/.test(rule)) continue;
+              references.push({ path, rule, line: Number.isInteger(line) && line > 0 ? line : null });
+            }
+          }
+          references.sort((a, b) => a.path.localeCompare(b.path) || (a.line ?? 0) - (b.line ?? 0));
+          writeFileSync('devskim-finding-references.json', JSON.stringify({
+            schema: 'juss/devskim-finding-references@v1',
+            scope: 'non-secret-rule-and-location-only',
+            references,
+          }, null, 2) + '\n');
+          NODE
+
+      - name: Upload short-lived DevSkim finding references
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: devskim-finding-references-${{ github.event.pull_request.head.sha }}
+          path: devskim-finding-references.json
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Upload DevSkim scan results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
         with:
