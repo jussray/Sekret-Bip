@@ -10,13 +10,15 @@ This document defines the visual contract for every Se’kret Bip character, ill
 
 Teen, Parent Space, and Bip Jr may carry different emotional tones, but they must never drift into different rendering styles or unrelated franchises.
 
-## Authority hierarchy
+## Authority hierarchy — founder supersession, 2026-11-21
 
-1. **Teen welcome-door artwork** is the rendering and cinematic-style authority.
-2. **Canonical standing/reference sheets** define identity, hair, clothing, accessories, personality, and silhouette.
-3. **Parent Space and Bip Jr scenes** define age, role, emotional tone, and environment without inventing a new rendering engine.
+1. **Approved individual character fingerprints and existing Pages companion artwork** govern faces, natural hair, skin tone, proportions, clothing, silhouettes, roles, and expression. Keep each approved face, not a lookalike inferred from a new ensemble.
+2. **The approved Pages scrapbook / intimate companion-room direction** (docs/SCRAPBOOK_UI_CANON.md) governs the shared visual atmosphere: soft night-plum and indigo, warm personal paper, handwriting, imperfect tape, Polaroid frames, cozy city-window light, restrained stars, and a lived-in space.
+3. **Companion Rooms follow Pages next.** Reuse character identity masters and the existing room/time-of-day system; change only what is needed for the quieter same-film finish. The existing Ja/Oracle continuity and Ja's approved individual look remain untouched. Never invent a Ja face.
+4. **The public website follows verified companion Rooms after that**, preserving Teen, Bip Jr, and Parent entry journeys. Separate high-glow Adobe castle/portal or Universe promotional posters are exploration or marketing references only, **not** production UI style or character identity authority.
+5. **Parent and Bip Jr scenes** retain age and emotional tone without drifting into unrelated illustration styles.
 
-Canva sticker/reference sheets are identity references. They do not override the approved cinematic rendering language.
+The previous Teen welcome-door rendering priority is superseded by this Pages-first founder direction. Grand portals, neon frames, crowded promotional casts, or newly inferred faces must not displace the intimate Pages atmosphere.
 
 ## Canonical family
 
@@ -137,6 +139,14 @@ The world should breathe rather than bounce:
 - Labels must not block the family, Cloud, or focal expressions.
 - Each welcome door keeps a clear primary action above the safe area.
 - Design-reference mockups are never imported directly as runtime interfaces.
+
+## Mobile and web composition gate
+
+- Preserve each approved character image and expressive face. On phones, recompose the surrounding room and paper layout instead of cropping the desktop illustration, stretching the art, or hiding people behind overlays.
+- Keep the image-led experience legible at 390 × 844, 320 × 568, and desktop widths of at least 1280px. Verify safe areas, soft-keyboard behavior, scroll reachability, contrast, reduced motion, and at least 44pt touch targets.
+- Keep existing Pages save, reply, privacy lock, voice/media, Bridge consent/sharing, navigation, guardian and age gates, and separate Parent/Bip Jr boundaries intact. Visual alignment authorizes no data-model or account changes.
+- Render interactive labels and buttons as accessible controls, never critical copy baked into illustrations. Companion actors stay distinct from backgrounds so viewport width never changes identity.
+- Do not claim visuals implemented, matching, or live without exact-head Playwright screenshots of Pages and Rooms on mobile plus the front door and entry journeys on web. Founder Control Room may observe evidence but does not substitute for browser/provider verification or founder approval.
 
 ## Approval gate: the same-film test
 
