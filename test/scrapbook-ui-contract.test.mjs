@@ -13,6 +13,8 @@ const e2ePath = 'e2e/scrapbook-companion-check-in.spec.ts';
 const workflowPath = '.github/workflows/product-design-playwright-proof.yml';
 
 const component = readFileSync(componentPath, 'utf8');
+const wall = readFileSync('components/rooms/RoomWallScrapbook.tsx', 'utf8');
+const userRoom = readFileSync('screens/UserRoomScreen.tsx', 'utf8');
 const route = readFileSync(routePath, 'utf8');
 const room = readFileSync(roomPath, 'utf8');
 const layout = readFileSync(layoutPath, 'utf8');
@@ -94,21 +96,26 @@ test('Pages keeps Sy a boy and Cloud a glowing cloud, not a human substitute', (
   assert.doesNotMatch(pages, /cardCaption:\s*'Big Sis Vibes'/);
 });
 
-test('approved scrapbook visual grammar and time-of-day behavior remain wired', () => {
+test('room art is the screen, the shared scrapbook note is pinned to its wall', () => {
   assert.match(component, /getRoomPhase\(new Date\(\)\)/);
-  assert.doesNotMatch(component, /maxHeight: '52%'/);
-  assert.match(component, /getRoomScene\(character, phase\)/);
-  assert.match(component, /you made it through today\./);
+  assert.match(component, /<BareRoomRenderer character=\{character as Character\} lightingMode=\{phase\}/);
+  assert.match(component, /<RoomWallScrapbook character=\{character\} phase=\{phase\}/);
+  assert.match(userRoom, /<BareRoomRenderer/);
+  assert.match(userRoom, /<RoomWallScrapbook[\s\S]*?customMessage=\{userRoom\.roomQuote\}/);
+  assert.match(userRoom, /room-companion-visual/);
+  assert.match(userRoom, /room-companion-hit-target/);
+  assert.match(userRoom, /hotspots\.map/);
+  assert.match(wall, /pointerEvents="none"/);
+  assert.match(wall, /WALL_LINES/);
+  assert.match(wall, /PHASE_HEADINGS/);
+  assert.match(wall, /customMessage\?\.trim\(\) \|\| copy\.message/);
+  assert.match(wall, /you made it through today\./);
+  assert.doesNotMatch(component, /scrapbook-photo-well|styles\.polaroid|<ImageBackground source=\{getRoomScene/);
   assert.match(component, /scrapbook-companion-scene/);
   assert.match(component, /scrapbook-bip-cta/);
   assert.match(component, /scrapbook-check-in-launcher/);
-  assert.match(component, /character === 'cloud' && styles\.photoGlowCloud/);
   assert.match(component, /scrapbook-cloud-aura/);
   assert.match(component, /shadowColor: '#b7f4ff'/);
-
-  for (const motif of ['sketchbook-paper', 'masking-tape', 'Polaroid', 'doodles', 'cozy dark-mode', 'time-of-day']) {
-    assert.match(canon, new RegExp(motif, 'i'));
-  }
 });
 
 test('approved Sy evening reference is checked into the design evidence path', () => {
@@ -118,32 +125,33 @@ test('approved Sy evening reference is checked into the design evidence path', (
   assert.match(canon, /Design QA status:\s*\*\*blocked/i);
 });
 
-test('Product Design proof captures the actual Sy evening scrapbook route at 390x844', () => {
+test('Playwright witnesses the real room art, identity, wall note and Pages handoff', () => {
   assert.match(workflow, /e2e\/scrapbook-companion-check-in\.spec\.ts/);
-  assert.match(e2e, /width:\s*390,\s*height:\s*844/);
-  assert.match(e2e, /Date\.prototype,\s*'getHours'/);
-  assert.match(e2e, /value:\s*\(\) => 18/);
-  assert.match(e2e, /\/scrapbook-check-in\?bipDevSide=teen&companion=sy/);
+  assert.match(e2e, /width: 390, height: 844/);
+  assert.match(e2e, /Date\.prototype, 'getHours'/);
+  assert.match(e2e, /value: \(\) => 18/);
+  assert.match(e2e, /scrapbook-check-in\?bipDevSide=teen&companion=sy/);
+  assert.match(e2e, /room-production-art/);
+  assert.match(e2e, /room-wall-scrapbook/);
   assert.match(e2e, /EVENING CHECK-IN/);
   assert.match(e2e, /you made it through today\./);
   assert.match(e2e, /sy-evening-390x844\.png/);
-  assert.match(e2e, /cloud-glow-390x844/);
   assert.match(e2e, /scrapbook-cloud-aura/);
   assert.match(e2e, /toHaveAccessibleName\('Bip with Sy'\)/);
   assert.match(e2e, /syActorBox!\.height/);
   assert.match(e2e, /toHaveURL\(\/\\\/pages/);
 });
 
-
-test('Pages and Room scrapbook reuse the same approved faces and protect short-phone art', () => {
-  assert.match(component, /raylene:\s*getTeenCompanionAsset\('raylene', 'neutral'\)/);
-  assert.match(component, /rylane:\s*getTeenCompanionAsset\('rylane', 'neutral'\)/);
-  assert.match(component, /night:\s*getTeenCompanionAsset\('night', 'neutral'\)/);
-  assert.match(component, /cloud:\s*IMAGES\.cloudAvatarNeutral/);
+test('Pages and immersive Room use the same approved separate actor art, not a flattened composite', () => {
+  assert.match(component, /raylene: getTeenCompanionAsset\('raylene', 'neutral'\)/);
+  assert.match(component, /rylane: getTeenCompanionAsset\('rylane', 'neutral'\)/);
+  assert.match(component, /night: getTeenCompanionAsset\('night', 'neutral'\)/);
+  assert.match(component, /cloud: IMAGES\.cloudAvatarNeutral/);
   assert.match(component, /useWindowDimensions\(\)/);
-  assert.match(component, /Math\.max\(190, Math\.min\(345, Math\.floor\(viewportHeight \* 0\.39\)\)\)/);
-  assert.match(component, /scrapbook-photo-well/);
-  assert.match(component, /compactViewport && styles\.compactRoot/);
   assert.match(component, /resizeMode="contain"/);
   assert.match(component, /character === 'ja'/);
+  assert.match(component, /IMAGES\.bgJournal/);
+  const bareRoom = readFileSync('components/rooms/BareRoomRenderer.tsx', 'utf8');
+  assert.match(bareRoom, /room-production-art/);
+  assert.match(bareRoom, /resized-bg|assets\/images\/archive/);
 });

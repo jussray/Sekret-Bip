@@ -28,7 +28,9 @@ test('approved Sy evening scrapbook check-in renders at 390x844 and hands off to
 
   await expect(scene).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('EVENING CHECK-IN', { exact: true })).toBeVisible();
-  await expect(page.getByText('Sy', { exact: true })).toBeVisible();
+  await expect(page.getByText("Sy's room", { exact: true })).toBeVisible();
+  await expect(page.getByTestId('room-production-art')).toBeVisible();
+  await expect(page.getByTestId('room-wall-scrapbook')).toBeVisible();
   const syActor = page.getByTestId('scrapbook-sy-actor');
   await expect(syActor).toBeVisible();
   const syActorBox = await syActor.boundingBox();
@@ -90,7 +92,7 @@ test('Cloud glow is rendered in the real scrapbook browser scene at 390x844', as
   const aura = page.getByTestId('scrapbook-cloud-aura');
   await expect(scene).toBeVisible({ timeout: 15_000 });
   await expect(aura).toBeVisible();
-  await expect(aura).toHaveCSS('background-color', 'rgba(123, 216, 255, 0.36)');
+  await expect(aura).toHaveCSS('background-color', 'rgba(123, 216, 255, 0.27)');
   await expect(page.getByTestId('scrapbook-bip-cta')).toHaveAccessibleName('Bip with Cloud');
 
   const metrics = await page.evaluate(() => ({
@@ -111,7 +113,7 @@ test('Ja alias reaches the existing Oracle-guided Pages tab without a duplicate 
   await expect(page.getByTestId('scrapbook-companion-scene')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('scrapbook-ja-presence')).toBeVisible();
   await expect(page.getByTestId('scrapbook-bip-cta')).toHaveAccessibleName('Bip with Ja');
-  // Ja appears in both the Polaroid portrait treatment and its caption.
+  // Ja keeps the existing approved symbolic fallback; no invented actor.
   await expect(page.getByText('Ja', { exact: true }).first()).toBeVisible();
 
   const screenshot = await page.screenshot({ fullPage: true, animations: 'disabled' });
@@ -130,24 +132,23 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 1440, height: 900 
     await page.setViewportSize(viewport);
     await page.goto('/scrapbook-check-in?bipDevSide=teen&companion=sy', { waitUntil: 'domcontentloaded' });
     const scene = page.getByTestId('scrapbook-companion-scene');
-    const portrait = page.getByTestId('scrapbook-photo-well');
+    const roomArt = page.getByTestId('room-production-art');
+    const wall = page.getByTestId('room-wall-scrapbook');
     const actor = page.getByTestId('scrapbook-sy-actor');
     const action = page.getByTestId('scrapbook-bip-cta');
     await expect(scene).toBeVisible({ timeout: 15_000 });
     await expect(actor).toBeVisible();
     await expect(action).toBeVisible();
-    // The Polaroid is intentionally rotated. boundingBox() includes that rotation
-    // and is ~14px taller than the actual photo well at desktop width.
-    // Measure layout height separately; keep screen-level visibility checks below.
-    const photoBox = await portrait.boundingBox();
-    const photoLayoutHeight = await portrait.evaluate(element => element.clientHeight);
+    await expect(roomArt).toBeVisible();
+    await expect(wall).toBeVisible();
+    const wallBox = await wall.boundingBox();
     const actorBox = await actor.boundingBox();
     const actionBox = await action.boundingBox();
-    expect(photoBox).not.toBeNull();
+    expect(wallBox).not.toBeNull();
     expect(actorBox).not.toBeNull();
     expect(actionBox).not.toBeNull();
-    expect(photoLayoutHeight).toBeGreaterThanOrEqual(190);
-    expect(photoLayoutHeight).toBeLessThanOrEqual(345);
+    expect(wallBox!.y).toBeGreaterThanOrEqual(0);
+    expect(wallBox!.y + wallBox!.height).toBeLessThanOrEqual(viewport.height);
     expect(actorBox!.width).toBeGreaterThan(0);
     expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(viewport.height + 1);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1);
@@ -157,3 +158,35 @@ for (const viewport of [{ width: 320, height: 640 }, { width: 1440, height: 900 
     });
   });
 }
+
+
+test('Suhana and Night live in their own room art with distinct changing wall notes', async ({ page }, testInfo) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(Date.prototype, 'getHours', { configurable: true, value: () => 18 });
+  });
+  for (const [companion, expected] of [
+    ['suhana', 'you showed up for yourself today.'],
+    ['night', 'the day can end without every answer.'],
+  ] as const) {
+    await page.goto('/scrapbook-check-in?bipDevSide=teen&companion=' + companion, { waitUntil: 'domcontentloaded' });
+    await expect(page.getByTestId('room-production-art')).toBeVisible();
+    await expect(page.getByTestId('room-wall-message')).toHaveText(expected);
+    await expect(page.getByTestId('scrapbook-room-companion')).toBeVisible();
+    const shot = await page.screenshot({ fullPage: true, animations: 'disabled' });
+    await fs.mkdir(VISUAL_DIR, { recursive: true });
+    await fs.writeFile(path.join(VISUAL_DIR, companion + '-evening-room-390x844.png'), shot);
+    await testInfo.attach(companion + '-evening-room.png', { body: shot, contentType: 'image/png' });
+  }
+});
+
+test('wall sayings change with real room phase without replacing scene or character', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(Date.prototype, 'getHours', { configurable: true, value: () => 12 });
+  });
+  await page.goto('/scrapbook-check-in?bipDevSide=teen&companion=sy', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('room-wall-phase')).toHaveText('MIDDAY CHECK-IN');
+  await expect(page.getByTestId('room-wall-message')).toHaveText('you can reset the play.');
+  await expect(page.getByTestId('room-production-art')).toBeVisible();
+});
