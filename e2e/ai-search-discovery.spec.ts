@@ -16,7 +16,8 @@ test('AI search definition page is crawlable, extractable, and privacy-bounded',
   expect(robots).toContain('Allow: /how-it-works/');
   expect(robots).toContain('Allow: /privacy-and-safety/');
   expect(robots).toContain('Allow: /site-map/');
-  expect(robots).toContain('Allow: /llms.txt
+  expect(robots).toContain('Allow: /llms.txt');
+  expect(robots).toContain('Sitemap: https://sekretbip.net/sitemap.xml');
 
   const sitemapResponse = await request.get('/sitemap.xml');
   expect(sitemapResponse.ok()).toBe(true);
