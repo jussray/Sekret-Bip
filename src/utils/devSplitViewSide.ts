@@ -10,7 +10,7 @@ export const DEV_SPLIT_VIEW_SIDE_PARAM = 'bipDevSide';
  * without touching the persisted userSide.
  */
 export function getDevSplitViewSideOverride(): 'teen' | 'parent' | null {
-  if (Platform.OS !== 'web' || typeof window === 'undefined') return null;
+  if (!__DEV__ || Platform.OS !== 'web' || typeof window === 'undefined') return null;
   const side = new URLSearchParams(window.location.search).get(DEV_SPLIT_VIEW_SIDE_PARAM);
   return side === 'teen' || side === 'parent' ? side : null;
 }
