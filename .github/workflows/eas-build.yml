@@ -23,6 +23,7 @@ on:
         options:
           - ios
           - android
+          - all
       channel:
         description: Build channel
         required: true
@@ -34,7 +35,7 @@ on:
           - production
 
 concurrency:
-  group: eas-build-${{ inputs.target_sha }}-${{ inputs.app }}-${{ inputs.platform }}
+  group: eas-build-${{ inputs.target_sha }}-${{ inputs.app }}-${{ inputs.channel }}
   cancel-in-progress: false
 
 permissions:

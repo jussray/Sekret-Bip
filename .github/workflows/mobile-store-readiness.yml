@@ -12,6 +12,12 @@ on:
       - package.json
       - package-lock.json
       - app/(parent)/_layout.tsx
+      - app/(teen)/circle/**
+      - src/features/circle/**
+      - supabase/migrations/**circle*.sql
+      - public/support/**
+      - public/account-deletion/**
+      - test/open-bip-*.test.mjs
       - e2e/smoke.spec.ts
       - scripts/verify-mobile-store-release.mjs
       - .github/workflows/eas-build.yml
@@ -24,6 +30,12 @@ on:
       - package.json
       - package-lock.json
       - app/(parent)/_layout.tsx
+      - app/(teen)/circle/**
+      - src/features/circle/**
+      - supabase/migrations/**circle*.sql
+      - public/support/**
+      - public/account-deletion/**
+      - test/open-bip-*.test.mjs
       - e2e/smoke.spec.ts
       - scripts/verify-mobile-store-release.mjs
       - .github/workflows/eas-build.yml
@@ -61,6 +73,8 @@ jobs:
       - run: npm ci
       - run: node --check scripts/verify-mobile-store-release.mjs
       - run: node scripts/verify-mobile-store-release.mjs
+      - name: Verify Open Bip blocking contract
+        run: node --test test/open-bip-blocking-contract.test.mjs
       - run: npm run type-check
 
   playwright-regression:
