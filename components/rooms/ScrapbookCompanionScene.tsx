@@ -3,6 +3,7 @@ import {
   Image,
   ImageBackground,
   Platform,
+  useWindowDimensions,
   Pressable,
   StyleSheet,
   Text,
@@ -36,10 +37,10 @@ const DISPLAY_NAMES: Record<ScrapbookIdentity, string> = {
 // the existing teen image registry has the proper separate 617 KB neutral asset.
 // Reuse that existing registry instead of inventing or duplicating artwork.
 const AVATARS: Record<Character, ImageSourcePropType> = {
-  raylene: IMAGES.rayleneFullbody,
+  raylene: getTeenCompanionAsset('raylene', 'neutral') ?? IMAGES.rayleneFullbody,
   rylane: getTeenCompanionAsset('rylane', 'neutral') ?? IMAGES.rylaneProfile,
   cloud: IMAGES.cloudAvatarNeutral,
-  night: IMAGES.nightFullbody,
+  night: getTeenCompanionAsset('night', 'neutral') ?? IMAGES.nightFullbody,
 };
 
 const PHASE_COPY: Record<RoomPhase, { eyebrow: string; note: string; accent: string }> = {
@@ -120,6 +121,11 @@ export function ScrapbookCompanionScene({
   const displayName = DISPLAY_NAMES[character];
   const phase = useMemo(() => getRoomPhase(new Date()), []);
   const phaseCopy = PHASE_COPY[phase];
+  // Use the same individual portraits as Pages. Scale the paper frame for short phones
+  // instead of cropping character artwork or pushing the action below the viewport.
+  const { height: viewportHeight, width: viewportWidth } = useWindowDimensions();
+  const portraitHeight = Math.max(190, Math.min(345, Math.floor(viewportHeight * 0.39)));
+  const compactViewport = viewportHeight < 700 || viewportWidth < 360;
   // Ja uses the existing journal atmosphere while isolated Ja character art
   // awaits exact-identity approval. This background is never avatar authority.
   const roomArt = useMemo(() => character === 'ja' ? IMAGES.bgJournal : getRoomScene(character, phase), [character, phase]);
@@ -128,7 +134,7 @@ export function ScrapbookCompanionScene({
     <ImageBackground
       source={roomArt}
       resizeMode="cover"
-      style={styles.root}
+      style={[styles.root, compactViewport && styles.compactRoot]}
       testID="scrapbook-companion-scene"
     >
       <LinearGradient
@@ -175,7 +181,7 @@ export function ScrapbookCompanionScene({
         <View style={styles.polaroidWrap}>
           <View style={styles.tapeLeft} pointerEvents="none" />
           <View style={styles.polaroid}>
-            <View style={styles.photoWell}>
+            <View style={[styles.photoWell, { height: portraitHeight }]} testID="scrapbook-photo-well">
               <LinearGradient
                 colors={['rgba(30, 14, 61, 0.28)', 'rgba(8, 5, 22, 0.82)']}
                 style={StyleSheet.absoluteFill}
@@ -285,6 +291,11 @@ const styles = StyleSheet.create({
     paddingTop: 14,
     paddingBottom: 24,
     justifyContent: 'space-between',
+  },
+  compactRoot: {
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 12,
   },
   doodles: {
     position: 'absolute',
@@ -413,8 +424,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   photoWell: {
-    height: 345,
-    minHeight: 270,
+    minHeight: 190,
     // A percentage maxHeight can clip the nested actor to nearly nothing on web.
     backgroundColor: '#1c1030',
     overflow: 'hidden',

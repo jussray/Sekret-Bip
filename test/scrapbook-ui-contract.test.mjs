@@ -133,3 +133,17 @@ test('Product Design proof captures the actual Sy evening scrapbook route at 390
   assert.match(e2e, /syActorBox!\.height/);
   assert.match(e2e, /toHaveURL\(\/\\\/pages/);
 });
+
+
+test('Pages and Room scrapbook reuse the same approved faces and protect short-phone art', () => {
+  assert.match(component, /raylene:\s*getTeenCompanionAsset\('raylene', 'neutral'\)/);
+  assert.match(component, /rylane:\s*getTeenCompanionAsset\('rylane', 'neutral'\)/);
+  assert.match(component, /night:\s*getTeenCompanionAsset\('night', 'neutral'\)/);
+  assert.match(component, /cloud:\s*IMAGES\.cloudAvatarNeutral/);
+  assert.match(component, /useWindowDimensions\(\)/);
+  assert.match(component, /Math\.max\(190, Math\.min\(345, Math\.floor\(viewportHeight \* 0\.39\)\)\)/);
+  assert.match(component, /scrapbook-photo-well/);
+  assert.match(component, /compactViewport && styles\.compactRoot/);
+  assert.match(component, /resizeMode="contain"/);
+  assert.match(component, /character === 'ja'/);
+});

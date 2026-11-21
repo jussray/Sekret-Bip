@@ -123,3 +123,33 @@ test('Ja alias reaches the existing Oracle-guided Pages tab without a duplicate 
   await expect(page).toHaveURL(/\/pages(?:\/|\?|$)/);
   await expect(page.getByText('Ja', { exact: true }).first()).toBeVisible();
 });
+
+
+for (const viewport of [{ width: 320, height: 640 }, { width: 1440, height: 900 }]) {
+  test(`scrapbook companion art and actions fit ${viewport.width}x${viewport.height}`, async ({ page }, testInfo) => {
+    await page.setViewportSize(viewport);
+    await page.goto('/scrapbook-check-in?bipDevSide=teen&companion=sy', { waitUntil: 'domcontentloaded' });
+    const scene = page.getByTestId('scrapbook-companion-scene');
+    const portrait = page.getByTestId('scrapbook-photo-well');
+    const actor = page.getByTestId('scrapbook-sy-actor');
+    const action = page.getByTestId('scrapbook-bip-cta');
+    await expect(scene).toBeVisible({ timeout: 15_000 });
+    await expect(actor).toBeVisible();
+    await expect(action).toBeVisible();
+    const photoBox = await portrait.boundingBox();
+    const actorBox = await actor.boundingBox();
+    const actionBox = await action.boundingBox();
+    expect(photoBox).not.toBeNull();
+    expect(actorBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    expect(photoBox!.height).toBeGreaterThanOrEqual(190);
+    expect(photoBox!.height).toBeLessThanOrEqual(345);
+    expect(actorBox!.width).toBeGreaterThan(0);
+    expect(actionBox!.y + actionBox!.height).toBeLessThanOrEqual(viewport.height + 1);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width + 1);
+    await testInfo.attach(`scrapbook-${viewport.width}x${viewport.height}.png`, {
+      body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+      contentType: 'image/png',
+    });
+  });
+}
