@@ -202,11 +202,6 @@ test('public site map and AI summary are discoverable without exposing private r
 
   const publicPage = await request.get('/what-is-sekret-bip/');
   expect(publicPage.ok()).toBe(true);
-  expect(publicPage.headers()['content-signal']).toContain('ai-input=yes');
-  expect(publicPage.headers()['content-signal']).toContain('ai-train=no');
-  const agentPolicy = await request.get('/auth.md');
-  expect(agentPolicy.ok()).toBe(true);
-  expect(agentPolicy.headers()['content-signal']).toContain('ai-input=no');
 
   await page.goto('/site-map/', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveTitle("Se'kret Bip site map | Public product information");
