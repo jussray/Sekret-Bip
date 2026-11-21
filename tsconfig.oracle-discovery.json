@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "noEmit": false
+  },
+  "include": [
+    "services/oracleDiscovery.ts",
+    "services/sekretPresence.ts",
+    "services/sekretVoice.ts"
+  ]
+}
