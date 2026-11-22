@@ -40,6 +40,14 @@ export type SafetyTier =
   | 'concerning_pattern'  // medium severity
   | 'immediate_danger';   // high severity
 
+/** Shared tier presentation — single source so the blocking sheet and the
+ *  non-blocking journal nudge (#415) never drift into disagreeing colors/labels. */
+export const TIER_META: Record<SafetyTier, { label: string; color: string }> = {
+  emotional_support:  { label: '💜 here with you', color: '#c4b5fd' },
+  concerning_pattern: { label: '💛 checking in', color: '#fbbf24' },
+  immediate_danger:   { label: '🚨 right here', color: '#f87171' },
+};
+
 // ── Experience shape ───────────────────────────────────────────────────────────
 
 export interface CrisisResource {

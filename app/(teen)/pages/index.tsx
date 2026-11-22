@@ -69,6 +69,7 @@ import {
   type SafetyExperience,
 } from '../../../src/features/safety/safetyCoordinator';
 import { SafetyExperienceSheet } from '../../../components/safety/SafetyExperienceSheet';
+import { JournalSafetyNudge } from '../../../components/safety/JournalSafetyNudge';
 import {
   buildBridgeSharePreview,
   createBridgeShareRequest,
@@ -1094,11 +1095,19 @@ export default function TeenPagesRoute() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Safety experience sheet — rendered above all page content */}
-      <SafetyExperienceSheet
-        experience={safetyExperience}
-        onDismiss={() => setSafetyExperience(null)}
-      />
+      {/* #415: high-risk always gets the full blocking sheet; mild/moderate
+          get a supportive nudge that does not interrupt writing. */}
+      {safetyExperience?.tier === 'immediate_danger' ? (
+        <SafetyExperienceSheet
+          experience={safetyExperience}
+          onDismiss={() => setSafetyExperience(null)}
+        />
+      ) : safetyExperience ? (
+        <JournalSafetyNudge
+          experience={safetyExperience}
+          onDismiss={() => setSafetyExperience(null)}
+        />
+      ) : null}
     </View>
   );
 }
