@@ -245,6 +245,7 @@ export async function fetchSekretBrainReply(input: {
     suggestedComfortTool: typeof data.suggestedComfortTool === 'string' ? data.suggestedComfortTool : null,
     replySource: normalizeReplySource(data.replySource),
     traceId: data.traceId ?? result.meta.traceId,
+    questionBudget: typeof data.questionBudget === 'number' ? data.questionBudget : undefined,
   };
 }
 
