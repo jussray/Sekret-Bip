@@ -55,3 +55,9 @@ test('both teen and parent settings surface Download my data outside the danger 
     assert.ok(dataSectionIndex < dangerSectionIndex, `${label} settings must list "Your data" before "Danger zone", not inside it`);
   }
 });
+
+test('export failures never log untrusted provider error details', () => {
+  // Auth provider errors may embed request metadata or user identifiers.
+  // Keep user feedback generic and log only fixed, non-sensitive event codes.
+  assert.doesNotMatch(service, /console\.(?:info|warn|error|log)\([^;\n]*\berror\.(?:message|stack|cause)/);
+});
