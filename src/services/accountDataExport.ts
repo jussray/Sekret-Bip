@@ -36,7 +36,7 @@ export async function requestAccountDataExport(): Promise<AccountDataExportResul
   });
 
   if (error) {
-    if (__DEV__) console.info('[account-data-export] request failed', error.message);
+    if (__DEV__) console.info('ACCOUNT_DATA_EXPORT_REQUEST_FAILED');
     return { ok: false, message: 'Could not prepare your data export. Check your connection and try again.' };
   }
 
