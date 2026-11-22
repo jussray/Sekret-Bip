@@ -40,6 +40,14 @@ export type SafetyTier =
   | 'concerning_pattern'  // medium severity
   | 'immediate_danger';   // high severity
 
+/** Shared tier presentation — single source so the blocking sheet and the
+ *  non-blocking journal nudge (#415) never drift into disagreeing colors/labels. */
+export const TIER_META: Record<SafetyTier, { label: string; color: string }> = {
+  emotional_support:  { label: '💜 here with you', color: '#c4b5fd' },
+  concerning_pattern: { label: '💛 checking in', color: '#fbbf24' },
+  immediate_danger:   { label: '🚨 right here', color: '#f87171' },
+};
+
 // ── Experience shape ───────────────────────────────────────────────────────────
 
 export interface CrisisResource {
@@ -163,7 +171,7 @@ const PRE_FLIGHT_RULES: { re: RegExp; tier: SafetyTier }[] = [
   // immediate_danger (high)
   {
     // Terms mirror server CRISIS_RE (worker/sekret-reply.ts) so the sheet and the reply agree.
-    re:   /\b(kill myself|end my life|want to die|suicid(?:e|al)|cut myself|self[- ]?harm|hurt myself|disappear forever|run away|abuse|abused|being abused|assault|unsafe|not safe|danger|emergency|he hits|she hits)\b/i,
+    re:   /\b(kill myself|killing myself|end my life|want to die|suicid(?:e|al)|cut myself|cutting myself|self[- ]?harm|hurt myself|hurting myself|disappear forever|run away|abuse|abused|being abused|assault|unsafe|not safe|danger|emergency|he hits|she hits)\b/i,
     tier: 'immediate_danger',
   },
   // concerning_pattern (medium)
