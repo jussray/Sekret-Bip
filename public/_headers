@@ -6,6 +6,25 @@
   Content-Security-Policy: frame-ancestors 'none'; base-uri 'self'; object-src 'none'
   Content-Signal: ai-train=no, search=yes, ai-input=no
 
+# Public discovery content is explicitly usable for answer-engine retrieval,
+# while model training remains disallowed and all other paths keep the default.
+/what-is-sekret-bip/*
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
+/how-it-works/*
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
+/privacy-and-safety/*
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
+/site-map/*
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=3600
+  Content-Signal: ai-train=no, search=yes, ai-input=yes
+
 /auth.md
   Content-Type: text/markdown; charset=utf-8
   Cache-Control: public, max-age=3600

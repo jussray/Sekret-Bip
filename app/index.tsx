@@ -4,6 +4,8 @@ import { router } from 'expo-router';
 import { useAppContext } from '@/context/AppContext';
 import { useVerificationContext } from '@/context/VerificationContext';
 import { SplashScreen } from '@screens/SplashScreen';
+import { checkCompliance } from '@utils/compliance';
+
 import { WebWelcomeScreen } from '@screens/WebWelcomeScreen';
 import { FrontDoorSceneArrival } from '@/components/FrontDoorSceneArrival';
 import { getDevSplitViewSideOverride } from '@/utils/devSplitViewSide';
@@ -196,6 +198,21 @@ export default function Index() {
 
       if (postAuthNextRoute === '/(dev)/control-room') {
         router.replace('/(dev)/control-room' as never);
+        return;
+      }
+
+      const compliance = await checkCompliance();
+      if (compliance.status === 'needs_age_gate') {
+        router.replace('/(auth)/age-gate');
+        return;
+      }
+      if (compliance.status === 'needs_consent') {
+        // Versioned terms/privacy re-acceptance must happen before a restored
+        // session can enter private onboarding, parent, or teen routes.
+        // Keep the existing public auth consent screen as the destination.
+        const dob = encodeURIComponent(compliance.dob);
+        const accountType = encodeURIComponent(compliance.accountType);
+        router.replace(`/(auth)/consent?dob=${dob}&accountType=${accountType}&reConsent=true` as never);
         return;
       }
 

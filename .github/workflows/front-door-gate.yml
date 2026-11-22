@@ -22,6 +22,7 @@ on:
       - assets/images/parent-space-splash.png
       - e2e/smoke.spec.ts
       - e2e/front-door-scene-arrival.spec.ts
+      - e2e/ai-search-discovery.spec.ts
       - playwright.config.ts
       - package.json
       - package-lock.json
@@ -83,6 +84,7 @@ jobs:
             test/dual-front-door-contract.test.mjs \
             test/front-door-motion-contract.test.mjs \
             test/mobile-entry-performance-contract.test.mjs \
+            test/agent-discovery.test.mjs \
             2>&1 | tee gate-evidence/front-door-contracts.log
 
       - name: Compare TypeScript diagnostics with base
@@ -143,13 +145,13 @@ jobs:
       - name: Run focused front-door Playwright contracts
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           npx playwright test \
             e2e/smoke.spec.ts \
             e2e/front-door-scene-arrival.spec.ts \
             --grep "teen front door|parent front door|rollback front door|web welcome|frontend entry|canonical teen front door|reduced motion renders" \
             --trace on 2>&1 | tee gate-evidence/playwright.log
-
+          npx playwright test e2e/ai-search-discovery.spec.ts --trace on 2>&1 | tee gate-evidence/ai-search-discovery-playwright.log
       - name: Upload exact-head evidence
         if: always()
         uses: actions/upload-artifact@v4
