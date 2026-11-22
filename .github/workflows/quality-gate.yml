@@ -1,6 +1,8 @@
 name: Quality Gate
 
 on:
+  push:
+    branches: [main, 'security/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
