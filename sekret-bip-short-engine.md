@@ -94,7 +94,10 @@ Run:
 
 ```text
 npm run verify:character-canon
+node scripts/verify-character-canon.mjs --video-cast=sy,night,suhana,cloud
 ```
+
+The second command is the **paid-video cast gate**. A nonzero result blocks video generation for the requested cast, even when older approved provider IDs exist. Add Ja only once she is in the exact shot cast; Ja remains blocked until an isolated, approved element is bound. Do not use ensemble/world poster crops as isolated character authority. Current review status in `registry.json` blocks all four existing element references until updated.
 
 before spending generation credits on a cast that touches the Sorian pair system.
 
