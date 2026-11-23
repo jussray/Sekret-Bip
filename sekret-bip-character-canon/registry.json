@@ -10,16 +10,96 @@
     "higgsfield": "Translate trigger to <<<higgsfield_element_id>>>. Do not assume a raw @trigger is a provider reference."
   },
   "characters": [
-    {"key":"night","display_name":"Night","role":"The Watcher","trigger":"@NIGHT_CANON","higgsfield_element_id":"25b76824-adb9-4cc6-803f-9d272ed8417b","age_lane":"teen","status":"approved"},
-    {"key":"suhana","display_name":"Suhana","role":"The Center","trigger":"@SUHANA_CANON","higgsfield_element_id":"b504054a-ee65-491e-aa37-0dccc740458c","age_lane":"teen","status":"approved"},
-    {"key":"sy","display_name":"Sy","role":"The Mind","trigger":"@SY_CANON","higgsfield_element_id":"d0705c8f-4941-47f3-9d00-cb6161f1c9d3","age_lane":"teen","status":"approved"},
-    {"key":"cloud","display_name":"Cloud","role":"The Calm","trigger":"@CLOUD_CANON","higgsfield_element_id":"45cc0133-5ad3-4182-90a5-4dca0d5b58fa","age_lane":"companion","status":"approved"},
-    {"key":"dad","display_name":"Dad","role":"The Guardian","trigger":"@DAD_GUARDIAN_CANON","higgsfield_element_id":"b7f88401-c66d-4b54-9460-94313b28e886","age_lane":"parent","status":"approved"},
-    {"key":"mom","display_name":"Mom","role":"The Heart","trigger":"@MOM_HEART_CANON","higgsfield_element_id":"e8d19172-ae3d-41d5-b42f-01666d322b9d","age_lane":"parent","status":"approved"},
-    {"key":"bipjr-spark","display_name":"Bip Jr. 1","role":"The Spark","trigger":"@BIPJR_SPARK","higgsfield_element_id":"663a9e85-30e8-409d-b408-846f4c73ab46","age_lane":"bip-jr","status":"approved"},
-    {"key":"bipjr-giggle","display_name":"Bip Jr. 2","role":"The Giggle","trigger":"@BIPJR_GIGGLE","higgsfield_element_id":"508d8676-c053-4ecd-942f-06030b6142ee","age_lane":"bip-jr","status":"approved"},
-    {"key":"bipjr-dreamer","display_name":"Bip Jr. 3","role":"The Dreamer","trigger":"@BIPJR_DREAMER","higgsfield_element_id":"cc4bc603-0250-4e99-b8f8-227dab2d93ea","age_lane":"bip-jr","status":"approved"},
-    {"key":"bipjr-explorer","display_name":"Bip Jr. 4","role":"The Explorer","trigger":"@BIPJR_EXPLORER","higgsfield_element_id":"5a9dfde6-11a0-4345-8e98-4bfffb743ec8","age_lane":"bip-jr","status":"approved"}
+    {
+      "key": "night",
+      "display_name": "Night",
+      "role": "The Watcher",
+      "trigger": "@NIGHT_CANON",
+      "higgsfield_element_id": "25b76824-adb9-4cc6-803f-9d272ed8417b",
+      "age_lane": "teen",
+      "status": "approved"
+    },
+    {
+      "key": "suhana",
+      "display_name": "Suhana",
+      "role": "The Center",
+      "trigger": "@SUHANA_CANON",
+      "higgsfield_element_id": "b504054a-ee65-491e-aa37-0dccc740458c",
+      "age_lane": "teen",
+      "status": "approved"
+    },
+    {
+      "key": "sy",
+      "display_name": "Sy",
+      "role": "The Mind",
+      "trigger": "@SY_CANON",
+      "higgsfield_element_id": "d0705c8f-4941-47f3-9d00-cb6161f1c9d3",
+      "age_lane": "teen",
+      "status": "approved"
+    },
+    {
+      "key": "cloud",
+      "display_name": "Cloud",
+      "role": "The Calm",
+      "trigger": "@CLOUD_CANON",
+      "higgsfield_element_id": "45cc0133-5ad3-4182-90a5-4dca0d5b58fa",
+      "age_lane": "companion",
+      "status": "approved"
+    },
+    {
+      "key": "dad",
+      "display_name": "Dad",
+      "role": "The Guardian",
+      "trigger": "@DAD_GUARDIAN_CANON",
+      "higgsfield_element_id": "b7f88401-c66d-4b54-9460-94313b28e886",
+      "age_lane": "parent",
+      "status": "approved"
+    },
+    {
+      "key": "mom",
+      "display_name": "Mom",
+      "role": "The Heart",
+      "trigger": "@MOM_HEART_CANON",
+      "higgsfield_element_id": "e8d19172-ae3d-41d5-b42f-01666d322b9d",
+      "age_lane": "parent",
+      "status": "approved"
+    },
+    {
+      "key": "bipjr-spark",
+      "display_name": "Bip Jr. 1",
+      "role": "The Spark",
+      "trigger": "@BIPJR_SPARK",
+      "higgsfield_element_id": "663a9e85-30e8-409d-b408-846f4c73ab46",
+      "age_lane": "bip-jr",
+      "status": "approved"
+    },
+    {
+      "key": "bipjr-giggle",
+      "display_name": "Bip Jr. 2",
+      "role": "The Giggle",
+      "trigger": "@BIPJR_GIGGLE",
+      "higgsfield_element_id": "508d8676-c053-4ecd-942f-06030b6142ee",
+      "age_lane": "bip-jr",
+      "status": "approved"
+    },
+    {
+      "key": "bipjr-dreamer",
+      "display_name": "Bip Jr. 3",
+      "role": "The Dreamer",
+      "trigger": "@BIPJR_DREAMER",
+      "higgsfield_element_id": "cc4bc603-0250-4e99-b8f8-227dab2d93ea",
+      "age_lane": "bip-jr",
+      "status": "approved"
+    },
+    {
+      "key": "bipjr-explorer",
+      "display_name": "Bip Jr. 4",
+      "role": "The Explorer",
+      "trigger": "@BIPJR_EXPLORER",
+      "higgsfield_element_id": "5a9dfde6-11a0-4345-8e98-4bfffb743ec8",
+      "age_lane": "bip-jr",
+      "status": "approved"
+    }
   ],
   "recognition_contract": {
     "principle": "Pairs rhyme, never clone.",
@@ -27,7 +107,10 @@
     "runtime_enrollment_implicit": false,
     "design_contract_is_character_authority": false,
     "world_or_ensemble_art_may_promote_identity": false,
-    "silhouette_review_sizes_px": [128, 64],
+    "silhouette_review_sizes_px": [
+      128,
+      64
+    ],
     "promotion_order": [
       "design-contract-approved",
       "exact-character-authority-reference-approved",
@@ -62,7 +145,10 @@
         "status": "design-contract-approved-reference-pending",
         "instant_read": "Intuitive",
         "magic_direction": "inside -> emotion",
-        "palette": ["violet", "silver-lilac"],
+        "palette": [
+          "violet",
+          "silver-lilac"
+        ],
         "symbol": "Crescent Eye",
         "silhouette_contract": [
           "softer asymmetric outer layer",
@@ -99,7 +185,11 @@
         "status": "design-contract-approved-reference-pending",
         "instant_read": "Steady presence",
         "magic_direction": "person -> connection",
-        "palette": ["deep gold", "warm burgundy", "earth-plum"],
+        "palette": [
+          "deep gold",
+          "warm burgundy",
+          "earth-plum"
+        ],
         "symbol": "Open Circle",
         "silhouette_contract": [
           "layered open-front overshirt or jacket",
@@ -136,7 +226,11 @@
         "status": "design-contract-approved-reference-pending",
         "instant_read": "Imagineer",
         "magic_direction": "rule -> possibility",
-        "palette": ["cyan", "violet", "luminous teal"],
+        "palette": [
+          "cyan",
+          "violet",
+          "luminous teal"
+        ],
         "symbol": "Split Star",
         "silhouette_contract": [
           "short asymmetric tech layer",
@@ -157,5 +251,27 @@
     "Ensemble posters and world images are not character authority.",
     "A design contract never grants character authority or provider generation eligibility by itself.",
     "Video generation is blocked until the exact cast passes a still-image canon check."
+  ],
+  "visual_benchmark": {
+    "title": "Se’kret Bip: The First Door Opens(5)(1).png",
+    "sha256": "a1fcabacf87d71e8bf7c3d47eabc899dfbb644a4e09e9b3a6ff29ac9ee037f41",
+    "confirmed_on": "2026-11-22",
+    "status": "user-approved-final-visual-canon",
+    "authority": "visual-direction-only",
+    "promotes_character_identity": false,
+    "notes": "Latest user-confirmed Se’kret Bip Family storyboard. Visual benchmark for drift checks only; an ensemble or world storyboard must not replace isolated character-authority references."
+  },
+  "pending_character_authority": [
+    {
+      "key": "ja",
+      "display_name": "Ja",
+      "role": "The Oracle",
+      "visual_design_status": "confirmed-by-user-final-storyboard",
+      "visual_description": "Female Oracle, long silver-lavender wavy hair, dark outfit and gold jewelry, interpreting a luminous star map.",
+      "status": "isolated-character-reference-pending",
+      "provider_reference_bound": false,
+      "generation_allowed": false,
+      "notes": "Do not generate Ja or substitute another character until an approved isolated character reference is bound to a verified provider element."
+    }
   ]
 }
