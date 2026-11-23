@@ -105,3 +105,31 @@ test('latest Family visual canon is traceable without promoting ensemble art to 
   assert.equal(ja.generation_allowed, false);
   assert.ok(!registry.characters.some(character => character.key === 'ja'), 'Ja must not be promoted before isolated reference approval');
 });
+
+
+test('final Family reference mismatch blocks video until isolated references are reapproved', () => {
+  const registry = readJson('sekret-bip-character-canon/registry.json');
+  const review = registry.provider_reference_review;
+  assert.equal(review.benchmark_sha256, registry.visual_benchmark.sha256);
+  for (const key of ['sy', 'night', 'suhana', 'cloud']) {
+    const entry = review.evaluations.find(item => item.character_key === key);
+    const canonical = registry.characters.find(item => item.key === key);
+    assert.ok(entry, `missing reference-review evidence: ${key}`);
+    assert.equal(entry.higgsfield_element_id, canonical.higgsfield_element_id);
+    assert.equal(entry.review_status, 'mismatch-current-benchmark');
+    assert.equal(entry.generation_allowed, false);
+  }
+  const ja = registry.pending_character_authority.find(item => item.key === 'ja');
+  assert.equal(ja.generation_allowed, false);
+});
+
+test('paid-video cast preflight rejects outdated and unbound character references', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath, ['scripts/verify-character-canon.mjs', '--video-cast=sy,night,suhana,cloud,ja'], {
+    cwd: new URL('../', import.meta.url),
+    encoding: 'utf8'
+  });
+  assert.notEqual(r.status, 0);
+  assert.match(r.stderr, /sy: exact provider reference not approved for current benchmark/);
+  assert.match(r.stderr, /ja: isolated reference not yet approved/);
+});
