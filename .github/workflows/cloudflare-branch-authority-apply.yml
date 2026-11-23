@@ -230,6 +230,7 @@ jobs:
           const cleanArray = (value) => Array.isArray(value) ? value.map(clean) : [];
           const active = (rows) => (Array.isArray(rows) ? rows : []).filter((row) => !row?.deleted_on);
           const stableTrigger = (row) => ({ triggerUuid: clean(row?.trigger_uuid), branchIncludes: cleanArray(row?.branch_includes), branchExcludes: cleanArray(row?.branch_excludes), buildCommand: clean(row?.build_command), deployCommand: clean(row?.deploy_command) });
+          const acceptedProductionBuildCommands = new Set(['', 'npm test && npm run type-check && npm run lint']);
           const fingerprint = (rows) => crypto.createHash('sha256')
             .update(JSON.stringify(active(rows).map(stableTrigger).sort((a, b) => a.triggerUuid.localeCompare(b.triggerUuid))))
             .digest('hex');
@@ -292,7 +293,7 @@ jobs:
               await request(`/accounts/${accountId}/builds/builds/${uuid}/cancel`, { method: 'PUT' });
               record({ action: 'cancel-build', worker: 'sekret-backend', buildUuid: uuid, branch: clean(build?.build_trigger_metadata?.branch) });
             }
-            const patch = { branch_includes: ['main'], branch_excludes: [], deploy_command: 'npm run deploy:api:production', build_command: '' };
+            const patch = { branch_includes: ['main'], branch_excludes: [], deploy_command: 'npm run deploy:api:production' };
             await request(`/accounts/${accountId}/builds/triggers/${currentTrigger.triggerUuid}`, { method: 'PATCH', body: patch });
             record({ action: 'patch-production-trigger', worker: 'sekret-backend', triggerUuid: currentTrigger.triggerUuid, appliedPatch: patch });
             const verifyTriggers = await request(`/accounts/${accountId}/builds/workers/${before.productionWorker.scriptTag}/triggers`);
@@ -309,7 +310,7 @@ jobs:
               JSON.stringify(verifyTrigger.branchIncludes) === JSON.stringify(['main']) &&
               verifyTrigger.branchExcludes.length === 0 &&
               verifyTrigger.deployCommand === 'npm run deploy:api:production' &&
-              verifyTrigger.buildCommand === '' &&
+              acceptedProductionBuildCommands.has(verifyTrigger.buildCommand) &&
               remainingNonMain.length === 0 &&
               fingerprint(verifyAlpha) === before.alphaWorker.triggerFingerprint &&
               pagesReadback.verified === true && pagesReadback.snapshotMatched === true;
