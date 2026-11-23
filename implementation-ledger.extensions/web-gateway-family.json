@@ -1,0 +1,23 @@
+{
+  "id": "web-gateway-family",
+  "name": "Web Family Gateway, parent linking, and telemetry contract",
+  "status": "contract",
+  "ownerIssue": "https://github.com/jussray/Sekret-Bip/issues/451",
+  "acceptanceCriteria": [
+    "Web family gateway supports clear segmentation between Teen and Bip Jr. + Family onboarding paths.",
+    "Parent linking contract preserves mutual consent and 8-character invite code verification via public.parent_links.",
+    "Anonymous and authenticated telemetry insertion is enabled for signup_attempted and teen_age_selected funnel tracking."
+  ],
+  "contractPaths": [
+    "docs/contracts/web-gateway-parent-link.md",
+    "docs/prd-family-gateway-onboarding.md"
+  ],
+  "testPaths": [
+    "test/parent-link-contract.test.mjs",
+    "test/teen-parent-link-approval-required.test.mjs"
+  ],
+  "verification": {
+    "state": "not-run",
+    "evidence": "https://github.com/jussray/Sekret-Bip/pull/1240"
+  }
+}
