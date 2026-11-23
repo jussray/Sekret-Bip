@@ -61,11 +61,11 @@ if (!fs.existsSync(migrationsDir)) {
     const enablePattern = new RegExp(`alter\\s+table\\s+(?:public\\.)?${table}\\s+enable\\s+row\\s+level\\s+security`, 'i');
     const policyPattern = new RegExp(`create\\s+policy[^;]*?on\\s+(?:public\\.)?${table}\\b`, 'i');
     const revokeAnonPattern = new RegExp(
-      `revoke\\s+all\\s+on\\s+table\\s+(?:public\\.)?${table}\\s+from\\s+anon\\b`,
+      `revoke\\s+all\\s+on\\s+table\\s+(?:public\\.)?${table}\\s+from\\s+[^;]*\\banon\\b`,
       'i',
     );
     const revokeAuthenticatedPattern = new RegExp(
-      `revoke\\s+all\\s+on\\s+table\\s+(?:public\\.)?${table}\\s+from\\s+authenticated\\b`,
+      `revoke\\s+all\\s+on\\s+table\\s+(?:public\\.)?${table}\\s+from\\s+[^;]*\\bauthenticated\\b`,
       'i',
     );
     const coveredByDynamicLoop = dynamicTableNames.has(table);
