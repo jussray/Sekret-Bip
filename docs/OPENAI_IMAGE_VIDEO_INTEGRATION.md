@@ -111,6 +111,13 @@ it never fabricates motion from a still or silently calls a paid provider.
 The private run directory must initially be empty. Keep it out of Git/public
 assets because renderer and verifier receipts contain operator filesystem paths.
 The command produces `master.mp4`, stage receipts, and `production-run.json`.
+The production runner requires a numeric master duration of at least 60 seconds
+and independently rejects render, metadata, or playback receipts with measured
+durations below 60 seconds or absent duration evidence, including cached stages.
+Duration tolerance never lowers this production minimum. Low-level render and
+verification tools still support shorter synthetic checks. Technical completion
+keeps character continuity, lip sync, final human approval, and publication gated;
+it does not establish those subjective reviews.
 
 A failed browser lane preserves successful render and metadata stages. Install
 the existing Playwright browser with `npm run setup:video:playback`, then rerun

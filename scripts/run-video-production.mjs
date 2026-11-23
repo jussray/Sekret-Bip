@@ -6,12 +6,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { renderBipVideoMaster } from './render-video-master.mjs';
 
 const schema = 'sekret-bip-video-production-run@v1';
+const minimumFinalDurationSeconds = 60;
 const scripts = dirname(fileURLToPath(import.meta.url));
 const proofSchemas = { render: 'sekret-bip-video-render-proof@v1', metadata: 'sekret-bip-video-master-proof@v1', playback: 'sekret-bip-video-playback-proof@v1' };
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const hashFile = async (path) => digest(await readFile(path));
 async function json(path) { return JSON.parse(await readFile(path, 'utf8')); }
 async function exists(path) { try { await readFile(path); return true; } catch (error) { if (error.code === 'ENOENT') return false; throw error; } }
+function meetsFinalDuration(seconds) { return Number.isFinite(seconds) && seconds >= minimumFinalDurationSeconds; }
+function receiptMeetsFinalDuration(name, receipt) {
+  return meetsFinalDuration(name === 'render' ? receipt.master?.durationSeconds
+    : name === 'metadata' ? receipt.actual?.durationSeconds : receipt.before?.duration);
+}
 function reject(code) { const error = new Error(code); error.code = code; throw error; }
 
 // Test injection is module-only; the operator CLI always invokes the repo verifiers.
@@ -53,6 +59,7 @@ async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPat
     const payload = await json(resolve(sourcesPath));
     sources = payload.shots || payload;
     if (!Array.isArray(manifest.timeline)) reject('APPROVED_TIMELINE_REQUIRED');
+    if (!meetsFinalDuration(manifest.master?.durationSeconds)) reject('FINAL_MASTER_MINIMUM_DURATION_REQUIRED');
     if (!Array.isArray(sources) || !sources.length) reject('APPROVED_MOVING_CLIPS_REQUIRED');
     const boundSources = [];
     for (const source of sources) {
@@ -79,7 +86,7 @@ async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPat
     const receiptPath = join(directory, `${name}-receipt.json`);
     if (!await exists(receiptPath) || await hashFile(receiptPath) !== stage.receiptSha256) return false;
     const receipt = await json(receiptPath);
-    return receipt.schema === proofSchemas[name] && receipt.pass === true && receipt.sha256 === stage.mediaSha256;
+    return receipt.schema === proofSchemas[name] && receipt.pass === true && receipt.sha256 === stage.mediaSha256 && receiptMeetsFinalDuration(name, receipt);
   };
   if (state.stages.render && !await validStage('render')) reject('RUN_RENDER_EVIDENCE_CHANGED');
   if (!state.stages.render) {
@@ -88,6 +95,7 @@ async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPat
       const rendered = await renderBipVideoMaster({ manifest, sources, outputPath: mediaPath,
         receiptPath: join(directory, 'render-receipt.json'), audioPath: audioPath ? resolve(audioPath) : null });
       if (rendered.kind !== 'RENDERED') return blocked('render', 'MEDIA_RENDER_CAPABILITY_UNAVAILABLE');
+      if (!receiptMeetsFinalDuration('render', rendered.receipt)) return blocked('render', 'FINAL_MASTER_MINIMUM_DURATION_REQUIRED');
       state.stages.render = { pass: true, mediaSha256: rendered.receipt.sha256,
         receiptSha256: await hashFile(join(directory, 'render-receipt.json')) };
       await save();
@@ -103,6 +111,7 @@ async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPat
     try { receipt = await json(receiptPath); } catch { return blocked(stage, 'VERIFIER_RECEIPT_MISSING_OR_INVALID'); }
     const receiptSha256 = await hashFile(receiptPath);
     if (receipt.schema !== proofSchemas[stage] || receipt.pass !== true || receipt.sha256 !== state.stages.render.mediaSha256 || await hashFile(mediaPath) !== state.stages.render.mediaSha256) return blocked(stage, 'VERIFIER_MEDIA_BINDING_FAILED');
+    if (!receiptMeetsFinalDuration(stage, receipt)) return blocked(stage, 'FINAL_MASTER_MINIMUM_DURATION_REQUIRED');
     state.stages[stage] = { pass: true, mediaSha256: receipt.sha256, receiptSha256 };
     await save();
   }
