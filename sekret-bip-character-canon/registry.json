@@ -273,5 +273,43 @@
       "generation_allowed": false,
       "notes": "Do not generate Ja or substitute another character until an approved isolated character reference is bound to a verified provider element."
     }
-  ]
+  ],
+  "provider_reference_review": {
+    "benchmark_sha256": "a1fcabacf87d71e8bf7c3d47eabc899dfbb644a4e09e9b3a6ff29ac9ee037f41",
+    "provider": "higgsfield",
+    "status": "blocked-requires-updated-isolated-references",
+    "reviewed_on": "2026-11-22",
+    "source": "visual comparison of completed Higgsfield element media against user-provided final storyboard; provider completion is not visual approval",
+    "evaluations": [
+      {
+        "character_key": "sy",
+        "higgsfield_element_id": "d0705c8f-4941-47f3-9d00-cb6161f1c9d3",
+        "review_status": "mismatch-current-benchmark",
+        "generation_allowed": false,
+        "observation": "Existing image includes another character and shows older styling without the updated purple headphones; exact isolated identity needs review."
+      },
+      {
+        "character_key": "night",
+        "higgsfield_element_id": "25b76824-adb9-4cc6-803f-9d272ed8417b",
+        "review_status": "mismatch-current-benchmark",
+        "generation_allowed": false,
+        "observation": "Existing reference lacks the final board's black-cat companion and differs in styling; Night and Sy must not be interchanged."
+      },
+      {
+        "character_key": "suhana",
+        "higgsfield_element_id": "b504054a-ee65-491e-aa37-0dccc740458c",
+        "review_status": "mismatch-current-benchmark",
+        "generation_allowed": false,
+        "observation": "Older reference has a different outfit and curl color from the final copper-highlighted, purple-clad Suhana."
+      },
+      {
+        "character_key": "cloud",
+        "higgsfield_element_id": "45cc0133-5ad3-4182-90a5-4dca0d5b58fa",
+        "review_status": "mismatch-current-benchmark",
+        "generation_allowed": false,
+        "observation": "Older reference depicts Cloud with headphones; final user-approved Cloud is a luminous lavender cloud without headphones."
+      }
+    ],
+    "rule": "Before generating a cast member, require an individually approved isolated reference, a verified provider binding, a still-image review, and approval against visual_benchmark.sha256."
+  }
 }
