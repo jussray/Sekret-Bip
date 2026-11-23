@@ -99,11 +99,18 @@ test('the database migrations separate private notebooks and harden Circle', () 
   assert.equal(optimizerMigration.includes('circle_reactions_permanent_accounts_only'), true);
 });
 
-test('Parent Circle does not re-upload local history or double-save a new post', () => {
+test('Parent Circle active route uses the redacted V2 repository while legacy history remains rollback-only', () => {
   const route = read('app/(parent)/circle/feed.tsx');
-  assert.equal(route.includes('parentCirclePosts.forEach'), false);
+  const legacySync = read('src/utils/sync.ts');
+  assert.equal(route.includes('loadParentCommunityFeed'), true);
+  assert.equal(route.includes('createParentCommunityPost'), true);
+  assert.equal(route.includes('reactToParentCommunityPost'), true);
+  assert.equal(route.includes('reportParentCommunityPost'), true);
+  assert.equal(route.includes('loadParentCircleFeed'), false);
   assert.equal(route.includes('syncParentCirclePost'), false);
-  assert.equal(route.includes('saveParentCirclePost={saveParentCirclePost}'), true);
+  assert.equal(route.includes('reactToParentPost(Number'), false);
+  assert.equal(legacySync.includes('export async function loadParentCircleFeed'), true);
+  assert.equal(legacySync.includes('export function syncParentCirclePost'), true);
 });
 
 test('navigation exposes Bridge and canonicalizes duplicate Room paths', () => {

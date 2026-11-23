@@ -114,12 +114,14 @@ export type ScreenKey =
   | 'discover';
 
 export interface ParentCirclePost {
-  id: number;
+  id: string | number;
   text: string;
   date: string;
   time: string;
   mood?: string;
   circleTag?: string;
+  anonymousName?: string;
+  quietRepliesCount?: number;
   reactions?: {
     felt?: number;
     comfort?: number;
