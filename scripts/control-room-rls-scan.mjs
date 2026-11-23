@@ -10,6 +10,18 @@ const SERVICE_ROLE_ONLY_TABLES = new Map([
     'notification_deliveries',
     'Server-owned push delivery ledger. RLS is enabled and all table privileges are revoked from anon and authenticated in 20260704030000_harden_push_notifications.sql.',
   ],
+  [
+    'guardian_verification_reviews',
+    'Founder/admin review audit trail. RLS is enabled and client table privileges are revoked in 20260711194500_guardian_review_queue.sql.',
+  ],
+  [
+    'account_deletion_receipts',
+    'Non-identifying deletion completion receipts are service-role-only. RLS is enabled and anon/authenticated table privileges are revoked in 20260715060000_harden_consent_and_deletion_runtime_truth.sql.',
+  ],
+  [
+    'runtime_contract_versions',
+    'Deployment health markers are service-role-only. RLS is enabled and anon/authenticated table privileges are revoked in 20260715063000_register_runtime_contract_version.sql.',
+  ],
 ]);
 
 if (!fs.existsSync(migrationsDir)) {
@@ -25,7 +37,11 @@ if (!fs.existsSync(migrationsDir)) {
   const sql = fs.readdirSync(migrationsDir)
     .filter((name) => name.endsWith('.sql'))
     .map((name) => fs.readFileSync(path.join(migrationsDir, name), 'utf8'))
-    .join('\n');
+    .join('\n')
+    // Comments are documentation, not executable DDL. Strip them before the
+    // regex scan so phrases such as "CREATE TABLE migration" cannot invent tables.
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/--.*$/gm, '');
 
   const tableRegex = /create\s+table\s+(?:if\s+not\s+exists\s+)?(?:public\.)?([a-zA-Z0-9_]+)/gi;
   const tables = new Set();
@@ -44,15 +60,24 @@ if (!fs.existsSync(migrationsDir)) {
   for (const table of tables) {
     const enablePattern = new RegExp(`alter\\s+table\\s+(?:public\\.)?${table}\\s+enable\\s+row\\s+level\\s+security`, 'i');
     const policyPattern = new RegExp(`create\\s+policy[^;]*?on\\s+(?:public\\.)?${table}\\b`, 'i');
-    const revokeClientPattern = new RegExp(
-      `revoke\\s+all\\s+on\\s+table\\s+(?:public\\.)?${table}\\s+from\\s+anon\\s*,\\s*authenticated`,
+    const revokeAnonPattern = new RegExp(
+      `revoke\\s+all\\s+on\\s+table\\s+(?:public\\.)?${table}\\s+from\\s+anon\\b`,
+      'i',
+    );
+    const revokeAuthenticatedPattern = new RegExp(
+      `revoke\\s+all\\s+on\\s+table\\s+(?:public\\.)?${table}\\s+from\\s+authenticated\\b`,
       'i',
     );
     const coveredByDynamicLoop = dynamicTableNames.has(table);
     const rlsEnabled = enablePattern.test(sql) || (dynamicRlsLoop && coveredByDynamicLoop);
     const policyExists = policyPattern.test(sql) || (dynamicPolicyLoop && coveredByDynamicLoop);
     const exceptionRationale = SERVICE_ROLE_ONLY_TABLES.get(table);
-    const verifiedServiceRoleOnly = Boolean(exceptionRationale && rlsEnabled && revokeClientPattern.test(sql));
+    const verifiedServiceRoleOnly = Boolean(
+      exceptionRationale
+      && rlsEnabled
+      && revokeAnonPattern.test(sql)
+      && revokeAuthenticatedPattern.test(sql),
+    );
 
     if (!rlsEnabled) {
       findings.push({
