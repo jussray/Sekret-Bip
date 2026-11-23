@@ -97,6 +97,49 @@ if ((registry.sorian_pairs ?? []).length !== expectedPairs.size) {
   fail(`expected exactly ${expectedPairs.size} Sorian pair contracts`);
 }
 
+
+const referenceReview = registry.provider_reference_review;
+const reviewByCharacter = new Map();
+if (referenceReview) {
+  if (referenceReview.benchmark_sha256 !== registry.visual_benchmark?.sha256) {
+    fail('provider reference review must bind current visual benchmark');
+  }
+  for (const review of referenceReview.evaluations ?? []) {
+    if (reviewByCharacter.has(review.character_key)) fail(`duplicate provider review: ${review.character_key}`);
+    reviewByCharacter.set(review.character_key, review);
+    const original = characters.get(review.character_key);
+    if (!original) fail(`provider review character not registered: ${review.character_key}`);
+    if (original && review.higgsfield_element_id !== original.higgsfield_element_id) fail(`provider review element mismatch: ${review.character_key}`);
+    if (review.review_status !== 'approved-current-benchmark' && review.generation_allowed !== false) {
+      fail(`unapproved provider review must block generation: ${review.character_key}`);
+    }
+    if (review.generation_allowed === true && (
+      review.review_status !== 'approved-current-benchmark' ||
+      !review.isolated_reference_sha256 ||
+      !review.still_review_sha256
+    )) fail(`approved provider review lacks isolated still/identity evidence: ${review.character_key}`);
+  }
+}
+
+const castFlag = process.argv.find(arg => arg.startsWith('--video-cast='));
+if (castFlag) {
+  const requested = castFlag.slice('--video-cast='.length).split(',').map(x => x.trim()).filter(Boolean);
+  if (requested.length === 0) fail('video cast must have at least one character');
+  const pending = new Map((registry.pending_character_authority ?? []).map(character => [character.key, character]));
+  for (const key of requested) {
+    if (pending.has(key)) {
+      fail(`${key}: isolated reference not yet approved; video blocked`);
+      continue;
+    }
+    const character = characters.get(key);
+    const review = reviewByCharacter.get(key);
+    if (!character || character.status !== 'approved') fail(`${key}: character identity not approved; video blocked`);
+    if (!review || review.generation_allowed !== true || review.review_status !== 'approved-current-benchmark') {
+      fail(`${key}: exact provider reference not approved for current benchmark; video blocked`);
+    }
+  }
+}
+
 if (failures.length > 0) {
   console.error('CHARACTER_CANON_VERIFY_FAIL');
   for (const failure of failures) console.error(`- ${failure}`);
