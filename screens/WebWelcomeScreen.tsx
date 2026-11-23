@@ -554,6 +554,15 @@ export function WebWelcomeScreen({
           )}
 
           <Pressable
+            testID="web-welcome-find-doorway"
+            accessibilityRole="button"
+            accessibilityLabel="Find your doorway helper"
+            onPress={() => router.push('/find-family' as never)}
+            style={({ pressed }) => [styles.findDoorwayButton, pressed && styles.controlPressed]}
+          >
+            <Text style={styles.findDoorwayText}>Not sure where to start? Find your doorway →</Text>
+          </Pressable>
+          <Pressable
             testID="web-welcome-audience-switch"
             accessibilityRole="button"
             accessibilityLabel={copy.switchLabel}
@@ -985,6 +994,18 @@ const styles = StyleSheet.create({
     color: color.lilacLight,
     fontSize: TYPE.sm,
     fontWeight: '900',
+  },
+  findDoorwayButton: {
+    minHeight: 40,
+    marginHorizontal: SPACE[5],
+    marginTop: SPACE[2],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  findDoorwayText: {
+    color: color.textMid,
+    fontSize: TYPE.sm,
+    fontWeight: '600',
   },
   audienceSwitch: {
     minHeight: 48,

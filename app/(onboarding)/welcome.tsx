@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
+import { trackAnalyticsEvent } from '@/utils/telemetry';
 
 import { useAppContext } from '@/context/AppContext';
 import { useOnboarding } from '@/context/OnboardingContext';
@@ -55,6 +56,10 @@ export default function Welcome() {
     await persistDecision(decision);
     setUserSide(decision.nextSide);
 
+    void trackAnalyticsEvent('teen_age_selected', {
+      age_band: decision.ageBucket,
+    });
+
     if (decision.allowed) {
       await advance('age_verified', {
         age_bucket: decision.ageBucket,
@@ -71,6 +76,9 @@ export default function Welcome() {
   async function handleParent() {
     await AsyncStorage.setItem(ONBOARDING_SIDE_KEY, 'parent');
     setUserSide('parent');
+    void trackAnalyticsEvent('teen_age_selected', {
+      age_band: 'parent',
+    });
     await advance('role_selected', { role: 'parent' });
     router.push('/(onboarding)/parent-splash');
   }
