@@ -87,3 +87,21 @@ test('Episode 001 preserves the final ten-shot YouTube story and exact default c
     assert.ok(episode.includes(trigger), `episode must bind ${trigger}`);
   }
 });
+
+
+test('latest Family visual canon is traceable without promoting ensemble art to character authority', () => {
+  const registry = readJson('sekret-bip-character-canon/registry.json');
+  const visual = registry.visual_benchmark;
+  assert.equal(visual.sha256, 'a1fcabacf87d71e8bf7c3d47eabc899dfbb644a4e09e9b3a6ff29ac9ee037f41');
+  assert.equal(visual.status, 'user-approved-final-visual-canon');
+  assert.equal(visual.authority, 'visual-direction-only');
+  assert.equal(visual.promotes_character_identity, false);
+
+  const ja = registry.pending_character_authority.find(character => character.key === 'ja');
+  assert.ok(ja, 'Ja must be represented as the female Oracle');
+  assert.equal(ja.role, 'The Oracle');
+  assert.match(ja.visual_description, /Female Oracle.*silver-lavender/);
+  assert.equal(ja.provider_reference_bound, false);
+  assert.equal(ja.generation_allowed, false);
+  assert.ok(!registry.characters.some(character => character.key === 'ja'), 'Ja must not be promoted before isolated reference approval');
+});
