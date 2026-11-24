@@ -352,7 +352,7 @@ test('Founder Visual Truth: Teen first-five-minute packet', async ({ page }, tes
     currentStage = '01-teen-welcome';
     await page.goto('/?bipDevAudience=teen', { waitUntil: 'domcontentloaded' });
     await expect(page.getByTestId('web-welcome-shell')).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Se’kret Bip Family', { exact: true })).toBeVisible();
     await expectNoDocumentHorizontalOverflow(page);
     await capture('01-teen-welcome');
 
