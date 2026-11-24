@@ -40,7 +40,8 @@ export async function trackAnalyticsEvent(
         const { data } = await sb.auth.getUser();
         resolvedUserId = data?.user?.id ?? null;
       } catch {
-        resolvedUserId = null;
+        // Never downgrade an unexpected auth error into an anonymous event.
+        return false;
       }
     }
 
