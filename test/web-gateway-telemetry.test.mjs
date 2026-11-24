@@ -52,3 +52,9 @@ test('web-gateway migration provisions public.analytics_events insert access', a
   assert.match(sql, /grant insert on public\.analytics_events to anon, authenticated/);
   assert.match(sql, /grant select on public\.analytics_events to authenticated/);
 });
+
+test('auth lookup exceptions fail closed without an anonymous telemetry downgrade', async () => {
+  const source = await read('src/utils/telemetry.ts');
+  assert.doesNotMatch(source, /catch\s*\{\s*resolvedUserId\s*=\s*null\s*;/);
+  assert.match(source, /catch\s*\{\s*return false;\s*\}/);
+});
