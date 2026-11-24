@@ -81,3 +81,13 @@ test('slow CDN loading shows a thumbnail from the same final poster rather than 
   assert.match(welcome, /styles\.heroPlaceholder/);
   assert.match(welcome, /accessible=\{false\}/);
 });
+
+test('mobile front door prioritizes readable canon portraits rather than shrinking the landscape poster', () => {
+  assert.match(welcome, /const teenPhoneCanvas = compact && !isBipJr/);
+  assert.match(welcome, /teenPhoneCanvas \? \(/);
+  assert.match(welcome, /!teenPhoneCanvas && \(/);
+  assert.match(gallery, /snapToInterval=\{compact \? cardWidth \+ 14 : undefined\}/);
+  assert.match(gallery, /width: cardWidth/);
+  assert.match(gallery, /paddingHorizontal: compact \? Math\.max\(16, \(width - cardWidth\) \/ 2\) : 20/);
+  assert.match(welcome, /onEnter\(entrySide\)/);
+});
