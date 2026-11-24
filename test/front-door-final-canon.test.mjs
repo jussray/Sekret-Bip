@@ -6,7 +6,7 @@ const read = (path) => fs.readFileSync(path, 'utf8');
 const canon = read('constants/companionVisualCanon.ts');
 const welcome = read('screens/WebWelcomeScreen.tsx');
 const gallery = read('components/companions/CanonCompanionShowcase.tsx');
-const scrapbook = read('components/rooms/ScrapbookCompanionScene.tsx');
+const discover = read('app/(teen)/discover.tsx');
 
 test('final uploaded canon image, not a regenerated image, is the public hero authority', () => {
   assert.match(canon, /ef5888960600669fa25922bb345cdcd1b5d4cccecb2a9ef578a616a7a8085971/);
@@ -36,11 +36,11 @@ test('front-door companion choice is functional but never bypasses account gates
   assert.doesNotMatch(gallery, /router\.push/);
 });
 
-test('existing private scrapbook uses the same actual Suhana Sy Night and Cloud art', () => {
-  assert.match(scrapbook, /CANON_COMPANION_IMAGES/);
+test('private Discover companion cards use the same actual Suhana Sy Night and Cloud art', () => {
+  assert.match(discover, /CANON_COMPANION_IMAGES/);
   assert.match(scrapbook, /source=\{CANON_COMPANION_IMAGES\[character\]\}/);
-  assert.match(canon, /raylene:.*suhana/s);
-  assert.match(canon, /rylane:.*sy/s);
+  assert.match(canon, /raylene:\\s*CANON_COMPANIONS\\.suhana/);
+  assert.match(canon, /rylane:\\s*CANON_COMPANIONS\\.sy/);
 });
 
 test('Bip Jr remains a separate audience and private features stay behind auth', () => {
