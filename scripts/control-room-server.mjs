@@ -117,7 +117,7 @@ function processTreeAlive(pid) {
   if (process.platform !== 'linux') return true;
   try {
     for (const entry of fs.readdirSync('/proc')) {
-      if (!/^\\d+$/.test(entry)) continue;
+      if (!/^\d+$/.test(entry)) continue;
       let stat;
       try {
         stat = fs.readFileSync(`/proc/${entry}/stat`, 'utf8');
