@@ -28,6 +28,7 @@ import {
   type VibeKey,
 } from '../constants/theme';
 import STICKER_IMAGES from '../constants/stickerImages';
+import { CANON_COMPANION_IMAGES } from '@/constants/companionVisualCanon';
 import { FURNISH_CATALOG, type FurnishCategory } from '../constants/furnishingCatalog';
 import { BareRoomRenderer } from '../components/rooms/BareRoomRenderer';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';
@@ -490,7 +491,7 @@ function VibeLab2Sheet({ visible, current, onSave, onClose }: VibeLab2SheetProps
             {CHARACTERS.map(id => {
               const meta = ROOM_META[id];
               const selected = draft.companionId === id;
-              const avatarSrc = safe(AVATARS[id]?.neutral, FALLBACK_AVATAR[id]);
+              const avatarSrc = CANON_COMPANION_IMAGES[id];
               return (
                 <TouchableOpacity
                   key={id}
@@ -498,7 +499,7 @@ function VibeLab2Sheet({ visible, current, onSave, onClose }: VibeLab2SheetProps
                   onPress={() => setDraft(d => ({ ...d, companionId: id }))}
                   activeOpacity={0.82}
                 >
-                  <Image source={avatarSrc} style={vl.companionAvatar} resizeMode="contain" />
+                  <Image source={avatarSrc} style={[vl.companionAvatar, vl.canonCompanionPortrait]} resizeMode="cover" accessibilityLabel={`${getCompanionRuntime(id).label} approved companion portrait`} />
                   <Text style={vl.cardEmoji}>{meta.emoji}</Text>
                   <Text style={vl.cardName}>{getCompanionRuntime(id).label}</Text>
                 </TouchableOpacity>
@@ -1262,6 +1263,7 @@ const vl = StyleSheet.create({
     alignItems: 'center', paddingBottom: 10,
   },
   companionAvatar: { width: 100, height: 120 },
+  canonCompanionPortrait: { borderRadius: 7, borderWidth: 3, borderColor: '#F4E4D1', backgroundColor: '#240D37' },
 
   // ── Decor tab ────────────────────────────────────────────────────────────────
 
