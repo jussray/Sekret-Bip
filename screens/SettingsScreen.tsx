@@ -117,7 +117,7 @@ export function SettingsScreen({
   const [inviteCode,    setInviteCode]    = useState('');
   const [isGenerating,  setIsGenerating]  = useState(false);
   const [codeInput,     setCodeInput]     = useState('');
-  const [redeemStatus,  setRedeemStatus]  = useState<'idle' | 'ok' | 'not_found' | 'error'>('idle');
+  const [redeemStatus,  setRedeemStatus]  = useState<'idle' | 'pending' | 'not_found' | 'error'>('idle');
   const [isRedeeming,   setIsRedeeming]   = useState(false);
 
   const [reportNote,    setReportNote]    = useState('');
@@ -144,7 +144,7 @@ export function SettingsScreen({
     const result = await redeemParentLink(codeInput.trim());
     setIsRedeeming(false);
     setRedeemStatus(result);
-    if (result === 'ok') setCodeInput('');
+    if (result === 'pending') setCodeInput('');
   }, [codeInput]);
 
   const handleSubmitReport = useCallback(async () => {
@@ -525,15 +525,15 @@ export function SettingsScreen({
               </Text>
               <TextInput
                 style={[styles.codeInput, { borderColor: glow + '66', color: '#fff' }]}
-                placeholder="enter 6-letter code"
+                placeholder="enter 8-character code"
                 placeholderTextColor="#7c6899"
                 autoCapitalize="characters"
-                maxLength={6}
+                maxLength={8}
                 value={codeInput}
                 onChangeText={v => { setCodeInput(v); setRedeemStatus('idle'); }}
               />
-              {redeemStatus === 'ok' && (
-                <Text style={[styles.privacyText, { color: '#34d399' }]}>✓ Linked! You're now connected.</Text>
+              {redeemStatus === 'pending' && (
+                <Text style={[styles.privacyText, { color: '#34d399' }]}>Request sent. The teen must approve before Bridge access starts.</Text>
               )}
               {redeemStatus === 'not_found' && (
                 <Text style={[styles.privacyText, { color: '#f87171' }]}>Code not found or already used — check with your teen.</Text>

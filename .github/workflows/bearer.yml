@@ -32,6 +32,8 @@ jobs:
         id: report
         uses: bearer/bearer-action@828eeb928ce2f4a7ca5ed57fb8b59508cb8c79bc
         with:
+          # Pin to a published Bearer CLI release; avoid brittle unauthenticated latest-tag discovery.
+          version: '2.1.3'
           api-key: ${{ secrets.BEARER_TOKEN }}
           format: sarif
           output: results.sarif

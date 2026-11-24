@@ -104,3 +104,33 @@ test('link helpers return actionable failures without Supabase or auth', () => {
   assert.match(linkSrc, /export async function generateInviteCode\(\): Promise<string \| null>/);
   assert.match(linkSrc, /export async function redeemInviteCode\(code: string\): Promise<string \| null>/);
 });
+
+test('parent link helpers reject anonymous sessions before account relationship access', () => {
+  const start = linkSrc.indexOf('async function currentUserId()');
+  const end = linkSrc.indexOf('export async function generateInviteCodeWithDeliveryResult', start);
+  assert.ok(start >= 0 && end > start);
+  const currentUser = linkSrc.slice(start, end);
+  assert.match(currentUser, /user\.is_anonymous === true/);
+  assert.match(currentUser, /return null/);
+
+  const revokeStart = linkSrc.indexOf('export async function revokeParentLink()');
+  assert.ok(revokeStart >= 0);
+  const revoke = linkSrc.slice(revokeStart);
+  assert.match(revoke, /await currentUserId\(\)/);
+});
+
+test('forward privacy migration restores non-public execution for relationship RPCs', () => {
+  const sql = fs.readFileSync(
+    new URL('../supabase/migrations/20261103024500_harden_bridge_permanent_account_boundary.sql', import.meta.url),
+    'utf8',
+  );
+  for (const signature of [
+    'create_parent_link_invite\\(\\)',
+    'redeem_parent_link_invite\\(text\\)',
+    'revoke_parent_link\\(uuid\\)',
+    'redeem_crew_invite\\(text, text\\)',
+  ]) {
+    assert.match(sql, new RegExp(`revoke execute on function public\\.${signature} from public, anon;`, 'i'));
+    assert.match(sql, new RegExp(`grant execute on function public\\.${signature} to authenticated, service_role;`, 'i'));
+  }
+});

@@ -517,7 +517,7 @@ select
   'valid_redemption_is_one_time_and_self_scoped',
   (select value = '1' from parent_link_runtime where key = 'valid_returned_rows')
   and coalesce((
-    select status = 'active'
+    select status = 'pending' and is_active = false
       and parent_user_id = (
         select user_id from parent_link_context where label = 'parent'
       )
@@ -541,7 +541,29 @@ select
       select user_id from parent_link_context where label = 'anonymous_teen'
     )
   ), false),
-  'Valid redemption consumes the code and changes only the selected teen';
+  'Valid redemption consumes the code without granting access before Teen approval';
+
+-- The owner Teen is the only actor who can activate this disabled request.
+select set_config('request.jwt.claim.sub',
+  (select user_id::text from parent_link_context where label = 'teen'), true);
+select set_config('request.jwt.claims', jsonb_build_object(
+  'sub', (select user_id::text from parent_link_context where label = 'teen'),
+  'role', 'authenticated', 'is_anonymous', false
+)::text, true);
+set local role authenticated;
+insert into parent_link_runtime values ('teen_approved',
+  public.approve_parent_link_request(
+    (select id from public.parent_links where teen_user_id =
+      (select user_id from parent_link_context where label = 'teen')), true
+  )::text);
+reset role;
+insert into parent_link_results
+select 'teen_confirmation_required_for_active_link',
+  (select value = 'true' from parent_link_runtime where key = 'teen_approved')
+  and coalesce((select status = 'active' and is_active = true
+    from public.parent_links where teen_user_id =
+      (select user_id from parent_link_context where label = 'teen')), false),
+  'Teen approval activates the link after adult code submission';
 
 -- The consumed code is unavailable to a second caller.
 select set_config(

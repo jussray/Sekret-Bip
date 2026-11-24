@@ -51,6 +51,34 @@ Do not create an `api` duplicate or grant teen data access to anon to quiet the 
 If migration parity or API schema exposure is missing, treat it as a separate
 reviewed production operation. Never execute a deletion sweep as a diagnostic.
 
+## 2026-10-27 confirmation and non-destructive recovery proof
+
+The scheduled sweep on 2026-10-27 received HTTP 406 from
+`/rest/v1/account_deletion_requests` in the intended Supabase project,
+even with `Accept-Profile: public`. The production database does contain
+`public.account_deletion_requests`; the `api` schema has no relations
+or functions. These observations support an exposed-schema mismatch, but
+do not establish the current Data API dashboard configuration or authorize
+a configuration change.
+
+**Do not add `public` to the exposed Data API schema list without a
+separately approved privacy/security review.** Recheck client grants,
+row-level security, invoker views, privileged RPC execution permissions,
+and `anon`/authenticated cross-user denial before and after any proposal.
+Never create an `api` copy of the deletion queue as a shortcut. Restoring
+the Data API is a founder-gated production configuration action, not an
+implicit consequence of this script change.
+
+A **manual** Account Deletion Sweep dispatch now defaults to
+`check_only=true`. It performs an authenticated, read-only GET of the
+expired pending queue, logs fixed event codes only, and does not call
+`account-delete`. A scheduled run retains its existing processing path.
+For a manual check, keep the checkbox enabled and require the successful
+`SAUCE_GUARD_DELETE_QUEUE_READ_OK` event before considering any
+controlled end-to-end deletion proof. A green read-only check is **not**
+proof that account deletion works end-to-end. Manual processing with the
+checkbox disabled must remain a separately approved destructive action.
+
 ## Verification gates
 
 Do not mark the technical lane complete until all gates are evidenced:

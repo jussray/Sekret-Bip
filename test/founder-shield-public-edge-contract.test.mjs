@@ -24,7 +24,7 @@ test('Founder Shield proves the public edge anonymously and binds the release ma
   assert.ok(workflow.includes("deploymentProvider: 'cloudflare-pages'"));
   assert.ok(workflow.includes("canonicalUrl: 'https://sekretbip.net'"));
 
-  assert.ok(workflow.includes('for release_attempt in $(seq 1 16); do'));
+  assert.ok(workflow.includes('for release_attempt in $(seq 1 36); do'));
   assert.ok(workflow.includes('--max-time 5'));
   assert.ok(workflow.includes(': > "$release_headers"'));
   assert.ok(workflow.includes(': > "$release_body"'));
