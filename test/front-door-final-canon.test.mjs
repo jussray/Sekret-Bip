@@ -38,7 +38,7 @@ test('front-door companion choice is functional but never bypasses account gates
 
 test('private Discover companion cards use the same actual Suhana Sy Night and Cloud art', () => {
   assert.match(discover, /CANON_COMPANION_IMAGES/);
-  assert.match(scrapbook, /source=\{CANON_COMPANION_IMAGES\[character\]\}/);
+  assert.match(discover, /source=\{CANON_COMPANION_IMAGES\[id\]\}/);
   assert.match(canon, /raylene:\\s*CANON_COMPANIONS\\.suhana/);
   assert.match(canon, /rylane:\\s*CANON_COMPANIONS\\.sy/);
 });
