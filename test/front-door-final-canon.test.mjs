@@ -7,6 +7,7 @@ const canon = read('constants/companionVisualCanon.ts');
 const welcome = read('screens/WebWelcomeScreen.tsx');
 const gallery = read('components/companions/CanonCompanionShowcase.tsx');
 const discover = read('app/(teen)/discover.tsx');
+const room = read('screens/UserRoomScreen.tsx');
 
 test('final uploaded canon image, not a regenerated image, is the public hero authority', () => {
   assert.match(canon, /ef5888960600669fa25922bb345cdcd1b5d4cccecb2a9ef578a616a7a8085971/);
@@ -47,4 +48,11 @@ test('Bip Jr remains a separate audience and private features stay behind auth',
   assert.match(welcome, /BIP_JR_HERO/);
   assert.match(welcome, /welcomeAudienceForAccountSide/);
   assert.match(welcome, /web-welcome-hero-bip-jr/);
+});
+
+test('private Room picker displays approved portraits without changing full-body placement or chat routing', () => {
+  assert.match(room, /const avatarSrc = CANON_COMPANION_IMAGES\[id\]/);
+  assert.match(room, /source=\{avatarSrc\}/);
+  assert.match(room, /style=\{\[vl\.companionAvatar, vl\.canonCompanionPortrait\]\}/);
+  assert.match(room, /const cSrc\s+= safe\(AVATARS\[cId\]\?\.fullbody/);
 });
