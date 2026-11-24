@@ -187,6 +187,13 @@ test('canonical teen front door reveals family artwork and switches to Bip Jr wi
     window as typeof window & { __sekretAudienceMotionSamples?: AudienceMotionSample[] }
   ).__sekretAudienceMotionSamples ?? []);
 
+  // Sample a settled state; the frame immediately after a fixed delay can
+  // still be transitioning even though the final opacity is unchanged.
+  await expect.poll(async () => {
+    const samples = (await read()).filter(sample => sample.audience === 'teen');
+    return samples.at(-1)?.cues ?? 0;
+  }, { timeout: 5_000 }).toBeGreaterThanOrEqual(0.61);
+
   const teen = (await read()).filter(sample => sample.audience === 'teen');
   expect(teen.length).toBeGreaterThan(4);
   expect(teen.some(sample => sample.copy < 0.95)).toBe(true);
