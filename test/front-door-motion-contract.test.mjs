@@ -75,7 +75,7 @@ test('Teen and Bip Jr artwork reveal in sequence without replacing character art
     'activeAudience, audienceCopyReveal, audienceHeroReveal, audienceCuesReveal, motionEnabled',
     'values.forEach(value => value.setValue(1))',
     "const BIP_JR_HERO = require('../assets/images/parent-space-splash.png')",
-    "import { CANON_FAMILY_POSTER_IMAGE } from '@/constants/companionVisualCanon'",
+    "import { CANON_FAMILY_POSTER_IMAGE } from '../constants/companionVisualCanon'",
   ]) {
     assert.ok(screen.includes(marker), `Missing approved Family-art or reduced-motion guarantee: ${marker}`);
   }
