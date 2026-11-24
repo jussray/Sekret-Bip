@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 for (const viewport of [
+  { width: 320, height: 568, name: 'small-phone' },
   { width: 390, height: 844, name: 'mobile' },
   { width: 1440, height: 900, name: 'desktop' },
 ]) {
@@ -11,11 +12,25 @@ for (const viewport of [
 
     const hero = page.getByTestId('web-welcome-hero-teen');
     await expect(hero).toBeVisible();
-    await expect(hero).toHaveAttribute('src', /1c462922-24b6-4984-89aa-826dc36c62f8\.jpg/);
+    const phone = viewport.width < 520;
+    await expect(hero).toHaveAttribute('src', phone
+      ? /207db92c-7f3b-45d3-9534-cd9a7cd2b6fe\.jpg/
+      : /1c462922-24b6-4984-89aa-826dc36c62f8\.jpg/);
     await expect.poll(() => hero.evaluate((element) => (element as HTMLImageElement).naturalWidth), {
       timeout: 15_000,
-      message: 'Exact founder-approved poster must load, not a broken CDN image',
+      message: 'Founder-approved character artwork must load, never an empty hero',
     }).toBeGreaterThan(0);
+
+    if (phone) {
+      // A portrait must fill an appreciable part of the initial viewport.
+      // A miniature 5-column poster or empty spacer is an explicit failure.
+      const box = await hero.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.width).toBeGreaterThan(180);
+      expect(box!.height).toBeGreaterThan(260);
+      expect(box!.y).toBeLessThan(viewport.height * 0.47);
+      await expect(page.getByTestId('web-welcome-hero-safe-area')).toHaveCount(0);
+    }
 
     const gallery = page.getByTestId('canon-companion-showcase');
     await expect(gallery).toBeVisible();
