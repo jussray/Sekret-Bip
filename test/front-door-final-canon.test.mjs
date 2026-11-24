@@ -66,11 +66,11 @@ test('root-owned canon imports resolve in both Expo and TypeScript', () => {
     'screens/WebWelcomeScreen.tsx',
   ]) {
     const source = read(file);
-    const specifier = source.match(/from ['\"]([^'\"]*companionVisualCanon)['\"]/u)?.[1];
+    const specifier = source.match(/from\s+['"]([^'"]*companionVisualCanon)['"]/u)?.[1];
     assert.ok(specifier?.startsWith('.'), `${file}: root canon must use a relative import; @ aliases map to src/`);
     assert.ok(fs.existsSync(path.resolve(path.dirname(file), `${specifier}.ts`)), `${file}: canon module must exist`);
   }
-  const showcaseImport = welcome.match(/from ['\"]([^'\"]*CanonCompanionShowcase)['\"]/u)?.[1];
+  const showcaseImport = welcome.match(/from\s+['"]([^'"]*CanonCompanionShowcase)['"]/u)?.[1];
   assert.ok(showcaseImport?.startsWith('.'), 'welcome: root showcase must use a relative import');
   assert.ok(fs.existsSync(path.resolve('screens', `${showcaseImport}.tsx`)), 'welcome: showcase module must exist');
 });
