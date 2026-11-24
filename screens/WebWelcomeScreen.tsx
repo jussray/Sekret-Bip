@@ -17,8 +17,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { AccountSide } from '@/features/identity/accountProfile';
 import { FRONT_DOOR_THEME } from '@/constants/frontDoorTheme';
 import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
+import { CANON_FAMILY_POSTER_IMAGE } from '@/constants/companionVisualCanon';
+import { CanonCompanionShowcase } from '@/components/companions/CanonCompanionShowcase';
 
-const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
 const TEEN_CUE_REST_OPACITY = 0.62;
 const GRID_POSITIONS = ['20%', '40%', '60%', '80%'] as const;
@@ -85,11 +86,15 @@ export function WebWelcomeScreen({
   const heroContract = isBipJr
     ? FRONT_DOOR_THEME.heroSafeArea.bipJr
     : FRONT_DOOR_THEME.heroSafeArea.teen;
-  const heroHeight = shortViewport
-    ? heroContract.shortHeight
-    : compact
-      ? heroContract.compactHeight
-      : heroContract.desktopHeight;
+  const heroHeight = !isBipJr
+    ? compact
+      ? Math.min(300, Math.max(216, (width - 12) / 1.5))
+      : Math.min(620, (Math.min(width - 40, 1120) - 28) / 1.5)
+    : shortViewport
+      ? heroContract.shortHeight
+      : compact
+        ? heroContract.compactHeight
+        : heroContract.desktopHeight;
   const worldPulse = useRef(new Animated.Value(0)).current;
   const heroDrift = useRef(new Animated.Value(0)).current;
   // A first paint at full opacity would flash before the reveal effect starts.
@@ -346,8 +351,8 @@ export function WebWelcomeScreen({
         title: 'Your people.\nYour peace.',
         lead: 'A safe little world where kids, teens, and parents can stay close—without losing their own space.',
         subtitle: 'Come on in.',
-        hero: TEEN_HERO,
-        heroLabel: 'Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together',
+        hero: CANON_FAMILY_POSTER_IMAGE,
+        heroLabel: 'Approved Se’kret Bip Family scrapbook: Sy, Night, Suhana, Ja, and Cloud in that order',
         cues: [
           { symbol: '☾', label: 'start quiet' },
           { symbol: '♡', label: 'stay close' },
@@ -382,7 +387,7 @@ export function WebWelcomeScreen({
       <View
         testID="web-welcome-shell"
         accessibilityLabel={isBipJr ? 'Bip Jr welcome' : "Se'kret Bip teen welcome"}
-        style={[styles.shell, { height: shellHeight }, compact && styles.shellCompact]}
+        style={[styles.shell, !isBipJr && styles.shellTeen, { height: shellHeight }, compact && styles.shellCompact]}
       >
         <View
           pointerEvents="none"
@@ -496,6 +501,10 @@ export function WebWelcomeScreen({
               </Animated.View>
             </Animated.View>
           </View>
+
+          {!isBipJr && (
+            <CanonCompanionShowcase motionEnabled={motionEnabled} onContinue={() => onEnter(entrySide)} />
+          )}
 
           <Animated.View
             testID="web-welcome-world-cues"
@@ -666,6 +675,10 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xxl + SPACE[2],
     backgroundColor: '#0D071E',
     boxShadow: FRONT_DOOR_THEME.shadow.shell as never,
+  },
+  shellTeen: {
+    maxWidth: 1120,
+    borderColor: 'rgba(213,154,255,0.34)',
   },
   shellCompact: {
     maxWidth: '100%',
