@@ -492,7 +492,6 @@ export function WebWelcomeScreen({
               <Image
                 source={CANON_FAMILY_POSTER_PREVIEW_IMAGE}
                 resizeMode="contain"
-                pointerEvents="none"
                 accessible={false}
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
