@@ -41,9 +41,8 @@ async function githubJson(pathname) {
 
 async function githubText(pathname) {
   const response = await fetch(`https://api.github.com${pathname}`, { headers: githubHeaders() });
-  const body = await response.text();
-  if (!response.ok) throw new Error(`GitHub ${response.status} ${response.statusText}: ${body.slice(0, 700)}`);
-  return body;
+  if (!response.ok) throw Object.assign(new Error('GITHUB_JOB_LOG_UNAVAILABLE'), { status: response.status });
+  return response.text();
 }
 
 async function supabaseRequest(pathname, options = {}) {
@@ -80,6 +79,7 @@ async function collectObservations(repo, run, jobs) {
     runId: run.id,
   };
   const observations = [];
+  const unavailableJobLogs = [];
 
   if (run.conclusion === 'skipped') {
     observations.push(buildSkipObservation({
@@ -108,7 +108,13 @@ async function collectObservations(repo, run, jobs) {
     try {
       logs = await githubText(`/repos/${repo}/actions/jobs/${job.id}/logs`);
     } catch (error) {
-      if (job.conclusion !== 'skipped') throw error;
+      if (job.conclusion !== 'skipped') {
+        unavailableJobLogs.push({
+          job_id: job.id,
+          http_status: Number.isInteger(error?.status) ? error.status : null,
+          reason_code: 'GITHUB_JOB_LOG_UNAVAILABLE',
+        });
+      }
       continue;
     }
     for (const line of logs.split(/\r?\n/)) {
@@ -117,7 +123,10 @@ async function collectObservations(repo, run, jobs) {
     }
   }
 
-  return [...new Map(observations.map((item) => [item.fingerprint, item])).values()];
+  return {
+    observations: [...new Map(observations.map((item) => [item.fingerprint, item])).values()],
+    unavailableJobLogs,
+  };
 }
 
 async function ingestObservation(item) {
@@ -178,7 +187,9 @@ if (requestedHeadSha && run.head_sha?.toLowerCase() !== requestedHeadSha) {
 }
 const jobsResponse = await githubJson(`/repos/${repo}/actions/runs/${id}/jobs?per_page=100`);
 const jobs = Array.isArray(jobsResponse?.jobs) ? jobsResponse.jobs : [];
-const observations = await collectObservations(repo, run, jobs);
+const jobListComplete = Array.isArray(jobsResponse?.jobs) && Number.isInteger(jobsResponse?.total_count) && jobsResponse.total_count === jobs.length;
+const { observations, unavailableJobLogs } = await collectObservations(repo, run, jobs);
+const logScanComplete = jobListComplete && unavailableJobLogs.length === 0;
 
 if (shouldIngest) {
   for (const observation of observations) await ingestObservation(observation);
@@ -197,8 +208,15 @@ writeSkipReport(observations, {
     workflow_skip_count: observations.filter((item) => item.classification === 'workflow_skipped').length,
     job_skip_count: observations.filter((item) => item.classification === 'job_skipped').length,
     marker_skip_count: observations.filter((item) => !['workflow_skipped', 'job_skipped'].includes(item.classification)).length,
+    job_list_complete: jobListComplete,
+    log_scan_complete: logScanComplete,
+    unavailable_job_logs: unavailableJobLogs,
     ingested: shouldIngest,
   },
 });
 
 console.log('CONTROL_ROOM_GITHUB_TEST_SKIP_REPORT_WRITTEN');
+if (!logScanComplete) {
+  console.error('CONTROL_ROOM_GITHUB_TEST_SKIP_REPORT_INCOMPLETE');
+  process.exitCode = 1;
+}
