@@ -82,11 +82,12 @@ test('web welcome Enter supports keyboard activation', async ({ page }) => {
 test('web welcome hero safe area keeps the primary action below teen artwork', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?bipDevAudience=teen');
-  const heroSafeArea = page.getByTestId('web-welcome-hero-safe-area');
+  const portraitHero = page.getByTestId('web-welcome-hero-teen');
   const enter = page.getByTestId('web-welcome-enter');
-  await expect(heroSafeArea).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId('canon-companion-showcase')).toBeVisible({ timeout: 30_000 });
+  await expect(portraitHero).toBeVisible();
   await expect(enter).toBeVisible();
-  const heroBox = await heroSafeArea.boundingBox();
+  const heroBox = await portraitHero.boundingBox();
   const enterBox = await enter.boundingBox();
   expect(heroBox).not.toBeNull();
   expect(enterBox).not.toBeNull();
