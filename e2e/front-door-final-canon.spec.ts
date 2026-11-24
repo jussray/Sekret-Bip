@@ -13,13 +13,34 @@ for (const viewport of [
     const hero = page.getByTestId('web-welcome-hero-teen');
     await expect(hero).toBeVisible();
     const phone = viewport.width < 520;
-    await expect(hero).toHaveAttribute('src', phone
-      ? /207db92c-7f3b-45d3-9534-cd9a7cd2b6fe\.jpg/
-      : /1c462922-24b6-4984-89aa-826dc36c62f8\.jpg/);
-    await expect.poll(() => hero.evaluate((element) => (element as HTMLImageElement).naturalWidth), {
+    // React Native Web's Image renders an accessible div with nested/CSS image
+    // content, not necessarily an HTML <img> with a src attribute.
+    const expectedMediaId = phone
+      ? '207db92c-7f3b-45d3-9534-cd9a7cd2b6fe'
+      : '1c462922-24b6-4984-89aa-826dc36c62f8';
+    const getResolvedImage = async () => hero.evaluate((element, mediaId) => {
+      const nodes = [element, ...Array.from(element.querySelectorAll('*'))];
+      for (const node of nodes) {
+        const src = node.getAttribute('src');
+        if (src?.includes(mediaId)) return src;
+        const css = getComputedStyle(node).backgroundImage;
+        const match = css.match(/url\(["']?([^"')]+)["']?\)/);
+        if (match?.[1]?.includes(mediaId)) return match[1];
+      }
+      return '';
+    }, expectedMediaId);
+    await expect.poll(getResolvedImage, {
       timeout: 15_000,
-      message: 'Founder-approved character artwork must load, never an empty hero',
-    }).toBeGreaterThan(0);
+      message: 'Approved canon must be the image actually rendered by the browser',
+    }).toContain(expectedMediaId);
+    const imageUrl = await getResolvedImage();
+    const imageWidth = await page.evaluate(async url => {
+      const probe = new Image();
+      probe.src = url;
+      await probe.decode();
+      return probe.naturalWidth;
+    }, imageUrl);
+    expect(imageWidth).toBeGreaterThan(0);
 
     if (phone) {
       // A portrait must fill an appreciable part of the initial viewport.
