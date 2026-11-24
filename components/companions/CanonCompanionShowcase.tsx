@@ -69,6 +69,7 @@ export function CanonCompanionShowcase({ motionEnabled, onContinue }: Props) {
           const portrait = (
             <View style={styles.photoFrame}>
               <Image
+                testID={compact && companion.id === 'sy' ? 'web-welcome-hero-teen' : undefined}
                 source={companion.portrait}
                 style={styles.photo}
                 resizeMode="cover"
