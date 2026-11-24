@@ -15,6 +15,8 @@ test('AI search definition page is crawlable, extractable, and privacy-bounded',
   expect(robots).toContain('Allow: /what-is-sekret-bip/');
   expect(robots).toContain('Allow: /how-it-works/');
   expect(robots).toContain('Allow: /privacy-and-safety/');
+  expect(robots).toContain('Allow: /site-map/');
+  expect(robots).toContain('Allow: /llms.txt');
   expect(robots).toContain('Sitemap: https://sekretbip.net/sitemap.xml');
 
   const sitemapResponse = await request.get('/sitemap.xml');
@@ -23,6 +25,7 @@ test('AI search definition page is crawlable, extractable, and privacy-bounded',
   expect(sitemap).toContain('<loc>https://sekretbip.net/what-is-sekret-bip/</loc>');
   expect(sitemap).toContain('<loc>https://sekretbip.net/how-it-works/</loc>');
   expect(sitemap).toContain('<loc>https://sekretbip.net/privacy-and-safety/</loc>');
+  expect(sitemap).toContain('<loc>https://sekretbip.net/site-map/</loc>');
 
   await page.goto('/what-is-sekret-bip/index.html', { waitUntil: 'domcontentloaded' });
 
@@ -182,4 +185,47 @@ test('privacy-and-safety page states product guardrails without presenting an un
     body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
     contentType: 'image/png',
   });
+});
+
+
+test('public site map and AI summary are discoverable without exposing private routes', async ({ page, request }, testInfo) => {
+  const llmsResponse = await request.get('/llms.txt');
+  expect(llmsResponse.ok()).toBe(true);
+  expect(llmsResponse.headers()['content-type']).toContain('text/plain');
+  const llms = await llmsResponse.text();
+  expect(llms).toContain("Se'kret Bip");
+  expect(llms).toContain('https://sekretbip.net/privacy-and-safety/');
+  expect(llms).toContain('does not publish a retail storefront');
+  for (const privatePath of ['/api/', '/account/', '/signup/', '/login/', '/teen/', '/parent/']) {
+    expect(llms).not.toContain('https://sekretbip.net' + privatePath);
+  }
+
+  const publicPage = await request.get('/what-is-sekret-bip/');
+  expect(publicPage.ok()).toBe(true);
+
+  await page.goto('/site-map/', { waitUntil: 'domcontentloaded' });
+  await expect(page).toHaveTitle("Se'kret Bip site map | Public product information");
+  await expect(page.getByRole('heading', { level: 1, name: "Se'kret Bip site map" })).toBeVisible();
+  for (const label of ["What is Se'kret Bip?", "How Se'kret Bip works", "Privacy and safety at Se'kret Bip", 'XML sitemap', 'Crawler policy', 'AI-readable product summary']) {
+    await expect(page.getByRole('link', { name: label }).first()).toBeVisible();
+  }
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', 'https://sekretbip.net/site-map/');
+  const jsonLdText = await page.locator('script[type="application/ld+json"]').textContent();
+  const jsonLd = JSON.parse(jsonLdText ?? '{}') as { '@graph'?: Array<Record<string, unknown>> };
+  const graph = jsonLd['@graph'] ?? [];
+  const itemList = graph.find(entity => entity['@type'] === 'ItemList') as { itemListElement?: Array<unknown> } | undefined;
+  expect(itemList?.itemListElement).toHaveLength(5);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expectNoHorizontalOverflow(page);
+  await testInfo.attach('public-site-map-mobile.png', {
+    body: await page.screenshot({ fullPage: true, animations: 'disabled' }),
+    contentType: 'image/png',
+  });
+});
+
+test('welcome screen exposes the public site map link', async ({ page }) => {
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('web-welcome-site-map')).toBeVisible();
 });
