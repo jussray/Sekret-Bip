@@ -108,9 +108,29 @@ function processTreeAlive(pid) {
   if (process.platform === 'win32') return Boolean(activeChild && activeChild.exitCode == null);
   try {
     process.kill(-pid, 0);
-    return true;
   } catch (error) {
     return error?.code !== 'ESRCH';
+  }
+  // Linux retains terminated descendants as zombies until their parent reaps
+  // them. A zombie cannot execute, so it must not hold the mission lock.
+  // /proc reports the process group independently of parent reparenting.
+  if (process.platform !== 'linux') return true;
+  try {
+    for (const entry of fs.readdirSync('/proc')) {
+      if (!/^\\d+$/.test(entry)) continue;
+      let stat;
+      try {
+        stat = fs.readFileSync(`/proc/${entry}/stat`, 'utf8');
+      } catch (error) {
+        if (error?.code === 'ENOENT' || error?.code === 'ESRCH') continue;
+        return true; // Fail closed if liveness cannot be inspected.
+      }
+      const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+      if (Number(fields[2]) === pid && fields[0] !== 'Z' && fields[0] !== 'X') return true;
+    }
+    return false;
+  } catch {
+    return true; // Never release the lock on an uncertain inspection.
   }
 }
 
@@ -167,7 +187,13 @@ function executeMission(missionId, res, origin) {
       finish('timed_out', { ...closePayload, error: 'mission_timeout', termination: 'process_tree' });
       return;
     }
-    treePollTimer = setTimeout(finishWhenTreeStops, 40);
+    // Child close and timeout may both request cleanup: schedule only once.
+    if (treePollTimer === null) {
+      treePollTimer = setTimeout(() => {
+        treePollTimer = null;
+        finishWhenTreeStops();
+      }, 40);
+    }
   };
 
   timeoutTimer = setTimeout(() => {
