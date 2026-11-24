@@ -83,6 +83,9 @@ export function WebWelcomeScreen({
   const shellHeight = compact ? height : Math.min(height, 900);
   const entrySide = accountSideForWelcomeAudience(activeAudience);
   const isBipJr = activeAudience === 'bip-jr';
+  // On phones, the exact approved companion portraits ARE the hero.
+  // Never squeeze the landscape production sheet into a tiny thumbnail.
+  const teenPhoneCanvas = compact && !isBipJr;
   const heroContract = isBipJr
     ? FRONT_DOOR_THEME.heroSafeArea.bipJr
     : FRONT_DOOR_THEME.heroSafeArea.teen;
@@ -459,6 +462,11 @@ export function WebWelcomeScreen({
             </View>
           )}
 
+          {teenPhoneCanvas ? (
+            <CanonCompanionShowcase motionEnabled={motionEnabled} onContinue={() => onEnter(entrySide)} />
+          ) : null}
+
+          {!teenPhoneCanvas && (
           <Animated.View
             testID="web-welcome-copy-reveal"
             style={[styles.copy, isBipJr && styles.copyBipJr, audienceRevealStyle(audienceCopyReveal)]}
@@ -473,7 +481,9 @@ export function WebWelcomeScreen({
             <Text style={[styles.lead, isBipJr && styles.leadBipJr]}>{copy.lead}</Text>
             <Text style={[styles.subtitle, isBipJr && styles.subtitleBipJr]}>{copy.subtitle}</Text>
           </Animated.View>
+          )}
 
+          {!teenPhoneCanvas && (
           <View
             testID="web-welcome-hero-safe-area"
             style={{ paddingBottom: heroContract.bottomGap }}
@@ -512,11 +522,13 @@ export function WebWelcomeScreen({
               </Animated.View>
             </Animated.View>
           </View>
+          )}
 
-          {!isBipJr && (
+          {!isBipJr && !teenPhoneCanvas && (
             <CanonCompanionShowcase motionEnabled={motionEnabled} onContinue={() => onEnter(entrySide)} />
           )}
 
+          {!teenPhoneCanvas && (
           <Animated.View
             testID="web-welcome-world-cues"
             accessible
@@ -539,8 +551,11 @@ export function WebWelcomeScreen({
               </View>
             ))}
           </Animated.View>
+          )}
 
-          <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
+          {!teenPhoneCanvas && (
+            <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
+          )}
 
           <Pressable
             testID="web-welcome-enter"
