@@ -28,7 +28,7 @@ import {
   type VibeKey,
 } from '../constants/theme';
 import STICKER_IMAGES from '../constants/stickerImages';
-import { CANON_COMPANION_IMAGES } from '@constants/companionVisualCanon';
+import { CANON_COMPANION_IMAGES } from '../constants/companionVisualCanon';
 import { FURNISH_CATALOG, type FurnishCategory } from '../constants/furnishingCatalog';
 import { BareRoomRenderer } from '../components/rooms/BareRoomRenderer';
 import { AmbientWeatherOverlay } from '../components/AmbientWeatherOverlay';

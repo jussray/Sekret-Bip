@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { AccountSide } from '@/features/identity/accountProfile';
 import { FRONT_DOOR_THEME } from '@/constants/frontDoorTheme';
 import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
-import { CANON_FAMILY_POSTER_IMAGE } from '@constants/companionVisualCanon';
+import { CANON_FAMILY_POSTER_IMAGE } from '../constants/companionVisualCanon';
 import { CanonCompanionShowcase } from '../components/companions/CanonCompanionShowcase';
 
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');

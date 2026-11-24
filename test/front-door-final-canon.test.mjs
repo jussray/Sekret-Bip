@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 
 const read = (path) => fs.readFileSync(path, 'utf8');
@@ -55,4 +56,21 @@ test('private Room picker displays approved portraits without changing full-body
   assert.match(room, /source=\{avatarSrc\}/);
   assert.match(room, /style=\{\[vl\.companionAvatar, vl\.canonCompanionPortrait\]\}/);
   assert.match(room, /const cSrc\s+= safe\(AVATARS\[cId\]\?\.fullbody/);
+});
+
+
+test('root-owned canon imports resolve in both Expo and TypeScript', () => {
+  for (const file of [
+    'app/(teen)/discover.tsx',
+    'screens/UserRoomScreen.tsx',
+    'screens/WebWelcomeScreen.tsx',
+  ]) {
+    const source = read(file);
+    const specifier = source.match(/from ['\"]([^'\"]*companionVisualCanon)['\"]/u)?.[1];
+    assert.ok(specifier?.startsWith('.'), `${file}: root canon must use a relative import; @ aliases map to src/`);
+    assert.ok(fs.existsSync(path.resolve(path.dirname(file), `${specifier}.ts`)), `${file}: canon module must exist`);
+  }
+  const showcaseImport = welcome.match(/from ['\"]([^'\"]*CanonCompanionShowcase)['\"]/u)?.[1];
+  assert.ok(showcaseImport?.startsWith('.'), 'welcome: root showcase must use a relative import');
+  assert.ok(fs.existsSync(path.resolve('screens', `${showcaseImport}.tsx`)), 'welcome: showcase module must exist');
 });
