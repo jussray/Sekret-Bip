@@ -6,7 +6,8 @@
   "acceptanceCriteria": [
     "Web family gateway supports clear segmentation between Teen and Bip Jr. + Family onboarding paths.",
     "Parent linking contract preserves mutual consent and 8-character invite code verification via public.parent_links.",
-    "Anonymous and authenticated telemetry insertion is enabled for signup_attempted and teen_age_selected funnel tracking."
+    "Anonymous and authenticated telemetry insertion is enabled for signup_attempted and teen_age_selected funnel tracking.",
+    "Public Teen front door uses the exact founder-selected Family artwork with five accessible companion previews; private Discover reuses its portrait crops without bypassing age/auth or companion unlock restrictions."
   ],
   "contractPaths": [
     "docs/contracts/web-gateway-parent-link.md",
@@ -15,10 +16,32 @@
   "testPaths": [
     "test/parent-link-contract.test.mjs",
     "test/teen-parent-link-approval-required.test.mjs",
-    "test/web-gateway-telemetry.test.mjs"
+    "test/web-gateway-telemetry.test.mjs",
+    "test/front-door-final-canon.test.mjs",
+    "test/dual-front-door-contract.test.mjs"
   ],
   "verification": {
-    "state": "passed",
-    "evidence": "https://github.com/jussray/Sekret-Bip/pull/1240"
-  }
+    "state": "partial",
+    "evidence": "https://github.com/jussray/Sekret-Bip/pull/1240",
+    "blocker": "Exact-head CI and public production browser readback have not yet passed."
+  },
+  "runtimePaths": [
+    "app/index.tsx",
+    "screens/WebWelcomeScreen.tsx",
+    "app/(onboarding)/welcome.tsx",
+    "app/find-family.tsx",
+    "app/(teen)/discover.tsx",
+    "components/companions/CanonCompanionShowcase.tsx",
+    "constants/companionVisualCanon.ts"
+  ],
+  "telemetryPaths": [
+    "src/utils/telemetry.ts",
+    "supabase/migrations/20261122040000_web_gateway_telemetry_and_family_links.sql"
+  ],
+  "rollout": {
+    "state": "source-integrated-live-unverified",
+    "controlPath": "app/index.tsx",
+    "controlKey": "EXPO_PUBLIC_APP_VARIANT"
+  },
+  "rollback": "Revert only the front-door presentation and best-effort telemetry call sites on the verified source branch; retain the previous auth/age/parent routes and preserve existing Supabase tables and data. Production rollback requires an independently authorized deployment."
 }
