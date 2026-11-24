@@ -12,6 +12,12 @@ test('telemetry module exports trackAnalyticsEvent and writes to analytics_event
   assert.match(source, /teen_age_selected/);
 });
 
+test('analytics writes remain best-effort without logging private payloads or provider errors', async () => {
+  const source = await read('src/utils/telemetry.ts');
+  assert.doesNotMatch(source, /console\\.(?:warn|error|log|info)\\s*\\(/);
+  assert.match(source, /if \\(error\\) return false/);
+});
+
 test('signup screen instruments signup_attempted telemetry', async () => {
   const source = await read('app/(auth)/signup.tsx');
   assert.match(source, /trackAnalyticsEvent/);
