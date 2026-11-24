@@ -74,3 +74,10 @@ test('root-owned canon imports resolve in both Expo and TypeScript', () => {
   assert.ok(showcaseImport?.startsWith('.'), 'welcome: root showcase must use a relative import');
   assert.ok(fs.existsSync(path.resolve('screens', `${showcaseImport}.tsx`)), 'welcome: showcase module must exist');
 });
+
+test('slow CDN loading shows a thumbnail from the same final poster rather than a blank hero', () => {
+  assert.match(canon, /export const CANON_FAMILY_POSTER_PREVIEW_IMAGE/);
+  assert.match(welcome, /source=\{CANON_FAMILY_POSTER_PREVIEW_IMAGE\}/);
+  assert.match(welcome, /styles\.heroPlaceholder/);
+  assert.match(welcome, /accessible=\{false\}/);
+});
