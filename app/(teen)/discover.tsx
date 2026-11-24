@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { PERSONALITY_CONFIG } from '@/services/ai';
 import { usePoints } from '@/features/activity/ledger';
-import { CANON_COMPANION_IMAGES } from '@/constants/companionVisualCanon';
+import { CANON_COMPANION_IMAGES } from '@constants/companionVisualCanon';
 
 const COMPANION_UNLOCK_PTS: Record<string, number> = {
   raylene: 0, rylane: 50, cloud: 150, night: 350,
