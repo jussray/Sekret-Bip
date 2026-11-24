@@ -50,17 +50,11 @@ export async function trackAnalyticsEvent(
       user_id: resolvedUserId,
     });
 
-    if (error) {
-      if (__DEV__) {
-        console.warn(`[telemetry] Failed to record ${eventName}:`, error.message);
-      }
-      return false;
-    }
+    // Analytics must be best-effort; never log potentially sensitive payloads,
+    // provider responses, event names or exception objects in the client.
+    if (error) return false;
     return true;
-  } catch (err) {
-    if (__DEV__) {
-      console.warn(`[telemetry] Error recording ${eventName}:`, err);
-    }
+  } catch {
     return false;
   }
 }
