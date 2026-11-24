@@ -22,6 +22,7 @@ export function CanonCompanionShowcase({ motionEnabled, onContinue }: Props) {
   const float = useRef(new Animated.Value(0)).current;
   const { width } = useWindowDimensions();
   const compact = width < 520;
+  const cardWidth = compact ? Math.min(280, Math.round(width * 0.68)) : 176;
 
   useEffect(() => {
     if (!motionEnabled) {
@@ -53,13 +54,15 @@ export function CanonCompanionShowcase({ motionEnabled, onContinue }: Props) {
 
   return (
     <View testID="canon-companion-showcase" style={styles.section}>
-      <Text style={styles.heading}>Meet your Se’kret Bip family</Text>
-      <Text style={styles.subheading}>Real companions. Your space. Your pace.</Text>
+      <Text style={styles.heading}>Se’kret Bip Family</Text>
+      <Text style={styles.subheading}>Your people. Your stories. ✦</Text>
       <ScrollView
         testID="canon-companion-scroll"
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.row}
+        contentContainerStyle={[styles.row, { paddingHorizontal: compact ? Math.max(16, (width - cardWidth) / 2) : 20 }]}
+        snapToInterval={compact ? cardWidth + 14 : undefined}
+        decelerationRate={compact ? 'fast' : 'normal'}
         accessibilityLabel="Se'kret Bip family companion portraits"
       >
         {CANON_COMPANION_ORDER.map(companion => {
@@ -82,7 +85,7 @@ export function CanonCompanionShowcase({ motionEnabled, onContinue }: Props) {
               accessibilityState={{ selected: selected?.id === companion.id }}
               onPress={() => setSelected(companion)}
               style={({ pressed }) => [
-                styles.card, compact && styles.compactCard,
+                styles.card, { width: cardWidth }, compact && styles.compactCard,
                 selected?.id === companion.id && styles.cardSelected,
                 pressed && styles.cardPressed,
               ]}
@@ -136,23 +139,23 @@ const handwritten = Platform.select({ ios: 'Noteworthy', android: 'sans-serif-me
 const styles = StyleSheet.create({
   section: {
     width: '100%', paddingTop: 15, paddingBottom: 20, overflow: 'hidden',
-    backgroundColor: 'rgba(24,6,42,0.50)',
-    borderTopWidth: 1, borderTopColor: 'rgba(245,192,255,0.28)',
+    backgroundColor: 'rgba(24,6,42,0.18)',
+    borderTopWidth: 0, borderTopColor: 'transparent',
   },
   heading: {
-    fontFamily: 'Georgia', color: '#F8EDF9', fontSize: 25,
+    fontFamily: 'Georgia', color: '#F8EDF9', fontSize: 29,
     textAlign: 'center', marginHorizontal: 18, textShadowColor: '#B96EFF',
     textShadowRadius: 8,
   },
   subheading: { color: '#E7D5F4', textAlign: 'center', fontSize: 13, marginTop: 5 },
-  row: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 12, gap: 14, alignItems: 'flex-start' },
+  row: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 18, gap: 14, alignItems: 'flex-start' },
   card: {
     width: 176, alignItems: 'center',
     paddingTop: 8, paddingHorizontal: 7, paddingBottom: 10,
     borderWidth: 1, borderColor: 'rgba(232,199,255,0.19)',
     borderRadius: 15, backgroundColor: 'rgba(50,18,75,0.42)',
   },
-  compactCard: { width: 154 },
+  compactCard: { backgroundColor: 'rgba(51,13,72,0.32)', borderColor: 'rgba(250,213,255,0.28)' },
   cardSelected: { borderColor: '#FFD68C', backgroundColor: 'rgba(87,44,117,0.54)' },
   cardPressed: { opacity: 0.76 },
   tape: {
