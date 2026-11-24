@@ -25,10 +25,12 @@ test('rollback front door exposes bounded working actions and canonical identity
   await expect(page.getByTestId('web-welcome-shell')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible();
   await expect(page.getByText('Come on in.')).toBeVisible();
-  await expect(page.getByRole('img', { name: /Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together/ })).toBeVisible();
-  await expect(page.getByText('Night', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Suhana', { exact: true })).toHaveCount(0);
-  await expect(page.getByText('Sy', { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('web-welcome-hero-teen')).toHaveAccessibleName(/Approved Se’kret Bip Family scrapbook: Sy, Night, Suhana, Ja, and Cloud/);
+  const companions = page.getByTestId('canon-companion-select');
+  await expect(companions).toHaveCount(5);
+  for (const [index, name] of ['Sy', 'Night', 'Suhana', 'Ja', 'Cloud'].entries()) {
+    await expect(companions.nth(index)).toHaveAccessibleName(new RegExp('Meet ' + name + ','));
+  }
   await expect(page.getByTestId('web-welcome-about')).toBeVisible();
   await expect(page.getByTestId('web-welcome-enter')).toBeVisible();
   await expect(page.getByTestId('web-welcome-sign-in')).toBeVisible();
