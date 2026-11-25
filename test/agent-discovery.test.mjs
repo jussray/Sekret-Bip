@@ -20,6 +20,8 @@ test('robots.txt exposes only exact public discovery paths', () => {
   assert.match(robots, /^Allow: \/what-is-sekret-bip\/$/m);
   assert.match(robots, /^Allow: \/how-it-works\/$/m);
   assert.match(robots, /^Allow: \/privacy-and-safety\/$/m);
+  assert.match(robots, /^Allow: \/site-map\/$/m);
+  assert.match(robots, /^Allow: \/llms\.txt\$/m);
   assert.match(robots, /^Allow: \/robots\.txt\$$/m);
   assert.match(robots, /^Allow: \/sitemap\.xml\$$/m);
   assert.match(robots, /^Sitemap: https:\/\/sekretbip\.net\/sitemap\.xml$/m);
@@ -36,7 +38,27 @@ test('sitemap.xml contains exactly the canonical public discovery pages', () => 
     'https://sekretbip.net/what-is-sekret-bip/',
     'https://sekretbip.net/how-it-works/',
     'https://sekretbip.net/privacy-and-safety/',
+    'https://sekretbip.net/site-map/',
   ]);
+});
+
+test('public site map and llms summary expose only approved public information', () => {
+  const sitemapPage = read('public/site-map/index.html');
+  const llms = read('public/llms.txt');
+
+  assert.match(sitemapPage, /<h1>Se'kret Bip site map<\/h1>/);
+  assert.match(sitemapPage, /\"@type\": \"ItemList\"/);
+  for (const url of [
+    'https://sekretbip.net/',
+    'https://sekretbip.net/what-is-sekret-bip/',
+    'https://sekretbip.net/how-it-works/',
+    'https://sekretbip.net/privacy-and-safety/',
+  ]) {
+    assert.ok(sitemapPage.includes(url));
+    assert.ok(llms.includes(url));
+  }
+  assert.match(llms, /does not publish a retail storefront/i);
+  assert.doesNotMatch(sitemapPage + llms, /https:\/\/sekretbip\.net\/(api|account|signup|login|teen|parent)\//i);
 });
 
 test('auth.md does not advertise external-agent user delegation', () => {
@@ -44,7 +66,7 @@ test('auth.md does not advertise external-agent user delegation', () => {
 
   assert.match(auth, /^# .*auth\.md$/m);
   assert.match(auth, /Agent audience/);
-  assert.match(auth, /https:\/\/sekretbip\.net\/signup/);
+  assert.match(auth, /^- Human user registration URI: `https:\/\/sekretbip\.net\/signup`$/m);
   assert.match(auth, /Agent registration endpoint: none/);
   assert.match(auth, /Agent provisioning method: none/);
   assert.match(auth, /No public agent credential is currently issued/);
@@ -58,6 +80,11 @@ test('Cloudflare headers deny training and agent input by default', () => {
 
   assert.match(headers, /^\/\*$/m);
   assert.match(headers, /^  Content-Signal: ai-train=no, search=yes, ai-input=no$/m);
+  assert.match(headers, /^\/what-is-sekret-bip\/\*\n  Content-Signal: ai-train=no, search=yes, ai-input=yes$/m);
+  assert.match(headers, /^\/how-it-works\/\*\n  Content-Signal: ai-train=no, search=yes, ai-input=yes$/m);
+  assert.match(headers, /^\/privacy-and-safety\/\*\n  Content-Signal: ai-train=no, search=yes, ai-input=yes$/m);
+  assert.match(headers, /^\/site-map\/\*\n  Content-Signal: ai-train=no, search=yes, ai-input=yes$/m);
+  assert.match(headers, /\/llms\.txt\n  Content-Type: text\/plain; charset=utf-8[\s\S]*Content-Signal: ai-train=no, search=yes, ai-input=yes/);
   assert.match(headers, /^\/auth\.md$/m);
   assert.match(headers, /^  Content-Type: text\/markdown; charset=utf-8$/m);
   assert.match(headers, /^\/robots\.txt$/m);
