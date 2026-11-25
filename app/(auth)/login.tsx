@@ -23,11 +23,13 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useVerificationContext } from '@/context/VerificationContext';
 import type { AccountSide } from '@/features/identity/accountProfile';
 import {
+  buildEmailConfirmationRedirectUrl,
   clearEmailConfirmationUrl,
   parseEmailConfirmationUrl,
 } from '@/features/auth/emailConfirmation';
 import { fetchPostAuthBootstrap } from '@/services/auth/postAuthBootstrap';
 import { getSupabase } from '@/utils/supabase';
+import { createConfirmationResend } from '@/features/auth/confirmationResend.mjs';
 
 function authErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -84,6 +86,17 @@ export default function LoginScreen() {
   const [error, setError]         = useState('');
   const [loading, setLoading]     = useState(false);
   const [pwVisible, setPwVisible] = useState(false);
+  const [resendBusy, setResendBusy] = useState(false);
+  const [resendFeedback, setResendFeedback] = useState('');
+  const [resendWait, setResendWait] = useState(0);
+  const resend = useRef(createConfirmationResend()).current;
+  const resendBusyRef = useRef(false);
+
+  useEffect(() => {
+    if (resendWait <= 0) return;
+    const timer = setTimeout(() => setResendWait(resend.remainingMs()), Math.min(resendWait, 1000));
+    return () => clearTimeout(timer);
+  }, [resendWait, resend]);
 
   const shakeAnim = useRef(new Animated.Value(0)).current;
   const confirmationHandled = useRef(false);
@@ -168,7 +181,35 @@ export default function LoginScreen() {
     };
   }, [emailConfirmed, preferredSide, refreshVerification]);
 
+  async function handleResendConfirmation() {
+    if (loading || resendBusyRef.current) return;
+    const sb = getSupabase();
+    if (!sb) {
+      setResendFeedback('We could not request another link right now. Please try again later.');
+      return;
+    }
+    resendBusyRef.current = true;
+    setResendBusy(true);
+    setResendFeedback('');
+    try {
+      const result = await resend.request(email, (recipient) => sb.auth.resend({
+        type: 'signup',
+        email: recipient,
+        options: { emailRedirectTo: buildEmailConfirmationRedirectUrl(preferredSide ?? 'teen') },
+      }));
+      if (result === 'invalid') setResendFeedback('Enter a valid email address first.');
+      else if (result === 'throttled') setResendFeedback('Please wait before requesting another confirmation link.');
+      else if (result === 'accepted') setResendFeedback('Request accepted. If your account still needs confirmation, a link may arrive. Check spam too.');
+      else setResendFeedback('We could not request another link right now. Please try again later.');
+    } finally {
+      setResendWait(resend.remainingMs());
+      resendBusyRef.current = false;
+      setResendBusy(false);
+    }
+  }
+
   async function handleSignIn() {
+    if (resendBusyRef.current) return;
     setError('');
     const e = email.trim();
     const p = password;
@@ -237,8 +278,8 @@ export default function LoginScreen() {
             keyboardType="email-address"
             textContentType="emailAddress"
             value={email}
-            editable={!loading}
-            onChangeText={t => { setEmail(t); setError(''); }}
+            editable={!loading && !resendBusy}
+            onChangeText={t => { setEmail(t); setError(''); setResendFeedback(''); }}
             accessibilityLabel="Email"
           />
         </View>
@@ -272,6 +313,20 @@ export default function LoginScreen() {
         ) : null}
 
         <TouchableOpacity
+          onPress={handleResendConfirmation}
+          disabled={loading || resendBusy || resendWait > 0}
+          accessibilityRole="button"
+          accessibilityLabel="Resend confirmation email"
+          accessibilityState={{ disabled: loading || resendBusy || resendWait > 0, busy: resendBusy }}
+          style={s.resendRow}
+        >
+          <Text style={s.forgotText}>
+            {resendBusy ? 'Requesting link…' : resendWait > 0 ? `Resend available in ${Math.ceil(resendWait / 1000)}s` : 'Resend confirmation email'}
+          </Text>
+        </TouchableOpacity>
+        {resendFeedback ? <Text style={s.resendFeedback} accessibilityRole="alert">{resendFeedback}</Text> : null}
+
+        <TouchableOpacity
           onPress={() => router.push(authRoute('/(auth)/forgot-password', preferredSide) as never)}
           style={s.forgotRow}
           accessibilityRole="link"
@@ -283,7 +338,7 @@ export default function LoginScreen() {
         <TouchableOpacity
           style={[s.btn, (loading || !email || !password) && s.btnDim]}
           onPress={handleSignIn}
-          disabled={loading}
+          disabled={loading || resendBusy}
           activeOpacity={0.82}
           accessibilityRole="button"
           accessibilityLabel="Log in"
@@ -403,6 +458,8 @@ const s = StyleSheet.create({
     marginBottom: 6,
     marginLeft: 2,
   },
+  resendRow: { alignSelf: 'flex-start', paddingVertical: 10 },
+  resendFeedback: { color: '#c4b5fd', fontSize: 12, alignSelf: 'flex-start', marginBottom: 8 },
   forgotRow: { alignSelf: 'flex-end', marginBottom: 20 },
   forgotText: { color: '#a78bfa', fontSize: 13, fontWeight: '600' },
   btn: {
