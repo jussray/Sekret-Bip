@@ -112,7 +112,7 @@ test('navigation exposes Bridge and canonicalizes duplicate Room paths', () => {
   const userRoom = read('app/(teen)/user-room.tsx');
   const points = read('app/(teen)/points.tsx');
   assert.equal(parentLayout.includes('name="bridge"'), true);
-  assert.equal(parentLayout.includes(`name="calm" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }}`), true);
+  assert.equal(parentLayout.includes('name="calm" options={{ href: null }}'), true);
   assert.equal(sharedRoutes.includes("return side === 'parent' ? PARENT_ROUTES.more : TEEN_ROUTES.more"), true);
   assert.equal(sharedRoutes.includes('crew: TEEN_ROUTES.circle'), true);
   assert.equal(userRoom.includes('<Redirect href="/(teen)/room"'), true);

@@ -27,7 +27,7 @@ test('Circle child routes stay reachable without leaking into the Teen tab bar',
 
   for (const route of childRoutes) {
     const hiddenRegistration = new RegExp(
-      `<Tabs\\.Screen name="${escapeRegExp(route)}" options=\\{\\{ tabBarButton: \\(\\) => null, tabBarItemStyle: \\{ display: 'none' \\} \\}\\} \\/>`,
+      `<Tabs\\.Screen name="${escapeRegExp(route)}" options=\\{\\{ href: null \\}\\} \\/>`,
     );
 
     assert.match(

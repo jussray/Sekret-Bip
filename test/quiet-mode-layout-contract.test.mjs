@@ -19,7 +19,7 @@ test('teen layout centrally enforces Quiet Bip and hides engagement navigation',
   assert.match(layout, /!hideGlobalChrome && <SideSafeBackButton/);
   assert.match(layout, /!hideGlobalChrome && <GlobalMoodButton/);
   assert.match(layout, /const immersiveScrapbook = pathname\.includes\('scrapbook-check-in'\)/);
-  assert.match(layout, /Tabs\.Screen name="quiet" options=\{\{ tabBarButton: \(\) => null, tabBarItemStyle: \{ display: 'none' \} \}\}/);
+  assert.match(layout, /Tabs\.Screen name="quiet" options=\{\{ href: null \}\}/);
 });
 
 test('Quiet surfaces import Sleep Guard from a path that actually resolves', () => {

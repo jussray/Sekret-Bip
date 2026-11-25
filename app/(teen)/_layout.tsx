@@ -51,8 +51,8 @@ function TeenTabs({
         <Tabs.Screen name="calm" options={{ title: 'Calm', tabBarIcon: () => <TabIcon emoji="🌙" /> }} />
         <Tabs.Screen name="calm/breathe" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="circle" options={{ title: 'Circle', tabBarIcon: () => <TabIcon emoji="🌐" /> }} />
-        <Tabs.Screen name="circle/feed" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-        <Tabs.Screen name="circle/feed-v2" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="circle/feed" options={{ href: null }} />
+        <Tabs.Screen name="circle/feed-v2" options={{ href: null }} />
         <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: () => <TabIcon emoji="•••" /> }} />
         <Tabs.Screen name="user-room" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="sekret" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
@@ -79,15 +79,15 @@ function TeenTabs({
         <Tabs.Screen name="bippin2/manhood" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="growth" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="mind-body-reset" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-        <Tabs.Screen name="body-workout" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="body-workout" options={{ href: null }} />
         <Tabs.Screen name="companion-chat" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="pages/[id]" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="pages/history" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="pages/new" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-        <Tabs.Screen name="circle/[id]" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-        <Tabs.Screen name="circle/weather" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="circle/[id]" options={{ href: null }} />
+        <Tabs.Screen name="circle/weather" options={{ href: null }} />
         <Tabs.Screen name="resources" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-        <Tabs.Screen name="quiet" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="quiet" options={{ href: null }} />
         <Tabs.Screen name="meaning" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
       </Tabs>
       {!hideGlobalChrome && <SideSafeBackButton side="teen" />}
