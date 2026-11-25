@@ -50,7 +50,7 @@ test('workout flow includes low-impact, pause, skip, rest, safety, and anti-skip
 test('Expo Router keeps the workout route hidden from the teen tab bar', () => {
   const layout = read('app/(teen)/_layout.tsx');
   const routes = read('src/teen/routes.ts');
-  assert.match(layout, /<Tabs\.Screen\s+name="body-workout"\s+options=\{\{\s*href:\s*null\s*\}\}\s*\/>/);
+  assert.match(layout, /<Tabs\.Screen\s+name="body-workout"\s+options=\{\{\s*tabBarButton:\s*\(\)\s*=>\s*null,\s*tabBarItemStyle:\s*\{\s*display:\s*'none'\s*\}\s*\}\}\s*\/>/);
   assert.match(routes, /bodyWorkout:\s*'\/\(teen\)\/body-workout'/);
 });
 

@@ -78,7 +78,7 @@ test('runtime asset contracts preserve the product navigation and dedicated CI g
   const registry = read('src/config/nightRoomAssetRegistry.ts');
   const sprite = read('src/components/room/character/SekretSprite.tsx');
   for (const route of ['room', 'pages', 'calm', 'circle', 'more']) assert.match(layout, new RegExp(`name="${route}"`));
-  assert.match(layout, /name="circle\/feed-v2" options=\{\{ href: null \}\}/);
+  assert.match(layout, /name="circle\/feed-v2" options=\{\{ tabBarButton: \(\) => null, tabBarItemStyle: \{ display: 'none' \} \}\}/);
   assert.match(e2e, /normalizeTabLabel/);
   assert.match(e2e, /\['Room', 'Pages', 'Calm', 'Circle', 'More'\]/);
   assert.match(config, /'\*\*\/rooms\/\*\*'/);
