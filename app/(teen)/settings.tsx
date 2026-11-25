@@ -23,6 +23,7 @@ import {
 import { createParentLink, redeemParentLink } from '@/utils/parentBridgeCompat';
 import { useSleepGuard, type SleepWindow } from '../../hooks/useSleepGuard';
 import { AccountDeletionControls } from '@/components/settings/AccountDeletionControls';
+import { DataExportControls } from '@/components/settings/DataExportControls';
 import { ParentLinkStatusCard } from '@/components/settings/ParentLinkStatusCard';
 import { advanceStage } from '@/services/onboarding';
 import { getSupabase } from '@/utils/supabase';
@@ -241,6 +242,9 @@ export default function SettingsScreen() {
         </TouchableOpacity>
         {redeemStatus === 'pending' && <Text style={styles.hint}>Request sent. Teen approval is required before Bridge sharing.</Text>}
         {redeemStatus !== 'idle' && redeemStatus !== 'pending' && <Text style={styles.hint}>Status: {redeemStatus}</Text>}
+
+        <Text style={styles.sectionTitle}>Your data</Text>
+        <DataExportControls />
 
         <Text style={styles.sectionTitle}>Danger zone</Text>
         <AccountDeletionControls />

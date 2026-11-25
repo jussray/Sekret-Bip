@@ -16,6 +16,7 @@ import {
   StyleSheet, Animated, Platform,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { fetchS2TellShares } from '@/utils/sync';
 
 const TOP = Platform.OS === 'ios' ? 56 : 36;
 const S2TELL_STORAGE_KEY   = 's2tell_entries';
@@ -59,12 +60,20 @@ export function ParentS2TellInboxScreen({ setScreen, BottomNav }: ParentS2TellIn
 
   async function loadEntries() {
     try {
-      const [raw, draftsRaw] = await Promise.all([
-        AsyncStorage.getItem(S2TELL_STORAGE_KEY),
+      const [cloudShares, draftsRaw] = await Promise.all([
+        fetchS2TellShares(),
         AsyncStorage.getItem(PARENT_DRAFTS_KEY),
       ]);
-      const all: S2TellEntry[] = raw ? JSON.parse(raw) : [];
-      setEntries(all.filter(e => e.shared));
+
+      if (cloudShares.length > 0) {
+        setEntries(cloudShares.map(e => ({ ...e, shared: true })));
+      } else {
+        // AsyncStorage fallback for same-device / offline use
+        const raw = await AsyncStorage.getItem(S2TELL_STORAGE_KEY);
+        const all: S2TellEntry[] = raw ? JSON.parse(raw) : [];
+        setEntries(all.filter(e => e.shared));
+      }
+
       if (draftsRaw) setDrafts(JSON.parse(draftsRaw));
       // Clear the pending nudge once parent opens the inbox
       await AsyncStorage.removeItem(PENDING_FLAG_KEY).catch(() => {});
