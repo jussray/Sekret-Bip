@@ -98,6 +98,14 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
   expect(vibeLabBox).not.toBeNull();
   expect(boxesOverlap(scrapbookBox!, vibeLabBox!)).toBe(false);
   expect(boxesOverlap(scrapbookBox!, returnBox!)).toBe(false);
+  const supportButton = page.getByRole('button', {
+    name: 'Get help now — crisis support resources',
+    exact: true,
+  });
+  await expect(supportButton).toBeVisible();
+  const supportBox = await supportButton.boundingBox();
+  expect(supportBox).not.toBeNull();
+  expect(boxesOverlap(scrapbookBox!, supportBox!)).toBe(false);
 
   await saveEvidence(page, '01-room-companion-first-composition');
 
