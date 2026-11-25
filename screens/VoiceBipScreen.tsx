@@ -31,8 +31,10 @@ import {
 import { useVoiceCompanion } from '../hooks/useVoiceCompanion';
 import { SyncBadge, type SyncStatus } from '../components/SyncBadge';
 import type { VoiceNote } from '../types/bridge';
-import { Audio } from 'expo-av';
+import { Audio, Video, ResizeMode } from 'expo-av';
 import * as ImagePicker from 'expo-image-picker';
+import { uploadVideoToSupabase } from '../services/video/videoUpload';
+import { getSupabase } from '@/utils/supabase';
 import { fetchSekretReply, fetchSekretVoice, fetchSekretTranscribe, type SekretVoiceResponse } from '../utils/api';
 import { useVoiceBipIntelligence } from '../hooks/useVoiceBipIntelligence';
 import { useReducedMotion } from '../hooks/useReducedMotion';
@@ -40,7 +42,7 @@ import type { OracleJournalEntry } from '../types/voiceIntelligence';
 import type { OracleProfile, OracleSide } from '../services/oracleDiscovery';
 import {
   Text, TouchableOpacity, ScrollView, View,
-  Animated, Image, StyleSheet, Easing,
+  Animated, Image, StyleSheet, Easing, Modal,
   type DimensionValue, Platform,
 } from 'react-native';
 import { PresenceAvatar } from '../components/PresenceAvatar';
@@ -139,6 +141,9 @@ export function VoiceBipScreen({
   const [isThinking,       setIsThinking]        = useState(false);
   const [recordingTime,    setRecordingTime]     = useState(0);
   const [selectedBipType,  setSelectedBipType]   = useState<string | null>(null);
+  const [videoPreviewUri,  setVideoPreviewUri]   = useState<string | null>(null);
+  const [playingVideoUri,  setPlayingVideoUri]   = useState<string | null>(null);
+  const [videoUploading,   setVideoUploading]    = useState(false);
   const [transcriptFailed, setTranscriptFailed]  = useState(false);
 
   const recordingRef    = useRef<Audio.Recording | null>(null);
@@ -151,6 +156,13 @@ export function VoiceBipScreen({
   const pulseLoop = useRef<any>(null);
   const glowLoop  = useRef<any>(null);
   const timerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // #667: Cloud's subtle "talking" pulse during reply playback, cued to the
+  // Worker's per-character timing (requested only for this screen's canon
+  // companions, consumed only here — never logged, per the AGENTS.md no
+  // private-content-in-logs boundary this metadata is already held to).
+  const talkAnim = useRef(new Animated.Value(1)).current;
+  const talkTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Cloud drift + breath
   const cloudFloat = useRef(new Animated.Value(0)).current;
@@ -232,6 +244,7 @@ export function VoiceBipScreen({
       { translateX: cloudFloat.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudTranslateX }) },
       { translateY: cloudFloat.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudTranslateY }) },
       { scale: cloudBreath.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudScale }) },
+      { scale: talkAnim },
     ],
     opacity: cloudBreath.interpolate({ inputRange: [0, 1], outputRange: PRESENCE_MOTION.cloudOpacity }),
   };
@@ -253,6 +266,9 @@ export function VoiceBipScreen({
     setSekretReply('');
     setReplyAudioUri('');
     setReplyVoiceMeta(null);
+    talkTimersRef.current.forEach(clearTimeout);
+    talkTimersRef.current = [];
+    talkAnim.setValue(1);
     setRecordingTime(0);
     setTranscriptFailed(false);
     setShowBipMenu(false);
@@ -386,7 +402,11 @@ export function VoiceBipScreen({
     ].slice(-20);
     setSekretReply(reply);
     setIsVoiceLoading(true);
-    const audio = await fetchSekretVoice({ reply, characterId: avatar.personality });
+    // includeTiming only matters when the Worker is in hybrid provider mode —
+    // otherwise it's a harmless no-op flag the server ignores (worker/voice-entry.ts).
+    // Safe to request for every VOICE_BIP_AVATARS entry: all four are canon
+    // companions (suhana/sy/cloud/night), never the legacy/parentCoach ids.
+    const audio = await fetchSekretVoice({ reply, characterId: avatar.personality, includeTiming: true });
     if (audio) {
       setReplyAudioUri(`data:${audio.contentType};base64,${audio.audioBase64}`);
       const { audioBase64, contentType, characterId, ...meta } = audio;
@@ -427,8 +447,9 @@ export function VoiceBipScreen({
     }
     const asset = result.assets[0];
     const secs = typeof asset.duration === 'number' ? Math.floor(asset.duration) : 0;
+    const noteId = Date.now();
     const note: VoiceNote = {
-      id: Date.now(),
+      id: noteId,
       title: 'Video Bip',
       date: new Date().toLocaleDateString(),
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -439,7 +460,30 @@ export function VoiceBipScreen({
     };
     (onSave ?? ((n: VoiceNote) => setVoiceNotes(prev => [n, ...prev])))(note);
     setRecorded(true);
+    setVideoPreviewUri(asset.uri);
     setSelectedBipType(null);
+
+    // Background upload — patches local state + DB with remote URL when done
+    void (async () => {
+      setVideoUploading(true);
+      try {
+        const sb = getSupabase();
+        const userId = (await sb?.auth.getUser())?.data?.user?.id;
+        if (!userId) return;
+        const { publicUrl } = await uploadVideoToSupabase(asset.uri, userId);
+        setVoiceNotes(prev =>
+          prev.map(n => n.id === noteId ? { ...n, videoUrl: publicUrl } : n)
+        );
+        await sb!.from('voice_notes')
+          .update({ video_url: publicUrl })
+          .eq('id', noteId)
+          .eq('user_id', userId);
+      } catch {
+        // local URI stays as fallback — not user-facing
+      } finally {
+        setVideoUploading(false);
+      }
+    })();
   };
 
   useEffect(() => {
@@ -450,15 +494,44 @@ export function VoiceBipScreen({
       if (timerRef.current) clearInterval(timerRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => null);
       replySoundRef.current?.unloadAsync().catch(() => null);
+      talkTimersRef.current.forEach(clearTimeout);
     };
   }, []);
 
+
+  // Caps how many character-boundary pulses a single reply can schedule —
+  // long replies still get the effect without flooding setTimeout.
+  const MAX_TALK_PULSES = 60;
+
+  const clearTalkPulses = () => {
+    talkTimersRef.current.forEach(clearTimeout);
+    talkTimersRef.current = [];
+    talkAnim.stopAnimation();
+    talkAnim.setValue(1);
+  };
+
+  const scheduleTalkPulses = (timing: SekretVoiceResponse['timing'] | undefined) => {
+    clearTalkPulses();
+    if (reduceMotion) return;
+    const starts = timing?.characterStartTimesSeconds;
+    if (!starts || starts.length === 0) return;
+    starts.slice(0, MAX_TALK_PULSES).forEach(startSeconds => {
+      const timer = setTimeout(() => {
+        Animated.sequence([
+          Animated.timing(talkAnim, { toValue: 1.08, duration: 90, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+          Animated.timing(talkAnim, { toValue: 1,    duration: 90, easing: Easing.in(Easing.quad),  useNativeDriver: true }),
+        ]).start();
+      }, Math.max(0, startSeconds * 1000));
+      talkTimersRef.current.push(timer);
+    });
+  };
 
   const playReplyAudio = async () => {
     if (!replyAudioUri) return;
     if (replySoundRef.current) {
       const prior = replySoundRef.current;
       replySoundRef.current = null;
+      clearTalkPulses();
       await prior.unloadAsync().catch(() => null);
     }
     const { sound } = await Audio.Sound.createAsync({ uri: replyAudioUri });
@@ -470,10 +543,12 @@ export function VoiceBipScreen({
       return;
     }
     replySoundRef.current = sound;
+    scheduleTalkPulses(replyVoiceMeta?.timing);
     sound.setOnPlaybackStatusUpdate(status => {
       if ('didJustFinish' in status && status.didJustFinish) {
         sound.unloadAsync().catch(() => null);
         if (replySoundRef.current === sound) replySoundRef.current = null;
+        clearTalkPulses();
       }
     });
     // A newer overlapping tap can unload this exact sound while playAsync()
@@ -704,13 +779,27 @@ export function VoiceBipScreen({
         )}
 
         {/* ── Saved confirmation ── */}
-        {recorded && !isRecording && (
+        {recorded && !isRecording && videoPreviewUri ? (
+          <View style={[styles.floatCard, { borderColor: '#a855f7', backgroundColor: 'rgba(13,9,20,0.92)' }]}>
+            <Text style={[styles.savedLabel, { color: '#c4b5fd', marginBottom: 10 }]}>
+              📹 Video Bip saved {videoUploading ? '· uploading…' : ''}
+            </Text>
+            <TouchableOpacity
+              style={styles.videoThumbBtn}
+              onPress={() => setPlayingVideoUri(videoPreviewUri)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.videoThumbPlay}>▶</Text>
+              <Text style={styles.videoThumbLabel}>tap to preview</Text>
+            </TouchableOpacity>
+          </View>
+        ) : recorded && !isRecording ? (
           <View style={[styles.floatCard, { borderColor: theme.accent, backgroundColor: 'rgba(13,9,20,0.88)' }]}>
             <Text style={[styles.savedLabel, { color: theme.soft }]}>
               Saved to your journal {avatar.emoji}
             </Text>
           </View>
-        )}
+        ) : null}
 
         {/* ── Transcript failed badge ── */}
         {recorded && transcriptFailed && !isThinking && (
@@ -786,6 +875,27 @@ export function VoiceBipScreen({
 
       {BottomNav}
 
+      {/* ── Video player modal ── */}
+      {playingVideoUri ? (
+        <Modal visible transparent animationType="fade" onRequestClose={() => setPlayingVideoUri(null)}>
+          <View style={styles.videoModalOverlay}>
+            <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setPlayingVideoUri(null)} />
+            <View style={styles.videoModalCard}>
+              <Video
+                source={{ uri: playingVideoUri }}
+                style={styles.videoPlayer}
+                useNativeControls
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay
+              />
+              <TouchableOpacity style={styles.videoCloseBtn} onPress={() => setPlayingVideoUri(null)}>
+                <Text style={styles.videoCloseBtnText}>✕ close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
+
       {/* ── Bip type menu ── */}
       {showBipMenu && (
         <View style={styles.overlayWrap}>
@@ -844,7 +954,15 @@ export function VoiceBipScreen({
                       <Text style={[styles.noteTitle, { color: '#fff' }]}>{n.title}</Text>
                       <Text style={[styles.noteMeta, { color: '#7c6899' }]}>{n.date} · {n.duration}</Text>
                     </View>
-                    <TouchableOpacity style={[styles.playBtn, { backgroundColor: 'rgba(124,58,237,0.25)' }]}>
+                    <TouchableOpacity
+                      style={[styles.playBtn, { backgroundColor: 'rgba(124,58,237,0.25)' }]}
+                      onPress={() => {
+                        if (n.type === 'video') {
+                          const uri = (n.videoUrl as string | undefined) ?? (n.videoUri as string | undefined);
+                          if (uri) setPlayingVideoUri(uri);
+                        }
+                      }}
+                    >
                       <Text style={[styles.playBtnText, { color: '#c4b5fd' }]}>▶</Text>
                     </TouchableOpacity>
                   </View>
@@ -966,4 +1084,16 @@ const styles = StyleSheet.create({
   playBtn:            { borderRadius: 10, padding: 8 },
   playBtnText:        { fontSize: 14 },
   emptyText:          { fontSize: 13, textAlign: 'center', fontStyle: 'italic' },
+
+  // Video preview tap-target (inside saved confirmation card)
+  videoThumbBtn:      { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(124,58,237,0.25)', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(168,85,247,0.4)' },
+  videoThumbPlay:     { fontSize: 22, color: '#a855f7' },
+  videoThumbLabel:    { color: '#c4b5fd', fontSize: 13, fontWeight: '700' },
+
+  // Video player modal
+  videoModalOverlay:  { flex: 1, backgroundColor: 'rgba(0,0,0,0.88)', alignItems: 'center', justifyContent: 'center' },
+  videoModalCard:     { width: '92%', borderRadius: 20, overflow: 'hidden', backgroundColor: '#0d0914', borderWidth: 1, borderColor: '#3d1a5e' },
+  videoPlayer:        { width: '100%', height: 320 },
+  videoCloseBtn:      { alignItems: 'center', paddingVertical: 14 },
+  videoCloseBtnText:  { color: '#7c5a9e', fontSize: 14, fontWeight: '700' },
 });

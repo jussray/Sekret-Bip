@@ -14,6 +14,7 @@ import {
 } from '../utils/api';
 import { MiniReactionSticker, type MiniStickerCharacter } from '../components/MiniReactionSticker';
 import type { OracleProfile, OracleSide } from '../services/oracleDiscovery';
+import type { VoiceNote } from '../src/types/index';
 import {
   Text,
   TouchableOpacity,
@@ -96,6 +97,7 @@ interface CloudThoughtsScreenProps {
   character?: MiniStickerCharacter;
   privateProfile?: OracleProfile;
   profileSide?: OracleSide;
+  onSave?:       (note: VoiceNote) => void;
 }
 
 export function CloudThoughtsScreen({
@@ -108,6 +110,7 @@ export function CloudThoughtsScreen({
   character,
   privateProfile,
   profileSide = 'teen',
+  onSave,
 }: CloudThoughtsScreenProps) {
   const characterId = normalizeSekretCharacter(selectedSekret);
   const characterName = getVisibleSekretName(characterId);
@@ -168,6 +171,21 @@ export function CloudThoughtsScreen({
     setReply('');
     setRequestError(null);
     setIsThinking(true);
+
+    // Persist as a cloud-type voice note before the async API call
+    if (onSave) {
+      const now = new Date();
+      const note = {
+        id:        Date.now(),
+        title:     text.slice(0, 60),
+        date:      now.toLocaleDateString(),
+        time:      now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        duration:  '0:00',
+        type:      'cloud' as const,
+        cloudText: text,
+      } as VoiceNote;
+      onSave(note);
+    }
 
     try {
       const nextReply = await fetchSekretReply(

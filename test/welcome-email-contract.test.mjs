@@ -69,7 +69,12 @@ test('welcome delivery uses a cancellable 4-second platform timeout', () => {
 test('the standard timeout signal aborts without evaluating text', async () => {
   assert.equal(typeof AbortSignal.timeout, 'function');
   const signal = AbortSignal.timeout(10);
-  await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }));
+  const keepAlive = setTimeout(() => {}, 1000);
+  try {
+    await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }));
+  } finally {
+    clearTimeout(keepAlive);
+  }
   assert.equal(signal.aborted, true);
 });
 

@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  type TextInputInstance,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -25,7 +24,7 @@ const STEP_IDX  = 1; // 0-based; this is step 2 of 4 (post-signup)
 export default function NameScreen() {
   const { advance } = useOnboarding();
   const [name, setName] = useState('');
-  const inputRef = useRef<TextInputInstance>(null);
+  const inputRef = useRef<TextInput>(null);
   const ready = name.trim().length > 0;
 
   async function handleNext() {
