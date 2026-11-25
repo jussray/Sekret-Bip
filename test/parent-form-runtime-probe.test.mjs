@@ -13,8 +13,8 @@ test('parent-form rollout probe is rollback-contained and validates real databas
   assert.match(sql, /parent_registration/);
   assert.match(sql, /parent_private_forms/);
   assert.match(sql, /count\(\*\)\s*=\s*2/i);
-  assert.match(sql, /has_table_privilege\('anon'/);
-  assert.match(sql, /has_table_privilege\('authenticated'/);
+  assert.match(sql, /foreach actor in array array\['anon', 'authenticated'\]/);
+  assert.match(sql, /has_table_privilege\(actor,/);
   assert.match(sql, /'SELECT'/i);
   for (const privilege of ['INSERT','UPDATE','DELETE','TRUNCATE']) {
     assert.match(sql, new RegExp("'"+privilege+"'"));
