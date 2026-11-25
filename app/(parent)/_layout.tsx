@@ -40,7 +40,7 @@ function ParentTabs() {
         <Tabs.Screen name="circle/feed" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="bip-jr" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="teen-verification" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
-        <Tabs.Screen name="calm" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="calm" options={{ href: null }} />
         <Tabs.Screen name="voicebip" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="settings" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="profile" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
