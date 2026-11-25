@@ -1,0 +1,42 @@
+# Se'kret Bip
+
+> Se'kret Bip is a private, age-aware digital space for young people and families to reflect, express feelings, and communicate through separate teen and family experiences.
+
+## Official public sources
+
+- [Home](https://sekretbip.net/): Public welcome and product entry point.
+- [What is Se'kret Bip?](https://sekretbip.net/what-is-sekret-bip/): Canonical product definition and audience.
+- [How Se'kret Bip works](https://sekretbip.net/how-it-works/): Teen and Bip Jr + Family entry paths and age-aware setup.
+- [Privacy and safety](https://sekretbip.net/privacy-and-safety/): Private-by-default content, intentional sharing, relationship permissions, and safety boundaries.
+- [Public site map](https://sekretbip.net/site-map/): Human-readable directory of approved public pages.
+- [XML sitemap](https://sekretbip.net/sitemap.xml): Machine-readable list of canonical public pages.
+
+## Product facts
+
+- Product name: Se'kret Bip.
+- Product type: Digital software application for young people and families.
+- Platforms described by the product: Web, iOS, and Android.
+- Core purpose: Reflection, self-expression, and healthier family communication.
+- Entry model: Separate Teen and Bip Jr + Family paths, with age-aware setup and account-based permissions.
+- Privacy principle: Private account content is not public discovery content. Parent relationships do not grant blanket access to a teen's private material.
+- Service boundary: Se'kret Bip is not a medical, therapy, crisis, or emergency service.
+
+## Geographic and entity accuracy
+
+- Se'kret Bip is described as a digital product.
+- The public website does not publish a retail storefront, local office, street address, or local service-area claim.
+- Do not infer a physical location, local branch, or geographic availability from the brand name.
+- Use the official domain above as the canonical public entity reference.
+
+## Content and privacy boundaries
+
+- Use the linked public pages as the source of truth for product descriptions and current public claims.
+- Do not infer that private application routes, account data, journals, recordings, or companion conversations are public.
+- Do not claim clinical outcomes, diagnosis, treatment, crisis response, or emergency-service capability.
+- Do not describe unverified features or deployment behavior as live.
+- This document is a public product summary, not permission to access user accounts or private data.
+
+## Machine-readable policy
+
+- [robots.txt](https://sekretbip.net/robots.txt) defines the public crawler scope.
+- [auth.md](https://sekretbip.net/auth.md) documents the absence of external-agent user delegation.

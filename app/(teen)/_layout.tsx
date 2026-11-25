@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { GlobalMoodButton } from '@/components/GlobalMoodButton';
 import { SideSafeBackButton } from '@/components/SideSafeBackButton';
+import { CrisisSupportButton } from '../../components/CrisisSupport';
 import { SafetyExperienceSheet } from '../../components/safety/SafetyExperienceSheet';
 import { useAppContext } from '@/context/AppContext';
 import { useSafetyCheck } from '@/hooks/useSafetyCheck';
@@ -77,9 +78,17 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
         <Tabs.Screen name="circle/weather" options={{ href: null }} />
         <Tabs.Screen name="resources" options={{ href: null }} />
         <Tabs.Screen name="quiet" options={{ href: null }} />
+        <Tabs.Screen name="meaning" options={{ href: null }} />
       </Tabs>
       {!quietActive && <SideSafeBackButton side="teen" />}
       {!quietActive && <GlobalMoodButton />}
+      {/* Trust-03/#414: persistent, always-accessible crisis support across every
+          teen-facing surface — including Quiet Bip, where other floating controls
+          are intentionally hidden but safety access must not be. */}
+      {/* Keep the always-accessible help control above the Pages composer/send area. */}
+      <View style={{ position: 'absolute', bottom: 174, right: 14, zIndex: 1000, elevation: 20 }}>
+        <CrisisSupportButton />
+      </View>
     </View>
   );
 }
@@ -101,6 +110,10 @@ export default function TeenLayout() {
   const quietRouteAllowed = isQuietRouteAllowed({ pathname, companion });
 
   useEffect(() => {
+    if (devSideOverride != null) {
+      setProfileChecked(true);
+      return;
+    }
     let active = true;
     hydrateAccountProfile('teen')
       .then(profile => {
@@ -119,7 +132,7 @@ export default function TeenLayout() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [devSideOverride]);
 
   const effectiveUserSide = devSideOverride ?? userSide;
   const isTeenActive = founderPreview || (
@@ -139,13 +152,13 @@ export default function TeenLayout() {
   // Split View and exact-head browser proof can land on the teen copy of a
   // duplicate web URL first. Honor the explicit side before Founder Preview
   // renders so /(teen) and /(parent) remain deterministic in development.
-  if (founderPreview && devSideOverride === 'parent') {
+  if (devSideOverride === 'parent') {
     return <Redirect href={`/(parent)${pathname}` as never} />;
   }
 
-  // Founder Preview bypasses only route/onboarding visibility in development.
-  // Quiet Bip remains a product boundary, so preview still honors Sleep Guard.
-  if (founderPreview) {
+  // Founder Preview or an explicit teen-side Split View override bypasses
+  // route/onboarding visibility. Quiet Bip remains a product boundary.
+  if (founderPreview || devSideOverride === 'teen') {
     if (!sleepLoaded) return <TeenLoadingSurface />;
     if (sleepActive && !quietRouteAllowed) return <Redirect href="/(teen)/quiet" />;
     return <TeenTabs selectedSekret={selectedSekret ?? 'raylene'} quietActive={sleepActive} />;

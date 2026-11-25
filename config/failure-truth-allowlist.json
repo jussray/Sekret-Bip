@@ -1,4 +1,23 @@
 {
   "schemaVersion": 1,
-  "entries": []
+  "entries": [
+    {
+      "path": "app/(auth)/consent.tsx",
+      "contains": "non-fatal — local consent already saved",
+      "classification": "graceful-degradation",
+      "reason": "Best-effort Supabase remote consent log, reached only after local consent already saved successfully. Local save failure returns early; no success UI is shown inside this catch."
+    },
+    {
+      "path": "screens/MeaningScreen.tsx",
+      "contains": "tolerate AsyncStorage read failures",
+      "classification": "graceful-degradation",
+      "reason": "AsyncStorage read on initial engagement state hydration. Failure leaves all sparks in default un-engaged state — honest fallback, no false progress shown."
+    },
+    {
+      "path": "screens/MeaningScreen.tsx",
+      "contains": "/* tolerate */",
+      "classification": "fire-and-forget-write",
+      "reason": "AsyncStorage draft/engagement persistence writes. UI state already updated before the write attempt; write failure means persistence is lost on restart but no false success is shown."
+    }
+  ]
 }
