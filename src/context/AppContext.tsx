@@ -118,7 +118,7 @@ interface AppContextValue {
 
   saveParentPageEntry: (entry: SavePageInput) => void;
   saveParentCirclePost: () => void;
-  reactToParentPost: (postId: number, reaction: string) => void;
+  reactToParentPost: (postId: number | string, reaction: string) => void;
   completeParentOracleSession: (profile: OracleProfile, session: OracleSessionSummary) => void;
 
   teenGender: 'girl' | 'boy' | 'other' | null;
@@ -304,7 +304,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void withSyncWrap(async () => syncParentCirclePost(post));
   }
 
-  function reactToParentPost(postId: number, reaction: string) {
+  function reactToParentPost(postId: number | string, reaction: string) {
     state.setParentCirclePosts(current => {
       const next = current.map(post => post.id === postId
         ? {

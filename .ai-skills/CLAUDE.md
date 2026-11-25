@@ -111,7 +111,7 @@ Read `.ai-skills/control-input-boundary.json` when this file is used in-repo. Sl
 6. If research doesn't help: ask the user. A 30-second human answer beats 2 hours of guessing.
 
 ### Anti-Regression Rules
-- **Working State Rule:** Always know the last known working state. Commit after every successful test.
+- **Working State Rule:** Always know the last known working state. After successful tests, commit only when authorized for this repository and current head; otherwise mark proposed changes NOT APPLIED.
 - **One Change Rule:** Make one change at a time. Test after each.
 - **Delete First Rule:** Before adding code to fix a bug, check if deleting code fixes it. Simpler > complex.
 
@@ -251,7 +251,7 @@ Use `/lindy /confess` together — proven solutions + honest uncertainty. No sta
 - **Long context window:** Paste entire files. Don't summarize before asking. Claude can read a full repo.
 - **Artifacts feature:** Use for interactive React/HTML/CSS components. Preview code before committing.
 - **XML-structured prompts:** Use `<task>`, `<constraints>`, `<format>` tags for complex multi-part requests.
-- **Claude Projects:** Store project context, repo structure, conventions. They persist across conversations.
+- **Claude Projects:** Persist context only where available; otherwise use active-chat or supported CLI references without claiming cross-session persistence.
 - **Claude Code (CLI):** Can read/write files directly, run terminal commands, execute tests. Use this for actual development work.
 
 ### When to Use Claude vs Other Tools
@@ -266,12 +266,12 @@ Use `/lindy /confess` together — proven solutions + honest uncertainty. No sta
 
 ### Cross-Tool Relay Pattern
 ```
-1. Perplexity: Research the API/library → Save findings to file in repo
-2. Claude: Generate code based on findings → Commit to GitHub
-3. ChatGPT: Test code in Code Interpreter → Fix issues, commit fixes
-4. Perplexity: Verify final output works in browser
-5. Any: Ship from wherever working code is most current
-6. Sync: git pull before starting, git commit before switching tools
+1. Perplexity (if enabled): Research the API/library; save findings to a repository only with scoped write access and approval. Otherwise return sourced findings as NOT SAVED.
+2. Claude (if enabled): Prepare a patch; commit only with authorized repository access, verified branch/head and scoped approval. Otherwise return a proposed patch, NOT APPLIED.
+3. ChatGPT (if enabled): Test using available permitted tools; changes require scoped repository write authority. Otherwise mark tests NOT RUN and patches NOT APPLIED.
+4. Verify: Use available authorized, independent tests/browser checks tied to the exact subject; if unavailable, label proof NOT RUN and retain the gate.
+5. Any: Ship — only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
+6. Sync: use GitHub only with authorized repo access/writes; recheck branch and exact head before commit or pull
 ```
 
 Every relay preserves repository, branch/PR, exact head SHA, evidence labels, rollback, and next authority gate. A tool switch does not reset the governed repair state or authorize stale evidence.
@@ -284,7 +284,7 @@ Before committing any change:
 - What changed? Could it break imports elsewhere?
 - Run existing tests. All passing?
 - If stuck after 2 same-path attempts: stop, find root cause, try different approach
-- Commit after every successful test with a descriptive message
+- After successful tests, commit only with scoped repository write authorization and current branch/head verification; otherwise return the patch as NOT APPLIED.
 
 ---
 

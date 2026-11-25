@@ -91,7 +91,7 @@ test('mission timeout terminates the process tree before the active slot is rele
   assert.match(localServer, /terminateProcessTree\(child, 'SIGKILL'\)/);
   assert.match(localServer, /const finishWhenTreeStops = \(\) => \{/);
   assert.match(localServer, /if \(!processTreeAlive\(processGroupId\)\) \{/);
-  assert.match(localServer, /treePollTimer = setTimeout\(finishWhenTreeStops, 40\)/);
+  assert.match(localServer, /if \(treePollTimer === null\) \{\s*treePollTimer = setTimeout\(\(\) => \{\s*treePollTimer = null;\s*finishWhenTreeStops\(\);\s*\}, 40\);/);
   assert.match(localServer, /if \(settled \|\| !processTreeAlive\(processGroupId\)\) return/);
 
   const timeoutStart = localServer.indexOf('timeoutTimer = setTimeout');
