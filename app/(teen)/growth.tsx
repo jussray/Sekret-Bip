@@ -4,6 +4,7 @@ import { useAppContext } from '@/context/AppContext';
 import { THEME_PACKS } from '@constants/theme';
 import { GrowthScreen } from '@screens/GrowthScreen';
 import { routeForSide } from '@/shared/routes';
+import { syncGrowthMilestone } from '@/utils/sync';
 import { useStreak } from '@/hooks/useStreak';
 import { emitEvent } from '@/features/activity/events';
 
@@ -16,9 +17,9 @@ export default function GrowthRoute() {
       t={t}
       mood={mood}
       selectedSekret={selectedSekret}
-      setScreen={(screen: string) => router.push(routeForSide('teen', screen) as any)}
-      onMilestone={() => emitEvent('goal_completed')}
       streakDays={streakDays}
+      setScreen={(screen: string) => router.push(routeForSide('teen', screen) as any)}
+      onMilestone={(key: string) => { emitEvent('goal_completed'); void syncGrowthMilestone(key); }}
       BottomNav={null}
     />
   );

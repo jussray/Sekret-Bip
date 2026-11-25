@@ -18,6 +18,18 @@
       "contains": "/* tolerate */",
       "classification": "fire-and-forget-write",
       "reason": "AsyncStorage draft/engagement persistence writes. UI state already updated before the write attempt; write failure means persistence is lost on restart but no false success is shown."
+    },
+    {
+      "path": "app/(teen)/pages/index.tsx",
+      "contains": "local URI remains as fallback — not a user-facing error",
+      "classification": "graceful-degradation",
+      "reason": "Background photo upload after the journal entry is already saved locally. On failure the entry keeps its local image URI; no upload-success UI is shown, and nothing is set inside this catch."
+    },
+    {
+      "path": "screens/VoiceBipScreen.tsx",
+      "contains": "local URI stays as fallback — not user-facing",
+      "classification": "graceful-degradation",
+      "reason": "Background Video Bip upload after the note is already saved locally. On failure the note keeps its local video URI and the 'uploading…' label clears in finally; no success state is set inside this catch."
     }
   ]
 }
