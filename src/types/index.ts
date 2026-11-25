@@ -31,7 +31,9 @@ export interface JournalEntry {
 }
 
 export interface CirclePost {
-  id: number;
+  // number for locally-created optimistic posts (Date.now()), string for
+  // posts loaded from Circle V2's uuid-keyed `posts` table.
+  id: number | string;
   text: string;
   date: string;
   time: string;
@@ -114,7 +116,9 @@ export type ScreenKey =
   | 'discover';
 
 export interface ParentCirclePost {
-  id: number;
+  // number for locally-created optimistic posts (Date.now()), string for
+  // posts loaded from Circle V2's uuid-keyed `posts` table.
+  id: number | string;
   text: string;
   date: string;
   time: string;
