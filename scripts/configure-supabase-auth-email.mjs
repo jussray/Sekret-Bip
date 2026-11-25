@@ -94,6 +94,7 @@ function desiredConfig({ smtpPass }) {
     external_email_enabled: true,
     mailer_secure_email_change_enabled: true,
     mailer_autoconfirm: false,
+    mailer_allow_unverified_email_sign_ins: false,
     smtp_admin_email: env('AUTH_SMTP_ADMIN_EMAIL', 'invite@sekretbip.net'),
     smtp_host: env('AUTH_SMTP_HOST', 'smtp.resend.com'),
     smtp_port: Number(env('AUTH_SMTP_PORT', '465')),
@@ -108,6 +109,7 @@ function comparable(config = {}) {
     external_email_enabled: config.external_email_enabled,
     mailer_secure_email_change_enabled: config.mailer_secure_email_change_enabled,
     mailer_autoconfirm: config.mailer_autoconfirm,
+    mailer_allow_unverified_email_sign_ins: config.mailer_allow_unverified_email_sign_ins,
     smtp_admin_email: config.smtp_admin_email,
     smtp_host: config.smtp_host,
     smtp_port: Number(config.smtp_port),
@@ -138,9 +140,59 @@ async function writeReceipt(receipt) {
 
 async function main() {
   const apply = process.argv.includes('--apply');
+  const verifyOnly = process.argv.includes('--verify-only');
+  if (apply && verifyOnly) throw new Error('AUTH_EMAIL_MODE_CONFLICT');
   const target = await resolveSupabaseTarget();
   const projectRef = target.projectRef;
   const desiredPublic = desiredConfig({ smtpPass: '[redacted]' });
+
+  if (verifyOnly) {
+    // Management credentials must never be handled by untrusted PR workflows.
+    if (env('GITHUB_EVENT_NAME') === 'pull_request' || env('GITHUB_EVENT_NAME') === 'pull_request_target') {
+      throw new Error('AUTH_EMAIL_VERIFY_UNTRUSTED_EVENT');
+    }
+    if (env('GITHUB_REF_NAME') && env('GITHUB_REF_NAME') !== 'main') {
+      throw new Error('AUTH_EMAIL_VERIFY_NON_MAIN');
+    }
+    // Read-only provider gate. Run only in a trusted environment with a
+    // tightly scoped Supabase Management API credential, never in untrusted
+    // pull-request head code. Do not return raw provider config or secrets.
+    const accessToken = required('SUPABASE_ACCESS_TOKEN');
+    const supabaseIdentity = await verifySupabaseManagementIdentity({ target, accessToken });
+    const live = await request(projectRef, accessToken);
+    const mandatory = {
+      external_email_enabled: true,
+      mailer_autoconfirm: false,
+      mailer_allow_unverified_email_sign_ins: false,
+    };
+    const mismatched = Object.entries(mandatory)
+      .filter(([key, expected]) => live?.[key] !== expected)
+      .map(([key]) => key);
+    const verified = mismatched.length === 0;
+    await writeReceipt({
+      schema: 'juss/bip-email-provider-readback@v1',
+      mode: 'verify-only',
+      projectRef,
+      supabaseIdentity,
+      browserCookie: false,
+      authority: false,
+      mutationPerformed: false,
+      observedAt: new Date().toISOString(),
+      requiredSettings: mandatory,
+      mismatchedSettingNames: mismatched,
+      providerSettingsVerified: verified,
+      authorizesMerge: false,
+      authorizesDeploy: false,
+      invalidatesOn: ['projectRef', 'supabaseIdentity', 'providerAuthSettings', 'observationAge'],
+    });
+    if (!verified) {
+      console.error('AUTH_EMAIL_PROVIDER_CONFIRMATION_NOT_ENFORCED');
+      process.exitCode = 1;
+      return;
+    }
+    console.log('AUTH_EMAIL_PROVIDER_CONFIRMED');
+    return;
+  }
 
   if (!apply) {
     const receipt = {
@@ -201,10 +253,10 @@ main().catch(async (err) => {
   console.error(bounded);
   try {
     await writeReceipt({
-      mode: process.argv.includes('--apply') ? 'apply' : 'plan',
+      mode: process.argv.includes('--apply') ? 'apply' : (process.argv.includes('--verify-only') ? 'verify-only' : 'plan'),
       ok: false,
       errorCode: bounded,
-      mutationPhase: process.argv.includes('--apply') ? 'apply' : 'plan',
+      mutationPhase: process.argv.includes('--apply') ? 'apply' : (process.argv.includes('--verify-only') ? 'verify-only' : 'plan'),
     });
   } catch {}
   process.exit(1);

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+const authGuard = fs.readFileSync(new URL('../services/piper-tts/auth_guard.py', import.meta.url), 'utf8');
+import { spawnSync } from 'node:child_process';
 
 const worker = fs.readFileSync(new URL('../worker/index.ts', import.meta.url), 'utf8');
 const client = fs.readFileSync(new URL('../worker/piper-tts.ts', import.meta.url), 'utf8');
@@ -21,9 +23,10 @@ test('Piper client supports protected WAV synthesis with a bounded request', () 
 });
 
 test('Piper service fails closed without auth unless local bypass is explicit', () => {
-  for (const token of ['PIPER_API_TOKEN', 'PIPER_ALLOW_INSECURE_LOCAL', 'authentication is not configured', 'Bearer']) {
+  for (const token of ['PIPER_API_TOKEN', 'PIPER_ALLOW_INSECURE_LOCAL', 'authentication is not configured']) {
     assert.equal(service.includes(token), true);
   }
+  assert.match(authGuard, /Bearer/);
 });
 
 test('canonical Piper defaults match the voice models baked into the image', () => {
@@ -78,4 +81,36 @@ test('Render Piper canary remains bounded, authenticated, and manual-deploy only
   }
 
   assert.equal(/PIPER_API_TOKEN\s*\n\s*value:/.test(renderBlueprint), false, 'Piper token must not be committed');
+});
+
+test('Piper authentication guard is executable and rejects remote local-mode bypass', () => {
+  const result = spawnSync('python3', [
+    '-m', 'unittest', 'discover', '-s', 'services/piper-tts', '-p', 'test_auth_guard.py',
+  ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(service, /request\.client\.host if request\.client else None/);
+  assert.match(service, /x-forwarded-for/);
+  assert.match(dockerfile, /COPY auth_guard\.py \.\/auth_guard\.py/);
+});
+
+
+test('Piper speech text is passed as stdin, never evaluated as a shell command', () => {
+  assert.match(service, /if not VOICE_STEM\.fullmatch\(voice\)/);
+  assert.match(service, /model = resolve_model\(payload\.voice\)/);
+  assert.match(service, /\["piper", "--model", str\(model\), "--output_file", output\]/);
+  assert.match(service, /input=payload\.text/);
+  assert.match(service, /shell=False/);
+  assert.doesNotMatch(service, /shell=True/);
+});
+
+test('Piper removes private WAV files on subprocess failure, not only timeout or nonzero exit', () => {
+  const result = spawnSync('python3', [
+    '-m', 'unittest', 'discover', '-s', 'services/piper-tts', '-p', 'test_piper_runtime.py',
+  ], { cwd: process.cwd(), encoding: 'utf8', timeout: 15_000 });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+  assert.match(service, /with_private_wav/);
+  assert.match(service, /except OSError as exc:/);
+  assert.match(dockerfile, /COPY piper_runtime\.py \.\/piper_runtime\.py/);
 });

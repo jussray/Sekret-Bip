@@ -14,7 +14,12 @@ import {
   type SekretHistoryTurn,
 } from '@/utils/api';
 import { buildSekretPresence } from '../../../services/sekretPresence';
-import { recoverSafetyResourcesFromUpstreamFallback } from '../../../services/sekretSafety';
+import {
+  getLocalSafetyFallback,
+  recoverSafetyResourcesFromUpstreamFallback,
+  shouldBypassReplyGuard,
+} from '../../../services/sekretSafety';
+import { getSekretFallback, guardSekretReply } from '../../../services/sekretVoice';
 import { buildReplyRequest } from '@/services/ai/buildReplyRequest';
 import { emitEvent } from '@/features/activity/events';
 import { COMPANION_CURRICULUM } from '@/config/companionCurriculum';
@@ -142,7 +147,7 @@ export function toCompanionId(value: string): CompanionId {
 // ── Safety detection ───────────────────────────────────────────────────────────
 
 const CRISIS_PATTERN =
-  /\b(suicidal|self[- ]?harm|not safe|abuse|danger)\b/i;
+  /\b(kill myself|killing myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm(?:ing|ed|s)?|hurt myself|hurting myself|cut myself|cutting myself|disappear forever|run away|abuse(?:s|d)?|abusing|assault(?:s|ed|ing)?|unsafe|not safe|danger|emergency)\b/i;
 
 export function isSafetyTrigger(text: string): boolean {
   return CRISIS_PATTERN.test(text);
@@ -197,14 +202,26 @@ export async function sendCompanionMessage(
     result.replySource,
   );
 
+  // Same voice guard as sekretReply.ts and chat.ts: safety replies (flagged or
+  // carrying crisis resources) are never replaced; anything else that trips
+  // BLOCKED_REPLY_LANGUAGE becomes the character fallback, labeled as fallback.
+  const guardBypass = shouldBypassReplyGuard(
+    safetyRecovery.reply,
+    result.safetyFlag || safetyRecovery.substituted,
+  );
+  const fallback = getLocalSafetyFallback(input.text) ?? getSekretFallback(companionId, input.text);
+  const { reply: guardedReply, blocked: guardBlocked } = guardBypass.bypass
+    ? { reply: safetyRecovery.reply, blocked: false }
+    : guardSekretReply(safetyRecovery.reply, fallback);
+
   return {
-    reply:                safetyRecovery.reply,
+    reply:                guardedReply,
     safetyFlag:           result.safetyFlag,
     avatarState:          result.avatarState,
     tone:                 result.tone,
     parentShareSummary:   result.parentShareSummary,
     suggestedComfortTool: result.suggestedComfortTool,
-    replySource:          (result.replySource ?? 'openai') as CompanionReplySource,
+    replySource:          guardBlocked ? 'fallback' : (result.replySource ?? 'openai') as CompanionReplySource,
     questionBudget:       typeof result.questionBudget === 'number' ? result.questionBudget : undefined,
   };
 }

@@ -417,10 +417,10 @@ test('baseline separates repository truth, live catalog observation, and behavio
   assert.equal(candidateReview.schemaVersion, 1);
   assert.equal(candidateReview.status, 'candidate_not_live');
   assert.equal(candidateReview.sourceMigration, '20260919190000_auth_signup_onboarding_baseline.sql');
-  assert.equal(candidateReview.functions.length, 1);
-  assert.equal(candidateReview.attachments.length, 2);
-  assert.equal(repositoryFunctions.size, 14);
-  assert.equal(repositoryAttachments.size, 16);
+  assert.equal(candidateReview.functions.length, 2);
+  assert.equal(candidateReview.attachments.length, 3);
+  assert.equal(repositoryFunctions.size, 15);
+  assert.equal(repositoryAttachments.size, 17);
   assert.equal(candidateReview.functions[0].deployedLive, false);
   assert.equal(candidateReview.functions[0].clientExecuteRevokedLive, false);
 });

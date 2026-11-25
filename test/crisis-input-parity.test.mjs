@@ -35,6 +35,11 @@ const localInputRe = localInputSource.slice(
   localInputSource.indexOf('const CRISIS_INPUT_RE'),
   localInputSource.indexOf(';', localInputSource.indexOf('const CRISIS_INPUT_RE')),
 );
+const companionSource = read('src/features/sekret/companionEngine.ts');
+const companionRe = companionSource.slice(
+  companionSource.indexOf('const CRISIS_PATTERN'),
+  companionSource.indexOf(';', companionSource.indexOf('const CRISIS_PATTERN')),
+);
 
 test('server crisis regex carries the full term list this parity test guards', () => {
   for (const term of TERMS) {
@@ -51,5 +56,11 @@ test('client pre-flight immediate tier recognises every server crisis term', () 
 test('client local safety fallback recognises every server crisis term', () => {
   for (const term of TERMS) {
     assert.ok(localInputRe.includes(term), `local CRISIS_INPUT_RE is missing: ${term}`);
+  }
+});
+
+test('companion engine safety trigger recognises every server crisis term', () => {
+  for (const term of TERMS) {
+    assert.ok(companionRe.includes(term), `companion engine CRISIS_PATTERN is missing: ${term}`);
   }
 });
