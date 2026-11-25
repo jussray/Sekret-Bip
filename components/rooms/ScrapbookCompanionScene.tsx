@@ -153,6 +153,6 @@ const styles = StyleSheet.create({
   ctaText: { color: '#fff7f1', fontSize: 19, fontWeight: '800' },
   ctaArrow: { fontSize: 26, fontWeight: '700' },
   pressed: { opacity: 0.75 },
-  launcher: { position: 'absolute', bottom: 112, right: 12, minHeight: 44, minWidth: 140, zIndex: 40, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(222,191,146,0.65)', backgroundColor: 'rgba(31,13,52,0.87)', alignItems: 'center', justifyContent: 'center' },
+  launcher: { position: 'absolute', bottom: 160, right: 12, minHeight: 44, minWidth: 140, zIndex: 40, paddingHorizontal: 12, borderRadius: 6, borderWidth: 1, borderColor: 'rgba(222,191,146,0.65)', backgroundColor: 'rgba(31,13,52,0.87)', alignItems: 'center', justifyContent: 'center' },
   launcherText: { color: '#f3e5fa', fontSize: 12, fontWeight: '700' },
 });
