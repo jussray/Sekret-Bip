@@ -62,9 +62,12 @@ interface AppContextValue {
 
   voiceNotes: VoiceNote[];
   setVoiceNotes: React.Dispatch<React.SetStateAction<VoiceNote[]>>;
+
+  // Teen circle
   circlePosts: CirclePost[];
   setCirclePosts: React.Dispatch<React.SetStateAction<CirclePost[]>>;
   comfortSessions: ComfortSession[];
+  setComfortSessions: React.Dispatch<React.SetStateAction<ComfortSession[]>>;
   periodDays: string[];
   roomMemory: RoomMemory;
   updateRoomMemory: (patch: Partial<RoomMemory>) => void;
@@ -115,7 +118,7 @@ interface AppContextValue {
 
   saveParentPageEntry: (entry: SavePageInput) => void;
   saveParentCirclePost: () => void;
-  reactToParentPost: (postId: number, reaction: string) => void;
+  reactToParentPost: (postId: number | string, reaction: string) => void;
   completeParentOracleSession: (profile: OracleProfile, session: OracleSessionSummary) => void;
 
   teenGender: 'girl' | 'boy' | 'other' | null;
@@ -301,7 +304,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     void withSyncWrap(async () => syncParentCirclePost(post));
   }
 
-  function reactToParentPost(postId: number, reaction: string) {
+  function reactToParentPost(postId: number | string, reaction: string) {
     state.setParentCirclePosts(current => {
       const next = current.map(post => post.id === postId
         ? {
@@ -375,6 +378,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     circlePosts: state.circlePosts,
     setCirclePosts: state.setCirclePosts,
     comfortSessions: state.comfortSessions,
+    setComfortSessions: state.setComfortSessions,
     periodDays: state.periodDays,
     roomMemory: state.roomMemory,
     updateRoomMemory,

@@ -25,7 +25,7 @@ const workflow = readFileSync(workflowPath, 'utf8');
 
 test('scrapbook check-in is registered as a hidden teen route and launched from Room', () => {
   assert.match(routes, /scrapbookCheckIn:\s*'\/\(teen\)\/scrapbook-check-in'/);
-  assert.match(layout, /<Tabs\.Screen name="scrapbook-check-in" options=\{\{ href: null \}\} \/>/);
+  assert.match(layout, /<Tabs\.Screen name="scrapbook-check-in" options=\{\{ tabBarButton: \(\) => null, tabBarItemStyle: \{ display: 'none' \} \}\} \/>/);
   assert.match(room, /ScrapbookCheckInLauncher/);
   assert.match(room, /TEEN_ROUTES\.scrapbookCheckIn/);
 });
