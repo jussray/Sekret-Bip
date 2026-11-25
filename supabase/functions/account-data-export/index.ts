@@ -18,14 +18,23 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getSupabasePublishableKey } from '../_shared/supabase-api-keys.ts';
 
+// Browser clients send a bearer JWT; CORS is transport only, never authorization.
+const responseHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-retry-count, traceparent, tracestate, baggage',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Cache-Control': 'no-store',
+};
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'content-type': 'application/json' },
+    headers: { ...responseHeaders, 'content-type': 'application/json' },
   });
 }
 
 Deno.serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: responseHeaders });
   if (req.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
 
   const authorization = req.headers.get('authorization');
@@ -47,10 +56,10 @@ Deno.serve(async (req: Request) => {
   const [profile, verification, moods, journals, room, memories] = await Promise.all([
     db.from('app_profiles').select('email,created_at').eq('user_id', userId).maybeSingle(),
     db.from('account_verification').select('verification_state,parent_link_state,verification_updated_at').eq('user_id', userId).maybeSingle(),
-    db.from('mood_history').select('mood,date,time,created_at').eq('user_id', userId).order('created_at', { ascending: true }),
-    db.from('journal_entries').select('text,mood,date,time,sekret_reply,created_at').eq('user_id', userId).order('created_at', { ascending: true }),
+    db.from('mood_history').select('mood,date,time,created_at', { count: 'exact' }).eq('user_id', userId).order('created_at', { ascending: true }),
+    db.from('journal_entries').select('text,mood,date,time,sekret_reply,created_at', { count: 'exact' }).eq('user_id', userId).order('created_at', { ascending: true }),
     db.from('room_memory').select('character,last_visit,last_hotspot,last_summon,visit_count,updated_at').eq('user_id', userId).maybeSingle(),
-    db.from('agent_memories').select('scope,companion_id,kind,summary,created_at,updated_at').eq('user_id', userId).order('created_at', { ascending: true }),
+    db.from('agent_memories').select('scope,companion_id,kind,summary,created_at,updated_at', { count: 'exact' }).eq('user_id', userId).order('created_at', { ascending: true }),
   ]);
 
   const failures = [
@@ -65,6 +74,13 @@ Deno.serve(async (req: Request) => {
   if (failures.length > 0) {
     return json({ error: 'export_partial_failure', failed: failures.map((f) => f.label) }, 500);
   }
+
+  // PostgREST may cap returned rows without an error. Never label a truncated
+  // response a successful export. Paginated/snapshot export is a separate gate.
+  const incomplete = [moods, journals, memories].filter((result) =>
+    !Array.isArray(result.data) || !Number.isSafeInteger(result.count) || result.count !== result.data.length
+  );
+  if (incomplete.length > 0) return json({ error: 'export_incomplete' }, 500);
 
   return json({
     ok: true,

@@ -61,3 +61,19 @@ test('export failures never log untrusted provider error details', () => {
   // Keep user feedback generic and log only fixed, non-sensitive event codes.
   assert.doesNotMatch(service, /console\.(?:info|warn|error|log)\([^;\n]*\berror\.(?:message|stack|cause)/);
 });
+
+test('browser export preflight succeeds before authentication and response bodies are never cached', () => {
+  assert.match(func, /if \(req\.method === 'OPTIONS'\) return new Response\(null, \{ status: 204, headers: responseHeaders \}\);/);
+  assert.ok(func.indexOf("req.method === 'OPTIONS'") < func.indexOf("const authorization"));
+  assert.match(func, /headers: \{ \.\.\.responseHeaders, 'content-type': 'application\/json' \}/);
+  assert.match(func, /'Cache-Control': 'no-store'/);
+});
+
+test('row-capped list queries cannot silently produce a successful incomplete export', () => {
+  for (const table of ['mood_history', 'journal_entries', 'agent_memories']) {
+    assert.match(func, new RegExp("db\\.from\\('" + table + "'\\)\\.select\\('[^']+', \\{ count: 'exact' \\}\\)"));
+  }
+  assert.match(func, /!Number\.isSafeInteger\(result\.count\) \|\| result\.count !== result\.data\.length/);
+  assert.match(func, /if \(incomplete\.length > 0\) return json\(\{ error: 'export_incomplete' \}, 500\);/);
+  assert.ok(func.indexOf('const incomplete') < func.indexOf('return json({\n    ok: true'));
+});
