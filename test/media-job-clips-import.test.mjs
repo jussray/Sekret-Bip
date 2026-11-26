@@ -117,3 +117,14 @@ test('CLI creates sources locally and emits only bounded status, never private p
   assert.deepEqual(JSON.parse(again.stderr), { kind: 'REJECTED', code: 'OUTPUT_ALREADY_EXISTS' });
   assert.ok(!again.stderr.includes(f.dir));
 });
+
+test('storyboard-bound import refuses unrelated jobs and missing materialization hashes', async (t) => {
+  const f = await fixture(t);
+  const mapping = { ...f.mapping, expectedInputFingerprint: f.receipt.inputFingerprint, expectedAdapterId: f.receipt.adapterId };
+  assert.equal((await importMediaJobClips({ projectId: 'sekret-bip', mappings: [mapping] })).shots.length, 1);
+  await assert.rejects(importMediaJobClips({ projectId: 'sekret-bip', mappings: [{ ...mapping, expectedInputFingerprint: 'b'.repeat(64) }] }), { code: 'STORYBOARD_JOB_BINDING_MISMATCH' });
+  await assert.rejects(importMediaJobClips({ projectId: 'sekret-bip', mappings: [{ ...mapping, expectedAdapterId: 'other' }] }), { code: 'STORYBOARD_JOB_BINDING_MISMATCH' });
+  delete f.receipt.result.output.sha256;
+  await f.save();
+  await assert.rejects(importMediaJobClips({ projectId: 'sekret-bip', mappings: [mapping] }), { code: 'STORYBOARD_JOB_BINDING_MISMATCH' });
+});
