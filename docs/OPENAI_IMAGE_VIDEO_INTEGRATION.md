@@ -175,3 +175,27 @@ The imported descriptors retain only SHA-256 fingerprints of the exact job
 receipt and separate human-review record in `approvalEvidence`. The production
 run binds those fields with the descriptor fingerprint; it does not copy raw
 reviewer identity or review text into its state.
+
+## FCR-bound Shorts (strict handoff)
+
+For the vertical template with `sourcePolicy.requireFcrStoryboardBinding: true`,
+use the reviewed private FCR compiled plan, ordered shot mapping with materialized
+MP4s and independent review receipts, and the approved full-length audio file.
+Do not commit these private inputs. The FCR plan must originate from the trusted
+operator workflow, not from a customer or provider. Use native 720×1280 to match
+the FCR plan without presenting a resized file as native HD footage.
+
+```sh
+npm run video:produce -- --manifest /secure/approved-short.json --fcr-plan /secure/plan.json --mapping /secure/mapping.json --audio /secure/approved-audio.wav --run-dir /secure/bip-short-run
+```
+
+Do not pass `--sources` on this path. The runner checks ordered shot durations,
+frame rate, project, plan and audio fingerprints, provider output hashes, and
+separate clip reviews before rendering. The approved audio is copied and verified
+again before encoding. Existing non-FCR operator manifests retain their legacy
+source-descriptor interface; they are not evidence of FCR storyboard binding.
+Neither the plan nor its hashes establish human approval or visual fidelity.
+Run focused checks with `node --test test/storyboard-handoff.test.mjs test/media-job-clips-import.test.mjs test/video-production-run.test.mjs test/video-render-master.test.mjs`.
+To roll back, revert this handoff change set together (validator, runner,
+importer, renderer, tests and template). Never rewrite an existing bound run;
+use a new run directory after changing inputs or implementation.
