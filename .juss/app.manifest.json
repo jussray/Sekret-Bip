@@ -3,7 +3,7 @@
   "registryVersion": "2.0.0",
   "id": "sekret-bip",
   "name": "Se’kret Bip",
-  "repository": "Sekret-Bip",
+  "repository": "jussray/Sekret-Bip",
   "defaultBranch": "main",
   "sourceHeadAtAudit": "36a7bdccec848f0ef61be6ba5daac6ce9e40919c",
   "identityStatus": "source-verified",
