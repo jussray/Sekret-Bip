@@ -95,7 +95,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
       expectedSha: process.env.EXPECTED_HEAD_SHA,
       expectedBaseUrl: process.env.LIVE_ONBOARDING_BASE_URL,
     });
-    console.log(JSON.stringify({ status: 'receipt-validated', ...outcome }));
+    console.log('FAMILY_PROOF_RECEIPT_VALIDATED');
   } catch (error) {
     // Never echo receipt content, credentials, or identity data to CI logs.
     if (error?.code === 'ENOENT') console.error('FAMILY_PROOF_RECEIPT_MISSING');
