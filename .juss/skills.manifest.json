@@ -5,7 +5,7 @@
   "registry": {
     "repository": "jussray/promptos",
     "manifestPath": "manifests/apps/sekret-bip.json",
-    "revision": "e8e16ba6c197dfbf5a36131d83a990effff20955",
+    "revision": "eaf8b831de197d97e40c52da885cee932b635f9e",
     "sourceRef": "feat/app-skill-registry-v2-20261125",
     "status": "candidate"
   },
@@ -220,6 +220,10 @@
   "plugins": [
     {
       "id": "github",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_connector_1p_1a69035c238881919c4190932b2df699",
+      "displayName": "GitHub",
+      "catalogStatus": "listed",
       "provider": "GitHub",
       "purpose": "Repository, review, and CI evidence.",
       "mode": "operator-tooling",
@@ -240,6 +244,10 @@
     },
     {
       "id": "cloudflare",
+      "kind": "connector",
+      "canonicalPluginId": null,
+      "displayName": "Cloudflare",
+      "catalogStatus": "namespace-only",
       "provider": "Cloudflare",
       "purpose": "Worker and deployment metadata inspection.",
       "mode": "operator-tooling",
@@ -259,6 +267,10 @@
     },
     {
       "id": "supabase",
+      "kind": "chatgpt-plugin",
+      "canonicalPluginId": "plugin_asdk_app_69d3e5ee6a708191baa733f7b8931995",
+      "displayName": "Supabase",
+      "catalogStatus": "listed",
       "provider": "Supabase",
       "purpose": "Schema, RLS, auth, and function inspection; teen-private data remains scoped.",
       "mode": "operator-tooling",
