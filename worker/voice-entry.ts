@@ -375,13 +375,8 @@ async function handleVoice(
       questionBudget: style.maxQuestions,
       styleDecision: 'allow',
     }, 200, cors);
-  } catch (error) {
-    console.error('[voice-entry:synthesis]', {
-      actorId,
-      provider: route.provider,
-      fallbackProvider: route.fallbackProvider,
-      error: error instanceof Error ? error.message : 'unknown',
-    });
+  } catch {
+    console.error('SEKRET_VOICE_SYNTHESIS_FAILED');
     return json({
       error: 'voice synthesis unavailable',
       characterId: route.canonicalCharacterId,
@@ -426,10 +421,8 @@ export default {
           releaseSha: WORKER_RELEASE_SHA,
           version: workerVersionEvidence(env),
         }, response.status, cors);
-      } catch (error) {
-        console.error('[voice-entry:health]', {
-          error: error instanceof Error ? error.message : 'invalid delegated health response',
-        });
+      } catch {
+        console.error('SEKRET_DELEGATED_HEALTH_INVALID');
         return json({
           ok: false,
           worker: 'sekret-backend',

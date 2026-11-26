@@ -34,25 +34,25 @@ function ParentTabs() {
         <Tabs.Screen name="circle" options={{ title: 'Circle', tabBarIcon: () => <TabIcon emoji="🤝" /> }} />
         <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: () => <TabIcon emoji="•••" /> }} />
 
-        <Tabs.Screen name="dashboard" options={{ href: null }} />
-        <Tabs.Screen name="circle/[id]" options={{ href: null }} />
-        <Tabs.Screen name="circle/weather" options={{ href: null }} />
-        <Tabs.Screen name="circle/feed" options={{ href: null }} />
-        <Tabs.Screen name="bip-jr" options={{ href: null }} />
-        <Tabs.Screen name="teen-verification" options={{ href: null }} />
+        <Tabs.Screen name="dashboard" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="circle/[id]" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="circle/weather" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="circle/feed" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="bip-jr" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="teen-verification" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="calm" options={{ href: null }} />
-        <Tabs.Screen name="voicebip" options={{ href: null }} />
-        <Tabs.Screen name="settings" options={{ href: null }} />
-        <Tabs.Screen name="profile" options={{ href: null }} />
-        <Tabs.Screen name="s2tell" options={{ href: null }} />
-        <Tabs.Screen name="repair" options={{ href: null }} />
-        <Tabs.Screen name="voicereflect" options={{ href: null }} />
-        <Tabs.Screen name="period-calendar" options={{ href: null }} />
-        <Tabs.Screen name="sekret" options={{ href: null }} />
-        <Tabs.Screen name="growth" options={{ href: null }} />
-        <Tabs.Screen name="resources" options={{ href: null }} />
-        <Tabs.Screen name="approvals" options={{ href: null }} />
-        <Tabs.Screen name="bip-jr-study" options={{ href: null }} />
+        <Tabs.Screen name="voicebip" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="settings" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="profile" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="s2tell" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="repair" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="voicereflect" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="period-calendar" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="sekret" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="growth" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="resources" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="approvals" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="bip-jr-study" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
       </Tabs>
       <SideSafeBackButton side="parent" />
     </View>

@@ -44,6 +44,8 @@ import { CompanionTypingIndicator } from '../../components/chat/CompanionTypingI
 import { ChatBubble } from '../../components/chat/ChatBubble';
 import { ChatInput } from '../../components/chat/ChatInput';
 import { SafetyExperienceSheet } from '../../components/safety/SafetyExperienceSheet';
+import AIDisclosureModal from '../../components/companions/AIDisclosureModal';
+import { getSupabase } from '../../src/utils/supabase';
 import {
   sendCompanionMessage,
   toCompanionId,
@@ -63,6 +65,8 @@ import {
   SEKRET_PROFILES,
   type Character,
 } from '../../constants/theme';
+import { syncOracleSession, loadOracleSession } from '../../src/utils/sync';
+import { useAppContext } from '@/context/AppContext';
 
 // ── Types ────────────────────────────────────────────────────────────────────────
 
@@ -110,6 +114,7 @@ async function persistHistory(key: string, msgs: ChatMsg[]): Promise<void> {
 
 export default function CompanionChatScreen() {
   const router = useRouter();
+  const { mood } = useAppContext();
 
   const params = useLocalSearchParams<{
     companion?: string;
@@ -147,6 +152,7 @@ export default function CompanionChatScreen() {
   const [safetyExperience, setSafetyExperience]   = useState<SafetyExperience | null>(null);
   const [comfortNudge, setComfortNudge]           = useState<string | null>(null);
   const [teenGender, setTeenGender]               = useState<'girl' | 'boy' | 'other' | null>(null);
+  const [showAiDisclosure, setShowAiDisclosure]   = useState(false);
   /**
    * questionBudget — how many questions the companion has left this session.
    * Initialised to null (unknown) and updated from each backend reply.
@@ -155,6 +161,7 @@ export default function CompanionChatScreen() {
    */
   const [questionBudget, setQuestionBudget] = useState<number | null>(null);
   const listRef = useRef<FlatList<ChatMsg>>(null);
+  const sessionCountRef = useRef(0);
 
   // Load teen gender from profile so companions can tailor their responses
   useEffect(() => {
@@ -169,22 +176,67 @@ export default function CompanionChatScreen() {
     });
   }, []);
 
-  // Load history on mount; show companion greeting if empty
+  // App Store requirement + Trust-08: disclose AI status once, ever, on first
+  // companion message. Best-effort — never blocks chat if the check fails.
   useEffect(() => {
-    loadHistory(storageKey).then((saved) => {
-      if (saved.length === 0) {
-        const welcome: ChatMsg = {
-          id:   'welcome',
-          from: 'companion',
-          text: profile.greeting,
-          time: nowTime(),
-        };
-        setMsgs([welcome]);
-        persistHistory(storageKey, [welcome]);
-      } else {
-        setMsgs(saved);
+    let active = true;
+    (async () => {
+      try {
+        const supabase = getSupabase();
+        if (!supabase) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from('profiles')
+          .select('ai_disclosure_accepted_at')
+          .eq('id', user.id)
+          .single();
+        if (active && !data?.ai_disclosure_accepted_at) {
+          setShowAiDisclosure(true);
+        }
+      } catch (e) {
+        // Non-blocking — disclosure check is best-effort.
+        console.warn('AI_DISCLOSURE_STATUS_UNAVAILABLE');
       }
-    });
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Load history on mount; fall back to cloud oracle memory if AsyncStorage empty
+  useEffect(() => {
+    (async () => {
+      const saved = await loadHistory(storageKey);
+      if (saved.length > 0) {
+        setMsgs(saved);
+        // Restore session count from cloud (non-blocking)
+        loadOracleSession(profileKey).then((cloud) => {
+          if (cloud) sessionCountRef.current = cloud.sessionCount;
+        });
+        return;
+      }
+
+      // Try cloud restore first — gives returning users continuity on a new device
+      const cloud = await loadOracleSession(profileKey);
+      if (cloud?.memory?.recentMessages) {
+        const restored = cloud.memory.recentMessages as ChatMsg[];
+        sessionCountRef.current = cloud.sessionCount;
+        setMsgs(restored);
+        await persistHistory(storageKey, restored);
+        return;
+      }
+
+      // Brand new — show greeting
+      const welcome: ChatMsg = {
+        id: 'welcome',
+        from: 'companion',
+        text: profile.greeting,
+        time: nowTime(),
+      };
+      setMsgs([welcome]);
+      persistHistory(storageKey, [welcome]);
+    })();
   }, [storageKey]);
 
   // ── Send ──────────────────────────────────────────────────────────────────────────
@@ -213,6 +265,7 @@ export default function CompanionChatScreen() {
       const result = await sendCompanionMessage({
         companionId,
         surface,
+        mood: mood ?? undefined,
         text: userMsg.text,
         teenGender,
         history: msgs.map((m) => ({
@@ -253,6 +306,14 @@ export default function CompanionChatScreen() {
       if (result.suggestedComfortTool && !preflight) {
         setComfortNudge(result.suggestedComfortTool);
       }
+
+      // Sync compact memory snapshot to Supabase (cross-device continuity)
+      sessionCountRef.current += 1;
+      syncOracleSession(
+        profileKey,
+        { recentMessages: final.slice(-20), surface },
+        sessionCountRef.current,
+      );
     } catch {
       const errMsg: ChatMsg = {
         id:   String(Date.now() + 1),
@@ -369,6 +430,12 @@ export default function CompanionChatScreen() {
           onDismiss={() => setSafetyExperience(null)}
         />
       )}
+
+      <AIDisclosureModal
+        visible={showAiDisclosure}
+        companionName={profile.name}
+        onAccept={() => setShowAiDisclosure(false)}
+      />
     </ImageBackground>
   );
 }

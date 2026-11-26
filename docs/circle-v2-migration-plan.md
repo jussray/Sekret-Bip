@@ -1,6 +1,6 @@
 # Circle V1 → V2 Migration Plan
 
-**Status: Phase 0 — migration applied to `tbsevonvegdnlyjgplmm` and verified. `parent_community` circle kind is live. Two pre-existing bugs found and fixed along the way (§10). One larger pre-existing bug found and left unfixed, out of scope (§10.3). No app screens or `sync.ts` changed yet.**
+**Status: Migration applied to `tbsevonvegdnlyjgplmm` and verified as of 2026-07-01, but NOT re-verified since — `main` has moved substantially since this work landed, including shipping its own, later, independent fixes for things this doc originally flagged. Re-confirm before trusting any claim below blindly. `parent_community` circle kind is live. Reaction vocabulary was decided and applied directly to the live database in this work; the repo-tracked migration for it was dropped from this PR because `main` already carries an equivalent, idempotent fix (`20261025025400_parent_community_reaction_kind_values.sql`, dated 2026-10-25) that both creates the type fresh and adds the missing values to the already-existing live type — mine duplicated it with an earlier timestamp, which broke fresh-replay CI by running first. The §10.3 `safety_alerts` mismatch this doc originally scoped as unresolved was independently and fully fixed on `main` on 2026-08-08 (`20260808222500_reconcile_safety_alert_runtime_schema.sql`) — §10.3 below is now HISTORICAL, not a live gap, and `docs/safety-alerts-schema-mismatch.md` has been removed from this PR as factually superseded. Two pre-existing bugs found and fixed along the way (§10.1–10.2) remain valid. The `sync.ts` Circle rewrite described below is STALE and was never landed — and is now doubly so: beyond the auth-model hardening noted below, `main` has since shipped a complete RPC-only Parent Community architecture (`20261025025500_parent_community_v2_rpc_cutover.sql`, `20261026103000_harden_parent_community_security_definer_surface.sql`) that supersedes the direct-table-RLS design this doc and the original rewrite assumed. No client code calls those RPCs yet — that is the real remaining implementation gap, not the rewrite as originally scoped. Only the safe, non-conflicting pieces (type widenings, a one-line id-type bug fix) have landed from this PR.**
 
 Work order, per direction: (1) repo plan locked here first, (2) a real Supabase migration applied only after this plan is signed off, (3) app code (`sync.ts`, `CircleScreen.tsx`, `feed.tsx`) updated last. This document is step 1 only.
 
@@ -177,11 +177,15 @@ No SQL drafted for this yet — pending the decision, though (a) is now low-risk
 - `supabase/functions/safety-scan/index.ts` — `posts` added to the allowlist, flag-update made table-aware (`author_user_id` vs `user_id`).
 - This doc, fully updated with confirmed live facts.
 
+**Dropped from this PR after it was opened (superseded, see top status line):**
+- `supabase/migrations/20260701050000_reaction_kind_add_app_vocabulary.sql` — removed; `main`'s `20261025025400_...` already does this, idempotently, and mine broke fresh-replay CI by running first.
+- `docs/safety-alerts-schema-mismatch.md` — removed; the mismatch it scoped was independently fixed on `main` on 2026-08-08.
+
 **Explicitly still open, not in this PR:**
-- §6 reaction vocabulary — separate decision, no SQL drafted.
 - Friends/Crew identity-reveal-after-acceptance logic (§4) — design is clear, no SQL drafted yet.
 - Full `supabase/migrations/` reconciliation for pre-existing drift (bigint vs. uuid, missing `crews`/`media_attachments` definitions, etc.) — real but out of scope for this PR, which only adds new objects.
 - The earlier `docs/circle-v2-phase0-draft-migration.sql` is stale (marked as such) and superseded by the two files above.
+- Wiring teen/parent client code to the RPC-only Parent Community functions `main` already ships (`get_parent_community_feed`, `create_parent_community_post`, `react_to_parent_community_post`, `reply_to_parent_community_post`, `report_parent_community_post`) — confirmed via `git grep` that no client code calls them yet. This is the real remaining gap; it is not the same shape as the originally-scoped `sync.ts` rewrite, which assumed direct-table RLS reads that `main` no longer uses for this feature.
 
 ## 10. Applied and verified against `tbsevonvegdnlyjgplmm`
 
@@ -204,7 +208,9 @@ Fixed (approved, applied as `fix_trigger_safety_scan_dynamic_field_access`): rew
 
 `safety_alerts_alert_type_check` only allowed `('critical_mood','self_harm_keyword','panic_pattern','manual_sos')`; the deployed function writes `'moderation'`/`'keyword'`. `severity_check` didn't allow `'low'`, which the function can also produce. Fixed (approved, applied as `widen_safety_alerts_type_and_severity_check`): widened both constraints to include the function's actual vocabulary, rather than narrowing the function to match an older vocabulary — the function's two-layer (keyword + OpenAI moderation) design is the one actually deployed and running.
 
-### 10.3 Found, NOT fixed — out of scope, needs separate attention
+### 10.3 Found, NOT fixed at the time — now HISTORICAL, resolved independently on `main`
+
+**Update, re-verified against `main`:** both problems below were fixed by someone else's work on `main`, unrelated to this PR — `20260808222500_reconcile_safety_alert_runtime_schema.sql` (dated 2026-08-08) reconciled the `safety_alerts` column shape, keeping `user_id`/`source_table`/`source_id`/`parent_notified_at` canonical and making the legacy `teen_user_id`/`parent_user_id`/`title`/`summary` columns nullable instead, and resolved the open "no linked parent" question below by making `parent_user_id` nullable and moving parent-read eligibility into RLS. `docs/safety-alerts-schema-mismatch.md`, which scoped this below, has been removed from this PR as a result — it described a problem that no longer exists in the direction it described. The original findings are kept below as a historical record of what this session found at the time, not as a current gap.
 
 A real end-to-end test (committed insert into `posts` with self-harm-keyword content, confirmed via `net._http_response`) surfaced two more problems, deeper than anything authorized for this session:
 
@@ -215,6 +221,6 @@ Both are real, both are safety-relevant, both predate this session and this PR, 
 
 ## Next steps
 
-1. `sync.ts`/screens update (step 3) — this will be a larger rewrite than originally scoped, since the real schema (uuid ids, `author_user_id`/`body`, enum types, `crews`, `friendships`-based friend visibility) differs substantially from what the repo's own migrations assume.
-2. Separately: scope and fix §10.3 (safety-alert secret mismatch + column mismatch) — recommend treating this as its own PR, since it's unrelated to the Circle model and touches parent-notification logic for real safety alerts.
-3. §6 reaction vocabulary and Friends/Crew identity-reveal-after-acceptance logic remain open, as before.
+1. Wire teen/parent client code to the RPC-only Parent Community functions `main` already ships (`get_parent_community_feed`, `create_parent_community_post`, `react_to_parent_community_post`, `reply_to_parent_community_post`, `report_parent_community_post`). This replaces the originally-scoped `sync.ts` rewrite, which assumed direct-table RLS reads — `main` moved to an RPC-only architecture instead, and no client code calls these RPCs yet.
+2. §10.3's safety-alert column mismatch is resolved on `main` (2026-08-08); the Edge Function's shared-secret mismatch noted alongside it has not been independently re-checked since and should be re-verified before being assumed fixed.
+3. Friends/Crew identity-reveal-after-acceptance logic (§4) remains open, as before.

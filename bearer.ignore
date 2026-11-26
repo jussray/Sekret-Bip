@@ -1,0 +1,32 @@
+{
+  "85970c17b72faf91a8f14fd9fbb26e8b_0": {
+    "author": "Se'kret Bip engineering triage",
+    "comment": "scripts/control-room-server.mjs:390 — plan ID uses a strict basename grammar; parent directories reject symlinks, and exclusive file creation prevents overwrite. Local filesystem mutation is outside the untrusted HTTP client boundary. Re-evaluate if path validation changes.",
+    "false_positive": true,
+    "ignored_at": "2026-11-05T08:54:09Z"
+  },
+  "a63c81d4ff80d236fe4d1a920ae9485c_0": {
+    "author": "Se'kret Bip engineering triage",
+    "comment": "scripts/room-production-foreman.mjs:51 — root confinement is checked before component-by-component lstat symlink refusal. The CLI path is validated against repository-owned manifests. Re-evaluate if path input or root rules change.",
+    "false_positive": true,
+    "ignored_at": "2026-11-05T08:54:09Z"
+  },
+  "a63c81d4ff80d236fe4d1a920ae9485c_1": {
+    "author": "Se'kret Bip engineering triage",
+    "comment": "scripts/room-production-foreman.mjs:170 — directory is equal-checked against a repository-bound location made from a timestamp-format run ID. Symlink components are rejected. Re-evaluate if run IDs or writable directories change.",
+    "false_positive": true,
+    "ignored_at": "2026-11-05T08:54:09Z"
+  },
+  "a63c81d4ff80d236fe4d1a920ae9485c_2": {
+    "author": "Se'kret Bip engineering triage",
+    "comment": "scripts/room-production-foreman.mjs:177 — only a validated run ID and fixed report filename enter repository-confined writeFileSync with exclusive wx mode. Re-evaluate on pathname handling changes.",
+    "false_positive": true,
+    "ignored_at": "2026-11-05T08:54:09Z"
+  },
+  "af3644deb9abff7349edcc04af2dff8e_0": {
+    "author": "Se'kret Bip engineering triage",
+    "comment": "scripts/control-room-server.mjs:428 — Access-Control-Allow-Origin is emitted only when request Origin exactly matches a server-created loopback allowlist; unmatched origins receive HTTP 403. Re-evaluate if origins are no longer strict-equality allowlisted.",
+    "false_positive": true,
+    "ignored_at": "2026-11-05T08:54:09Z"
+  }
+}

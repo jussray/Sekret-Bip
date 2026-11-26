@@ -92,10 +92,10 @@ async function safeUpsert(table: string, payload: SyncRow | SyncRow[]): Promise<
     const withUser = rows.map(r => ({ ...r, user_id: uid }));
     const { error } = await sb.from(table).upsert(withUser, { onConflict: 'id,user_id' });
     if (error) {
-      console.warn('[sync] safeUpsert failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SAFEUPSERT_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] upsert ${table} failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_UPSERT_FAILED');
   }
 }
 
@@ -107,10 +107,10 @@ async function safeDelete(table: string, id: number | string): Promise<void> {
   try {
     const { error } = await sb.from(table).delete().match({ id, user_id: uid });
     if (error) {
-      console.warn('[sync] safeDelete failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SAFEDELETE_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] delete ${table} failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_DELETE_FAILED');
   }
 }
 
@@ -190,8 +190,8 @@ export async function loadParentCircleFeed(
       reactions: r.reactions ?? EMPTY_PARENT_REACTIONS,
       circleTag: r.circle_tag ?? undefined,
     })) as ParentCirclePost[];
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadParentCircleFeed failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPARENTCIRCLEFEED_FAILED');
     return [];
   }
 }
@@ -264,8 +264,8 @@ export async function loadCircleFeed(
       })) as CircleParentPost[];
     }
     return null;
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] loadCircleFeed(${tab}) failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADCIRCLEFEED_FAILED');
     return null;
   }
 }
@@ -291,10 +291,10 @@ export async function syncCircleReaction(
         { onConflict: 'post_id,post_type,user_id', ignoreDuplicates: true },
       );
     if (error) {
-      console.warn('[sync] syncCircleReaction failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCCIRCLEREACTION_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncCircleReaction failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCCIRCLEREACTION_FAILED');
   }
 }
 
@@ -302,7 +302,7 @@ export async function syncCircleReaction(
 export async function writeCirclePost(
   tab: CircleTab,
   text: string,
-  opts: { postMood?: string; circleTag?: string; mediaKind?: string; revealIdentity?: boolean } = {},
+  opts: { postMood?: string; circleTag?: string; mediaKind?: string; mediaUrl?: string; revealIdentity?: boolean } = {},
 ): Promise<void> {
   emitEvent('circle_post');
   const sb = getSupabase();
@@ -325,15 +325,16 @@ export async function writeCirclePost(
       text,
       post_mood:  opts.postMood  ?? null,
       media_kind: opts.mediaKind ?? null,
+      media_url:  opts.mediaUrl  ?? null,
       circle_tag: opts.circleTag ?? null,
       reactions:  defaultReactions,
       created_at: new Date().toISOString(),
     });
     if (error) {
-      console.warn('[sync] writeCirclePost failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_WRITECIRCLEPOST_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn(`[sync] writeCirclePost(${tab}) failed`, e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_WRITECIRCLEPOST_FAILED');
   }
 }
 
@@ -341,8 +342,14 @@ export async function writeCirclePost(
 export function syncVoiceNote(note: VoiceNote): void {
   emitEvent('voice_completed', { durationSecs: note.duration ? Number(note.duration) : undefined });
   void safeUpsert(TABLES.voiceNotes, {
-    id: note.id, title: note.title, date: note.date,
-    time: note.time, duration: note.duration,
+    id:         note.id,
+    title:      note.title,
+    date:       note.date,
+    time:       note.time,
+    duration:   note.duration,
+    video_url:  (note.videoUrl  as string | undefined) ?? null,
+    type:       (note.type      as string | undefined) ?? null,
+    cloud_text: (note.cloudText as string | undefined) ?? null,
   });
 }
 
@@ -399,10 +406,10 @@ export async function syncRoomMemory(rm: {
       { onConflict: 'user_id' },
     );
     if (error) {
-      console.warn('[sync] syncRoomMemory failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCROOMMEMORY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncRoomMemory failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCROOMMEMORY_FAILED');
   }
 }
 
@@ -417,10 +424,10 @@ export async function snapshotPoints(total: number): Promise<void> {
       user_id: uid, total, captured_at: new Date().toISOString(),
     });
     if (error) {
-      console.warn('[sync] snapshotPoints failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SNAPSHOTPOINTS_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] snapshotPoints failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SNAPSHOTPOINTS_FAILED');
   }
 }
 
@@ -438,10 +445,10 @@ export async function syncPeriodDay(day: string, note?: string): Promise<void> {
       { onConflict: 'user_id,day' },
     );
     if (error) {
-      console.warn('[sync] syncPeriodDay failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCPERIODDAY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncPeriodDay failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCPERIODDAY_FAILED');
   }
 }
 
@@ -454,10 +461,10 @@ export async function deletePeriodDay(day: string): Promise<void> {
   try {
     const { error } = await sb.from(TABLES.periodDays).delete().match({ user_id: uid, day });
     if (error) {
-      console.warn('[sync] deletePeriodDay failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_DELETEPERIODDAY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] deletePeriodDay failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_DELETEPERIODDAY_FAILED');
   }
 }
 
@@ -475,8 +482,8 @@ export async function loadPeriodDays(): Promise<string[]> {
       .order('day', { ascending: true });
     if (error) throw error;
     return (data ?? []).map((r: { day: string }) => r.day);
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadPeriodDays failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADPERIODDAYS_FAILED');
     return [];
   }
 }
@@ -504,10 +511,10 @@ export async function syncOracleSession(
       { onConflict: 'user_id,personality_id' },
     );
     if (error) {
-      console.warn('[sync] syncOracleSession failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCORACLESESSION_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncOracleSession failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCORACLESESSION_FAILED');
   }
 }
 
@@ -531,8 +538,8 @@ export async function loadOracleSession(
       memory:       (data.memory) ?? {},
       sessionCount: (data.session_count) ?? 0,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] loadOracleSession failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_LOADORACLESESSION_FAILED');
     return null;
   }
 }
@@ -579,10 +586,10 @@ export async function syncTeenActivitySummary(): Promise<void> {
       { onConflict: 'user_id' },
     );
     if (error) {
-      console.warn('[sync] syncTeenActivitySummary failed:', error.message, error.code);
+      console.warn('SEKRET_SYNC_SYNCTEENACTIVITYSUMMARY_FAILED');
     }
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] syncTeenActivitySummary failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCTEENACTIVITYSUMMARY_FAILED');
   }
 }
 
@@ -612,8 +619,8 @@ export async function fetchTeenActivitySummary(
       session_count: data.session_count,
       points_tier:   data.points_tier,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] fetchTeenActivitySummary failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_FETCHTEENACTIVITYSUMMARY_FAILED');
     return null;
   }
 }
@@ -657,7 +664,7 @@ export async function pullAll(): Promise<{
 
     function settled<T>(res: PromiseSettledResult<SupabaseDataResult<T>>): T | null {
       if (res.status === 'rejected') return null;
-      if (res.value.error) { console.warn('[sync] pullAll partial error:', res.value.error.message); return null; }
+      if (res.value.error) { console.warn('SEKRET_SYNC_PULLALL_PARTIAL_ERROR'); return null; }
       return res.value.data;
     }
 
@@ -682,9 +689,107 @@ export async function pullAll(): Promise<{
       parentCirclePosts: parentPosts.map(r => ({ id: r.id, text: r.text, date: r.date, time: r.time, reactions: r.reactions ?? {}, circleTag: r.circle_tag ?? undefined })) as ParentCirclePost[],
       roomMemory: room ? { character: room.character, lastVisit: room.last_visit ?? '', lastHotspot: room.last_hotspot ?? '', lastSummon: room.last_summon ?? '', visitCount: room.visit_count ?? 0 } : null,
     };
-  } catch (e) {
-    if (__DEV__) console.warn('[sync] pullAll failed', e);
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_PULLALL_FAILED');
     return null;
+  }
+}
+
+// ── Parent repair, voice reflection, S2Tell ─────────────────────────────────
+
+export function syncRepairWin(entry: { id: number; text: string; date: string; ritual?: string }): void {
+  void safeUpsert(TABLES.parentRepairWins, {
+    id: entry.id, text: entry.text, date: entry.date, ritual: entry.ritual ?? null,
+  });
+}
+
+export function syncVoiceReflection(entry: { id: number; prompt: string; text: string; date: string; lens: string }): void {
+  void safeUpsert(TABLES.parentVoiceReflections, {
+    id: entry.id, prompt: entry.prompt, text: entry.text, date: entry.date, lens: entry.lens,
+  });
+}
+
+// ── S2Tell cross-device delivery ─────────────────────────────────────────────
+
+/** Teen shares a rewrite with their linked parent. raw is NEVER passed or stored. */
+export async function shareS2Tell(entry: {
+  id: string; rewrite: string; tone: string; savedAt: string;
+}): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  try {
+    const { data: link } = await sb
+      .from('parent_links')
+      .select('parent_user_id')
+      .eq('teen_user_id', uid)
+      .eq('status', 'active')
+      .eq('is_active', true)
+      .maybeSingle();
+    if (!link?.parent_user_id) return;
+    const { error } = await sb.from(TABLES.parentTellShares).upsert(
+      {
+        teen_user_id:   uid,
+        parent_user_id: link.parent_user_id,
+        id:             entry.id,
+        rewrite:        entry.rewrite,
+        tone:           entry.tone,
+        saved_at:       entry.savedAt,
+      },
+      { onConflict: 'teen_user_id,id' },
+    );
+    if (error) console.warn('SEKRET_SYNC_SHARES2TELL_FAILED');
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SHARES2TELL_FAILED');
+  }
+}
+
+/** Parent fetches all S2Tell shares addressed to them. */
+export async function fetchS2TellShares(): Promise<Array<{
+  id: string; rewrite: string; tone: string; savedAt: string;
+}>> {
+  const sb = getSupabase();
+  if (!sb) return [];
+  const uid = await currentUserId();
+  if (!uid) return [];
+  try {
+    const { data, error } = await sb
+      .from(TABLES.parentTellShares)
+      .select('id, rewrite, tone, saved_at')
+      .eq('parent_user_id', uid)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    if (error) throw error;
+    return (data ?? []).map((r: any) => ({
+      id:      r.id,
+      rewrite: r.rewrite,
+      tone:    r.tone,
+      savedAt: r.saved_at,
+    }));
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_FETCHS2TELLSHARES_FAILED');
+    return [];
+  }
+}
+
+// ── Growth milestones ─────────────────────────────────────────────────────────
+
+/** Record one track completion. Safe no-op when Supabase isn't configured. */
+export async function syncGrowthMilestone(trackKey: string): Promise<void> {
+  const sb = getSupabase();
+  if (!sb) return;
+  const uid = await currentUserId();
+  if (!uid) return;
+  try {
+    const { error } = await sb.from(TABLES.growthMilestones).insert({
+      user_id:      uid,
+      track_key:    trackKey,
+      completed_at: new Date().toISOString(),
+    });
+    if (error) console.warn('SEKRET_SYNC_SYNCGROWTHMILESTONE_FAILED');
+  } catch {
+    if (__DEV__) console.warn('SEKRET_SYNC_SYNCGROWTHMILESTONE_FAILED');
   }
 }
 

@@ -1,0 +1,67 @@
+name: Bip Sprite Governed Proof Contract
+
+on:
+  push:
+    paths:
+      - 'scripts/bip-sprite-proof.mjs'
+      - 'test/bip-sprite-proof.test.mjs'
+      - 'test/bip-sprite-governance-contract.test.mjs'
+      - 'config/bip-sprite-policy.json'
+      - 'docs/BIP_SPRITE_RUNTIME.md'
+      - '.github/workflows/bip-sprite-proof.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/bip-sprite-proof.mjs'
+      - 'test/bip-sprite-proof.test.mjs'
+      - 'test/bip-sprite-governance-contract.test.mjs'
+      - 'config/bip-sprite-policy.json'
+      - 'docs/BIP_SPRITE_RUNTIME.md'
+      - '.github/workflows/bip-sprite-proof.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bip-sprite-proof-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify-governed-proof-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact proof subject
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ env.EXPECTED_HEAD_SHA }}
+          persist-credentials: false
+      - name: Confirm exact proof subject
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_HEAD_SHA"
+      - name: Configure Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+      - name: Verify Sprite security contract
+        run: |
+          node --check scripts/bip-sprite-proof.mjs
+          node --test test/bip-sprite-proof.test.mjs test/bip-sprite-governance-contract.test.mjs
+          node --test test/agent-discovery.test.mjs test/companion-runtime-contracts.test.mjs
+      - name: Verify Sprite runtime policy is non-authorizing
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+          import { MISSIONS } from './scripts/bip-sprite-proof.mjs';
+          const policy = JSON.parse(readFileSync('config/bip-sprite-policy.json', 'utf8'));
+          if (policy.network !== 'deny-all' || policy.access !== 'sprite-private-admins') throw Error('Network/access boundary drift');
+          if (JSON.stringify(policy.allowedMissions) !== JSON.stringify(Object.keys(MISSIONS))) throw Error('Sprite mission allowlist drift');
+          if (policy.receiptAuthority !== false || !policy.neverAuthorized.includes('deploy') || !policy.deniedData.includes('teen-personal-data')) throw Error('Missing privacy/authority boundary');
+          console.log('BIP_SPRITE_POLICY_CONTRACT_VERIFIED');
+          NODE

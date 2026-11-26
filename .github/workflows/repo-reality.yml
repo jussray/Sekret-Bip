@@ -51,6 +51,7 @@ jobs:
 
           payload = json.loads(Path(os.environ["GITHUB_EVENT_PATH"]).read_text())
           body = payload.get("pull_request", {}).get("body") or ""
+          body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
           required = ("Scope", "Verification", "Evidence", "Limits", "Rollback")
           missing = []
           for label in required:

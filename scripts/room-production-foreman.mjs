@@ -4,28 +4,99 @@ import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { chromium } from '@playwright/test';
+import { validateManifest as validateAssetManifest, verifyAssets } from './room-asset-verification.mjs';
 
 const EXPECTED_NAV = ['Room', 'Pages', 'Calm', 'Circle', 'More'];
 const DEFAULT_MANIFEST = 'config/room-production.manifest.json';
-const BLOCKING_STATUSES = new Set(['missing', 'blocked', 'fail']);
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const RUN_ID = /^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z$/;
+const SAFE_NAME = /^[a-z][a-zA-Z0-9-]{0,63}$/;
+const TOOLS = ['canva', 'figma', 'leonardo', 'app'];
+const WORKSPACE_IMAGES = Object.freeze({
+  canva: 'canva-workspace.png',
+  figma: 'figma-workspace.png',
+  leonardo: 'leonardo-workspace.png',
+  app: 'app-workspace.png',
+});
+const CHECKPOINT_IMAGES = Object.freeze({
+  canva: 'canva-checkpoint.png',
+  figma: 'figma-checkpoint.png',
+  leonardo: 'leonardo-checkpoint.png',
+  app: 'app-checkpoint.png',
+});
+
+// All filesystem operations stay beneath the repository and reject symlink
+// components. Never treat a CLI argument or manifest field as a trusted path.
+export function safeProjectPath(...parts) {
+  const resolved = path.resolve(ROOT, ...parts);
+  const relative = path.relative(ROOT, resolved);
+  assert(relative && relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative),
+    'Room foreman path escapes repository.');
+  let candidate = ROOT;
+  for (const part of relative.split(path.sep)) {
+    candidate = path.join(candidate, part);
+    try {
+      // Reviewed false-positive: Component-by-component symlink rejection after rejecting paths outside the fixed repository root.
+      // bearer:disable javascript_lang_path_traversal
+      if (fs.lstatSync(candidate).isSymbolicLink()) throw new Error('Room foreman symlink target rejected.');
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+    }
+  }
+  return resolved;
+}
+
+export function resolveManifestPath(requested) {
+  assert(typeof requested === 'string' && requested.length > 0, 'Manifest path required.');
+  const resolved = path.resolve(ROOT, requested);
+  const relative = path.relative(ROOT, resolved).split(path.sep).join('/');
+  assert(/^config\/room-production(?:\.[a-z0-9-]+)?\.json$/.test(relative),
+    'Only repository-owned room-production manifests are allowed.');
+  return safeProjectPath(relative);
+}
+
+function safeName(value) {
+  assert(typeof value === 'string' && SAFE_NAME.test(value), 'Invalid room production identifier.');
+  return value;
+}
+
+function safeRunId(value) {
+  assert(typeof value === 'string' && RUN_ID.test(value), 'Invalid room foreman run id.');
+  return value;
+}
+
+function reportPath(runId, name) {
+  safeRunId(runId);
+  assert(name === 'run-report.json' || name === 'run-report.md', 'Invalid report name.');
+  return safeProjectPath('.room-foreman', 'runs', runId, name);
+}
 
 function parseArgs(argv) {
-  const args = { manifest: DEFAULT_MANIFEST, mode: 'plan', tool: 'all', headless: false, holdMs: 15_000 };
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (arg === '--manifest') args.manifest = argv[++index];
-    else if (arg === '--mode') args.mode = argv[++index];
-    else if (arg === '--tool') args.tool = argv[++index];
+  const args = {
+    manifest: DEFAULT_MANIFEST,
+    mode: 'plan',
+    tool: 'all',
+    headless: false,
+    holdMs: 15_000,
+  };
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i];
+    if (arg === '--manifest') args.manifest = argv[++i];
+    else if (arg === '--mode') args.mode = argv[++i];
+    else if (arg === '--tool') args.tool = argv[++i];
     else if (arg === '--headless') args.headless = true;
-    else if (arg === '--hold-ms') args.holdMs = Number(argv[++index]);
+    else if (arg === '--hold-ms') args.holdMs = Number(argv[++i]);
     else if (arg === '--help' || arg === '-h') args.help = true;
     else throw new Error(`Unknown argument: ${arg}`);
   }
+
   return args;
 }
 
 function usage() {
-  console.log('ROOM_FOREMAN_USAGE');
+  console.log('ROOM_FOREMAN_HELP_SEE_ROOM_PRODUCTION_ENGINE_DOC');
 }
 
 function readJson(filePath) {
@@ -36,6 +107,55 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function validateManifest(manifest) {
+  assert(manifest.schemaVersion === 1, 'Unsupported room manifest schemaVersion.');
+  assert(manifest.repository === 'jussray/Sekret-Bip', 'Manifest repository mismatch.');
+  assert(Array.isArray(manifest.policies?.bottomNavigation), 'Missing bottom-navigation contract.');
+  assert(
+    JSON.stringify(manifest.policies.bottomNavigation) === JSON.stringify(EXPECTED_NAV),
+    `Bottom navigation must remain exactly: ${EXPECTED_NAV.join(', ')}`,
+  );
+  assert(manifest.policies.bottomNavigationLocked === true, 'Bottom navigation must be locked.');
+  assert(manifest.policies.userRoomOwnsDashboardCards === true, 'User Room must own dashboard/update cards.');
+  assert(manifest.policies.companionRoomsRejectDashboardCards === true, 'Companion rooms must reject dashboard cards.');
+  assert(manifest.policies.companionRoomsArePermanentDestinations === true, 'Companion rooms must remain permanent destinations.');
+  assert(manifest.rooms?.night?.verticalSlice === true, 'Night must remain the first vertical slice.');
+
+  assert(Array.isArray(manifest.phases) && manifest.phases.length > 0, 'Missing room phases.');
+  for (const phase of manifest.phases) safeName(phase);
+
+  for (const [id, character] of Object.entries(manifest.characters ?? {})) {
+    safeName(id);
+    for (const pose of character.requiredPoses ?? []) safeName(pose);
+    assert(character.canonicalMaster, `${id} is missing canonicalMaster.`);
+    assert(Array.isArray(character.requiredPoses) && character.requiredPoses.length > 0, `${id} has no pose queue.`);
+  }
+
+  for (const [id, room] of Object.entries(manifest.rooms ?? {})) {
+    safeName(id);
+    assert(room.baseAsset, `${id} room is missing baseAsset.`);
+    assert(Array.isArray(room.anchors) && room.anchors.includes(room.defaultAnchor), `${id} defaultAnchor is invalid.`);
+  }
+}
+
+function buildQueue(manifest) {
+  const queue = [];
+
+  for (const [characterId, character] of Object.entries(manifest.characters)) {
+    for (const pose of character.requiredPoses) {
+      queue.push({ kind: 'character-pose', characterId, pose, source: character.canonicalMaster });
+    }
+  }
+
+  for (const [roomId, room] of Object.entries(manifest.rooms)) {
+    for (const phase of manifest.phases) {
+      queue.push({ kind: 'room-phase', roomId, phase, source: room.baseAsset });
+    }
+  }
+
+  return queue;
+}
+
 function fileToken(value) {
   return String(value)
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
@@ -43,235 +163,48 @@ function fileToken(value) {
     .toLowerCase();
 }
 
-function parseSize(value) {
-  const match = /^(\d+)x(\d+)$/.exec(String(value || ''));
-  if (!match) throw new Error(`Invalid image size contract: ${value}`);
-  return { width: Number(match[1]), height: Number(match[2]) };
-}
-
-function parseAspectRatio(value) {
-  const match = /^(\d+):(\d+)$/.exec(String(value || ''));
-  if (!match) throw new Error(`Invalid aspect ratio contract: ${value}`);
-  return Number(match[1]) / Number(match[2]);
-}
-
-function validateManifest(manifest, promptPack) {
-  assert(manifest.schemaVersion === 1, 'Unsupported room manifest schemaVersion.');
-  assert(manifest.repository === 'jussray/Sekret-Bip', 'Manifest repository mismatch.');
-  assert(JSON.stringify(manifest.policies?.bottomNavigation) === JSON.stringify(EXPECTED_NAV), `Bottom navigation must remain exactly: ${EXPECTED_NAV.join(', ')}`);
-  assert(manifest.policies.bottomNavigationLocked === true, 'Bottom navigation must be locked.');
-  assert(manifest.policies.userRoomOwnsDashboardCards === true, 'User Room must own dashboard/update cards.');
-  assert(manifest.policies.companionRoomsRejectDashboardCards === true, 'Companion rooms must reject dashboard cards.');
-  assert(manifest.policies.companionRoomsArePermanentDestinations === true, 'Companion rooms must remain permanent destinations.');
-  assert(JSON.stringify(manifest.productionScope?.characters) === JSON.stringify(['night']), 'The first production slice must contain only Night.');
-  assert(JSON.stringify(manifest.productionScope?.rooms) === JSON.stringify(['night']), 'The first room production slice must contain only Night.');
-  assert(manifest.rooms?.night?.verticalSlice === true, 'Night must remain the first vertical slice.');
-  assert(manifest.runtime?.assetRegistry, 'Runtime asset registry is required.');
-  assert(Array.isArray(manifest.runtime?.registryConsumers) && manifest.runtime.registryConsumers.length > 0, 'Runtime registry consumers are required.');
-  const requiredPoses = manifest.characters.night.requiredPoses;
-  const promptedPoses = promptPack.poses.map(item => item.id);
-  assert(JSON.stringify(requiredPoses) === JSON.stringify(promptedPoses), 'Night prompt pose order must exactly match the manifest.');
-  assert(JSON.stringify(manifest.phases) === JSON.stringify(promptPack.roomPhases.map(item => item.id)), 'Room phase order must exactly match the prompt pack.');
-  assert(promptPack.canonicalMaster === manifest.characters.night.canonicalMaster, 'Canonical Night master mismatch.');
-  assert(promptPack.roomMaster === manifest.rooms.night.baseAsset, 'Night room master mismatch.');
-}
-
-function buildQueue(promptPack) {
-  return [
-    ...promptPack.poses.map(pose => ({ kind: 'character-pose', characterId: 'night', pose: pose.id, file: pose.file, fallback: promptPack.canonicalMaster })),
-    ...promptPack.roomPhases.map(phase => ({ kind: 'room-phase', roomId: 'night', phase: phase.id, file: phase.file, fallback: promptPack.roomMaster })),
-  ];
-}
-
-function pngMetadata(buffer) {
-  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-  if (buffer.length < 33 || !buffer.subarray(0, 8).equals(signature) || buffer.toString('ascii', 12, 16) !== 'IHDR') throw new Error('invalid_png');
-  const colorType = buffer[25];
-  return { format: 'png', width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20), transparent: colorType === 4 || colorType === 6 || buffer.includes(Buffer.from('tRNS')) };
-}
-
-function jpegMetadata(buffer) {
-  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) throw new Error('invalid_jpeg');
-  const sofMarkers = new Set([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf]);
-  let offset = 2;
-  while (offset + 8 < buffer.length) {
-    if (buffer[offset] !== 0xff) { offset += 1; continue; }
-    const marker = buffer[offset + 1];
-    offset += 2;
-    if (marker === 0xd8 || marker === 0xd9 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
-    if (offset + 2 > buffer.length) break;
-    const length = buffer.readUInt16BE(offset);
-    if (length < 2 || offset + length > buffer.length) break;
-    if (sofMarkers.has(marker)) return { format: 'jpeg', width: buffer.readUInt16BE(offset + 5), height: buffer.readUInt16BE(offset + 3), transparent: false };
-    offset += length;
+export function runtimeOutputFor(item) {
+  assert(item && typeof item === 'object', 'Missing room production job.');
+  if (item.kind === 'character-pose') {
+    const characterId = safeName(item.characterId);
+    const pose = fileToken(safeName(item.pose));
+    const output = path.join('assets', 'images', 'companions', 'teen', characterId, `${pose}.png`);
+    safeProjectPath(output);
+    return output;
   }
-  throw new Error('jpeg_dimensions_missing');
+  assert(item.kind === 'room-phase', 'Unsupported room production job.');
+  const roomId = safeName(item.roomId);
+  const phase = fileToken(safeName(item.phase));
+  const output = path.join('assets', 'images', 'resized-bg', `bg-${roomId}-room-${phase}.jpg`);
+  safeProjectPath(output);
+  return output;
 }
 
-function readImageMetadata(filePath) {
-  const buffer = fs.readFileSync(filePath);
-  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return pngMetadata(buffer);
-  if (buffer[0] === 0xff && buffer[1] === 0xd8) return jpegMetadata(buffer);
-  throw new Error('unsupported_image_format');
-}
+function writeReports(runDir, report) {
+  const runId = safeRunId(report.runId);
+  assert(runDir === safeProjectPath('.room-foreman', 'runs', runId), 'Invalid report directory.');
+  // Reviewed false-positive: runDir is equal-checked against the repository-bound path made from validated runId.
+  // bearer:disable javascript_lang_path_traversal
+  fs.mkdirSync(runDir, { recursive: true, mode: 0o700 });
+  // Reviewed false-positive: reportPath accepts only the validated runId and one fixed basename; exclusive creation.
+  // bearer:disable javascript_lang_path_traversal
+  fs.writeFileSync(reportPath(runId, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx', mode: 0o600 });
 
-function validateImage(filePath, requirements = {}) {
-  const metadata = readImageMetadata(filePath);
-  if (requirements.format && metadata.format !== requirements.format) throw new Error(`expected_${requirements.format}_received_${metadata.format}`);
-  if (requirements.minimumWidth && metadata.width < requirements.minimumWidth) throw new Error(`width_${metadata.width}_below_${requirements.minimumWidth}`);
-  if (requirements.minimumHeight && metadata.height < requirements.minimumHeight) throw new Error(`height_${metadata.height}_below_${requirements.minimumHeight}`);
-  if (requirements.transparent && !metadata.transparent) throw new Error('transparent_background_required');
-  if (requirements.aspectRatio) {
-    const actual = metadata.width / metadata.height;
-    if (Math.abs(actual - requirements.aspectRatio) > 0.03) throw new Error(`aspect_ratio_${actual.toFixed(3)}_outside_contract`);
-  }
-  if (requirements.sameDimensionsAs && (metadata.width !== requirements.sameDimensionsAs.width || metadata.height !== requirements.sameDimensionsAs.height)) {
-    throw new Error(`geometry_dimensions_${metadata.width}x${metadata.height}_differ_from_${requirements.sameDimensionsAs.width}x${requirements.sameDimensionsAs.height}`);
-  }
-  return metadata;
-}
+  const markdown = [
+    '# Room Foreman Run',
+    '',
+    `- Run: ${report.runId}`,
+    `- Mode: ${report.mode}`,
+    `- Status: ${report.status}`,
+    `- Started: ${report.startedAt}`,
+    `- Finished: ${report.finishedAt}`,
+    '',
+    '## Results',
+    ...report.results.map(result => `- ${result.status.toUpperCase()} — ${result.label}${result.detail ? `: ${result.detail}` : ''}`),
+    '',
+  ].join('\n');
 
-const ROOT_DIR = process.cwd();
-const RUN_DIR = path.resolve('.room-foreman', 'runs', 'latest');
-const EVIDENCE_DIR = path.join(RUN_DIR, 'evidence');
-const REGISTRY_CONSUMER_FILES = ['src/components/room/character/SekretSprite.tsx'];
-const TOOL_PROFILE_DIRS = {
-  canva: '.room-foreman/profiles/canva',
-  figma: '.room-foreman/profiles/figma',
-  leonardo: '.room-foreman/profiles/leonardo',
-  app: '.room-foreman/profiles/app',
-};
-const TOOL_EVIDENCE_FILES = {
-  canva: { workspace: 'canva-workspace.png', checkpoint: 'canva-checkpoint.png' },
-  figma: { workspace: 'figma-workspace.png', checkpoint: 'figma-checkpoint.png' },
-  leonardo: { workspace: 'leonardo-workspace.png', checkpoint: 'leonardo-checkpoint.png' },
-  app: { workspace: 'app-workspace.png', checkpoint: 'app-checkpoint.png' },
-};
-
-// Returns the text of one registry entry. Handles both forms the runtime registry uses:
-//   key: { ...multi-line object... }
-//   key: fallback('<generatedFile>')   (expanded exactly as the registry's fallback() helper defines it)
-export function registryBlock(source, collectionName, key) {
-  const collectionIndex = source.indexOf(`export const ${collectionName}`);
-  assert(collectionIndex >= 0, `Registry is missing ${collectionName}.`);
-  const collectionEnd = source.indexOf('\n};', collectionIndex);
-  const body = source.slice(collectionIndex, collectionEnd > 0 ? collectionEnd : undefined);
-  const entry = new RegExp(`^\\s*${key}:\\s*(\\{|fallback\\()`, 'm').exec(body);
-  assert(entry, `Registry is missing ${collectionName}.${key}.`);
-  if (entry[1] !== '{') {
-    const call = /^\s*\w+:\s*fallback\(\s*'([^']+)'\s*\)/.exec(body.slice(entry.index));
-    assert(call, `Registry entry ${collectionName}.${key} has a malformed fallback call.`);
-    const canonical = /const canonicalFile = '([^']+)'/.exec(source);
-    assert(canonical, 'Registry is missing canonicalFile for fallback entries.');
-    return `generatedFile: '${call[1]}', activeFile: '${canonical[1]}', status: 'fallback'`;
-  }
-  const open = entry.index + entry[0].length - 1;
-  let depth = 0;
-  let end = -1;
-  for (let index = open; index < body.length && end < 0; index += 1) {
-    if (body[index] === '{') depth += 1;
-    else if (body[index] === '}') {
-      depth -= 1;
-      if (depth === 0) end = index;
-    }
-  }
-  assert(end > 0, `Registry entry ${collectionName}.${key} is not closed.`);
-  // Resolve bare references to string constants (e.g. generatedFile: canonicalFile) into literals.
-  const constants = new Map([...source.matchAll(/const (\w+) = '([^']+)'/g)].map(match => [match[1], match[2]]));
-  return body.slice(open + 1, end).replace(/(\w+):\s*([A-Za-z_]\w*)(?=\s*[,}\n]|\s*$)/g, (match, prop, identifier) =>
-    constants.has(identifier) ? `${prop}: '${constants.get(identifier)}'` : match);
-}
-
-function requirePathFor(registryPath, assetPath) {
-  let relative = path.relative(path.dirname(registryPath), assetPath).replaceAll('\\', '/');
-  if (!relative.startsWith('.')) relative = `./${relative}`;
-  return relative;
-}
-
-function validateRegistryConsumer(manifest) {
-  for (const consumer of manifest.runtime.registryConsumers) {
-    assert(REGISTRY_CONSUMER_FILES.includes(consumer), 'Unknown registry consumer.');
-  }
-  for (const file of REGISTRY_CONSUMER_FILES) {
-    const source = fs.readFileSync(path.join(ROOT_DIR, file), 'utf8');
-    assert(source.includes('NIGHT_ROOM_POSE_ASSETS'), `${file} does not consume NIGHT_ROOM_POSE_ASSETS.`);
-  }
-}
-
-function verifyAssets({ rootDir, manifest, promptPack }) {
-  const results = [];
-  const registryRelative = manifest.runtime.assetRegistry;
-  const registryPath = path.join(rootDir, registryRelative);
-  const registrySource = fs.readFileSync(registryPath, 'utf8');
-  validateRegistryConsumer(manifest);
-  const minimum = parseSize(promptPack.output.minimumSize);
-  const aspectRatio = parseAspectRatio(promptPack.output.aspectRatio);
-  const canonicalPath = path.join(rootDir, promptPack.canonicalMaster);
-  const canonicalRequire = requirePathFor(registryRelative, promptPack.canonicalMaster);
-  assert(registrySource.includes(`require('${canonicalRequire}')`), 'Canonical Night fallback is not statically required by the runtime registry.');
-  let canonicalMetadata;
-  try {
-    canonicalMetadata = validateImage(canonicalPath, { format: 'png', transparent: true });
-    results.push({ status: 'pass', label: promptPack.canonicalMaster, detail: `${canonicalMetadata.width}x${canonicalMetadata.height} transparent canonical fallback` });
-  } catch (error) {
-    results.push({ status: 'fail', label: promptPack.canonicalMaster, detail: error instanceof Error ? error.message : String(error) });
-    return results;
-  }
-  for (const pose of promptPack.poses) {
-    const absolute = path.join(rootDir, pose.file);
-    const block = registryBlock(registrySource, 'NIGHT_ROOM_POSE_ASSETS', pose.id);
-    assert(block.includes(`generatedFile: '${pose.file}'`), `Registry generatedFile mismatch for ${pose.id}.`);
-    if (!fs.existsSync(absolute)) {
-      assert(block.includes(`activeFile: '${promptPack.canonicalMaster}'`), `Missing pose ${pose.id} must activate the canonical fallback.`);
-      assert(block.includes("status: 'fallback'"), `Missing pose ${pose.id} must be marked fallback.`);
-      results.push({ status: 'fallback', label: pose.file, detail: `using ${promptPack.canonicalMaster}` });
-      continue;
-    }
-    const expectedRequire = requirePathFor(registryRelative, pose.file);
-    assert(block.includes(`require('${expectedRequire}')`) || pose.file === promptPack.canonicalMaster, `Present pose ${pose.id} is not statically required by the runtime registry.`);
-    assert(block.includes(`activeFile: '${pose.file}'`), `Present pose ${pose.id} is not active in the runtime registry.`);
-    assert(block.includes("status: 'generated'"), `Present pose ${pose.id} must be marked generated.`);
-    try {
-      const isCanonical = pose.file === promptPack.canonicalMaster;
-      const metadata = validateImage(absolute, { format: 'png', transparent: true, ...(isCanonical ? {} : { minimumWidth: minimum.width, minimumHeight: minimum.height, aspectRatio }) });
-      results.push({ status: 'pass', label: pose.file, detail: `${metadata.width}x${metadata.height} transparent runtime pose` });
-    } catch (error) {
-      results.push({ status: 'fail', label: pose.file, detail: error instanceof Error ? error.message : String(error) });
-    }
-  }
-  const roomMasterPath = path.join(rootDir, promptPack.roomMaster);
-  let roomMasterMetadata;
-  try {
-    roomMasterMetadata = validateImage(roomMasterPath, { format: 'jpeg' });
-  } catch (error) {
-    results.push({ status: 'fail', label: promptPack.roomMaster, detail: error instanceof Error ? error.message : String(error) });
-    return results;
-  }
-  for (const phase of promptPack.roomPhases) {
-    const absolute = path.join(rootDir, phase.file);
-    const block = registryBlock(registrySource, 'NIGHT_ROOM_PHASE_ASSETS', phase.id);
-    assert(block.includes(`file: '${phase.file}'`), `Registry file mismatch for room phase ${phase.id}.`);
-    if (!fs.existsSync(absolute)) {
-      results.push({ status: 'missing', label: phase.file, detail: 'Night room phase is required.' });
-      continue;
-    }
-    const expectedRequire = requirePathFor(registryRelative, phase.file);
-    assert(block.includes(`require('${expectedRequire}')`), `Room phase ${phase.id} is not statically required by the runtime registry.`);
-    try {
-      const metadata = validateImage(absolute, { format: 'jpeg', sameDimensionsAs: roomMasterMetadata });
-      results.push({ status: 'pass', label: phase.file, detail: `${metadata.width}x${metadata.height} geometry-locked room phase` });
-    } catch (error) {
-      results.push({ status: 'fail', label: phase.file, detail: error instanceof Error ? error.message : String(error) });
-    }
-  }
-  return results;
-}
-
-function writeReports(report) {
-  fs.mkdirSync(RUN_DIR, { recursive: true });
-  fs.writeFileSync(path.join(RUN_DIR, 'run-report.json'), `${JSON.stringify(report, null, 2)}\n`);
-  const markdown = ['# Room Foreman Run', '', `- Run: ${report.runId}`, `- Mode: ${report.mode}`, `- Status: ${report.status}`, `- Started: ${report.startedAt}`, `- Finished: ${report.finishedAt}`, '', '## Results', ...report.results.map(result => `- ${result.status.toUpperCase()} — ${result.label}${result.detail ? `: ${result.detail}` : ''}`), ''].join('\n');
-  fs.writeFileSync(path.join(RUN_DIR, 'run-report.md'), markdown);
+  fs.writeFileSync(reportPath(runId, 'run-report.md'), markdown, { flag: 'wx', mode: 0o600 });
 }
 
 function resolveWorkspaceUrl(tool, manifest) {
@@ -282,74 +215,100 @@ function resolveWorkspaceUrl(tool, manifest) {
   return '';
 }
 
-async function runInteractiveTool(tool, manifest, args) {
-  assert(TOOL_PROFILE_DIRS[tool] && TOOL_EVIDENCE_FILES[tool], 'Unsupported interactive tool.');
+async function runInteractiveTool(tool, manifest, runDir, args) {
+  assert(TOOLS.includes(tool), 'Unsupported interactive tool.');
+  const runId = safeRunId(path.basename(runDir));
+  assert(runDir === safeProjectPath('.room-foreman', 'runs', runId), 'Invalid evidence directory.');
   const url = resolveWorkspaceUrl(tool, manifest);
-  if (!url) return { status: 'blocked', label: tool, detail: 'Workspace URL environment variable is not configured.' };
-  const { chromium } = await import('@playwright/test');
-  const profileDir = path.resolve(TOOL_PROFILE_DIRS[tool]);
-  const evidenceDir = EVIDENCE_DIR;
+  if (!url) {
+    return { status: 'blocked', label: tool, detail: 'Workspace URL environment variable is not configured.' };
+  }
+
+  const profileDir = safeProjectPath('.room-foreman', 'profiles', tool);
+  const evidenceDir = safeProjectPath('.room-foreman', 'runs', runId, 'evidence');
   fs.mkdirSync(profileDir, { recursive: true });
   fs.mkdirSync(evidenceDir, { recursive: true });
-  const context = await chromium.launchPersistentContext(profileDir, { headless: args.headless, viewport: { width: 1440, height: 1000 } });
+
+  const context = await chromium.launchPersistentContext(profileDir, {
+    headless: args.headless,
+    viewport: { width: 1440, height: 1000 },
+  });
+
   try {
     const page = context.pages()[0] ?? await context.newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 90_000 });
-    await page.screenshot({ path: path.join(evidenceDir, TOOL_EVIDENCE_FILES[tool].workspace), fullPage: true });
+    await page.screenshot({ path: safeProjectPath('.room-foreman', 'runs', runId, 'evidence', WORKSPACE_IMAGES[tool]), fullPage: true });
+
     if (!args.headless && args.holdMs > 0) {
-      console.log('ROOM_FOREMAN_MANUAL_LOGIN_WAIT');
+      console.log('ROOM_FOREMAN_INTERACTIVE_WORKSPACE_OPEN');
       await page.waitForTimeout(args.holdMs);
-      await page.screenshot({ path: path.join(evidenceDir, TOOL_EVIDENCE_FILES[tool].checkpoint), fullPage: true });
+      await page.screenshot({ path: safeProjectPath('.room-foreman', 'runs', runId, 'evidence', CHECKPOINT_IMAGES[tool]), fullPage: true });
     }
+
     return { status: 'captured', label: tool, detail: `Evidence saved under ${evidenceDir}.` };
   } finally {
     await context.close();
   }
 }
 
-function hasBlockingResults(results) {
-  return results.some(result => BLOCKING_STATUSES.has(result.status));
-}
-
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (args.help) { usage(); return; }
-  const rootDir = process.cwd();
-  const manifestPath = path.resolve(args.manifest);
+  if (args.help) {
+    usage();
+    return;
+  }
+
+  const manifestPath = resolveManifestPath(args.manifest);
   const manifest = readJson(manifestPath);
-  const promptPack = readJson(path.join(rootDir, manifest.creativeTools.leonardo.promptPack));
-  validateManifest(manifest, promptPack);
-  const runId = new Date().toISOString().replace(/[:.]/g, '-');
+  validateManifest(manifest);
+  const promptPack = readJson(safeProjectPath(manifest.creativeTools.leonardo.promptPack));
+  validateAssetManifest(manifest, promptPack);
+
+  const runId = safeRunId(new Date().toISOString().replace(/[:.]/g, '-'));
+  const runDir = safeProjectPath('.room-foreman', 'runs', runId);
   const startedAt = new Date().toISOString();
   const results = [];
+  const queue = buildQueue(manifest);
+
   if (args.mode === 'plan') {
-    const queue = buildQueue(promptPack);
-    results.push({ status: 'pass', label: 'manifest', detail: `${queue.length} vertical-slice jobs validated.` });
-    queue.forEach(() => console.log('ROOM_FOREMAN_QUEUE_ITEM'));
+    results.push({ status: 'pass', label: 'manifest', detail: `${queue.length} production jobs validated.` });
+    for (const item of queue) {
+      results.push({ status: 'planned', label: runtimeOutputFor(item), detail: item.kind });
+    }
   } else if (args.mode === 'verify') {
-    results.push(...verifyAssets({ rootDir, manifest, promptPack }));
+    results.push(...verifyAssets({ rootDir: ROOT, manifest, promptPack }));
   } else if (args.mode === 'interactive') {
-    const allowed = ['canva', 'figma', 'leonardo', 'app'];
-    const tools = args.tool === 'all' ? allowed : [args.tool];
+    const tools = args.tool === 'all' ? TOOLS : [args.tool];
     for (const tool of tools) {
-      assert(allowed.includes(tool), `Unsupported interactive tool: ${tool}`);
-      results.push(await runInteractiveTool(tool, manifest, args));
+      assert(TOOLS.includes(tool), 'Unsupported interactive tool.');
+      results.push(await runInteractiveTool(tool, manifest, runDir, args));
     }
   } else {
     throw new Error(`Unsupported mode: ${args.mode}`);
   }
-  const blocking = hasBlockingResults(results);
-  const report = { runId, mode: args.mode, tool: args.tool, manifest: path.relative(rootDir, manifestPath), startedAt, finishedAt: new Date().toISOString(), status: blocking ? 'attention-required' : 'pass', results };
-  writeReports(report);
-  console.log('ROOM_FOREMAN_FINISHED');
-  console.log('ROOM_FOREMAN_REPORT_WRITTEN');
+
+  const blocking = results.some(result => ['missing', 'blocked', 'fail'].includes(result.status));
+  const report = {
+    runId,
+    mode: args.mode,
+    tool: args.tool,
+    manifest: path.relative(process.cwd(), manifestPath),
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    status: blocking ? 'attention-required' : 'pass',
+    results,
+  };
+
+  writeReports(runDir, report);
+  if (blocking) console.error('ROOM_FOREMAN_ATTENTION_REQUIRED');
+  else console.log('ROOM_FOREMAN_REPORT_WRITTEN');
+
   if (blocking) process.exitCode = 1;
 }
 
 const isMain = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isMain) main().catch(() => {
-  console.error('ROOM_FOREMAN_FAILED');
+  // Do not surface provider, path, or credential-shaped content through CI logs.
+  console.error('ROOM_FOREMAN_EXECUTION_FAILED');
   process.exitCode = 1;
 });
-
-export { buildQueue, fileToken, hasBlockingResults, parseAspectRatio, parseSize, readImageMetadata, validateImage, validateManifest, verifyAssets };

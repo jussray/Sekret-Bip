@@ -10,6 +10,7 @@ import {
 import {
   fetchParentLinkStatuses,
   revokeParentLinkResult,
+  reviewParentLinkRequestResult,
   type ParentLinkAccountSide,
   type ParentLinkStatusSnapshot,
 } from '@/utils/relationshipLinkStatus';
@@ -25,9 +26,12 @@ interface ParentLinkStatusCardProps {
   onRevoked?: () => void;
 }
 
-function statusCopy(link: ParentLinkStatusSnapshot): string {
+function statusCopy(link: ParentLinkStatusSnapshot, accountSide: ParentLinkAccountSide): string {
   if (link.status === 'active') return 'Linked access is active.';
   if (link.status === 'pending') {
+    if (!link.isActive) return accountSide === 'teen'
+      ? 'An adult requested a connection. Review before any Bridge access starts.'
+      : 'Waiting for your teen to approve. No Bridge access is active.';
     if (link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now()) {
       return 'This invitation has reached its expiry time. Generate a fresh code to continue.';
     }
@@ -54,6 +58,7 @@ export function ParentLinkStatusCard({
   const requestId = useRef(0);
   const [loadState, setLoadState] = useState<LoadState>({ kind: 'loading' });
   const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
 
   const loadStatus = useCallback(async () => {
     const currentRequest = ++requestId.current;
@@ -108,6 +113,19 @@ export function ParentLinkStatusCard({
     );
   }, [counterparty, loadStatus, onRevoked]);
 
+  const reviewRequest = useCallback(async (linkId: string, approve: boolean) => {
+    if (reviewingId) return;
+    setReviewingId(linkId);
+    const result = await reviewParentLinkRequestResult(linkId, approve);
+    setReviewingId(null);
+    if (!result.ok || !result.value) {
+      Alert.alert('Could not review request', result.ok
+        ? 'That request is no longer pending. Refresh to check its state.'
+        : result.message);
+    }
+    await loadStatus();
+  }, [loadStatus, reviewingId]);
+
   return (
     <View style={styles.panel}>
       <Text style={styles.heading}>{counterparty === 'parent' ? 'Parent' : 'Teen'} link status</Text>
@@ -155,9 +173,31 @@ export function ParentLinkStatusCard({
             <Text style={styles.statusLabel}>
               {loadState.links.length > 1 ? `Link ${index + 1}: ` : ''}{link.status}
             </Text>
-            <Text style={styles.body}>{statusCopy(link)}</Text>
+            <Text style={styles.body}>{statusCopy(link, accountSide)}</Text>
             {updated && <Text style={styles.metadata}>{updated}</Text>}
-            {link.canRevoke && (
+            {accountSide === 'teen' && link.status === 'pending' && !link.isActive && (
+              <View>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.secondaryButton}
+                  disabled={reviewingId !== null || unlinkingId !== null}
+                  onPress={() => void reviewRequest(link.linkId, true)}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    {reviewingId === link.linkId ? 'Reviewing…' : 'Approve parent request'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={styles.dangerButton}
+                  disabled={reviewingId !== null || unlinkingId !== null}
+                  onPress={() => void reviewRequest(link.linkId, false)}
+                >
+                  <Text style={styles.dangerButtonText}>Reject parent request</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            {link.canRevoke && !(accountSide === 'teen' && link.status === 'pending' && !link.isActive) && (
               <TouchableOpacity
                 accessibilityRole="button"
                 style={styles.dangerButton}

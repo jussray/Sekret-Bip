@@ -47,6 +47,18 @@ on:
       - test/supabase-bridge-rls-authorization.test.mjs
       - test/trigger-function-hardening.test.mjs
       - e2e/smoke.spec.ts
+      - src/context/VerificationContext.tsx
+      - src/components/shared/NotificationBootstrap.tsx
+      - app/index.tsx
+      - test/mobile-entry-performance-contract.test.mjs
+      - src/services/auth/postAuthBootstrap.ts
+      - scripts/configure-supabase-auth-email.mjs
+      - scripts/auth-email-continuity.mjs
+      - test/auth-email-continuity.test.mjs
+      - e2e/live-onboarding-email.spec.ts
+      - .github/workflows/live-signup-proof.yml
+      - test/email-confirmation-access-gate.test.mjs
+      - config/supabase-targets.json
       - package.json
       - package-lock.json
       - .github/workflows/onboarding-type-gate.yml
@@ -119,6 +131,29 @@ jobs:
             test/bridge-learning-teaching-contract.test.mjs \
             test/journal-avatar-presentation.test.mjs \
             2>&1 | tee gate-evidence/focused-tests.log
+
+      - name: Record exact-head email verification proof cookie
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --test test/email-confirmation-access-gate.test.mjs test/auth-email-continuity.test.mjs \
+            2>&1 | tee gate-evidence/email-confirmation-contracts.log
+          node scripts/auth-email-continuity.mjs
+
+      # The video-master contract is part of npm test. Provision its real
+      # ffmpeg/ffprobe witnesses rather than recording an avoidable test skip.
+      - name: Install video proof tooling for complete unit suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
 
       - name: Run complete unit suite
         shell: bash

@@ -17,13 +17,30 @@
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebSite",
+        "@id": "https://sekretbip.net/#website",
+        "url": "https://sekretbip.net/",
+        "name": "Se'kret Bip",
+        "inLanguage": "en"
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://sekretbip.net/#software",
+        "name": "Se'kret Bip",
+        "url": "https://sekretbip.net/",
+        "applicationCategory": "LifestyleApplication",
+        "operatingSystem": "Web, iOS, Android",
+        "description": "A private, age-aware digital space for young people and families to reflect, express feelings, and communicate through separate teen and family experiences."
+      },
+      {
         "@type": "WebPage",
         "@id": "https://sekretbip.net/privacy-and-safety/#page",
         "url": "https://sekretbip.net/privacy-and-safety/",
         "name": "Privacy and safety at Se'kret Bip",
+        "dateModified": "2026-11-21",
         "description": "A plain-language description of Se'kret Bip's product privacy, identity, parent-access, age-aware, safety, and AI boundaries.",
         "isPartOf": { "@id": "https://sekretbip.net/#website" },
-        "about": { "@id": "https://sekretbip.net/what-is-sekret-bip/#app" }
+        "about": { "@id": "https://sekretbip.net/#software" }
       },
       {
         "@type": "FAQPage",
@@ -239,6 +256,8 @@
     <footer>
       <p>Want the product flow next? <a class="cta" href="/how-it-works/">Read “How Se'kret Bip works.”</a></p>
     </footer>
+      <p><a href="/site-map/">Public site map</a> · <a href="/llms.txt">AI-readable product summary</a></p>
+
   </main>
 </body>
 </html>

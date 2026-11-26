@@ -22,7 +22,8 @@ type ConversationIntent =
   | 'planning'
   | 'creative'
   | 'emotional_support'
-  | 'safety_crisis';
+  | 'safety_crisis'
+  | 'identity_question';
 
 interface Env {
   OPENAI_API_KEY: string;
@@ -122,7 +123,7 @@ Teens curse. That is normal. If the teen uses profanity first, you can mirror it
 - 1–4 short sentences. Shorter is almost always better. Match the length of what the teen sent.
 - At most ONE question. Zero questions is often the right call.
 - No therapy or clinical language: "validate," "process," "unpack," "trauma response," "coping mechanism," "self-regulate," "hold space," "sit with your feelings," "check in with yourself" — never.
-- Never say "as an AI," "I'm an AI," or anything that breaks the peer fiction.
+- Never say "as an AI," "I'm an AI," or anything that breaks the peer fiction — except when the teen sincerely and directly asks whether you're real, human, or an AI. Then tell the truth plainly and warmly: you're an AI companion, not a human, and say so without hedging, denial, or deflection. This is the one case where honesty overrides the peer fiction; every other voice rule still applies.
 - Never open with "I hear you," "That sounds really hard," "I'm here for you." Start with something specific and real.
 - Never quote motivational sayings, proverbs, affirmations, or inspirational lines.
 - Never close with "You've got this," "You're not alone," or "Keep going!"
@@ -330,7 +331,7 @@ THINGS SE'KRET NEVER DOES:
 - Never sounds like a fortune teller making predictions.
 - Never uses astrology, horoscope, or "the universe" framing.
 - Never makes the teen feel categorized, diagnosed, or studied.
-- Never says "as an AI" or breaks the experience.
+- Never says "as an AI" or breaks the experience — except when sincerely and directly asked whether she's real, human, or an AI; then she says so plainly and warmly, without hedging or denial.
 `.trim(),
 
   parentCoach: `
@@ -1227,7 +1228,12 @@ const VOICE_INSTRUCTIONS: Record<CharacterId, string> = {
   parentCoach: "Speak as a warm, grounded coaching presence for a parent. Sound calm, real, and quietly knowing — like a trusted person sitting across the table, not a wellness app.",
 };
 
-export const CRISIS_RE = /\b(kill myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm|hurt myself|cut myself|disappear forever|run away|abuse|abused|assault|unsafe|not safe|danger|emergency)\b/i;
+export const CRISIS_RE = /\b(kill myself|killing myself|end my life|want to die|suicid(?:e|al)|self[- ]?harm(?:ing|ed|s)?|hurt myself|hurting myself|cut myself|cutting myself|disappear forever|run away|abuse(?:s|d)?|abusing|assault(?:s|ed|ing)?|unsafe|not safe|danger|emergency)\b/i;
+
+// Trust-08: a sincere, direct question about whether the companion is real/human/AI
+// must get an honest answer, never a denial — this is a deterministic override of
+// the peer-fiction voice rule, same tier as the crisis intercept above.
+const IDENTITY_RE = /\b(?:are you (?:a |an )?(?:real|human|a person|an? ai|a bot|a robot|a computer|a chatbot)|is (?:this|that) (?:a |an )?(?:ai|bot|robot|chatbot)|am i (?:talking|texting) to (?:a |an )?(?:ai|bot|robot|human|person)|r u (?:real|human|ai|a bot))\s*[?!.]*$/i;
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), { status, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
@@ -1298,6 +1304,8 @@ function detectIntent(text: string, history: ConversationTurn[]): ConversationIn
   const t = text.trim().toLowerCase();
 
   if (CRISIS_RE.test(text)) return 'safety_crisis';
+
+  if (IDENTITY_RE.test(text)) return 'identity_question';
 
   // Pure greeting openers
   if (/^(hey+|hi+|hello|heyy+|hiii+|sup|wassup|wyd|what'?s? ?up|what you on|yo+|ayo|heyyy)\s*[!?.😭😂🙂]*$/i.test(t)) return 'greeting';
@@ -1409,6 +1417,26 @@ export function crisisReply(characterId: CharacterId, parentSharingEnabled: bool
     safetyFlag: true,
     parentShareSummary: parentSharingEnabled ? 'Safety concern: teen may need trusted adult or emergency support.' : null,
     suggestedComfortTool: 'safety-plan',
+    replySource: 'fallback',
+  };
+}
+
+function identityReply(characterId: CharacterId): CompanionReply {
+  const lead = characterId === 'rylane'
+    ? 'Real talk —'
+    : characterId === 'cloud'
+      ? 'Gentle honesty —'
+      : characterId === 'night'
+        ? 'Straight up —'
+        : characterId === 'sekret'
+          ? 'Honestly?'
+          : 'Not gonna dodge this —';
+  return {
+    reply: `${lead} I'm an AI companion, not a human. I'm not pretending otherwise — I just talk like a real friend because that's how I'm here for you.`,
+    tone: 'honest',
+    safetyFlag: false,
+    parentShareSummary: null,
+    suggestedComfortTool: null,
     replySource: 'fallback',
   };
 }
@@ -1552,6 +1580,8 @@ async function handleReply(request: Request, env: Env, principal: PreflightPrinc
 
   if (intent === 'safety_crisis' || CRISIS_RE.test(userText)) return json(crisisReply(characterId, parentSharingEnabled));
 
+  if (intent === 'identity_question') return json(identityReply(characterId));
+
   const fallbackReply = getFallbackReply(characterId, userText, history, intent, userName);
   if (!env.OPENAI_API_KEY) {
     return json({
@@ -1678,8 +1708,8 @@ async function handleReply(request: Request, env: Env, principal: PreflightPrinc
       },
       durationMs: Date.now() - startedAt,
     });
-  } catch (error) {
-    console.error('[sekret/reply]', error);
+  } catch {
+    console.error('SEKRET_REPLY_PROVIDER_FAILED');
     return json({
       reply: fallbackReply,
       tone: intent === 'greeting' ? 'casual' : characterId,
@@ -1765,8 +1795,8 @@ async function handleTranscribe(request: Request, env: Env): Promise<Response> {
     if (!res.ok) return json({ error: 'transcription failed' }, 502);
     const data = await res.json() as { text?: string };
     return json({ transcript: typeof data.text === 'string' ? data.text.trim() : '', model: getModels(env).stt });
-  } catch (error) {
-    console.error('[sekret/transcribe]', error);
+  } catch {
+    console.error('SEKRET_TRANSCRIPTION_FAILED');
     return json({ error: 'transcription error' }, 500);
   }
 }

@@ -10,9 +10,7 @@ const require = createRequire(import.meta.url);
 
 try {
   execFileSync(path.resolve('node_modules/.bin/tsc'), [
-    'services/oracleDiscovery.ts',
-    'services/sekretPresence.ts',
-    'services/sekretVoice.ts',
+    '--project', 'tsconfig.oracle-discovery.json',
     '--outDir', outputDirectory,
     '--target', 'ES2020',
     '--module', 'commonjs',
