@@ -98,7 +98,9 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
     console.log(JSON.stringify({ status: 'receipt-validated', ...outcome }));
   } catch (error) {
     // Never echo receipt content, credentials, or identity data to CI logs.
-    console.error(error?.code === 'ENOENT' ? 'FAMILY_PROOF_RECEIPT_MISSING' : (error instanceof SyntaxError ? 'FAMILY_PROOF_JSON_INVALID' : error.message));
+    if (error?.code === 'ENOENT') console.error('FAMILY_PROOF_RECEIPT_MISSING');
+    else if (error instanceof SyntaxError) console.error('FAMILY_PROOF_JSON_INVALID');
+    else console.error('FAMILY_PROOF_VALIDATION_FAILED');
     process.exitCode = 1;
   }
 }
