@@ -58,6 +58,9 @@ export async function importMediaJobClips({ projectId, mappings }) {
       || receipt.outputApproval !== 'REVIEW_REQUIRED'
       || receipt.publishAuthority !== false) reject('JOB_RECEIPT_REJECTED');
 
+    if (mapping.expectedInputFingerprint !== undefined &&
+        (!HASH.test(mapping.expectedInputFingerprint) || receipt.inputFingerprint !== mapping.expectedInputFingerprint ||
+         receipt.adapterId !== mapping.expectedAdapterId || !HASH.test(receipt.result.output?.sha256 ?? ''))) reject('STORYBOARD_JOB_BINDING_MISMATCH');
     if (!text(mapping.mediaPath)) reject('NEEDS_MATERIALIZATION');
     if (!isAbsolute(mapping.mediaPath) || extname(mapping.mediaPath).toLowerCase() !== '.mp4') reject('LOCAL_MP4_REQUIRED');
     const media = await readLocal(mapping.mediaPath, 'NEEDS_MATERIALIZATION');
@@ -101,7 +104,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     console.log(JSON.stringify(result));
   } catch (error) {
     // Private paths, receipt contents, provider messages and media never enter logs.
-    const known = new Set(['PROJECT_NOT_SUPPORTED', 'SHOT_MAPPING_REQUIRED', 'SHOT_INVALID', 'SHOT_DUPLICATED', 'JOB_RECEIPT_INVALID', 'JOB_RECEIPT_REJECTED', 'NEEDS_MATERIALIZATION', 'LOCAL_MP4_REQUIRED', 'LOCAL_MP4_EMPTY', 'PROVIDER_OUTPUT_HASH_MISMATCH', 'HUMAN_REVIEW_REQUIRED', 'HUMAN_REVIEW_REJECTED', 'OUTPUT_PATH_REQUIRED', 'MAPPING_FILE_REQUIRED']);
+    const known = new Set(['PROJECT_NOT_SUPPORTED', 'SHOT_MAPPING_REQUIRED', 'SHOT_INVALID', 'SHOT_DUPLICATED', 'JOB_RECEIPT_INVALID', 'JOB_RECEIPT_REJECTED', 'STORYBOARD_JOB_BINDING_MISMATCH', 'NEEDS_MATERIALIZATION', 'LOCAL_MP4_REQUIRED', 'LOCAL_MP4_EMPTY', 'PROVIDER_OUTPUT_HASH_MISMATCH', 'HUMAN_REVIEW_REQUIRED', 'HUMAN_REVIEW_REJECTED', 'OUTPUT_PATH_REQUIRED', 'MAPPING_FILE_REQUIRED']);
     console.error(JSON.stringify({ kind: 'REJECTED', code: error?.code === 'EEXIST' ? 'OUTPUT_ALREADY_EXISTS' : known.has(error?.code) ? error.code : 'MEDIA_IMPORT_FAILED' }));
     process.exitCode = 1;
   }
