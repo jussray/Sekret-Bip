@@ -140,6 +140,21 @@ jobs:
             2>&1 | tee gate-evidence/email-confirmation-contracts.log
           node scripts/auth-email-continuity.mjs
 
+      # The video-master contract is part of npm test. Provision its real
+      # ffmpeg/ffprobe witnesses rather than recording an avoidable test skip.
+      - name: Install video proof tooling for complete unit suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get \
+            -o Acquire::Retries=3 \
+            -o Acquire::http::Timeout=30 \
+            -o Acquire::https::Timeout=30 \
+            update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+
       - name: Run complete unit suite
         shell: bash
         run: |

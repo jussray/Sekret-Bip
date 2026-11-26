@@ -14,6 +14,7 @@ import {
   type CrewRelationship,
 } from '@/services/crewRelationshipRepository';
 import { syncCrewMember, deleteCrewMember } from '@/utils/sync';
+import { scheduleCrewReminder, cancelCrewReminder } from '@/utils/notifications';
 import type { SyncStatus } from '../components/SyncBadge';
 
 interface Props {
@@ -90,6 +91,7 @@ export function BipCrewScreen({
     };
 
     setCrewMembers(current => [...current, member]);
+    void scheduleCrewReminder(member);
     const write = async () => { syncCrewMember(member); };
     if (withSyncWrap) void withSyncWrap(write);
     else void write();
@@ -113,6 +115,7 @@ export function BipCrewScreen({
     setCrewMembers(current => current.filter(item => String(item.id) !== String(member.id)));
     setCrewCheckIns(current => current.filter(item => String(item.memberId) !== String(member.id)));
     deleteCrewMember(member.id);
+    void cancelCrewReminder(member.id);
   }
 
   return (

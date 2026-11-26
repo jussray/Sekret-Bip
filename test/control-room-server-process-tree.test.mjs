@@ -38,10 +38,20 @@ async function waitForHealth(port, child) {
 function pidAlive(pid) {
   try {
     process.kill(pid, 0);
-    return true;
   } catch (error) {
     return error?.code !== 'ESRCH';
   }
+  // A terminated child can remain in /proc as an unreaped zombie in CI.
+  if (process.platform === 'linux') {
+    try {
+      const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+      const state = stat.slice(stat.lastIndexOf(')') + 2).split(' ')[0];
+      if (state === 'Z' || state === 'X') return false;
+    } catch (error) {
+      if (error?.code === 'ENOENT' || error?.code === 'ESRCH') return false;
+    }
+  }
+  return true;
 }
 
 async function waitForFile(file) {
@@ -83,8 +93,8 @@ test('timeout kills descendants before the mission lock is released', { skip: pr
       ...process.env,
       CONTROL_ROOM_LOCAL_PORT: String(port),
       CONTROL_ROOM_LOCAL_TOKEN: token,
-      CONTROL_ROOM_MISSION_TIMEOUT_MS: '150',
-      CONTROL_ROOM_TERMINATION_GRACE_MS: '120',
+      CONTROL_ROOM_MISSION_TIMEOUT_MS: '600',
+      CONTROL_ROOM_TERMINATION_GRACE_MS: '250',
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -101,6 +111,12 @@ test('timeout kills descendants before the mission lock is released', { skip: pr
   });
   const descendantPid = await waitForFile(pidFile);
   assert.equal(pidAlive(descendantPid), true);
+  const concurrent = await fetch(`http://127.0.0.1:${port}/missions/verify-local`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert.equal(concurrent.status, 409, 'mission lock must reject concurrent runs');
 
   const response = await missionPromise;
   const body = await response.json();

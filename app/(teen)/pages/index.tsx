@@ -48,6 +48,7 @@ import { useAppContext } from '@/context/AppContext';
 import { IMAGES } from '@/constants/theme';
 import { TEEN_ROUTES } from '@/teen/routes';
 import { updateSekretMemory } from '../../../services/sekretMemory';
+import { uploadImageToSupabase } from '../../../services/imageUpload';
 import {
   fetchSekretVoice,
   normalizeSekretCharacter,
@@ -55,6 +56,7 @@ import {
   type SekretCharacterId,
   type SekretHistoryTurn,
 } from '@/utils/api';
+import { getSupabase } from '@/utils/supabase';
 import { getTeenCompanionAsset } from '@/utils/companions';
 import type { JournalEntry } from '@/types';
 import {
@@ -432,6 +434,7 @@ export default function TeenPagesRoute() {
     setEntries(prev => [...prev, entry]);
     syncJournal(entry);
     setJournalText('');
+    const savedMediaUri = mediaUri;
     setMediaUri(undefined);
     setMediaType(undefined);
 
@@ -442,6 +445,21 @@ export default function TeenPagesRoute() {
       mood,
       journalEntries: [{ id: String(id), text, mood, date: new Date().toISOString() }],
     }).catch(() => null);
+
+    // Upload photo to Supabase Storage in background; patch entry with remote URL when done.
+    if (savedMediaUri && mediaType === 'photo') {
+      void (async () => {
+        try {
+          const sb = getSupabase();
+          const userId = (await sb?.auth.getUser())?.data?.user?.id;
+          if (!userId) return;
+          const remoteUrl = await uploadImageToSupabase(savedMediaUri, userId);
+          patchJournalEntry(id, { imageUri: remoteUrl });
+        } catch {
+          // local URI remains as fallback — not a user-facing error
+        }
+      })();
+    }
 
     if (!aiCompanion) return;
 

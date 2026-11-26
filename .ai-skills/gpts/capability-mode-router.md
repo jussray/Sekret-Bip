@@ -115,12 +115,12 @@ Use `/lindy /confess` together to prefer proven solutions AND honestly state whe
 
 ### Cross-Tool Relay Pattern
 ```
-1. Perplexity: Research the API/library → Save findings to file in repo
-2. Claude: Generate code based on findings → Commit to GitHub
-3. ChatGPT: Test code in Code Interpreter → Fix issues, commit fixes
-4. Perplexity: Verify final output works in browser
-5. Any: Ship from wherever working code is most current
-6. Sync: git pull before starting, git commit before switching tools
+1. Perplexity (if enabled): Research the API/library; save findings to a repository only with scoped write access and approval. Otherwise return sourced findings as NOT SAVED.
+2. Claude (if enabled): Prepare a patch; commit only with authorized repository access, verified branch/head and scoped approval. Otherwise return a proposed patch, NOT APPLIED.
+3. ChatGPT (if enabled): Test using available permitted tools; changes require scoped repository write authority. Otherwise mark tests NOT RUN and patches NOT APPLIED.
+4. Verify: Use available authorized, independent tests/browser checks tied to the exact subject; if unavailable, label proof NOT RUN and retain the gate.
+5. Any: Ship — only after explicit action-specific approval, exact-state evidence and required review/verification gates; latest working code alone is not shipping authority
+6. Sync: use GitHub only with authorized repo access/writes; recheck branch and exact head before commit or pull
 ```
 
 Every relay preserves authoritative repository, branch/PR, exact head SHA, evidence labels, rollback, and next authority gate. A tool switch does not reset the governed repair state or authorize stale evidence.
