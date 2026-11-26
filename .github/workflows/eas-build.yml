@@ -69,7 +69,7 @@ jobs:
             exit 1
           }
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\\nactual=%s\\n' "$EXPECTED_HEAD_SHA" "$actual"
+          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - uses: actions/setup-node@v4
@@ -84,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           eas_cli_version="$(node -p "require('./eas.json').cli.version")"
-          [[ "$eas_cli_version" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]] || {
+          [[ "$eas_cli_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
             echo 'eas.json cli.version must be an exact x.y.z version.' >&2
             exit 1
           }
@@ -141,22 +141,22 @@ jobs:
           EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
-          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \\
-            --environment "${{ inputs.channel }}" \\
-            --name EXPO_PUBLIC_SUPABASE_URL \\
-            --value "$EXPO_PUBLIC_SUPABASE_URL" \\
-            --visibility plaintext \\
-            --scope project \\
-            --force \\
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
+            --environment "${{ inputs.channel }}" \
+            --name EXPO_PUBLIC_SUPABASE_URL \
+            --value "$EXPO_PUBLIC_SUPABASE_URL" \
+            --visibility plaintext \
+            --scope project \
+            --force \
             --non-interactive
 
-          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \\
-            --environment "${{ inputs.channel }}" \\
-            --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \\
-            --value "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \\
-            --visibility sensitive \\
-            --scope project \\
-            --force \\
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
+            --environment "${{ inputs.channel }}" \
+            --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
+            --value "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            --visibility sensitive \
+            --scope project \
+            --force \
             --non-interactive
 
       - name: Build exact verified candidate and wait for provider result
@@ -165,12 +165,12 @@ jobs:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes "eas-cli@${EAS_CLI_VERSION}" build \\
-            --profile "${{ steps.profile.outputs.name }}" \\
-            --platform "${{ inputs.platform }}" \\
-            --non-interactive \\
-            --wait \\
-            --json \\
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" build \
+            --profile "${{ steps.profile.outputs.name }}" \
+            --platform "${{ inputs.platform }}" \
+            --non-interactive \
+            --wait \
+            --json \
             | tee eas-build-result.json
           test -s eas-build-result.json
 
