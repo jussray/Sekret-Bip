@@ -4,6 +4,8 @@ import { mkdir, readFile, writeFile, rename, readdir, open, unlink } from 'node:
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { renderBipVideoMaster } from './render-video-master.mjs';
+import { importMediaJobClips } from './import-media-job-clips.mjs';
+import { validateStoryboardHandoff } from './storyboard-handoff.mjs';
 
 const schema = 'sekret-bip-video-production-run@v1';
 const minimumFinalDurationSeconds = 60;
@@ -34,7 +36,7 @@ export async function runBipVideoProduction(options, dependencies = {}) {
   } finally { await lock.close(); await unlink(lockPath); }
 }
 
-async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPath = null }, { runProcess = spawnSync } = {}) {
+async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPath = null, fcrPlanPath = null, mappingPath = null }, { runProcess = spawnSync } = {}) {
   const directory = resolve(runDir);
   const statePath = join(directory, 'production-run.json');
   let state = await exists(statePath) ? await json(statePath) : null;
@@ -53,13 +55,24 @@ async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPat
   };
   const previous = state;
   state ||= { schema, runId: randomUUID(), actor: 'operator-cli', createdAt: new Date().toISOString(), inputFingerprint: null, stages: {}, finalApprovalEligible: false, published: false };
-  let manifest, sources, fingerprint;
+  let manifest, sources, fingerprint, planSha256 = null, expectedAudioSha256 = null;
   try {
     manifest = await json(resolve(manifestPath));
-    const payload = await json(resolve(sourcesPath));
-    sources = payload.shots || payload;
     if (!Array.isArray(manifest.timeline)) reject('APPROVED_TIMELINE_REQUIRED');
     if (!meetsFinalDuration(manifest.master?.durationSeconds)) reject('FINAL_MASTER_MINIMUM_DURATION_REQUIRED');
+    if (fcrPlanPath || mappingPath || manifest.sourcePolicy?.requireFcrStoryboardBinding === true) {
+      if (!fcrPlanPath || !mappingPath || !audioPath || sourcesPath) reject('FCR_STORYBOARD_HANDOFF_INVALID');
+      const planBytes = await readFile(resolve(fcrPlanPath));
+      const plan = JSON.parse(planBytes);
+      const mapping = await json(resolve(mappingPath));
+      expectedAudioSha256 = await hashFile(resolve(audioPath));
+      const mappings = validateStoryboardHandoff({ plan, manifest, mappings: mapping.shots, audioSha256: expectedAudioSha256 });
+      ({ shots: sources } = await importMediaJobClips({ projectId: 'sekret-bip', mappings }));
+      planSha256 = digest(planBytes);
+    } else {
+      const payload = await json(resolve(sourcesPath));
+      sources = payload.shots || payload;
+    }
     if (!Array.isArray(sources) || !sources.length) reject('APPROVED_MOVING_CLIPS_REQUIRED');
     const boundSources = [];
     for (const source of sources) {
@@ -69,9 +82,10 @@ async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPat
       if (actual !== String(source.sha256 || '').toLowerCase()) reject('SOURCE_HASH_MISMATCH');
       boundSources.push({ shot: source.shot, sha256: actual });
     }
-    fingerprint = digest(JSON.stringify({ manifest, descriptors: sources, boundSources,
-      audioSha256: audioPath ? await hashFile(resolve(audioPath)) : null,
-      runtimeHashes: await Promise.all(['run-video-production.mjs', 'render-video-master.mjs', 'verify-video-master.mjs', 'verify-video-playback.mjs'].map((file) => hashFile(join(scripts, file)))) }));
+    const audioSha256 = audioPath ? await hashFile(resolve(audioPath)) : null;
+    if (expectedAudioSha256 && audioSha256 !== expectedAudioSha256) reject('FCR_STORYBOARD_HANDOFF_INVALID');
+    fingerprint = digest(JSON.stringify({ manifest, descriptors: sources, boundSources, planSha256, audioSha256,
+      runtimeHashes: await Promise.all(['run-video-production.mjs', 'render-video-master.mjs', 'verify-video-master.mjs', 'verify-video-playback.mjs', 'import-media-job-clips.mjs', 'storyboard-handoff.mjs'].map((file) => hashFile(join(scripts, file)))) }));
   } catch (error) {
     // Never overwrite a previously bound run when its current inputs cannot be verified.
     if (previous?.inputFingerprint) return { schema, status: 'BLOCKED', blockedStage: 'preflight', reason: 'INPUT_REVERIFICATION_FAILED', finalApprovalEligible: false, published: false };
@@ -93,7 +107,7 @@ async function runLockedProduction({ manifestPath, sourcesPath, runDir, audioPat
     if (await exists(mediaPath)) return blocked('render', 'PARTIAL_OR_UNOWNED_MASTER_REQUIRES_REVIEW_NEW_RUN_DIRECTORY');
     try {
       const rendered = await renderBipVideoMaster({ manifest, sources, outputPath: mediaPath,
-        receiptPath: join(directory, 'render-receipt.json'), audioPath: audioPath ? resolve(audioPath) : null });
+        receiptPath: join(directory, 'render-receipt.json'), audioPath: audioPath ? resolve(audioPath) : null, expectedAudioSha256 });
       if (rendered.kind !== 'RENDERED') return blocked('render', 'MEDIA_RENDER_CAPABILITY_UNAVAILABLE');
       if (!receiptMeetsFinalDuration('render', rendered.receipt)) return blocked('render', 'FINAL_MASTER_MINIMUM_DURATION_REQUIRED');
       state.stages.render = { pass: true, mediaSha256: rendered.receipt.sha256,
@@ -126,8 +140,9 @@ function arg(name) { const i = process.argv.indexOf(name); return i < 0 ? null :
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try {
     const manifestPath = arg('--manifest'), sourcesPath = arg('--sources'), runDir = arg('--run-dir');
-    if (!manifestPath || !sourcesPath || !runDir) reject('MANIFEST_SOURCES_AND_RUN_DIRECTORY_REQUIRED');
-    const result = await runBipVideoProduction({ manifestPath, sourcesPath, runDir, audioPath: arg('--audio') });
+    const fcrPlanPath = arg('--fcr-plan'), mappingPath = arg('--mapping');
+    if (!manifestPath || !runDir || (!sourcesPath && !(fcrPlanPath && mappingPath))) reject('MANIFEST_SOURCES_AND_RUN_DIRECTORY_REQUIRED');
+    const result = await runBipVideoProduction({ manifestPath, sourcesPath, runDir, audioPath: arg('--audio'), fcrPlanPath, mappingPath });
     console.log(JSON.stringify(result));
     if (result.status === 'BLOCKED') process.exitCode = 2;
   } catch (error) {
