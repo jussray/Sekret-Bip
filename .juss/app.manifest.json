@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "registryVersion": "2.0.0",
+  "id": "sekret-bip",
+  "name": "Se’kret Bip",
+  "repository": "Sekret-Bip",
+  "defaultBranch": "main",
+  "sourceHeadAtAudit": "41f4c1e1b0ce8a9a289e9d217d7d9fedbbc9a223",
+  "identityStatus": "source-verified",
+  "role": "independent-teen-and-family-wellness-companion",
+  "authorityOwner": "sekret-bip",
+  "authorityScope": "Teen privacy, guardian consent, companion safety, and family sharing remain product-owned; a manifest never authorizes cross-user disclosure.",
+  "surfaces": [
+    "web",
+    "mobile",
+    "api",
+    "worker"
+  ],
+  "localManifestPaths": [
+    ".juss/app.manifest.json",
+    ".juss/skills.manifest.json"
+  ]
+}

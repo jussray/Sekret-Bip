@@ -1,0 +1,298 @@
+{
+  "schemaVersion": "1.0",
+  "registryVersion": "2.0.0",
+  "appId": "sekret-bip",
+  "registry": {
+    "repository": "jussray/promptos",
+    "manifestPath": "manifests/apps/sekret-bip.json",
+    "revision": "667ba485a051417f4ca6d00810b9732d08c095e0",
+    "sourceRef": "feat/app-skill-registry-v2-20261125",
+    "status": "candidate"
+  },
+  "source": {
+    "repository": "jussray/ULTRATHINK-",
+    "revision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+    "sourceRef": "feat/portable-skill-packages-20261125",
+    "status": "candidate"
+  },
+  "skills": {
+    "shared": [
+      {
+        "id": "goalfix",
+        "sourceRepository": "jussray/ULTRATHINK-",
+        "sourcePath": "skills/goalfix/SKILL.md",
+        "sourceRevision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+        "sourceRef": "feat/portable-skill-packages-20261125",
+        "status": "source-path-verified",
+        "lifecycle": "candidate",
+        "mode": "reference-only",
+        "authority": "advisory",
+        "owner": "ultrathink",
+        "compatibility": {
+          "apps": [
+            "*"
+          ],
+          "surfaces": [
+            "*"
+          ]
+        }
+      },
+      {
+        "id": "ultrathink",
+        "sourceRepository": "jussray/ULTRATHINK-",
+        "sourcePath": "skills/ultrathink/SKILL.md",
+        "sourceRevision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+        "sourceRef": "feat/portable-skill-packages-20261125",
+        "status": "source-path-verified",
+        "lifecycle": "candidate",
+        "mode": "reference-only",
+        "authority": "advisory",
+        "owner": "ultrathink",
+        "compatibility": {
+          "apps": [
+            "*"
+          ],
+          "surfaces": [
+            "*"
+          ]
+        }
+      },
+      {
+        "id": "redteam",
+        "sourceRepository": "jussray/ULTRATHINK-",
+        "sourcePath": "skills/redteam/SKILL.md",
+        "sourceRevision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+        "sourceRef": "feat/portable-skill-packages-20261125",
+        "status": "source-path-verified",
+        "lifecycle": "candidate",
+        "mode": "reference-only",
+        "authority": "advisory",
+        "owner": "ultrathink",
+        "compatibility": {
+          "apps": [
+            "*"
+          ],
+          "surfaces": [
+            "*"
+          ]
+        }
+      },
+      {
+        "id": "proofmode",
+        "sourceRepository": "jussray/ULTRATHINK-",
+        "sourcePath": "skills/proofmode/SKILL.md",
+        "sourceRevision": "4e650bdb2ca3a372300ca99bbf8af18c75a1d5ca",
+        "sourceRef": "feat/portable-skill-packages-20261125",
+        "status": "source-path-verified",
+        "lifecycle": "candidate",
+        "mode": "reference-only",
+        "authority": "advisory",
+        "owner": "ultrathink",
+        "compatibility": {
+          "apps": [
+            "*"
+          ],
+          "surfaces": [
+            "*"
+          ]
+        }
+      }
+    ],
+    "owned": [
+      {
+        "id": "bip-privacy-redteam",
+        "sourceRepository": "jussray/Sekret-Bip",
+        "sourcePath": ".agents/skills/bip-privacy-redteam/SKILL.md",
+        "sourceRevision": "41f4c1e1b0ce8a9a289e9d217d7d9fedbbc9a223",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "sekret-bip",
+        "compatibility": {
+          "apps": [
+            "sekret-bip"
+          ],
+          "surfaces": [
+            "web",
+            "mobile",
+            "api",
+            "worker"
+          ]
+        }
+      },
+      {
+        "id": "bip-auth-onboarding",
+        "sourceRepository": "jussray/Sekret-Bip",
+        "sourcePath": ".agents/skills/bip-auth-onboarding/SKILL.md",
+        "sourceRevision": "41f4c1e1b0ce8a9a289e9d217d7d9fedbbc9a223",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "sekret-bip",
+        "compatibility": {
+          "apps": [
+            "sekret-bip"
+          ],
+          "surfaces": [
+            "web",
+            "mobile",
+            "api",
+            "worker"
+          ]
+        }
+      },
+      {
+        "id": "bip-supabase-guardian",
+        "sourceRepository": "jussray/Sekret-Bip",
+        "sourcePath": ".agents/skills/bip-supabase-guardian/SKILL.md",
+        "sourceRevision": "41f4c1e1b0ce8a9a289e9d217d7d9fedbbc9a223",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "sekret-bip",
+        "compatibility": {
+          "apps": [
+            "sekret-bip"
+          ],
+          "surfaces": [
+            "web",
+            "mobile",
+            "api",
+            "worker"
+          ]
+        }
+      },
+      {
+        "id": "bip-release-gate",
+        "sourceRepository": "jussray/Sekret-Bip",
+        "sourcePath": ".agents/skills/bip-release-gate/SKILL.md",
+        "sourceRevision": "41f4c1e1b0ce8a9a289e9d217d7d9fedbbc9a223",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "sekret-bip",
+        "compatibility": {
+          "apps": [
+            "sekret-bip"
+          ],
+          "surfaces": [
+            "web",
+            "mobile",
+            "api",
+            "worker"
+          ]
+        }
+      },
+      {
+        "id": "bip-companion-style-engine",
+        "sourceRepository": "jussray/Sekret-Bip",
+        "sourcePath": ".agents/skills/bip-companion-style-engine/SKILL.md",
+        "sourceRevision": "41f4c1e1b0ce8a9a289e9d217d7d9fedbbc9a223",
+        "sourceRef": "main",
+        "status": "source-path-verified",
+        "lifecycle": "current-main",
+        "mode": "app-native",
+        "authority": "advisory",
+        "owner": "sekret-bip",
+        "compatibility": {
+          "apps": [
+            "sekret-bip"
+          ],
+          "surfaces": [
+            "web",
+            "mobile",
+            "api",
+            "worker"
+          ]
+        }
+      }
+    ],
+    "ownedSkillsStatus": "source-audited"
+  },
+  "plugins": [
+    {
+      "id": "github",
+      "provider": "GitHub",
+      "purpose": "Repository, review, and CI evidence.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "sekret-bip"
+      ],
+      "capabilities": [
+        "repository.read",
+        "branch.read",
+        "pull-request.read",
+        "checks.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "cloudflare",
+      "provider": "Cloudflare",
+      "purpose": "Worker and deployment metadata inspection.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "sekret-bip"
+      ],
+      "capabilities": [
+        "worker.read",
+        "deployment.read",
+        "runtime.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    },
+    {
+      "id": "supabase",
+      "provider": "Supabase",
+      "purpose": "Schema, RLS, auth, and function inspection; teen-private data remains scoped.",
+      "mode": "operator-tooling",
+      "status": "declared",
+      "connectionState": "runtime-discovery-required",
+      "authority": "none",
+      "compatibleApps": [
+        "sekret-bip"
+      ],
+      "capabilities": [
+        "database.schema.read",
+        "database.rls.read",
+        "auth.config.read",
+        "functions.read"
+      ],
+      "writePolicy": "explicit-action-approval-required",
+      "secretsPolicy": "never-store-in-manifest"
+    }
+  ],
+  "compatibility": {
+    "surfaces": [
+      "web",
+      "mobile",
+      "api",
+      "worker"
+    ],
+    "requiresPlaywrightForUi": true,
+    "observedSkillDirectories": [
+      ".agents/skills/",
+      ".ai-skills/",
+      ".claude/skills/"
+    ]
+  },
+  "authority": "catalog-and-compatibility-only",
+  "installationState": "not-asserted",
+  "executionAuthority": "none"
+}
