@@ -100,13 +100,14 @@ function storyboardTimeline(manifest) {
   return timeline.map((item) => ({ shot: Number(item.shot), durationSeconds: Number(item.durationSeconds), sourceStartSeconds: Number(item.sourceStartSeconds ?? 0) }));
 }
 
-export async function renderBipVideoMaster({ manifest, sources, outputPath, receiptPath = null, audioPath = null }) {
+export async function renderBipVideoMaster({ manifest, sources, outputPath, receiptPath = null, audioPath = null, expectedAudioSha256 = null }) {
   assertManifestPolicy(manifest);
   const timeline = storyboardTimeline(manifest);
   if (!Array.isArray(sources)) fail('SOURCES_MUST_BE_AN_ARRAY');
   if (!isAbsolute(String(outputPath || '')) || extname(String(outputPath)).toLowerCase() !== '.mp4') fail('OUTPUT_PATH_MUST_BE_ABSOLUTE_MP4');
   if (audioPath && (!isAbsolute(String(audioPath)) || !existsSync(String(audioPath)))) fail('AUDIO_PATH_INVALID');
 
+  if (expectedAudioSha256 !== null && (!audioPath || !/^[a-f0-9]{64}$/.test(expectedAudioSha256))) fail('APPROVED_AUDIO_HASH_REQUIRED');
   const requiredShots = manifest.sourcePolicy.requiredShots.map(Number);
   if (sources.length !== requiredShots.length) fail('SOURCE_COUNT_MUST_MATCH_REQUIRED_SHOTS');
   const sourceByShot = new Map(sources.map((source) => [Number(source?.shot), source]));
@@ -123,16 +124,6 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
     return { kind: 'CAPABILITY_UNAVAILABLE', reason: 'ffmpeg and ffprobe binaries are required on PATH' };
   }
 
-  if (timeline && audioPath) {
-    const audioProbe = spawnSync(process.env.FFPROBE_BIN || 'ffprobe', [
-      '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', audioPath,
-    ], { encoding: 'utf8' });
-    if (audioProbe.status !== 0) fail('AUDIO_PROBE_FAILED');
-    const parsed = JSON.parse(audioProbe.stdout || '{}');
-    const stream = (parsed.streams || []).find((entry) => entry.codec_type === 'audio');
-    const duration = Number(stream?.duration || parsed.format?.duration || 0);
-    if (!stream || !Number.isFinite(duration) || duration + 0.001 < Number(manifest.master.durationSeconds)) fail('EXTERNAL_AUDIO_TOO_SHORT_FOR_TIMELINE');
-  }
 
   const verifiedSources = [];
   for (const shot of requiredShots) {
@@ -152,6 +143,22 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
 
   const workDir = await mkdtemp(join(tmpdir(), 'sekret-bip-video-'));
   try {
+    if (expectedAudioSha256) {
+      const audioSnapshot = join(workDir, 'approved-audio' + extname(audioPath));
+      await copyFile(audioPath, audioSnapshot);
+      if (await sha256File(audioSnapshot) !== expectedAudioSha256) fail('APPROVED_AUDIO_HASH_MISMATCH');
+      audioPath = audioSnapshot;
+    }
+    if (timeline && audioPath) {
+      const audioProbe = spawnSync(process.env.FFPROBE_BIN || 'ffprobe', [
+        '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', audioPath,
+      ], { encoding: 'utf8' });
+      if (audioProbe.status !== 0) fail('AUDIO_PROBE_FAILED');
+      const parsed = JSON.parse(audioProbe.stdout || '{}');
+      const stream = (parsed.streams || []).find((entry) => entry.codec_type === 'audio');
+      const duration = Number(stream?.duration || parsed.format?.duration || 0);
+      if (!stream || !Number.isFinite(duration) || duration + 0.001 < Number(manifest.master.durationSeconds)) fail('EXTERNAL_AUDIO_TOO_SHORT_FOR_TIMELINE');
+    }
     const localSources = [];
     for (const source of verifiedSources) {
       const extension = extname(source.path).toLowerCase() || '.mp4';
@@ -239,6 +246,7 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
       sourceShots: verifiedSources.map(({ shot, sha256: sourceSha256 }) => ({ shot, sha256: sourceSha256 })),
       identityRegenerationUsed: false,
       inventedCharactersUsed: false,
+      ...(expectedAudioSha256 ? { audioSha256: expectedAudioSha256 } : {}),
       audioMode: audioPath ? 'approved-external-audio' : timeline ? 'approved-source-audio-with-silence-for-missing-streams' : 'silent-fallback',
       timeline: timeline || null,
       sourceApprovalBasis: 'caller-approved-descriptors-and-matching-content-hashes; independent human review remains required',
