@@ -13,8 +13,8 @@
   "master": {
     "container": "mp4",
     "codec": "h264",
-    "width": 1080,
-    "height": 1920,
+    "width": 720,
+    "height": 1280,
     "fps": 30,
     "durationSeconds": 60,
     "durationToleranceSeconds": 0.1
@@ -33,7 +33,8 @@
     "allowIdentityRegeneration": false,
     "allowInventedCharacters": false,
     "allowWorldAuthorityAsCharacterAuthority": false,
-    "providerOutputCreatesAuthority": false
+    "providerOutputCreatesAuthority": false,
+    "requireFcrStoryboardBinding": true
   },
   "proof": {
     "metadataVerification": "required",
