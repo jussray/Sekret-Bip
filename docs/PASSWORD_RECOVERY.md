@@ -21,16 +21,18 @@
 Configure these under **Authentication → URL Configuration → Redirect URLs** for the hosted Se'kret Bip project:
 
 ```text
-https://sekretbip.net/reset-password
+https://app.sekretbip.net/reset-password
 sekret://reset-password
 ```
+
+For side-specific recovery, also allow the exact `?side=teen` and `?side=parent` variants on both targets if required by hosted redirect matching. Verify these with a controlled account before release.
 
 Development builds may generate an Expo development URL. Add only the exact temporary development redirect being tested; do not use an unrestricted wildcard in production.
 
 The production Site URL should remain the canonical Se'kret Bip web origin:
 
 ```text
-https://sekretbip.net
+https://app.sekretbip.net
 ```
 
 ## Security boundaries
@@ -70,7 +72,7 @@ Playwright covers:
 
 A complete production proof still requires a controlled test account and a real received email:
 
-1. request a reset from `https://sekretbip.net/login`;
+1. request a reset from `https://app.sekretbip.net/login`;
 2. confirm receipt in the controlled inbox;
 3. open the link on web and on a native device;
 4. set a temporary test password;

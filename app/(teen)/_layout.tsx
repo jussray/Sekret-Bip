@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { GlobalMoodButton } from '@/components/GlobalMoodButton';
 import { SideSafeBackButton } from '@/components/SideSafeBackButton';
+import { CrisisSupportButton } from '../../components/CrisisSupport';
 import { SafetyExperienceSheet } from '../../components/safety/SafetyExperienceSheet';
 import { useAppContext } from '@/context/AppContext';
 import { useSafetyCheck } from '@/hooks/useSafetyCheck';
@@ -39,48 +40,55 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
         <Tabs.Screen name="room" options={{ title: 'Room', tabBarIcon: () => <TabIcon emoji="🏠" /> }} />
         <Tabs.Screen name="pages" options={{ title: 'Pages', tabBarIcon: () => <TabIcon emoji="📖" /> }} />
         <Tabs.Screen name="calm" options={{ title: 'Calm', tabBarIcon: () => <TabIcon emoji="🌙" /> }} />
-        <Tabs.Screen name="calm/breathe" options={{ href: null }} />
+        <Tabs.Screen name="calm/breathe" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="circle" options={{ title: 'Circle', tabBarIcon: () => <TabIcon emoji="🌐" /> }} />
         <Tabs.Screen name="circle/feed" options={{ href: null }} />
         <Tabs.Screen name="circle/feed-v2" options={{ href: null }} />
         <Tabs.Screen name="more" options={{ title: 'More', tabBarIcon: () => <TabIcon emoji="•••" /> }} />
-        <Tabs.Screen name="user-room" options={{ href: null }} />
-        <Tabs.Screen name="sekret" options={{ href: null }} />
-        <Tabs.Screen name="voicebip" options={{ href: null }} />
-        <Tabs.Screen name="cloud" options={{ href: null }} />
-        <Tabs.Screen name="cloudThoughts" options={{ href: null }} />
-        <Tabs.Screen name="comfort" options={{ href: null }} />
-        <Tabs.Screen name="crew" options={{ href: null }} />
-        <Tabs.Screen name="settings" options={{ href: null }} />
-        <Tabs.Screen name="points" options={{ href: null }} />
-        <Tabs.Screen name="chores" options={{ href: null }} />
-        <Tabs.Screen name="history" options={{ href: null }} />
-        <Tabs.Screen name="continuity" options={{ href: null }} />
-        <Tabs.Screen name="bridge" options={{ href: null }} />
-        <Tabs.Screen name="s2tell" options={{ href: null }} />
-        <Tabs.Screen name="period-calendar" options={{ href: null }} />
-        <Tabs.Screen name="discover" options={{ href: null }} />
-        <Tabs.Screen name="profile" options={{ href: null }} />
+        <Tabs.Screen name="user-room" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="sekret" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="voicebip" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="cloud" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="cloudThoughts" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="comfort" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="crew" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="settings" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="points" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="chores" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="history" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="continuity" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="bridge" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="s2tell" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="period-calendar" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="discover" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="profile" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="chat/index" options={{ href: null }} />
         <Tabs.Screen name="chat/[personalityId]" options={{ href: null }} />
-        <Tabs.Screen name="bippin2" options={{ href: null }} />
-        <Tabs.Screen name="bippin2/womanhood" options={{ href: null }} />
-        <Tabs.Screen name="bippin2/manhood" options={{ href: null }} />
-        <Tabs.Screen name="growth" options={{ href: null }} />
-        <Tabs.Screen name="mind-body-reset" options={{ href: null }} />
+        <Tabs.Screen name="bippin2" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="bippin2/womanhood" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="bippin2/manhood" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="growth" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="mind-body-reset" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="body-workout" options={{ href: null }} />
-        <Tabs.Screen name="companion-chat" options={{ href: null }} />
-        <Tabs.Screen name="pages/[id]" options={{ href: null }} />
-        <Tabs.Screen name="pages/history" options={{ href: null }} />
-        <Tabs.Screen name="pages/new" options={{ href: null }} />
+        <Tabs.Screen name="companion-chat" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="pages/[id]" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="pages/history" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="pages/new" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="circle/[id]" options={{ href: null }} />
         <Tabs.Screen name="circle/weather" options={{ href: null }} />
-        <Tabs.Screen name="resources" options={{ href: null }} />
+        <Tabs.Screen name="resources" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="quiet" options={{ href: null }} />
-        <Tabs.Screen name="meaning" options={{ href: null }} />
+        <Tabs.Screen name="meaning" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
       </Tabs>
       {!quietActive && <SideSafeBackButton side="teen" />}
       {!quietActive && <GlobalMoodButton />}
+      {/* Trust-03/#414: persistent, always-accessible crisis support across every
+          teen-facing surface — including Quiet Bip, where other floating controls
+          are intentionally hidden but safety access must not be. */}
+      {/* Keep the always-accessible help control above the Pages composer/send area. */}
+      <View style={{ position: 'absolute', bottom: 174, right: 14, zIndex: 1000, elevation: 20 }}>
+        <CrisisSupportButton />
+      </View>
     </View>
   );
 }
@@ -102,6 +110,10 @@ export default function TeenLayout() {
   const quietRouteAllowed = isQuietRouteAllowed({ pathname, companion });
 
   useEffect(() => {
+    if (devSideOverride != null) {
+      setProfileChecked(true);
+      return;
+    }
     let active = true;
     hydrateAccountProfile('teen')
       .then(profile => {
@@ -120,7 +132,7 @@ export default function TeenLayout() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [devSideOverride]);
 
   const effectiveUserSide = devSideOverride ?? userSide;
   const isTeenActive = founderPreview || (
@@ -138,15 +150,19 @@ export default function TeenLayout() {
   }, [isTeenActive]);
 
   // Split View and exact-head browser proof can land on the teen copy of a
-  // duplicate web URL first. Honor the explicit side before Founder Preview
-  // renders so /(teen) and /(parent) remain deterministic in development.
-  if (founderPreview && devSideOverride === 'parent') {
+  // duplicate web URL first. Honor the explicit side even outside Founder
+  // Preview (mirrors the parent layout's symmetric check) so /(teen) and
+  // /(parent) remain deterministic in development, pathname included —
+  // without this, a parent-side pane that resolves into this route group
+  // falls through to the generic `/(parent)/room` redirect below and loses
+  // whatever path it was actually trying to reach.
+  if (devSideOverride === 'parent') {
     return <Redirect href={`/(parent)${pathname}` as never} />;
   }
 
-  // Founder Preview bypasses only route/onboarding visibility in development.
-  // Quiet Bip remains a product boundary, so preview still honors Sleep Guard.
-  if (founderPreview) {
+  // Founder Preview or an explicit teen-side Split View override bypasses
+  // route/onboarding visibility. Quiet Bip remains a product boundary.
+  if (founderPreview || devSideOverride === 'teen') {
     if (!sleepLoaded) return <TeenLoadingSurface />;
     if (sleepActive && !quietRouteAllowed) return <Redirect href="/(teen)/quiet" />;
     return <TeenTabs selectedSekret={selectedSekret ?? 'raylene'} quietActive={sleepActive} />;

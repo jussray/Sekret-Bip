@@ -30,8 +30,8 @@ test('normalizes and validates recovery emails without changing account semantic
 test('builds explicit web and native recovery redirects', () => {
   assert.equal(PASSWORD_RECOVERY_PATH, '/reset-password');
   assert.equal(
-    buildRecoveryRedirectUrl({ webOrigin: 'https://sekretbip.net' }),
-    'https://sekretbip.net/reset-password',
+    buildRecoveryRedirectUrl({ webOrigin: 'https://app.sekretbip.net' }),
+    'https://app.sekretbip.net/reset-password',
   );
   assert.equal(
     buildRecoveryRedirectUrl({ nativeUrl: 'sekret://reset-password' }),
@@ -42,7 +42,7 @@ test('builds explicit web and native recovery redirects', () => {
 
 test('parses implicit recovery tokens from URL fragments and query strings', () => {
   const fragment = parseRecoveryUrl(
-    'https://sekretbip.net/reset-password#access_token=access-1&refresh_token=refresh-1&type=recovery',
+    'https://app.sekretbip.net/reset-password#access_token=access-1&refresh_token=refresh-1&type=recovery',
   );
   assert.deepEqual(fragment, {
     kind: 'tokens',
@@ -66,7 +66,7 @@ test('parses implicit recovery tokens from URL fragments and query strings', () 
 
 test('supports PKCE recovery codes but rejects non-recovery credentials', () => {
   const recoveryCode = parseRecoveryUrl(
-    'https://sekretbip.net/reset-password?code=pkce-code&type=recovery',
+    'https://app.sekretbip.net/reset-password?code=pkce-code&type=recovery',
   );
   assert.deepEqual(recoveryCode, {
     kind: 'code',
@@ -76,7 +76,7 @@ test('supports PKCE recovery codes but rejects non-recovery credentials', () => 
   assert.equal(isRecoveryCredential(recoveryCode), true);
 
   const ordinarySession = parseRecoveryUrl(
-    'https://sekretbip.net/reset-password#access_token=access&refresh_token=refresh&type=signup',
+    'https://app.sekretbip.net/reset-password#access_token=access&refresh_token=refresh&type=signup',
   );
   assert.equal(ordinarySession.kind, 'tokens');
   assert.equal(isRecoveryCredential(ordinarySession), false);
@@ -84,10 +84,10 @@ test('supports PKCE recovery codes but rejects non-recovery credentials', () => 
 
 test('fails closed for missing, expired, and malformed recovery links', () => {
   assert.deepEqual(parseRecoveryUrl(null), { kind: 'missing' });
-  assert.deepEqual(parseRecoveryUrl('https://sekretbip.net/reset-password'), { kind: 'missing' });
+  assert.deepEqual(parseRecoveryUrl('https://app.sekretbip.net/reset-password'), { kind: 'missing' });
 
   const expired = parseRecoveryUrl(
-    'https://sekretbip.net/reset-password?error=access_denied&error_description=Link%20expired',
+    'https://app.sekretbip.net/reset-password?error=access_denied&error_description=Link%20expired',
   );
   assert.deepEqual(expired, {
     kind: 'error',
@@ -139,7 +139,7 @@ test('production recovery browser checks are excluded only from the blank-config
 
 test('native scheme and hosted redirect requirements remain explicit', () => {
   assert.equal(appConfig.expo.scheme, 'sekret');
-  assert.match(setupDoc, /https:\/\/sekretbip\.net\/reset-password/);
+  assert.match(setupDoc, /https:\/\/app\.sekretbip\.net\/reset-password/);
   assert.match(setupDoc, /sekret:\/\/reset-password/);
   assert.match(setupDoc, /never logs? recovery tokens|never logged/i);
 });
