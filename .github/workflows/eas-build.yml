@@ -44,20 +44,13 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ inputs.target_sha }}
+  APP_VARIANT: ${{ inputs.app }}
+  EXPO_PUBLIC_APP_VARIANT: ${{ inputs.app }}
 
 jobs:
   build:
     name: Build ${{ inputs.app }} ${{ inputs.platform }} @ ${{ inputs.target_sha }}
     runs-on: ubuntu-latest
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      APP_VARIANT: ${{ inputs.app }}
-      EXPO_PUBLIC_APP_VARIANT: ${{ inputs.app }}
-      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-      # Prefer the current Supabase publishable-key contract. The legacy anon
-      # secret remains a bounded fallback so existing environments do not break
-      # before their GitHub secret is migrated.
-      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
     steps:
       - name: Check out exact verified candidate
@@ -76,7 +69,7 @@ jobs:
             exit 1
           }
           actual="$(git rev-parse HEAD)"
-          printf 'expected=%s\nactual=%s\n' "$EXPECTED_HEAD_SHA" "$actual"
+          printf 'expected=%s\\nactual=%s\\n' "$EXPECTED_HEAD_SHA" "$actual"
           test "$actual" = "$EXPECTED_HEAD_SHA"
 
       - uses: actions/setup-node@v4
@@ -91,7 +84,7 @@ jobs:
         run: |
           set -euo pipefail
           eas_cli_version="$(node -p "require('./eas.json').cli.version")"
-          [[ "$eas_cli_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || {
+          [[ "$eas_cli_version" =~ ^[0-9]+\\.[0-9]+\\.[0-9]+$ ]] || {
             echo 'eas.json cli.version must be an exact x.y.z version.' >&2
             exit 1
           }
@@ -112,7 +105,12 @@ jobs:
 
       - name: Verify required build secrets
         shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
+          set -euo pipefail
           missing=0
 
           if [ -z "$EXPO_TOKEN" ]; then
@@ -137,36 +135,42 @@ jobs:
 
       - name: Sync Supabase variables to EAS environment
         shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
-          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
-            --environment "${{ inputs.channel }}" \
-            --name EXPO_PUBLIC_SUPABASE_URL \
-            --value "$EXPO_PUBLIC_SUPABASE_URL" \
-            --visibility plaintext \
-            --scope project \
-            --force \
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \\
+            --environment "${{ inputs.channel }}" \\
+            --name EXPO_PUBLIC_SUPABASE_URL \\
+            --value "$EXPO_PUBLIC_SUPABASE_URL" \\
+            --visibility plaintext \\
+            --scope project \\
+            --force \\
             --non-interactive
 
-          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
-            --environment "${{ inputs.channel }}" \
-            --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \
-            --value "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
-            --visibility sensitive \
-            --scope project \
-            --force \
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \\
+            --environment "${{ inputs.channel }}" \\
+            --name EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY \\
+            --value "$EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \\
+            --visibility sensitive \\
+            --scope project \\
+            --force \\
             --non-interactive
 
       - name: Build exact verified candidate and wait for provider result
         shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
-          npx --yes "eas-cli@${EAS_CLI_VERSION}" build \
-            --profile "${{ steps.profile.outputs.name }}" \
-            --platform "${{ inputs.platform }}" \
-            --non-interactive \
-            --wait \
-            --json \
+          npx --yes "eas-cli@${EAS_CLI_VERSION}" build \\
+            --profile "${{ steps.profile.outputs.name }}" \\
+            --platform "${{ inputs.platform }}" \\
+            --non-interactive \\
+            --wait \\
+            --json \\
             | tee eas-build-result.json
           test -s eas-build-result.json
 
