@@ -120,7 +120,7 @@ export function CanonCompanionShowcase({ motionEnabled, onContinue }: Props) {
             >
               <View pointerEvents="none" style={styles.tape} />
               {member.id === 'cloud'
-                ? <Animated.View style={{ transform: [{ translateY: cloudFloat }] }}>{portrait}</Animated.View>
+                ? <Animated.View style={{ width: '100%', transform: [{ translateY: cloudFloat }] }}>{portrait}</Animated.View>
                 : portrait}
               <Text
                 numberOfLines={1}
