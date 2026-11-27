@@ -52,7 +52,7 @@ for (const viewport of VIEWPORTS) {
 
     await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible();
     await expect(page.getByTestId('web-welcome-hero-bip-jr')).toHaveCount(0);
-    await expect(page.getByText(viewport.name === 'mobile' ? 'Se’kret Bip Family' : 'YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
+    await expect(page.getByText(viewport.name === 'mobile' ? 'Your Se’kret Bip Family' : 'YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
     await expect(page.getByText("I'm Teen", { exact: true })).toHaveCount(0);
     await expect(page.getByText('I’m a Parent / Guardian', { exact: true })).toHaveCount(0);
     await expectNoDocumentHorizontalOverflow(page);
@@ -72,7 +72,7 @@ for (const viewport of VIEWPORTS) {
 
     await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible();
     await expect(page.getByTestId('web-welcome-hero-bip-jr')).toHaveCount(0);
-    await expect(page.getByText(viewport.name === 'mobile' ? 'Se’kret Bip Family' : 'YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
+    await expect(page.getByText(viewport.name === 'mobile' ? 'Your Se’kret Bip Family' : 'YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
     await expectNoDocumentHorizontalOverflow(page);
 
     await testInfo.attach(`front-door-audience-switch-${viewport.name}.png`, {
