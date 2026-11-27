@@ -156,6 +156,15 @@ jobs:
             -v ON_ERROR_STOP=1 \
             -f supabase/probes/parent_link_receiver_authority_phase1.sql
 
+      - name: Prove parent form rollout authorization
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v psql >/dev/null
+          psql "$SUPABASE_DB_URL" \
+            -v ON_ERROR_STOP=1 \
+            -f supabase/probes/parent_form_feature_gates_phase1.sql
+
       - name: Stop ephemeral Supabase
         if: always()
         shell: bash
