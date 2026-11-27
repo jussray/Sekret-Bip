@@ -91,7 +91,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.a
   try {
     if (process.env.LIVE_ONBOARDING_PHASE !== 'family') throw new Error('FAMILY_PROOF_PHASE_INVALID');
     const receipt = JSON.parse(fs.readFileSync('artifacts/live-family-authority.json', 'utf8'));
-    const outcome = verifyLiveFamilyProof(receipt, {
+    verifyLiveFamilyProof(receipt, {
       expectedSha: process.env.EXPECTED_HEAD_SHA,
       expectedBaseUrl: process.env.LIVE_ONBOARDING_BASE_URL,
     });
