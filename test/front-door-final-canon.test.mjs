@@ -83,7 +83,7 @@ test('the unified family scene paints its own ambient canvas without the rejecte
 });
 
 test('one responsive family composition replaces the mobile swipe-only poster on both breakpoints', () => {
-  assert.match(welcome, /const teenPhoneCanvas = compact && !isBipJr/);
+  assert.doesNotMatch(welcome, /teenPhoneCanvas/);
   assert.match(welcome, /\{!isBipJr && \(\s*<CanonCompanionShowcase/);
   assert.doesNotMatch(welcome, /!isBipJr && !teenPhoneCanvas &&/);
   assert.doesNotMatch(gallery, /snapToInterval/);
