@@ -1,0 +1,69 @@
+{
+  "schema": "fcr/handshake-social-draft@v1",
+  "project": "bip",
+  "sourceRepository": "jussray/Sekret-Bip",
+  "channelGroup": "business_only",
+  "intendedAccountHandle": "@jussnco",
+  "accountConnection": "UNVERIFIED",
+  "publishAllowed": false,
+  "queueAllowed": false,
+  "owner": "jussray/founder-control-room",
+  "sourcePath": "brand/handshake/logo.svg",
+  "social": {
+    "question": "What is Se’kret Bip designed to do?",
+    "answer": "Se’kret Bip is a privacy-first creative and emotional-growth product for teens and their families, with journaling, comfort, and permission-aware family experience concepts.",
+    "truthBoundary": "Not a therapy or emergency service. Features in source do not prove all member journeys are production ready.",
+    "copy": "What is Se’kret Bip designed to do?\n\nSe’kret Bip is a privacy-first creative and emotional-growth product for teens and their families, with journaling, comfort, and permission-aware family experience concepts.\n\nNot a therapy or emergency service. Features in source do not prove all member journeys are production ready.\n\nProject evidence: https://github.com/jussray/Sekret-Bip\n\n#SekretBip #FamilyTechnology #TeenWellbeingDesign #PrivacyFirst #AppDevelopment",
+    "mediaAltText": "Illustrative purple scrapbook bedroom scene, journal and phone interface with the Se’kret Bip logo; no real teen users or companion portraits.",
+    "mediaPathLocal": "Social/Sekret_Bip_Social_Ad_4x5.png",
+    "mediaPublicUrl": "https://media.publora.com/images/1795755731344-0-36523320-Sekret_Bip_Social_Ad_4x5.png",
+    "mediaPackagePath": "Social/Sekret_Bip_Social_Ad_4x5.png",
+    "mediaSha256": {
+      "algorithm": "SHA-256",
+      "chunks": [
+        "cd2b7ee1",
+        "8583b633",
+        "a8946105",
+        "0b2b8a37",
+        "c0552723",
+        "8eb31b89",
+        "93599cd3",
+        "7bb9811d"
+      ]
+    },
+    "mediaDimensions": [
+      1080,
+      1350
+    ],
+    "mediaPurpose": "social_ad",
+    "mediaState": "PUBLORA_DRAFT_MEDIA_READY",
+    "providerDraft": {
+      "provider": "publora",
+      "platform": "instagram",
+      "businessChannel": "@jussnco",
+      "postGroupId": "6b090ed1f04b2c093e2464c1",
+      "mediaId": "6b090ed3f04b2c093e246504",
+      "editorUrl": "https://app.publora.com/dashboard/editor?id=6b090ed1f04b2c093e2464c1",
+      "state": "draft",
+      "mediaState": "ready",
+      "scheduled": false,
+      "published": false,
+      "verifiedSource": "Publora get_post metadata",
+      "assetByteParity": "UNVERIFIED"
+    }
+  },
+  "handshake": {
+    "name": "Se’kret Bip",
+    "description": "Se’kret Bip is a privacy-first creative and emotional-growth product for teens and their families, with journaling, comfort, and permission-aware family experience concepts. Not a therapy or emergency service. Features in source do not prove all member journeys are production ready.",
+    "productUrl": "https://sekretbip.net/",
+    "submissionState": "NOT_SUBMITTED",
+    "coverPackagePath": "Handshake/Sekret_Bip_Handshake_3x2.png",
+    "coverStatus": "LOCAL_CANDIDATE_UNHOSTED"
+  },
+  "review": {
+    "exactMediaFounderApproval": false,
+    "liveBrandComparison": false,
+    "sourceCurrentness": false,
+    "providerAccountVerified": false
+  }
+}
