@@ -23,6 +23,7 @@ on:
         options:
           - ios
           - android
+          - all
       channel:
         description: Build channel
         required: true
@@ -34,7 +35,7 @@ on:
           - production
 
 concurrency:
-  group: eas-build-${{ inputs.target_sha }}-${{ inputs.app }}-${{ inputs.platform }}
+  group: eas-build-${{ inputs.target_sha }}-${{ inputs.app }}-${{ inputs.channel }}
   cancel-in-progress: false
 
 permissions:
@@ -43,20 +44,13 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   EXPECTED_HEAD_SHA: ${{ inputs.target_sha }}
+  APP_VARIANT: ${{ inputs.app }}
+  EXPO_PUBLIC_APP_VARIANT: ${{ inputs.app }}
 
 jobs:
   build:
     name: Build ${{ inputs.app }} ${{ inputs.platform }} @ ${{ inputs.target_sha }}
     runs-on: ubuntu-latest
-    env:
-      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-      APP_VARIANT: ${{ inputs.app }}
-      EXPO_PUBLIC_APP_VARIANT: ${{ inputs.app }}
-      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
-      # Prefer the current Supabase publishable-key contract. The legacy anon
-      # secret remains a bounded fallback so existing environments do not break
-      # before their GitHub secret is migrated.
-      EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
 
     steps:
       - name: Check out exact verified candidate
@@ -111,7 +105,12 @@ jobs:
 
       - name: Verify required build secrets
         shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
+          set -euo pipefail
           missing=0
 
           if [ -z "$EXPO_TOKEN" ]; then
@@ -136,6 +135,10 @@ jobs:
 
       - name: Sync Supabase variables to EAS environment
         shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
+          EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY || secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
         run: |
           set -euo pipefail
           npx --yes "eas-cli@${EAS_CLI_VERSION}" env:create \
@@ -158,6 +161,8 @@ jobs:
 
       - name: Build exact verified candidate and wait for provider result
         shell: bash
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
           set -euo pipefail
           npx --yes "eas-cli@${EAS_CLI_VERSION}" build \
