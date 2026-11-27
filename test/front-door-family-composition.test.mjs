@@ -34,3 +34,8 @@ test('public family scene is presentation only and preserves private route prote
   assert.match(scene, /onContinue/);
   assert.match(scene, /motionEnabled/);
 });
+
+test('Cloud floating portrait keeps a nonzero width inside the centered family group', () => {
+  const scene = read('components/companions/CanonCompanionShowcase.tsx');
+  assert.match(scene, /member\.id === 'cloud'[\s\S]*?<Animated\.View style=\{\{ width: '100%', transform:/);
+});
