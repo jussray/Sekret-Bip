@@ -46,3 +46,7 @@ Each member distinguishes `VERIFIED`, `INFERRED`, `UNKNOWN`, and `BLOCKED`.
 Return one packet: `REALITY / COUNCIL / FIX / PROOF / RISK / ROLLBACK / NEXT GATE`.
 
 A green build, migration, deploy, provider response, or Council vote is never enough by itself to certify the real Se’kret Bip user path.
+
+## Court
+
+For consequential product decisions, convene the architectural court in `.control-room/bip-court.contract.json` (`juss/bip-court@v1`): Safety, Companion, and Platform councils under the Founder Council. No second authority plane. Founder rules; teen user safety concerns block until the founder rules. The court carries no COPPA-derived language by founder direction.
