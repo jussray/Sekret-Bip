@@ -1,0 +1,46 @@
+{
+  "schema": "fcr/handshake-brand-social@v1",
+  "slug": "bip",
+  "product": "Se’kret Bip",
+  "sourceRepository": "jussray/Sekret-Bip",
+  "publicProductUrl": "https://sekretbip.net/",
+  "brand": {
+    "logoSource": "brand/handshake/logo.svg",
+    "logoFormat": "svg",
+    "logoWidth": 1200,
+    "logoHeight": 490,
+    "colors": [
+      "#c58aff",
+      "#f8a9df",
+      "#ffe0ab"
+    ],
+    "sourceAuthority": "repository visual design source plus live site; logo is an authored candidate, not approved canonical",
+    "reviewState": "PENDING_FOUNDER_LIVE_SITE_COMPARISON",
+    "neverBorrowBrandFromOtherProjects": true
+  },
+  "handshake": {
+    "target": "Handshake AI Showcase project card",
+    "coverLocalOutput": "handshake-cover.png",
+    "coverWidth": 1536,
+    "coverHeight": 1024,
+    "coverSha256": "2150c668a4452c1ee288fe92589133ec90c191bb0c9f61f826d5aea9e8c462d7",
+    "mediaPublicUrl": null,
+    "externalSubmissionState": "NOT_SUBMITTED",
+    "requireNativeConfirmation": true
+  },
+  "social": {
+    "owner": "jussray/founder-control-room",
+    "adapter": "src/lib/handshakeBrandSocial.ts",
+    "existingClassification": "src/lib/socialCampaignPolicy.ts",
+    "existingPublisher": "src/lib/firstPartySocialPublisher.ts",
+    "targetAudience": "parents_educators_community",
+    "firstPartyMode": "draft",
+    "publishAllowed": false,
+    "businessAccountBinding": "UNVERIFIED",
+    "publicMediaReadback": "UNVERIFIED",
+    "exactMediaReview": "REQUIRED",
+    "nativePublicationReceipt": "NOT_PRESENT",
+    "proofRoot": "https://sekretbip.net"
+  },
+  "safety": "No private teen/family data, no sensitive conversations, no actual teen or companion likeness without approved canon. Target adults only."
+}
