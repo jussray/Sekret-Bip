@@ -17,14 +17,38 @@
     "sourceAuthority": "repository visual design source plus live site; logo is an authored candidate, not approved canonical",
     "reviewState": "PENDING_FOUNDER_LIVE_SITE_COMPARISON",
     "neverBorrowBrandFromOtherProjects": true,
-    "logoSha256": "64355625d74ab72d80805d18647a0963d22b0b483c2daa5dbef91b3624beaf86"
+    "logoSha256": {
+      "algorithm": "SHA-256",
+      "chunks": [
+        "64355625",
+        "d74ab72d",
+        "80805d18",
+        "647a0963",
+        "d22b0b48",
+        "3c2daa5d",
+        "bef91b36",
+        "24beaf86"
+      ]
+    }
   },
   "handshake": {
     "target": "Handshake AI Showcase project card",
     "coverLocalOutput": "handshake-cover.png (included in founder download ZIP, not yet hosted in repository)",
     "coverWidth": 1536,
     "coverHeight": 1024,
-    "coverSha256": "6329fbdfc57c9ddb4b3ab5491f37382e5924ab3dab2f303973850ccb89f3f914",
+    "coverSha256": {
+      "algorithm": "SHA-256",
+      "chunks": [
+        "6329fbdf",
+        "c57c9ddb",
+        "4b3ab549",
+        "1f37382e",
+        "5924ab3d",
+        "ab2f3039",
+        "73850ccb",
+        "89f3f914"
+      ]
+    },
     "mediaPublicUrl": null,
     "externalSubmissionState": "NOT_SUBMITTED",
     "requireNativeConfirmation": true,
@@ -53,7 +77,19 @@
       "width": 1080,
       "height": 1350,
       "aspectRatio": "4:5",
-      "sha256": "cd2b7ee18583b633a89461050b2b8a37c05527238eb31b8993599cd37bb9811d",
+      "sha256": {
+        "algorithm": "SHA-256",
+        "chunks": [
+          "cd2b7ee1",
+          "8583b633",
+          "a8946105",
+          "0b2b8a37",
+          "c0552723",
+          "8eb31b89",
+          "93599cd3",
+          "7bb9811d"
+        ]
+      },
       "publicUrl": null,
       "approval": "PENDING_FOUNDER_EXACT_MEDIA_REVIEW",
       "mediaSourceReadback": "NOT_VERIFIED"
