@@ -65,7 +65,7 @@ test('canonical teen front door enters as one scene, settles, and stays interact
   await expect(qualityWash).toBeVisible();
   await expect(qualityVignette).toBeVisible();
   await expect(qualityRim).toBeVisible();
-  await expect(page.getByText('Se’kret Bip Family', { exact: true })).toBeVisible();
+  await expect(page.getByText('Your Se’kret Bip Family', { exact: true })).toBeVisible();
   await expect(page.getByText('Night · Suhana · Sy', { exact: true })).toHaveCount(0);
   await expect(enter).toBeVisible();
 
@@ -190,7 +190,7 @@ test('canonical teen front door reveals family artwork and switches to Bip Jr wi
   // The mobile canvas uses readable portrait cards instead of shrinking the
   // full landscape poster or animating an empty hero slot.
   await expect(page.getByTestId('canon-companion-showcase')).toBeVisible();
-  await expect(page.getByTestId('canon-companion-select')).toHaveCount(5);
+  await expect(page.getByTestId('family-composition').getByRole('button')).toHaveCount(10);
   await expect(page.getByTestId('web-welcome-hero-safe-area')).toHaveCount(0);
   await page.getByTestId('web-welcome-audience-switch').click();
   await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible();
@@ -227,7 +227,7 @@ test('reduced motion renders both audience scenes still with working family acce
   }));
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('canon-companion-showcase')).toBeVisible();
-  await expect(page.getByTestId('canon-companion-select')).toHaveCount(5);
+  await expect(page.getByTestId('family-composition').getByRole('button')).toHaveCount(10);
   expect(await opacity()).toEqual([null, null, null]);
   await page.getByTestId('web-welcome-audience-switch').click();
   await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible();
