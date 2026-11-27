@@ -35,7 +35,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  type TextInputInstance,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -49,6 +48,7 @@ import { useAppContext } from '@/context/AppContext';
 import { IMAGES } from '@/constants/theme';
 import { TEEN_ROUTES } from '@/teen/routes';
 import { updateSekretMemory } from '../../../services/sekretMemory';
+import { uploadImageToSupabase } from '../../../services/imageUpload';
 import {
   fetchSekretVoice,
   normalizeSekretCharacter,
@@ -56,6 +56,7 @@ import {
   type SekretCharacterId,
   type SekretHistoryTurn,
 } from '@/utils/api';
+import { getSupabase } from '@/utils/supabase';
 import { getTeenCompanionAsset } from '@/utils/companions';
 import type { JournalEntry } from '@/types';
 import {
@@ -68,6 +69,7 @@ import {
   type SafetyExperience,
 } from '../../../src/features/safety/safetyCoordinator';
 import { SafetyExperienceSheet } from '../../../components/safety/SafetyExperienceSheet';
+import { JournalSafetyNudge } from '../../../components/safety/JournalSafetyNudge';
 import {
   buildBridgeSharePreview,
   createBridgeShareRequest,
@@ -328,7 +330,7 @@ export default function TeenPagesRoute() {
   }, []);
 
   const flatListRef = useRef<FlatList<JournalEntry>>(null);
-  const composerRef = useRef<TextInputInstance>(null);
+  const composerRef = useRef<TextInput>(null);
 
   // Newest pages across every tab for the "My little universe" grid.
   const recentPages = useMemo(
@@ -432,6 +434,7 @@ export default function TeenPagesRoute() {
     setEntries(prev => [...prev, entry]);
     syncJournal(entry);
     setJournalText('');
+    const savedMediaUri = mediaUri;
     setMediaUri(undefined);
     setMediaType(undefined);
 
@@ -442,6 +445,21 @@ export default function TeenPagesRoute() {
       mood,
       journalEntries: [{ id: String(id), text, mood, date: new Date().toISOString() }],
     }).catch(() => null);
+
+    // Upload photo to Supabase Storage in background; patch entry with remote URL when done.
+    if (savedMediaUri && mediaType === 'photo') {
+      void (async () => {
+        try {
+          const sb = getSupabase();
+          const userId = (await sb?.auth.getUser())?.data?.user?.id;
+          if (!userId) return;
+          const remoteUrl = await uploadImageToSupabase(savedMediaUri, userId);
+          patchJournalEntry(id, { imageUri: remoteUrl });
+        } catch {
+          // local URI remains as fallback — not a user-facing error
+        }
+      })();
+    }
 
     if (!aiCompanion) return;
 
@@ -1077,11 +1095,19 @@ export default function TeenPagesRoute() {
         </KeyboardAvoidingView>
       </SafeAreaView>
 
-      {/* Safety experience sheet — rendered above all page content */}
-      <SafetyExperienceSheet
-        experience={safetyExperience}
-        onDismiss={() => setSafetyExperience(null)}
-      />
+      {/* #415: high-risk always gets the full blocking sheet; mild/moderate
+          get a supportive nudge that does not interrupt writing. */}
+      {safetyExperience?.tier === 'immediate_danger' ? (
+        <SafetyExperienceSheet
+          experience={safetyExperience}
+          onDismiss={() => setSafetyExperience(null)}
+        />
+      ) : safetyExperience ? (
+        <JournalSafetyNudge
+          experience={safetyExperience}
+          onDismiss={() => setSafetyExperience(null)}
+        />
+      ) : null}
     </View>
   );
 }

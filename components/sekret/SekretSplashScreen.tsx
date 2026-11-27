@@ -87,7 +87,7 @@ export default function SekretSplashScreen({ role, onEnter }: SekretSplashScreen
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
       {/* Full-bleed artwork */}
       <Image

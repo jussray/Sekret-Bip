@@ -17,6 +17,8 @@ const parentSetup = read('app/(onboarding)/parent-setup.tsx');
 const bootstrap = read('src/services/auth/postAuthBootstrap.ts');
 const founderAudit = read('src/services/founderAudit.ts');
 const ageAssurance = read('src/features/onboarding/ageAssurance.ts');
+const compliance = read('src/utils/compliance.ts');
+const localConsent = read('app/(auth)/consent.tsx');
 const manifest = JSON.parse(read('.control-room/repository.manifest.json'));
 
 test('splash and safe pre-auth onboarding routes are reachable before login', () => {
@@ -135,4 +137,27 @@ test('Control Room proof points to the real consent action', () => {
   const assertion = capability.usageAssertions.find(item => item.id === 'onboarding-requires-explicit-consent-action');
   assert.equal(assertion.path, 'app/(onboarding)/consent.tsx');
   assert.equal(assertion.marker, 'consentService.grant');
+});
+
+test('restored accounts re-accept versioned Terms and Privacy before private routing', () => {
+  const founderGuard = index.indexOf("if (postAuthNextRoute === '/(dev)/control-room')");
+  const localStatusCheck = index.indexOf('const compliance = await checkCompliance()');
+  const ageGate = index.indexOf("if (compliance.status === 'needs_age_gate')");
+  const renewedConsent = index.indexOf("if (compliance.status === 'needs_consent')");
+  const accountConsentGate = index.indexOf('if (!requiredConsentsComplete)');
+  const profileGate = index.indexOf('if (!accountProfile?.onboardingComplete)');
+
+  assert.ok(founderGuard >= 0 && founderGuard < localStatusCheck, 'verified founder destination is preserved');
+  assert.ok(ageGate > localStatusCheck && renewedConsent > ageGate, 'versioned consent follows age assurance');
+  assert.ok(accountConsentGate > renewedConsent && profileGate > renewedConsent,
+    'both app policy re-consent and persisted account onboarding consent must be completed');
+
+  assert.match(index, /if \(compliance\.status === 'needs_consent'\) \{/);
+  assert.match(index, /encodeURIComponent\(compliance\.dob\)/);
+  assert.match(index, /encodeURIComponent\(compliance\.accountType\)/);
+  assert.match(index, /router\.replace\(`\/\(auth\)\/consent\?dob=\$\{dob\}&accountType=\$\{accountType\}&reConsent=true` as never\)/);
+  assert.match(compliance, /status: 'needs_consent'; dob: string; accountType: string; reConsent: boolean/);
+  assert.match(localConsent, /const isReConsent = reConsent === 'true'/);
+  assert.match(localConsent, /\['compliance_tos_version',\s*TOS_VERSION\]/);
+  assert.match(localConsent, /\['compliance_privacy_version',\s*PRIVACY_VERSION\]/);
 });

@@ -206,6 +206,15 @@ export default function Index() {
         router.replace('/(auth)/age-gate');
         return;
       }
+      if (compliance.status === 'needs_consent') {
+        // Versioned terms/privacy re-acceptance must happen before a restored
+        // session can enter private onboarding, parent, or teen routes.
+        // Keep the existing public auth consent screen as the destination.
+        const dob = encodeURIComponent(compliance.dob);
+        const accountType = encodeURIComponent(compliance.accountType);
+        router.replace(`/(auth)/consent?dob=${dob}&accountType=${accountType}&reConsent=true` as never);
+        return;
+      }
 
       if (!requiredConsentsComplete) {
         router.replace(`/(onboarding)/consent?side=${effectiveSide}` as never);

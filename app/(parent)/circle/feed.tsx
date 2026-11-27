@@ -37,7 +37,7 @@ export default function ParentCircleRoute() {
       parentCirclePostText={parentCirclePostText}
       setParentCirclePostText={setParentCirclePostText}
       saveParentCirclePost={saveParentCirclePost}
-      reactToParentPost={(id: string | number, type: string) => reactToParentPost(Number(id), type)}
+      reactToParentPost={(id: string | number, type: string) => reactToParentPost(id, type)}
       setScreen={navigateTo}
       BottomNav={null}
       onPostPress={id => router.push(`/(parent)/circle/${id}` as never)}
