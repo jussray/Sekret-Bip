@@ -36,13 +36,13 @@ export const FRONT_DOOR_FAMILY: readonly FrontDoorFamilyMember[] = [
   { id: 'cloud', name: 'Cloud', role: 'The Calm', row: 'companions',
     portrait: { uri: FAMILY_MEDIA + '3dfd0df8-241d-4399-afc3-a825ea7df486.jpg' } },
   { id: 'bip-jr-1', name: 'Bip Jr. 1', role: 'The Spark', row: 'children',
-    portrait: { uri: FAMILY_MEDIA + '87ccad33-f04a-48a9-84f1-515101672cb3.jpg' } },
+    portrait: { uri: FAMILY_MEDIA + '2e6c4a37-8d12-4efb-9304-74b28a2ee6e2.jpg' } },
   { id: 'bip-jr-2', name: 'Bip Jr. 2', role: 'The Giggle', row: 'children',
-    portrait: { uri: FAMILY_MEDIA + '65c8dd97-353f-478b-b031-3986ac03f019.jpg' } },
+    portrait: { uri: FAMILY_MEDIA + '346baba4-0d64-450c-8464-6bbc3c1eeff3.jpg' } },
   { id: 'bip-jr-3', name: 'Bip Jr. 3', role: 'The Dreamer', row: 'children',
-    portrait: { uri: FAMILY_MEDIA + '71cafb4a-c5e1-4b4c-9247-3e83dc261d25.jpg' } },
+    portrait: { uri: FAMILY_MEDIA + '663fe261-8aea-4792-8408-ad0587941934.jpg' } },
   { id: 'bip-jr-4', name: 'Bip Jr. 4', role: 'The Explorer', row: 'children',
-    portrait: { uri: FAMILY_MEDIA + 'f7278f72-b67e-4430-8630-923650f0f9c5.jpg' } },
+    portrait: { uri: FAMILY_MEDIA + 'dba1ccbe-4518-45a1-a53d-ad8fe0aa1e85.jpg' } },
 ];
 
 export const FRONT_DOOR_FAMILY_ORDER: readonly FamilyMemberId[] = FRONT_DOOR_FAMILY.map(member => member.id);
