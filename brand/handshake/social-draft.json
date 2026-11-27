@@ -16,13 +16,23 @@
     "copy": "What is Se’kret Bip designed to do?\n\nSe’kret Bip is a privacy-first creative and emotional-growth product for teens and their families, with journaling, comfort, and permission-aware family experience concepts.\n\nNot a therapy or emergency service. Features in source do not prove all member journeys are production ready.\n\nProject evidence: https://github.com/jussray/Sekret-Bip\n\n#SekretBip #FamilyTechnology #TeenWellbeingDesign #PrivacyFirst #AppDevelopment",
     "mediaAltText": "Illustrative purple scrapbook bedroom scene, journal and phone interface with the Se’kret Bip logo; no real teen users or companion portraits.",
     "mediaPathLocal": "brand/handshake/handshake-cover.png (candidate file in downloadable kit, not publicly hosted)",
-    "mediaPublicUrl": null
+    "mediaPublicUrl": null,
+    "mediaPackagePath": "Social/Sekret_Bip_Social_Ad_4x5.png",
+    "mediaSha256": "cd2b7ee18583b633a89461050b2b8a37c05527238eb31b8993599cd37bb9811d",
+    "mediaDimensions": [
+      1080,
+      1350
+    ],
+    "mediaPurpose": "social_ad",
+    "mediaState": "LOCAL_CANDIDATE_UNHOSTED"
   },
   "handshake": {
     "name": "Se’kret Bip",
     "description": "Se’kret Bip is a privacy-first creative and emotional-growth product for teens and their families, with journaling, comfort, and permission-aware family experience concepts. Not a therapy or emergency service. Features in source do not prove all member journeys are production ready.",
     "productUrl": "https://sekretbip.net/",
-    "submissionState": "NOT_SUBMITTED"
+    "submissionState": "NOT_SUBMITTED",
+    "coverPackagePath": "Handshake/Sekret_Bip_Handshake_3x2.png",
+    "coverStatus": "LOCAL_CANDIDATE_UNHOSTED"
   },
   "review": {
     "exactMediaFounderApproval": false,
