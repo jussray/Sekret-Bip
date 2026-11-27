@@ -62,6 +62,14 @@ export function probeBipVideoRenderer() {
   };
 }
 
+// FFmpeg 4.4 exposes the global -vsync option; newer releases expose
+// the per-stream -fps_mode option. Keep constant frame rate on both.
+export function constantFrameRateArgs(help) {
+  if (/^\s*-fps_mode(?:\s|\[|:)/m.test(help)) return ['-fps_mode', 'cfr'];
+  if (/^\s*-vsync\s/m.test(help)) return ['-vsync', 'cfr'];
+  fail('FFMPEG_CFR_MODE_UNSUPPORTED', 'BIP_VIDEO_RENDER_FAILED');
+}
+
 function probeMedia(path) {
   const result = spawnSync(process.env.FFPROBE_BIN || 'ffprobe', [
     '-v', 'error', '-print_format', 'json', '-show_format', '-show_streams', path,
@@ -138,11 +146,16 @@ export async function renderBipVideoMaster({ manifest, sources, outputPath, rece
     const args = ['-nostdin', '-y', '-f', 'concat', '-safe', '1', '-i', concatPath];
     if (audioPath) args.push('-stream_loop', '-1', '-i', audioPath);
     else args.push('-f', 'lavfi', '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000');
+    const help = spawnSync(process.env.FFMPEG_BIN || 'ffmpeg', ['-hide_banner', '-h', 'full'], {
+      encoding: 'utf8', maxBuffer: 16 * 1024 * 1024,
+    });
+    if (help.status !== 0) fail('FFMPEG_OPTION_PROBE_FAILED', 'BIP_VIDEO_RENDER_FAILED');
+    const cfrArgs = constantFrameRateArgs(help.stdout + '\n' + help.stderr);
     args.push(
       '-t', String(duration),
       '-map', '0:v:0', '-map', '1:a:0',
       '-vf', videoFilter,
-      '-r', String(master.fps), '-fps_mode', 'cfr',
+      '-r', String(master.fps), ...cfrArgs,
       '-c:v', 'libx264', '-preset', 'medium', '-crf', '18', '-pix_fmt', 'yuv420p',
       '-c:a', 'aac', '-b:a', '160k', '-ar', '48000',
       '-movflags', '+faststart',

@@ -19,9 +19,18 @@ function TabIcon({ emoji }: { emoji: string }) {
   return <Text style={{ fontSize: 20 }}>{emoji}</Text>;
 }
 
-function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; quietActive: boolean }) {
+function TeenTabs({
+  selectedSekret,
+  quietActive,
+  immersive,
+}: {
+  selectedSekret: string;
+  quietActive: boolean;
+  immersive: boolean;
+}) {
   const companionId = toCompanionId(selectedSekret ?? 'raylene');
   const { experience, clear } = useSafetyCheck(companionId, true);
+  const hideGlobalChrome = quietActive || immersive;
 
   return (
     <View style={{ flex: 1 }}>
@@ -29,7 +38,7 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
       <Tabs
         screenOptions={{
           headerShown: false,
-          tabBarStyle: quietActive
+          tabBarStyle: hideGlobalChrome
             ? { display: 'none' }
             : { backgroundColor: '#111827', borderTopWidth: 0, height: 68, paddingBottom: 10 },
           tabBarActiveTintColor: '#fff',
@@ -62,6 +71,7 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
         <Tabs.Screen name="period-calendar" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="discover" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="profile" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
+        <Tabs.Screen name="scrapbook-check-in" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
         <Tabs.Screen name="chat/index" options={{ href: null }} />
         <Tabs.Screen name="chat/[personalityId]" options={{ href: null }} />
         <Tabs.Screen name="bippin2" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
@@ -80,8 +90,8 @@ function TeenTabs({ selectedSekret, quietActive }: { selectedSekret: string; qui
         <Tabs.Screen name="quiet" options={{ href: null }} />
         <Tabs.Screen name="meaning" options={{ tabBarButton: () => null, tabBarItemStyle: { display: 'none' } }} />
       </Tabs>
-      {!quietActive && <SideSafeBackButton side="teen" />}
-      {!quietActive && <GlobalMoodButton />}
+      {!hideGlobalChrome && <SideSafeBackButton side="teen" />}
+      {!hideGlobalChrome && <GlobalMoodButton />}
       {/* Trust-03/#414: persistent, always-accessible crisis support across every
           teen-facing surface — including Quiet Bip, where other floating controls
           are intentionally hidden but safety access must not be. */}
@@ -108,6 +118,7 @@ export default function TeenLayout() {
   const { companion } = useGlobalSearchParams<{ companion?: string | string[] }>();
   const { sleepActive, sleepLoaded } = useSleepGuard();
   const quietRouteAllowed = isQuietRouteAllowed({ pathname, companion });
+  const immersiveScrapbook = pathname.includes('scrapbook-check-in');
 
   useEffect(() => {
     if (devSideOverride != null) {
@@ -165,7 +176,13 @@ export default function TeenLayout() {
   if (founderPreview || devSideOverride === 'teen') {
     if (!sleepLoaded) return <TeenLoadingSurface />;
     if (sleepActive && !quietRouteAllowed) return <Redirect href="/(teen)/quiet" />;
-    return <TeenTabs selectedSekret={selectedSekret ?? 'raylene'} quietActive={sleepActive} />;
+    return (
+      <TeenTabs
+        selectedSekret={selectedSekret ?? 'raylene'}
+        quietActive={sleepActive}
+        immersive={immersiveScrapbook}
+      />
+    );
   }
 
   if (isLoading || !profileChecked || !sleepLoaded) return <TeenLoadingSurface />;
@@ -173,5 +190,11 @@ export default function TeenLayout() {
   if (effectiveUserSide !== 'teen') return <Redirect href="/" />;
   if (!profileComplete) return <Redirect href="/(onboarding)/welcome" />;
   if (sleepActive && !quietRouteAllowed) return <Redirect href="/(teen)/quiet" />;
-  return <TeenTabs selectedSekret={selectedSekret ?? 'raylene'} quietActive={sleepActive} />;
+  return (
+    <TeenTabs
+      selectedSekret={selectedSekret ?? 'raylene'}
+      quietActive={sleepActive}
+      immersive={immersiveScrapbook}
+    />
+  );
 }

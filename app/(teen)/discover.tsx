@@ -10,14 +10,15 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
+import { TEEN_ROUTES } from '@/teen/routes';
 import { PERSONALITY_CONFIG } from '@/services/ai';
 import { usePoints } from '@/features/activity/ledger';
 
 const COMPANION_UNLOCK_PTS: Record<string, number> = {
-  raylene: 0, rylane: 50, cloud: 150, night: 350,
+  raylene: 0, rylane: 50, cloud: 150, night: 350, oracle: 0,
 };
 
-const COMPANIONS = ['raylene', 'rylane', 'cloud', 'night'] as const;
+const COMPANIONS = ['raylene', 'rylane', 'cloud', 'night', 'oracle'] as const;
 
 const TOOLS = [
   { emoji: '🌊', title: 'Breathe',        desc: 'Two minutes of calm.',      route: '/(teen)/calm'     },
@@ -70,7 +71,9 @@ export default function DiscoverScreen() {
                 <TouchableOpacity
                   key={id}
                   style={[styles.companionCard, { borderColor: p.accentColor + '55', opacity: unlocked ? 1 : 0.45 }]}
-                  onPress={() => unlocked ? router.push(`/(teen)/chat/${id}` as any) : undefined}
+                  onPress={() => unlocked ? (id === 'oracle'
+                    ? router.push({ pathname: TEEN_ROUTES.pages, params: { companion: 'oracle' } } as never)
+                    : router.push(`/(teen)/chat/${id}` as any)) : undefined}
                   activeOpacity={unlocked ? 0.8 : 1}
                 >
                   <View style={[styles.companionGlow, { backgroundColor: p.accentColor + '1a' }]} />

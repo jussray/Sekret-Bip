@@ -87,15 +87,15 @@ export default function Welcome() {
         </View>
         <Text style={styles.wordmark}>Se'kret Bip</Text>
 
-        <Text style={styles.title}>One page.{`\n`}Clear path.</Text>
+        <Text style={styles.title}>Your space.{`\n`}Your story.</Text>
         <Text style={styles.body}>
-          Pick your age bucket, see the protection path, then create the right account. No raw ID, selfie, video, or full birth date is collected here.
+          Explore your world in Bip. Choose your age range to get started. No ID or birthday needed here.
         </Text>
 
         <View style={styles.promiseCard}>
-          <Text style={styles.promiseTitle}>Private by default. Guarded on purpose.</Text>
+          <Text style={styles.promiseTitle}>Your space, with safety built in.</Text>
           <Text style={styles.promiseText}>
-            Bip keeps onboarding lightweight while still recording the safety checkpoints the app needs: age bucket, assurance status, guardian requirement, and account side.
+            We use your age range to guide you to the right space. A parent or guardian helps when required.
           </Text>
         </View>
 
@@ -119,7 +119,7 @@ export default function Welcome() {
         {decision ? (
           <View style={[styles.decisionCard, !decision.allowed && styles.blockedCard]}>
             <Text style={[styles.decisionTitle, !decision.allowed && styles.blockedTitle]}>
-              {decision.allowed ? 'Your path is ready' : 'Parent path needed'}
+              {decision.allowed ? "You're ready for the next step" : 'A parent needs to help'}
             </Text>
             <Text style={styles.decisionText}>{decision.message}</Text>
           </View>
@@ -141,9 +141,9 @@ export default function Welcome() {
           activeOpacity={0.85}
           onPress={handleContinue}
           accessibilityRole="button"
-          accessibilityLabel={decision?.actionLabel ?? 'Choose an age bucket'}
+          accessibilityLabel={decision?.actionLabel ?? 'Choose your age range'}
         >
-          <Text style={styles.btnText}>{decision?.actionLabel ?? 'Choose an age bucket'}</Text>
+          <Text style={styles.btnText}>{decision?.actionLabel ?? 'Choose your age range'}</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleParent} style={styles.parentLink} accessibilityRole="link" accessibilityLabel="I'm a parent">
           <Text style={styles.parentLinkText}>I'm a parent →</Text>

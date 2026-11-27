@@ -86,6 +86,27 @@ test('Teen Room keeps one canonical companion visual with bounded interaction ge
   expect(boxesOverlap(intentionsBox!, returnBox!)).toBe(false);
   expect(boxesOverlap(moodBox!, returnBox!)).toBe(false);
 
+  // Regression: the scrapbook launcher must not intercept the VibeLab or return controls.
+  const scrapbookLauncher = page.getByTestId('scrapbook-check-in-launcher');
+  const vibeLabButton = page.getByRole('button', { name: 'Customize your room in VibeLab', exact: true });
+  await expect(scrapbookLauncher).toBeVisible();
+  const [scrapbookBox, vibeLabBox] = await Promise.all([
+    scrapbookLauncher.boundingBox(),
+    vibeLabButton.boundingBox(),
+  ]);
+  expect(scrapbookBox).not.toBeNull();
+  expect(vibeLabBox).not.toBeNull();
+  expect(boxesOverlap(scrapbookBox!, vibeLabBox!)).toBe(false);
+  expect(boxesOverlap(scrapbookBox!, returnBox!)).toBe(false);
+  const supportButton = page.getByRole('button', {
+    name: 'Get help now — crisis support resources',
+    exact: true,
+  });
+  await expect(supportButton).toBeVisible();
+  const supportBox = await supportButton.boundingBox();
+  expect(supportBox).not.toBeNull();
+  expect(boxesOverlap(scrapbookBox!, supportBox!)).toBe(false);
+
   await saveEvidence(page, '01-room-companion-first-composition');
 
   const journal = page.getByRole('button', { name: 'Journal 📖', exact: true });

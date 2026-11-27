@@ -94,6 +94,15 @@ jobs:
           test/cloudflare-token-verification-fallback.test.mjs
           test/founder-preview-unlock.test.mjs
 
+      - name: Install and verify media test dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          ffmpeg -version
+          ffprobe -version
+
       - name: Run complete unit suite
         run: npm test
 

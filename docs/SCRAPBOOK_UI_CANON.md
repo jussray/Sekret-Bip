@@ -1,0 +1,150 @@
+# Se’kret Bip Scrapbook UI Canon
+
+Status: **canonical visual direction for teen mobile companion scenes**  
+First approved receipt: **Sy — Evening Check-In**  
+Reference frame: `docs/design/reference/scrapbook-evening-sy-reference.jpg`  
+Target frame: **390 × 844 mobile**
+
+## Product intent
+
+Se’kret Bip should feel like a private sketchbook a teen actually wants to return to, not a clinical dashboard. Companion scenes combine a lived-in room with handmade paper layers so emotional check-ins feel personal, expressive, and grounded in the Bip world.
+
+## Visual contract
+
+Every scrapbook companion scene should preserve these ingredients unless a later approved design explicitly supersedes them:
+
+- white or warm-white sketchbook-paper surfaces;
+- imperfect masking-tape attachments;
+- hand-drawn doodles, arrows, stars, moons, or hearts;
+- slightly rotated white Polaroid-style character frames;
+- cozy dark-mode room backgrounds rather than flat dashboard panels;
+- warm interior light paired with cooler window/moon light where appropriate;
+- time-of-day-aware atmosphere using the existing `getRoomPhase` / `getRoomScene` system;
+- companion art as a separate actor layer so one layout can be reused across companions;
+- deliberately imperfect spacing/rotation so the composition feels assembled by hand rather than generated from a rigid card grid;
+- readable contrast and at least 44pt interactive targets for mobile controls.
+
+The dark room remains the product world. Paper, tape, doodles, and Polaroids sit **inside that world** instead of replacing it with a generic white UI.
+
+## Companion identity
+
+Visible peer-companion names for this reusable character-scene system are canonical:
+
+- **Suhana**
+- **Sy**
+- **Cloud**
+- **Night**
+- **Ja** (legacy Oracle identifier)
+
+The approved Se’kret Pages screenshot is **layout authority, not unconditional actor authority**. Its Cloud card incorrectly depicts a human. Cloud must always use the existing actual luminous cloud mascot asset, enhanced by a blue-white halo. **Sy is a boy**, and his card must use the approved boy actor keyed internally as `rylane` (not a girl silhouette). Suhana stays female; Night retains his individual darker style. Ja stays the silver-lavender-haired, gold-accented fifth identity; the current symbolic Ja preview is intentionally not a replacement for a reviewed isolated portrait. The Pages card order is **Sy, Suhana, Cloud, Night, Ja**, with Me available separately for private journaling.
+
+Legacy identifiers may remain only as internal compatibility aliases while the runtime is migrated:
+
+```text
+raylene -> Suhana
+rylane  -> Sy
+```
+
+Do not surface `Raylene` or `Rylane` as current character copy.
+
+**Ja is Oracle.** The approved display name for the fifth companion is **Ja**. Existing teen Pages and other internal systems use `oracle` as an older route/tab identifier; their backend can normalize that to `sekret`. These are compatibility identifiers for the same continuity entry, **not** a sixth character. Do not show `Oracle (Ja)` or use the old `Joseema` display label in teen Pages.
+
+Ja has a distinct fifth scrapbook view, using the existing journal atmosphere and a golden continuity symbol **only while a founder-approved isolated Ja portrait is unavailable**. It is not an invented face, not character-authority evidence, and not visual sign-off on Ja's final real-human cinematic identity. The teen route delegates to the existing Pages `oracle` tab; no extra AI provider, chat history, parent visibility, or persistence is created. Internal reasoning safety/privacy boundaries remain unchanged.
+
+## First approved scene
+
+The first locked composition is **Sy — Evening Check-In**:
+
+- cozy nighttime bedroom / city-window atmosphere;
+- moon and hand-drawn star/heart doodles;
+- central taped Polaroid frame;
+- character inside the Polaroid;
+- torn-paper-style note reading `you made it through today.`;
+- scrapbook CTA reading `Bip with Sy →`;
+- pink/violet accent appropriate to the evening scene.
+
+The approved generated reference is design evidence. It is not proof that the Expo implementation visually matches until the same route is rendered and inspected.
+
+## Runtime implementation
+
+Reusable scene component:
+
+- `components/rooms/ScrapbookCompanionScene.tsx`
+
+Teen route:
+
+- `app/(teen)/scrapbook-check-in.tsx`
+
+Room entry point:
+
+- `app/(teen)/room.tsx` renders `ScrapbookCheckInLauncher`
+
+Route registry:
+
+- `src/teen/routes.ts` → `scrapbookCheckIn`
+
+Founder Preview catalog:
+
+- `src/constants/founderPreview.ts` → `Scrapbook Companion Check-In`
+
+The scene resolves the selected peer companion into the existing compatibility key, chooses the existing companion/room assets, resolves the current room phase, and renders one shared scrapbook composition rather than four copied screens.
+
+The hidden route may also receive a normalized `companion` query parameter for deterministic deep links and visual verification. Normal Room entry continues to use the teen’s selected companion.
+
+The main CTA continues into the existing Se’kret Pages path with the active companion selected. This slice does not introduce a second chat backend, second journal system, new database state, or new telemetry.
+
+## Time-of-day behavior
+
+The layout is stable while atmosphere and short copy shift with the existing Room phase:
+
+- day / midday: lighter warmth;
+- afternoon: golden warmth;
+- evening: violet-pink glow and `you made it through today.`;
+- rain: cool blue softness;
+- night / deepNight: darker violet/indigo atmosphere and quieter copy.
+
+Do not create a separate navigation tree for each time period.
+
+## Privacy and data boundary
+
+Supabase dependency for this UI slice: **none**.
+
+The scene reads the already-selected companion and local theme/asset state. It does not add journal reads, message reads, parent visibility, analytics payloads, profile data, image uploads, microphone access, or private-data persistence.
+
+## Exact-head visual witness
+
+Dedicated Playwright witness:
+
+- `e2e/scrapbook-companion-check-in.spec.ts`
+
+The witness:
+
+- renders the real `/scrapbook-check-in` route at **390 × 844**;
+- requests **Sy** through the normalized companion route parameter;
+- freezes only the test browser’s `Date.prototype.getHours()` to `18` so the approved evening state is deterministic;
+- verifies `EVENING CHECK-IN`, `Sy`, `you made it through today.`, and the accessible `Bip with Sy` CTA;
+- rejects horizontal document overflow;
+- writes `artifacts/product-design-playwright/scrapbook-companion-check-in/sy-evening-390x844.png`;
+- verifies the CTA hands off to the existing Pages route.
+
+The browser-clock override exists only inside Playwright evidence. Production behavior continues to use the real local time.
+
+## Verification state
+
+Implementation status: **integrated on feature branch**.  
+Design QA status: **blocked until the exact-head 390 × 844 witness passes and its rendered screenshot is compared with the approved reference**.  
+Release status: **not released by this document**.
+
+Required before merge/release claims:
+
+1. focused scrapbook UI contract test;
+2. TypeScript check;
+3. lint;
+4. Expo/web build as required by the current release gate;
+5. dedicated Product Design Playwright rendered-route witness;
+6. visual comparison for typography, spacing, paper/tape/Polaroid fidelity, companion placement, time-of-day atmosphere, responsiveness, and visible accessibility risks;
+7. exact-head repository/release checks.
+
+## Rollback
+
+Remove the scrapbook route registration, hidden tab entry, Room launcher, reusable scene component, reference asset, dedicated Playwright witness, contract test, Founder Preview catalog entry, ledger extension, and this canon document. No database or provider rollback is required for this slice.

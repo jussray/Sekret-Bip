@@ -252,7 +252,7 @@ test('Pages renders the scrapbook home and keeps companion conversation and the 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/pages?bipDevSide=teen', { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByText("Se'kret Pages ♡", { exact: true })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Se’kret Pages ♡', { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText('your thoughts live here ♡', { exact: true })).toBeVisible();
   await expect(page.getByText('Dear me…', { exact: true })).toBeVisible();
   for (const action of ['Photo', 'Voice Bip', 'Write', 'Stickers', 'Video', 'Make a Page', 'See all pages']) {

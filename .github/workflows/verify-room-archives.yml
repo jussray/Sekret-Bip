@@ -85,6 +85,7 @@ jobs:
     needs: [verify-archives]
     if: always()
     runs-on: ubuntu-latest
+    permissions: {}
     steps:
       - name: On success
         if: needs.verify-archives.result == 'success'

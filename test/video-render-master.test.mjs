@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
 
-import { BIP_VIDEO_RENDERER, probeBipVideoRenderer, renderBipVideoMaster } from '../scripts/render-video-master.mjs';
+import { BIP_VIDEO_RENDERER, constantFrameRateArgs, probeBipVideoRenderer, renderBipVideoMaster } from '../scripts/render-video-master.mjs';
 
 const manifest = {
   $schema: 'sekret-bip-video-master@v1',
@@ -47,6 +47,12 @@ function makeShot(path, color) {
     path,
   ], { encoding: 'utf8' });
 }
+
+test('selects constant-frame-rate option from the actual FFmpeg capability', () => {
+  assert.deepEqual(constantFrameRateArgs('  -vsync video sync method'), ['-vsync', 'cfr']);
+  assert.deepEqual(constantFrameRateArgs('  -vsync video sync method\n  -fps_mode[:stream_specifier] set framerate mode'), ['-fps_mode', 'cfr']);
+  assert.throws(() => constantFrameRateArgs('no supported option'), /FFMPEG_CFR_MODE_UNSUPPORTED/);
+});
 
 test('Bip renderer rejects unapproved source media', async () => {
   const result = await (async () => {
