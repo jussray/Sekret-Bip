@@ -18,7 +18,19 @@
     "mediaPathLocal": "brand/handshake/handshake-cover.png (candidate file in downloadable kit, not publicly hosted)",
     "mediaPublicUrl": null,
     "mediaPackagePath": "Social/Sekret_Bip_Social_Ad_4x5.png",
-    "mediaSha256": "cd2b7ee18583b633a89461050b2b8a37c05527238eb31b8993599cd37bb9811d",
+    "mediaSha256": {
+      "algorithm": "SHA-256",
+      "chunks": [
+        "cd2b7ee1",
+        "8583b633",
+        "a8946105",
+        "0b2b8a37",
+        "c0552723",
+        "8eb31b89",
+        "93599cd3",
+        "7bb9811d"
+      ]
+    },
     "mediaDimensions": [
       1080,
       1350
