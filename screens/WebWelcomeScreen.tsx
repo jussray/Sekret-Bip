@@ -462,14 +462,9 @@ export function WebWelcomeScreen({
             </View>
           )}
 
-          {teenPhoneCanvas ? (
-            <CanonCompanionShowcase motionEnabled={motionEnabled} onContinue={() => onEnter(entrySide)} />
-          ) : null}
-
-          {!teenPhoneCanvas && (
           <Animated.View
             testID="web-welcome-copy-reveal"
-            style={[styles.copy, isBipJr && styles.copyBipJr, audienceRevealStyle(audienceCopyReveal)]}
+            style={[styles.copy, isBipJr && styles.copyBipJr, compact && !isBipJr && styles.copyTeenCompact, audienceRevealStyle(audienceCopyReveal)]}
           >
             <Text
               testID="web-welcome-eyebrow"
@@ -477,13 +472,12 @@ export function WebWelcomeScreen({
             >
               {copy.eyebrow}
             </Text>
-            <Text style={[styles.title, isBipJr && styles.titleBipJr]}>{copy.title}</Text>
+            <Text style={[styles.title, isBipJr && styles.titleBipJr, compact && !isBipJr && styles.titleTeenCompact]}>{copy.title}</Text>
             <Text style={[styles.lead, isBipJr && styles.leadBipJr]}>{copy.lead}</Text>
             <Text style={[styles.subtitle, isBipJr && styles.subtitleBipJr]}>{copy.subtitle}</Text>
           </Animated.View>
-          )}
 
-          {!teenPhoneCanvas && (
+          {isBipJr && (
           <View
             testID="web-welcome-hero-safe-area"
             style={{ paddingBottom: heroContract.bottomGap }}
@@ -523,11 +517,11 @@ export function WebWelcomeScreen({
           </View>
           )}
 
-          {!isBipJr && !teenPhoneCanvas && (
+          {!isBipJr && (
             <CanonCompanionShowcase motionEnabled={motionEnabled} onContinue={() => onEnter(entrySide)} />
           )}
 
-          {!teenPhoneCanvas && (
+          {isBipJr && (
           <Animated.View
             testID="web-welcome-world-cues"
             accessible
@@ -552,9 +546,7 @@ export function WebWelcomeScreen({
           </Animated.View>
           )}
 
-          {!teenPhoneCanvas && (
-            <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
-          )}
+          <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
 
           <Pressable
             testID="web-welcome-enter"
@@ -704,6 +696,16 @@ const styles = StyleSheet.create({
   shellTeen: {
     maxWidth: 1120,
     borderColor: 'rgba(213,154,255,0.34)',
+  },
+  copyTeenCompact: {
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  titleTeenCompact: {
+    fontSize: 35,
+    lineHeight: 38,
+    letterSpacing: -1.3,
+    marginTop: 2,
   },
   shellCompact: {
     maxWidth: '100%',
