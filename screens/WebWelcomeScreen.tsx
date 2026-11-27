@@ -83,9 +83,7 @@ export function WebWelcomeScreen({
   const shellHeight = compact ? height : Math.min(height, 900);
   const entrySide = accountSideForWelcomeAudience(activeAudience);
   const isBipJr = activeAudience === 'bip-jr';
-  // On phones, the exact approved companion portraits ARE the hero.
-  // Never squeeze the landscape production sheet into a tiny thumbnail.
-  const teenPhoneCanvas = compact && !isBipJr;
+  // All teen viewport sizes now share the same approved family composition.
   const heroContract = isBipJr
     ? FRONT_DOOR_THEME.heroSafeArea.bipJr
     : FRONT_DOOR_THEME.heroSafeArea.teen;
