@@ -35,7 +35,7 @@ export function CanonCompanionShowcase({ motionEnabled, onContinue }: Props) {
   const { width } = useWindowDimensions();
   const compact = width < 520;
   const stageWidth = Math.min(width - (compact ? 14 : 48), 880);
-  const stageHeight = compact ? (width < 350 ? 308 : 362) : 490;
+  const stageHeight = compact ? (width < 350 ? 282 : 335) : 490;
   const drift = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -138,6 +138,15 @@ export function CanonCompanionShowcase({ motionEnabled, onContinue }: Props) {
             <Text style={styles.detailNote}>Part of your Se’kret Bip family</Text>
           </View>
           <Pressable
+            testID="canon-companion-continue"
+            accessibilityRole="button"
+            accessibilityLabel="Continue to Se'kret Bip account setup"
+            onPress={onContinue}
+            style={styles.close}
+          >
+            <Text style={styles.closeText}>Enter →</Text>
+          </Pressable>
+          <Pressable
             accessibilityRole="button"
             testID="canon-companion-close"
             accessibilityLabel="Close family introduction"
@@ -148,15 +157,7 @@ export function CanonCompanionShowcase({ motionEnabled, onContinue }: Props) {
           </Pressable>
         </View>
       )}
-      <Pressable
-        testID="canon-companion-continue"
-        accessibilityRole="button"
-        accessibilityLabel="Continue to Se'kret Bip account setup"
-        onPress={onContinue}
-        style={styles.continue}
-      >
-        <Text style={styles.continueText}>Step into your space ✧</Text>
-      </Pressable>
+
     </View>
   );
 }
