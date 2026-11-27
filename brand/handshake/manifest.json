@@ -27,7 +27,12 @@
     "coverSha256": "6329fbdfc57c9ddb4b3ab5491f37382e5924ab3dab2f303973850ccb89f3f914",
     "mediaPublicUrl": null,
     "externalSubmissionState": "NOT_SUBMITTED",
-    "requireNativeConfirmation": true
+    "requireNativeConfirmation": true,
+    "coverPackagePath": "Handshake/Sekret_Bip_Handshake_3x2.png",
+    "coverDimensions": [
+      1536,
+      1024
+    ]
   },
   "social": {
     "owner": "jussray/founder-control-room",
@@ -41,7 +46,19 @@
     "publicMediaReadback": "UNVERIFIED",
     "exactMediaReview": "REQUIRED",
     "nativePublicationReceipt": "NOT_PRESENT",
-    "proofRoot": "https://sekretbip.net"
+    "proofRoot": "https://sekretbip.net",
+    "adCreative": {
+      "source": "founder-delivered download package only; not committed, hosted or published",
+      "packagePath": "Social/Sekret_Bip_Social_Ad_4x5.png",
+      "width": 1080,
+      "height": 1350,
+      "aspectRatio": "4:5",
+      "sha256": "cd2b7ee18583b633a89461050b2b8a37c05527238eb31b8993599cd37bb9811d",
+      "publicUrl": null,
+      "approval": "PENDING_FOUNDER_EXACT_MEDIA_REVIEW",
+      "mediaSourceReadback": "NOT_VERIFIED"
+    },
+    "draftInputReady": false
   },
   "safety": "No private teen/family data, no sensitive conversations, no actual teen or companion likeness without approved canon. Target adults only."
 }
