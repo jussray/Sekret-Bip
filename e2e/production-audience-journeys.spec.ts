@@ -24,7 +24,7 @@ test('production Teen journey reaches age-gated onboarding without a write', asy
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/?bipDevAudience=teen', { waitUntil: 'networkidle' });
     await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Se’kret Bip Family', { exact: true })).toBeVisible();
+    await expect(page.getByText('Your Se’kret Bip Family', { exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
     await page.getByTestId('web-welcome-enter').click();
     await expect(page).toHaveURL(/\/welcome(?:\?|$)/);
