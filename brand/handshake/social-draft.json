@@ -1,0 +1,33 @@
+{
+  "schema": "fcr/handshake-social-draft@v1",
+  "project": "bip",
+  "sourceRepository": "jussray/Sekret-Bip",
+  "channelGroup": "business_only",
+  "intendedAccountHandle": "@jussnco",
+  "accountConnection": "UNVERIFIED",
+  "publishAllowed": false,
+  "queueAllowed": false,
+  "owner": "jussray/founder-control-room",
+  "sourcePath": "brand/handshake/logo.svg",
+  "social": {
+    "question": "What is Se’kret Bip designed to do?",
+    "answer": "Se’kret Bip is a privacy-first creative and emotional-growth product for teens and their families, with journaling, comfort, and permission-aware family experience concepts.",
+    "truthBoundary": "Not a therapy or emergency service. Features in source do not prove all member journeys are production ready.",
+    "copy": "What is Se’kret Bip designed to do?\n\nSe’kret Bip is a privacy-first creative and emotional-growth product for teens and their families, with journaling, comfort, and permission-aware family experience concepts.\n\nNot a therapy or emergency service. Features in source do not prove all member journeys are production ready.\n\nProject evidence: https://github.com/jussray/Sekret-Bip\n\n#SekretBip #FamilyTechnology #TeenWellbeingDesign #PrivacyFirst #AppDevelopment",
+    "mediaAltText": "Illustrative purple scrapbook bedroom scene, journal and phone interface with the Se’kret Bip logo; no real teen users or companion portraits.",
+    "mediaPathLocal": "brand/handshake/handshake-cover.png (candidate file in downloadable kit, not publicly hosted)",
+    "mediaPublicUrl": null
+  },
+  "handshake": {
+    "name": "Se’kret Bip",
+    "description": "Se’kret Bip is a privacy-first creative and emotional-growth product for teens and their families, with journaling, comfort, and permission-aware family experience concepts. Not a therapy or emergency service. Features in source do not prove all member journeys are production ready.",
+    "productUrl": "https://sekretbip.net/",
+    "submissionState": "NOT_SUBMITTED"
+  },
+  "review": {
+    "exactMediaFounderApproval": false,
+    "liveBrandComparison": false,
+    "sourceCurrentness": false,
+    "providerAccountVerified": false
+  }
+}
