@@ -25,10 +25,10 @@ test('rollback front door exposes bounded working actions and canonical identity
   await expect(page.getByTestId('web-welcome-shell')).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible();
   await expect(page.getByText('Come on in.')).toBeVisible();
-  await expect(page.getByTestId('web-welcome-hero-teen')).toHaveAccessibleName(/Approved Se’kret Bip Family scrapbook: Sy, Night, Suhana, Ja, and Cloud/);
-  const companions = page.getByTestId('canon-companion-select');
-  await expect(companions).toHaveCount(5);
-  for (const [index, name] of ['Sy', 'Night', 'Suhana', 'Ja', 'Cloud'].entries()) {
+  await expect(page.getByTestId('web-welcome-hero-teen')).toHaveAccessibleName(/Sy, The Builder, approved family art/);
+  const companions = page.getByTestId('family-composition').getByRole('button');
+  await expect(companions).toHaveCount(10);
+  for (const [index, name] of ['Dad', 'Mom', 'Sy', 'Night', 'Suhana', 'Cloud', 'Bip Jr. 1', 'Bip Jr. 2', 'Bip Jr. 3', 'Bip Jr. 4'].entries()) {
     await expect(companions.nth(index)).toHaveAccessibleName(new RegExp('Meet ' + name + ','));
   }
   await expect(page.getByTestId('web-welcome-about')).toBeVisible();
@@ -82,7 +82,7 @@ test('web welcome Enter supports keyboard activation', async ({ page }) => {
 test('web welcome hero safe area keeps the primary action below teen artwork', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/?bipDevAudience=teen');
-  const portraitHero = page.getByTestId('web-welcome-hero-teen');
+  const portraitHero = page.getByTestId('family-composition');
   const enter = page.getByTestId('web-welcome-enter');
   await expect(page.getByTestId('canon-companion-showcase')).toBeVisible({ timeout: 30_000 });
   await expect(portraitHero).toBeVisible();
