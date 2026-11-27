@@ -10,10 +10,10 @@ const gallery = read('components/companions/CanonCompanionShowcase.tsx');
 const discover = read('app/(teen)/discover.tsx');
 const room = read('screens/UserRoomScreen.tsx');
 
-test('final uploaded canon image, not a regenerated image, is the public hero authority', () => {
+test('approved legacy canon remains in the registry while the public hero uses the full family', () => {
   assert.match(canon, /ef5888960600669fa25922bb345cdcd1b5d4cccecb2a9ef578a616a7a8085971/);
   assert.match(canon, /1c462922-24b6-4984-89aa-826dc36c62f8\.jpg/);
-  assert.match(welcome, /CANON_FAMILY_POSTER_IMAGE/);
+  assert.match(welcome, /<CanonCompanionShowcase/);
   assert.doesNotMatch(welcome, /TEEN_HERO = require/);
 });
 
@@ -32,8 +32,8 @@ test('all five companions receive exact crops from the same uploaded poster', ()
 
 test('front-door companion choice is functional but never bypasses account gates', () => {
   assert.match(welcome, /<CanonCompanionShowcase/);
-  assert.match(gallery, /testID="canon-companion-select"/);
-  assert.match(gallery, /onPress=\{\(\) => setSelected/);
+  assert.match(gallery, /testID=\{`family-member-\$\{member\.id\}`\}/);
+  assert.match(gallery, /onPress=\{\(\) => setSelected\(member\)\}/);
   assert.match(welcome, /onEnter\(entrySide\)/);
   assert.doesNotMatch(gallery, /router\.push/);
 });
@@ -75,19 +75,19 @@ test('root-owned canon imports resolve in both Expo and TypeScript', () => {
   assert.ok(fs.existsSync(path.resolve('screens', `${showcaseImport}.tsx`)), 'welcome: showcase module must exist');
 });
 
-test('slow CDN loading shows a thumbnail from the same final poster rather than a blank hero', () => {
+test('the unified family scene paints its own ambient canvas without the rejected miniature poster', () => {
   assert.match(canon, /export const CANON_FAMILY_POSTER_PREVIEW_IMAGE/);
-  assert.match(welcome, /source=\{CANON_FAMILY_POSTER_PREVIEW_IMAGE\}/);
-  assert.match(welcome, /styles\.heroPlaceholder/);
-  assert.match(welcome, /accessible=\{false\}/);
+  assert.doesNotMatch(welcome, /source=\{CANON_FAMILY_POSTER_PREVIEW_IMAGE\}/);
+  assert.match(gallery, /testID="family-composition"/);
+  assert.match(gallery, /backgroundColor: '#210D35'/);
 });
 
-test('mobile front door prioritizes readable canon portraits rather than shrinking the landscape poster', () => {
+test('one responsive family composition replaces the mobile swipe-only poster on both breakpoints', () => {
   assert.match(welcome, /const teenPhoneCanvas = compact && !isBipJr/);
-  assert.match(welcome, /teenPhoneCanvas \? \(/);
-  assert.match(welcome, /!teenPhoneCanvas && \(/);
-  assert.match(gallery, /snapToInterval=\{compact \? cardWidth \+ 14 : undefined\}/);
-  assert.match(gallery, /width: cardWidth/);
-  assert.match(gallery, /paddingHorizontal: compact \? Math\.max\(16, \(width - cardWidth\) \/ 2\) : 20/);
+  assert.match(welcome, /\{!isBipJr && \(\s*<CanonCompanionShowcase/);
+  assert.doesNotMatch(welcome, /!isBipJr && !teenPhoneCanvas &&/);
+  assert.doesNotMatch(gallery, /snapToInterval/);
+  assert.match(gallery, /const stageWidth = Math\.min/);
+  assert.match(gallery, /const stageHeight = compact/);
   assert.match(welcome, /onEnter\(entrySide\)/);
 });
