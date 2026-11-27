@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { AccountSide } from '@/features/identity/accountProfile';
 import { FRONT_DOOR_THEME } from '@/constants/frontDoorTheme';
 import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
-import { CANON_FAMILY_POSTER_IMAGE, CANON_FAMILY_POSTER_PREVIEW_IMAGE } from '../constants/companionVisualCanon';
+import { CANON_FAMILY_POSTER_IMAGE } from '../constants/companionVisualCanon';
 import { CanonCompanionShowcase } from '../components/companions/CanonCompanionShowcase';
 
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
@@ -482,16 +482,6 @@ export function WebWelcomeScreen({
             testID="web-welcome-hero-safe-area"
             style={{ paddingBottom: heroContract.bottomGap }}
           >
-            {!isBipJr ? (
-              <Image
-                source={CANON_FAMILY_POSTER_PREVIEW_IMAGE}
-                resizeMode="contain"
-                accessible={false}
-                accessibilityElementsHidden
-                importantForAccessibility="no-hide-descendants"
-                style={[styles.heroPlaceholder, { height: heroHeight }]}
-              />
-            ) : null}
             <Animated.View testID="web-welcome-hero-reveal" style={audienceHeroRevealStyle}>
               <Animated.View
                 testID="web-welcome-hero-motion"
