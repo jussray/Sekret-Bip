@@ -12,7 +12,7 @@ test('front door displays a single family composition with ten approved people',
   }
   assert.doesNotMatch(family, /id: 'ja'/, 'Ja is held out of public welcome');
   assert.match(scene, /testID="family-composition"/);
-  assert.match(scene, /testID={`family-member-${member.id}`}/);
+  assert.match(scene, /testID=\{`family-member-\$\{member\.id\}`\}/);
   assert.doesNotMatch(scene, /horizontal\s*(?:\n|\r|\s)*showsHorizontalScrollIndicator/);
   assert.doesNotMatch(scene, /snapToInterval/);
 });
