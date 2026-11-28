@@ -23,7 +23,10 @@ export default defineConfig({
     : [['html'], [controlRoomSkipReporter]],
   use: {
     baseURL: BASE_URL,
-    trace: 'retain-on-failure',
+    // Live auth journeys contain credentials; never capture replayable private traces.
+    trace: 'off',
+    screenshot: 'off',
+    video: 'off',
   },
   projects: [
     {

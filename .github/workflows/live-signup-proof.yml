@@ -29,6 +29,8 @@ on:
       - 'supabase/migrations/20260919191000_bip_jr_managed_child_profiles.sql'
       - 'scripts/live-signup-mailbox.mjs'
       - 'test/live-onboarding-email-gate.test.mjs'
+      - 'test/live-family-proof-receipt.test.mjs'
+      - 'scripts/verify-live-family-proof.mjs'
       - 'test/family-account-authority.test.mjs'
       - 'test/humane-retention-loops.test.mjs'
   workflow_dispatch:
@@ -446,6 +448,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Check family receipt verifier unit tests
+        run: node --test test/live-family-proof-receipt.test.mjs
+
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
 
@@ -499,6 +504,12 @@ jobs:
             exit 78
           fi
           npx playwright test e2e/live-family-authority.spec.ts --config=playwright.live-onboarding.config.ts
+
+      - name: Validate complete private family proof receipt
+        if: steps.family_opt_in.outputs.enabled == 'true'
+        env:
+          LIVE_ONBOARDING_PHASE: family
+        run: node scripts/verify-live-family-proof.mjs
 
       - name: Remove disposable mailbox
         if: always() && steps.opt_in.outputs.enabled == 'true'
