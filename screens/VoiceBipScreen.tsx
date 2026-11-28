@@ -136,6 +136,7 @@ export function VoiceBipScreen({
   const [recorded,         setRecorded]          = useState(false);
   const [sekretReply,      setSekretReply]       = useState('');
   const [replyAudioUri,    setReplyAudioUri]     = useState('');
+  const [replyPlaybackFailed, setReplyPlaybackFailed] = useState(false);
   const [replyVoiceMeta,   setReplyVoiceMeta]    = useState<Omit<SekretVoiceResponse, 'audioBase64' | 'contentType' | 'characterId'> | null>(null);
   const [isVoiceLoading,   setIsVoiceLoading]    = useState(false);
   const [isThinking,       setIsThinking]        = useState(false);
@@ -149,6 +150,7 @@ export function VoiceBipScreen({
   const recordingRef    = useRef<Audio.Recording | null>(null);
   const stopRecordingRef = useRef<() => Promise<void>>(async () => {});
   const replySoundRef   = useRef<Audio.Sound | null>(null);
+  const replyPlaybackAttemptRef = useRef(0);
 
   // Animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -266,6 +268,8 @@ export function VoiceBipScreen({
     setSekretReply('');
     setReplyAudioUri('');
     setReplyVoiceMeta(null);
+    setReplyPlaybackFailed(false);
+    invalidateReplyPlayback();
     talkTimersRef.current.forEach(clearTimeout);
     talkTimersRef.current = [];
     talkAnim.setValue(1);
@@ -494,6 +498,8 @@ export function VoiceBipScreen({
       if (timerRef.current) clearInterval(timerRef.current);
       recordingRef.current?.stopAndUnloadAsync().catch(() => null);
       replySoundRef.current?.unloadAsync().catch(() => null);
+      replySoundRef.current = null;
+      replyPlaybackAttemptRef.current += 1;
       talkTimersRef.current.forEach(clearTimeout);
     };
   }, []);
@@ -508,6 +514,14 @@ export function VoiceBipScreen({
     talkTimersRef.current = [];
     talkAnim.stopAnimation();
     talkAnim.setValue(1);
+  };
+
+  const invalidateReplyPlayback = () => {
+    replyPlaybackAttemptRef.current += 1;
+    const prior = replySoundRef.current;
+    replySoundRef.current = null;
+    clearTalkPulses();
+    prior?.unloadAsync().catch(() => null);
   };
 
   const scheduleTalkPulses = (timing: SekretVoiceResponse['timing'] | undefined) => {
@@ -528,35 +542,64 @@ export function VoiceBipScreen({
 
   const playReplyAudio = async () => {
     if (!replyAudioUri) return;
+    const attempt = ++replyPlaybackAttemptRef.current;
+    setReplyPlaybackFailed(false);
+    const reportFailure = () => {
+      if (attempt === replyPlaybackAttemptRef.current) setReplyPlaybackFailed(true);
+    };
+
     if (replySoundRef.current) {
       const prior = replySoundRef.current;
       replySoundRef.current = null;
       clearTalkPulses();
       await prior.unloadAsync().catch(() => null);
     }
-    const { sound } = await Audio.Sound.createAsync({ uri: replyAudioUri });
-    if (replySoundRef.current) {
-      // A later overlapping tap already claimed the ref while this one was
-      // still loading (createAsync decodes a data URI and can take a beat) —
-      // discard this redundant instance instead of leaking or stomping it.
+
+    let created;
+    try {
+      created = await Audio.Sound.createAsync({ uri: replyAudioUri });
+    } catch {
+      // A decode/load failure must leave the written reply available for retry.
+      reportFailure();
+      return;
+    }
+    const { sound } = created;
+    if (attempt !== replyPlaybackAttemptRef.current || replySoundRef.current) {
       await sound.unloadAsync().catch(() => null);
       return;
     }
+
     replySoundRef.current = sound;
-    scheduleTalkPulses(replyVoiceMeta?.timing);
-    sound.setOnPlaybackStatusUpdate(status => {
-      if ('didJustFinish' in status && status.didJustFinish) {
-        sound.unloadAsync().catch(() => null);
-        if (replySoundRef.current === sound) replySoundRef.current = null;
-        clearTalkPulses();
+    try {
+      sound.setOnPlaybackStatusUpdate(status => {
+        if (replySoundRef.current !== sound) return;
+        const failed = !status.isLoaded && Boolean(status.error);
+        if (failed || ('didJustFinish' in status && status.didJustFinish)) {
+          replySoundRef.current = null;
+          clearTalkPulses();
+          sound.unloadAsync().catch(() => null);
+          if (failed) reportFailure();
+        }
+      });
+      const status = await sound.playAsync().catch(() => null);
+      if (!status || !status.isLoaded) {
+        if (replySoundRef.current === sound) {
+          replySoundRef.current = null;
+          clearTalkPulses();
+          await sound.unloadAsync().catch(() => null);
+        }
+        reportFailure();
+        return;
       }
-    });
-    // A newer overlapping tap can unload this exact sound while playAsync()
-    // is still in flight (e.g. it was mid-start when the next tap's teardown
-    // ran) — that rejects the promise. Swallow it the same way every other
-    // op in this function does: the newer tap's sound is what should end up
-    // playing, not an unhandled rejection from the one it replaced.
-    await sound.playAsync().catch(() => null);
+      if (replySoundRef.current === sound) scheduleTalkPulses(replyVoiceMeta?.timing);
+    } catch {
+      if (replySoundRef.current === sound) {
+        replySoundRef.current = null;
+        clearTalkPulses();
+        await sound.unloadAsync().catch(() => null);
+      }
+      reportFailure();
+    }
   };
 
   const prompts = avatar.prompts;
@@ -564,6 +607,9 @@ export function VoiceBipScreen({
   const selectAvatar = (nextAvatarKey: VoiceBipAvatarKey) => {
     setVoicePromptIdx(0);
     setSekretReply('');
+    setReplyAudioUri('');
+    setReplyPlaybackFailed(false);
+    invalidateReplyPlayback();
     setRecorded(false);
     setReplyVoiceMeta(null);
     voiceHistoryRef.current = [];
@@ -827,7 +873,7 @@ export function VoiceBipScreen({
               <Text style={[styles.voiceStatus, { color: theme.soft }]}>preparing voice…</Text>
             ) : replyAudioUri ? (
               <TouchableOpacity style={styles.voiceBtn} onPress={playReplyAudio}>
-                <Text style={styles.voiceBtnText}>▶ hear this reply</Text>
+                <Text style={styles.voiceBtnText}>{replyPlaybackFailed ? '▶ retry voice reply' : '▶ hear this reply'}</Text>
               </TouchableOpacity>
             ) : null}
           </View>
