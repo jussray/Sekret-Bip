@@ -20,10 +20,10 @@ test('sendMessage keeps guard substitutions truthfully labeled as fallbacks', as
   assert.match(chat, /safety_resource_backstop: safetyBackstopTriggered/);
 });
 
-test('sendMessage warning metadata does not include reply content', async () => {
+test('sendMessage warning is a fixed event without reply content or metadata', async () => {
   const chat = await read('src/services/ai/chat.ts');
-  assert.match(chat, /blockedReplyLength: rawReply\.length/);
-  assert.match(chat, /substitutedReplyLength: guardedReply\.length/);
+  assert.match(chat, /console\.warn\('CHAT_REPLY_GUARD_SUBSTITUTED'\);/);
+  assert.doesNotMatch(chat, /blockedReplyLength:|substitutedReplyLength:/);
   assert.doesNotMatch(chat, /blocked:\s*rawReply\.slice/);
   assert.doesNotMatch(chat, /reply_text|replyText/);
 });
@@ -44,10 +44,10 @@ test('Pages reply keeps client substitutions truthfully labeled as local fallbac
   assert.doesNotMatch(pages, /replySource: 'worker',\s*fallbackUsed: false/);
 });
 
-test('Pages warning metadata does not include reply content', async () => {
+test('Pages warning is a fixed event without reply content or metadata', async () => {
   const pages = await read('src/utils/sekretReply.ts');
-  assert.match(pages, /blockedReplyLength: replyForGuard\.length/);
-  assert.match(pages, /substitutedReplyLength: guardedReply\.length/);
+  assert.match(pages, /console\.warn\('PAGES_REPLY_GUARD_SUBSTITUTED'\);/);
+  assert.doesNotMatch(pages, /blockedReplyLength:|substitutedReplyLength:/);
   assert.doesNotMatch(pages, /blocked:\s*response\.reply/);
   assert.doesNotMatch(pages, /reply_text|replyText/);
 });

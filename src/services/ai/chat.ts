@@ -193,10 +193,7 @@ export async function sendMessage(
   if (!WORKER_BASE_URL) {
     const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
     if (__DEV__) {
-      console.warn(
-        '[sendMessage] No EXPO_PUBLIC_BACKEND_URL set — using local fallback.',
-        { companion: personalityId, surface: normalizedSurface, userTextLength: text.length },
-      );
+      console.warn('CHAT_WORKER_UNCONFIGURED');
     }
     return {
       reply: fallbackText,
@@ -231,23 +228,13 @@ export async function sendMessage(
   };
 
   if (__DEV__) {
-    console.log('[sendMessage] → Worker', {
-      companion: payload.characterId,
-      surface: payload.surface,
-      url: `${WORKER_BASE_URL}/api/sekret/reply`,
-      isArrival,
-      phase,
-      payloadBytes: JSON.stringify(payload).length,
-      historyLength,
-      hasMood: Boolean(mood),
-      hasOracleContext: Boolean(oracleContext?.length),
-    });
+    console.log('CHAT_WORKER_REQUEST');
   }
 
   const result = await sekretClient.sendReply(payload);
   if (!result.ok) {
     const reason = `${result.error.code}${result.error.status ? ` (${result.error.status})` : ''}`;
-    console.error('[sendMessage] Worker request failed:', reason, result.error.traceId ?? 'no-trace');
+    console.error('CHAT_WORKER_REQUEST_FAILED');
     const fallbackText = localSafetyFallback ?? localFallback(personalityId, text, learnedRelationship);
     return {
       reply: fallbackText,
@@ -295,20 +282,11 @@ export async function sendMessage(
   const safetyBackstopTriggered = guardBypass.reason === 'crisis-resource-backstop';
 
   if (__DEV__ && guardSubstituted) {
-    console.warn('[sendMessage] keepSekretReply blocked Worker reply — substituted character fallback.', {
-      companion: personalityId,
-      blockedReplyLength: rawReply.length,
-      substitutedReplyLength: guardedReply.length,
-      traceId: data.traceId ?? result.meta.traceId,
-    });
+    console.warn('CHAT_REPLY_GUARD_SUBSTITUTED');
   }
 
   if (__DEV__ && safetyBackstopTriggered) {
-    console.warn('[sendMessage] crisis-resource backstop bypassed reply guard because safetyFlag was missing.', {
-      companion: personalityId,
-      surface: normalizedSurface,
-      traceId: data.traceId ?? result.meta.traceId,
-    });
+    console.warn('CHAT_REPLY_SAFETY_BACKSTOP');
   }
 
   logRuntimeAuditEvent('manual', {

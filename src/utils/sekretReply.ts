@@ -2,7 +2,6 @@ import { IMAGES } from '../../constants/theme';
 import { fetchSekretBrainReply, type SekretAvatarState } from './api';
 import {
   getSekretFallback,
-  isArrivalMessage,
   guardSekretReply,
 } from '../../services/sekretVoice';
 import {
@@ -138,11 +137,9 @@ export async function fetchPagesReplyDetails(input: {
   }
 
   const history = input.history ?? [];
-  const historyLength = history.length;
   const personality = normalizeSekretPersonality(avatarKey);
   const localSafetyFallback = getLocalSafetyFallback(input.text);
   const fallback = localSafetyFallback ?? getSekretFallback(personality, input.text);
-  const isArrival = isArrivalMessage(input.text, historyLength);
 
   // isArrival is forwarded to the Worker inside phaseInstruction so the Worker
   // can apply opening-tone rules. We do NOT short-circuit here anymore —
@@ -156,14 +153,7 @@ export async function fetchPagesReplyDetails(input: {
   }));
 
   if (__DEV__) {
-    console.log('[fetchPagesReplyDetails] → Worker', {
-      companion: avatarKey,
-      surface: 'journal',
-      isArrival,
-      historyLength,
-      hasMood: Boolean(input.mood),
-      userTextLength: input.text.length,
-    });
+    console.log('PAGES_REPLY_REQUEST');
   }
 
   try {
@@ -179,12 +169,7 @@ export async function fetchPagesReplyDetails(input: {
     const response = await fetchSekretBrainReply(request);
 
     if (__DEV__) {
-      console.log('[fetchPagesReplyDetails] ← Worker', {
-        companion: avatarKey,
-        replySource: response.replySource ?? 'worker',
-        tone: response.tone,
-        replyLength: (response.reply ?? '').length,
-      });
+      console.log('PAGES_REPLY_RESPONSE');
     }
 
     const nextState = inferAvatarState({
@@ -214,23 +199,13 @@ export async function fetchPagesReplyDetails(input: {
     const safetyBackstopTriggered = guardBypass.reason === 'crisis-resource-backstop';
 
     if (__DEV__ && guardBlocked) {
-      console.warn('[fetchPagesReplyDetails] keepSekretReply blocked Worker reply.', {
-        companion: avatarKey,
-        blockedReplyLength: replyForGuard.length,
-        substitutedReplyLength: guardedReply.length,
-      });
+      console.warn('PAGES_REPLY_GUARD_SUBSTITUTED');
     }
 
     if (__DEV__ && safetyRecovery.substituted) {
-      console.warn('[fetchPagesReplyDetails] upstream fallback lacked crisis resources — local safety fallback substituted.', {
-        companion: avatarKey,
-        surface: 'journal',
-      });
+      console.warn('PAGES_REPLY_SAFETY_FALLBACK');
     } else if (__DEV__ && safetyBackstopTriggered) {
-      console.warn('[fetchPagesReplyDetails] crisis-resource backstop bypassed reply guard because safetyFlag was missing.', {
-        companion: avatarKey,
-        surface: 'journal',
-      });
+      console.warn('PAGES_REPLY_SAFETY_BACKSTOP');
     }
 
     const fallbackUsed = guardBlocked || safetyRecovery.substituted;
@@ -248,7 +223,7 @@ export async function fetchPagesReplyDetails(input: {
     };
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    console.error('[fetchPagesReplyDetails] Worker fetch failed:', reason);
+    console.error('PAGES_REPLY_FETCH_FAILED');
     const nextState: SekretAvatarState = avatarKey === 'cloud' || avatarKey === 'night'
       ? 'comforting'
       : 'responding';
