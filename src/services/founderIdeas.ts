@@ -56,7 +56,7 @@ export const founderIdeasService = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.warn('[founderIdeas] list error:', error.message);
+      console.warn('FOUNDER_IDEAS_LIST_FAILED');
       return [];
     }
     return (data ?? []) as FounderIdea[];
@@ -88,7 +88,7 @@ export const founderIdeasService = {
       .single();
 
     if (error) {
-      console.warn('[founderIdeas] create error:', error.message);
+      console.warn('FOUNDER_IDEAS_CREATE_FAILED');
       return null;
     }
     return data as FounderIdea;
@@ -97,7 +97,7 @@ export const founderIdeasService = {
   /** Update an idea's status. */
   async updateStatus(id: string, status: IdeaStatus): Promise<boolean> {
     if (!isValidStatus(status)) {
-      console.warn('[founderIdeas] invalid status:', status);
+      console.warn('FOUNDER_IDEAS_INVALID_STATUS');
       return false;
     }
     if (!isSupabaseConfigured) return false;
@@ -110,7 +110,7 @@ export const founderIdeasService = {
       .eq('id', id);
 
     if (error) {
-      console.warn('[founderIdeas] updateStatus error:', error.message);
+      console.warn('FOUNDER_IDEAS_UPDATE_STATUS_FAILED');
       return false;
     }
     return true;
@@ -128,7 +128,7 @@ export const founderIdeasService = {
       .eq('id', id);
 
     if (error) {
-      console.warn('[founderIdeas] updateNotes error:', error.message);
+      console.warn('FOUNDER_IDEAS_UPDATE_NOTES_FAILED');
       return false;
     }
     return true;
@@ -146,7 +146,7 @@ export const founderIdeasService = {
       .eq('id', id);
 
     if (error) {
-      console.warn('[founderIdeas] remove error:', error.message);
+      console.warn('FOUNDER_IDEAS_REMOVE_FAILED');
       return false;
     }
     return true;
