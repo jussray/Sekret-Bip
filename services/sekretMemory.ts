@@ -237,8 +237,8 @@ export async function loadSekretMemory(): Promise<SekretMemory> {
       comfortUsage: mergeUnique(stored.comfortUsage, legacy.comfortUsage),
       recurringTopics: normalizeTopics([...stored.recurringTopics, ...legacy.recurringTopics]),
     };
-  } catch (error) {
-    console.warn('Unable to load Sekret memory', error);
+  } catch {
+    console.warn('SEKRET_MEMORY_LOAD_FAILED');
     return normalizeMemory(undefined);
   }
 }
@@ -247,8 +247,8 @@ export async function saveSekretMemory(memory: SekretMemory): Promise<boolean> {
   try {
     await AsyncStorage.setItem(SEKRET_MEMORY_STORAGE_KEY, JSON.stringify(normalizeMemory(memory)));
     return true;
-  } catch (error) {
-    console.warn('Unable to save Sekret memory', error);
+  } catch {
+    console.warn('SEKRET_MEMORY_SAVE_FAILED');
     return false;
   }
 }

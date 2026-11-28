@@ -112,11 +112,8 @@ async function sendInviteEmail(parentEmail: string, code: string, expiresAt: str
   });
 
   if (!response.ok) {
-    const payload = await response.json().catch(() => null);
-    console.error("[parent-link-create] invite email failed", {
-      status: response.status,
-      provider_error: payload && typeof payload === "object" ? "present" : "unavailable",
-    });
+    await response.json().catch(() => null);
+    console.error("PARENT_LINK_INVITE_EMAIL_FAILED");
     return { status: "failed", error_code: "provider_rejected" };
   }
 
@@ -177,11 +174,8 @@ Deno.serve(async (req: Request) => {
       },
       email,
     });
-  } catch (error) {
-    console.error(
-      "[parent-link-create] failed",
-      error instanceof Error ? error.message : String(error),
-    );
+  } catch {
+    console.error("PARENT_LINK_CREATE_FAILED");
     return json({ error: "parent_link_create_failed" }, 500);
   }
 });

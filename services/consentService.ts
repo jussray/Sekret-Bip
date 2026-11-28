@@ -126,7 +126,7 @@ export const consentService = {
       .eq('user_id', userId);
 
     if (error) {
-      console.warn('[consentService] Failed to load consents:', error.message);
+      console.warn('CONSENT_SERVICE_LOAD_FAILED');
       return;
     }
 

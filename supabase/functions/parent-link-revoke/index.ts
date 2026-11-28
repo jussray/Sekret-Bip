@@ -41,7 +41,7 @@ Deno.serve(async (req: Request) => {
   });
 
   if (error) {
-    console.error("[parent-link-revoke] revoke_parent_link failed", error.message);
+    console.error("PARENT_LINK_REVOKE_FAILED");
     return json({ error: "parent_link_revoke_failed" }, 500);
   }
 
