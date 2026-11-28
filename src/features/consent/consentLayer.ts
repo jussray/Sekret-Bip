@@ -66,8 +66,8 @@ export async function setItemVisibility(
       .update({ visibility: level })
       .eq('user_id', user.id)
       .eq('id', itemId);
-  } catch (e) {
-    if (__DEV__) console.warn('[consent] setItemVisibility failed:', e);
+  } catch {
+    if (__DEV__) console.warn('CONSENT_SET_ITEM_VISIBILITY_FAILED');
   }
 }
 
@@ -160,8 +160,8 @@ export async function pullSharedWithParent<T extends object>(
       .order('created_at', { ascending: false });
     if (error) throw error;
     return (data ?? []) as T[];
-  } catch (e) {
-    if (__DEV__) console.warn('[consent] pullSharedWithParent failed:', e);
+  } catch {
+    if (__DEV__) console.warn('CONSENT_PULL_SHARED_WITH_PARENT_FAILED');
     return [];
   }
 }

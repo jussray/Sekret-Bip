@@ -113,7 +113,7 @@ class ConsentService {
     this.granted.add(key);
 
     if (!supabaseOk) {
-      console.warn(`[consentService] Supabase write failed for key=${key}; cached locally.`);
+      console.warn('CONSENT_SERVICE_WRITE_FAILED_CACHED_LOCALLY');
     }
   }
 

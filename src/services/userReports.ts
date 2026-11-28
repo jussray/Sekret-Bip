@@ -47,7 +47,7 @@ export async function reportOwnAuditEvent(
   });
 
   if (error) {
-    console.warn('[userReports] report_own_audit_event_issue failed:', error.message);
+    console.warn('USER_REPORT_AUDIT_EVENT_FAILED');
     return GENERIC_ERROR_RESULT;
   }
 
