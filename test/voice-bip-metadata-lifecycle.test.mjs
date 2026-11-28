@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
+import vm from 'node:vm';
 
 const root = process.cwd();
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -53,7 +54,7 @@ test('VoiceBipScreen unloads the reply Audio.Sound instead of leaking playback i
   // instead of leaking.
   assert.match(
     source,
-    /const \{ sound \} = await Audio\.Sound\.createAsync\(\{ uri: replyAudioUri \}\);\s*\n\s*if \(replySoundRef\.current\) \{[\s\S]*?sound\.unloadAsync\(\)[\s\S]*?return;\s*\n\s*\}/,
+    /const \{ sound \} = created;\s*\n\s*if \(attempt !== replyPlaybackAttemptRef\.current \|\| replySoundRef\.current\) \{[\s\S]*?sound\.unloadAsync\(\)[\s\S]*?return;\s*\n\s*\}/,
   );
 
   // Unmount cleanup also unloads any sound left playing.
@@ -79,4 +80,96 @@ test('the canonical voice contract already carries provider, model, and timing m
 
   assert.match(api, /voiceProvider: result\.data\.voiceProvider/);
   assert.match(api, /timing: result\.data\.timing/);
+});
+
+function playbackHarness(createAsync) {
+  const source = read('screens/VoiceBipScreen.tsx');
+  const handler = source.match(/  const playReplyAudio = async \(\) => \{[\s\S]*?\n  \};/);
+  assert.ok(handler, 'real screen playback handler must exist');
+  const ref = { current: null };
+  const attempt = { current: 0 };
+  const state = { failed: false, pulses: 0 };
+  // Execute the actual handler with only the Expo platform audio API replaced.
+  const play = vm.runInNewContext(handler[0] + '\nplayReplyAudio;', {
+    Audio: { Sound: { createAsync } },
+    replyAudioUri: 'synthetic-audio',
+    replySoundRef: ref,
+    replyPlaybackAttemptRef: attempt,
+    setReplyPlaybackFailed: (value) => { state.failed = value; },
+    clearTalkPulses: () => { state.pulses = 0; },
+    scheduleTalkPulses: () => { state.pulses += 1; },
+    replyVoiceMeta: null,
+  });
+  return { play, ref, attempt, state };
+}
+
+function syntheticSound({ rejectPlay = false } = {}) {
+  let listener;
+  const sound = {
+    unloaded: 0,
+    async unloadAsync() { sound.unloaded += 1; },
+    setOnPlaybackStatusUpdate(callback) { listener = callback; },
+    async playAsync() {
+      if (rejectPlay) throw new Error('synthetic play failure');
+      return { isLoaded: true };
+    },
+    finish() { listener({ isLoaded: true, didJustFinish: true }); },
+  };
+  return sound;
+}
+
+test('decode failure preserves the written reply and allows a successful retry', async () => {
+  let calls = 0;
+  const sound = syntheticSound();
+  const h = playbackHarness(async () => {
+    if (++calls === 1) throw new Error('synthetic decode failure');
+    return { sound };
+  });
+  await h.play();
+  assert.equal(h.state.failed, true);
+  assert.equal(h.ref.current, null);
+  await h.play();
+  assert.equal(h.state.failed, false);
+  assert.equal(h.ref.current, sound);
+  sound.finish();
+  assert.equal(h.ref.current, null);
+  assert.equal(sound.unloaded, 1);
+  assert.equal(h.state.pulses, 0);
+});
+
+test('failed playback unloads the instance and resets the speaking animation', async () => {
+  const sound = syntheticSound({ rejectPlay: true });
+  const h = playbackHarness(async () => ({ sound }));
+  await h.play();
+  assert.equal(h.state.failed, true);
+  assert.equal(h.ref.current, null);
+  assert.equal(sound.unloaded, 1);
+  assert.equal(h.state.pulses, 0);
+});
+
+test('a delayed older decode cannot replace the latest sound or survive invalidation', async () => {
+  const oldSound = syntheticSound();
+  const newSound = syntheticSound();
+  let resolveOld;
+  let calls = 0;
+  const h = playbackHarness(() => ++calls === 1
+    ? new Promise(resolve => { resolveOld = resolve; })
+    : Promise.resolve({ sound: newSound }));
+  const old = h.play();
+  await h.play();
+  resolveOld({ sound: oldSound });
+  await old;
+  assert.equal(h.ref.current, newSound);
+  assert.equal(oldSound.unloaded, 1);
+  assert.equal(h.state.failed, false);
+
+  let resolvePending;
+  const pendingSound = syntheticSound();
+  const pending = playbackHarness(() => new Promise(resolve => { resolvePending = resolve; }));
+  const play = pending.play();
+  pending.attempt.current += 1;
+  resolvePending({ sound: pendingSound });
+  await play;
+  assert.equal(pending.ref.current, null);
+  assert.equal(pendingSound.unloaded, 1);
 });
