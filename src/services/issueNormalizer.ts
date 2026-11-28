@@ -236,7 +236,7 @@ export async function ingestAuditEvent(event: AuditEvent): Promise<string | null
   });
 
   if (error) {
-    console.warn('[issueNormalizer] ingestAuditEvent error:', error.message);
+    console.warn('ISSUE_NORMALIZER_INGEST_AUDIT_EVENT_FAILED');
     return null;
   }
 
@@ -271,7 +271,7 @@ export async function normalizeRecentEvents(limitHours = 72): Promise<{
     .limit(500);
 
   if (error || !events) {
-    console.warn('[issueNormalizer] normalizeRecentEvents fetch error:', error?.message);
+    console.warn('ISSUE_NORMALIZER_RECENT_EVENTS_FETCH_FAILED');
     return { processed: 0, created: 0, updated: 0, errors: 1 };
   }
 
@@ -322,7 +322,7 @@ export async function listNormalizedIssues(
   const { data, error } = await query;
 
   if (error) {
-    console.warn('[issueNormalizer] listNormalizedIssues error:', error.message);
+    console.warn('ISSUE_NORMALIZER_LIST_FAILED');
     return [];
   }
   return (data ?? []).map((issue) => ({
@@ -368,7 +368,7 @@ export async function updateIssueStatus(
     .eq('id', issueId);
 
   if (updateError) {
-    console.warn('[issueNormalizer] updateIssueStatus error:', updateError.message);
+    console.warn('ISSUE_NORMALIZER_UPDATE_STATUS_FAILED');
     return false;
   }
 
@@ -409,7 +409,7 @@ export async function updateIssueNotes(
     .eq('id', issueId);
 
   if (error) {
-    console.warn('[issueNormalizer] updateIssueNotes error:', error.message);
+    console.warn('ISSUE_NORMALIZER_UPDATE_NOTES_FAILED');
     return false;
   }
 
@@ -448,7 +448,7 @@ export async function assignIssue(
     .eq('id', issueId);
 
   if (error) {
-    console.warn('[issueNormalizer] assignIssue error:', error.message);
+    console.warn('ISSUE_NORMALIZER_ASSIGN_FAILED');
     return false;
   }
 
@@ -482,7 +482,7 @@ export async function getLinkedEvents(
     .limit(limit);
 
   if (error) {
-    console.warn('[issueNormalizer] getLinkedEvents error:', error.message);
+    console.warn('ISSUE_NORMALIZER_LINKED_EVENTS_FAILED');
     return [];
   }
 
@@ -512,7 +512,7 @@ export async function getIssueHistory(
     .order('changed_at', { ascending: false });
 
   if (error) {
-    console.warn('[issueNormalizer] getIssueHistory error:', error.message);
+    console.warn('ISSUE_NORMALIZER_HISTORY_FAILED');
     return [];
   }
   return (data ?? []) as IssueHistoryEntry[];
