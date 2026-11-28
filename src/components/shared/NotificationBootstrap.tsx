@@ -34,7 +34,7 @@ async function registerAndSync(): Promise<void> {
   if (registration.token) await syncExpoPushToken(registration.token);
 
   if (__DEV__ && registration.reason) {
-    console.info('[notifications]', registration.reason);
+    console.info('NOTIFICATIONS_REGISTRATION_UNAVAILABLE');
   }
 }
 
@@ -43,22 +43,22 @@ export function NotificationBootstrap() {
     if (Platform.OS === 'web') return;
 
     void configureNotificationHandling();
-    void registerAndSync().catch((error) => {
-      if (__DEV__) console.info('[notifications] initial sync failed', error);
+    void registerAndSync().catch(() => {
+      if (__DEV__) console.info('NOTIFICATIONS_INITIAL_SYNC_FAILED');
     });
 
     const supabase = getSupabase();
     const authSubscription = supabase?.auth.onAuthStateChange((event, session) => {
       if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user && !session.user.is_anonymous && session.user.email_confirmed_at) {
-        void registerAndSync().catch((error) => {
-          if (__DEV__) console.info('[notifications] auth sync failed', error);
+        void registerAndSync().catch(() => {
+          if (__DEV__) console.info('NOTIFICATIONS_AUTH_SYNC_FAILED');
         });
       }
     }).data.subscription;
 
-    const pushTokenSubscription = Notifications.addPushTokenListener((devicePushToken) => {
-      void registerAndSync().catch((error) => {
-        if (__DEV__) console.info('[notifications] token refresh sync failed', error, devicePushToken.type);
+    const pushTokenSubscription = Notifications.addPushTokenListener(() => {
+      void registerAndSync().catch(() => {
+        if (__DEV__) console.info('NOTIFICATIONS_TOKEN_REFRESH_SYNC_FAILED');
       });
     });
 

@@ -1,0 +1,114 @@
+{
+  "schema": "fcr/handshake-brand-social@v1",
+  "slug": "bip",
+  "product": "Se’kret Bip",
+  "sourceRepository": "jussray/Sekret-Bip",
+  "publicProductUrl": "https://sekretbip.net/",
+  "brand": {
+    "logoSource": "brand/handshake/logo.svg",
+    "logoFormat": "svg",
+    "logoWidth": 1200,
+    "logoHeight": 490,
+    "colors": [
+      "#c58aff",
+      "#f8a9df",
+      "#ffe0ab"
+    ],
+    "sourceAuthority": "repository visual design source plus live site; logo is an authored candidate, not approved canonical",
+    "reviewState": "PENDING_FOUNDER_LIVE_SITE_COMPARISON",
+    "neverBorrowBrandFromOtherProjects": true,
+    "logoSha256": {
+      "algorithm": "SHA-256",
+      "chunks": [
+        "64355625",
+        "d74ab72d",
+        "80805d18",
+        "647a0963",
+        "d22b0b48",
+        "3c2daa5d",
+        "bef91b36",
+        "24beaf86"
+      ]
+    }
+  },
+  "handshake": {
+    "target": "Handshake AI Showcase project card",
+    "coverLocalOutput": "handshake-cover.png (included in founder download ZIP, not yet hosted in repository)",
+    "coverWidth": 1536,
+    "coverHeight": 1024,
+    "coverSha256": {
+      "algorithm": "SHA-256",
+      "chunks": [
+        "6329fbdf",
+        "c57c9ddb",
+        "4b3ab549",
+        "1f37382e",
+        "5924ab3d",
+        "ab2f3039",
+        "73850ccb",
+        "89f3f914"
+      ]
+    },
+    "mediaPublicUrl": null,
+    "externalSubmissionState": "NOT_SUBMITTED",
+    "requireNativeConfirmation": true,
+    "coverPackagePath": "Handshake/Sekret_Bip_Handshake_3x2.png",
+    "coverDimensions": [
+      1536,
+      1024
+    ]
+  },
+  "social": {
+    "owner": "jussray/founder-control-room",
+    "adapter": "src/lib/handshakeBrandSocial.ts",
+    "existingClassification": "src/lib/socialCampaignPolicy.ts",
+    "existingPublisher": "src/lib/firstPartySocialPublisher.ts",
+    "targetAudience": "parents_educators_community",
+    "firstPartyMode": "draft",
+    "publishAllowed": false,
+    "businessAccountBinding": "PUBLORA_INSTAGRAM_CONNECTED_FCR_PUBLISHING_UNVERIFIED",
+    "publicMediaReadback": "BYTES_NOT_INDEPENDENTLY_VERIFIED",
+    "exactMediaReview": "REQUIRED",
+    "nativePublicationReceipt": "NOT_PRESENT",
+    "proofRoot": "https://sekretbip.net",
+    "adCreative": {
+      "source": "founder-delivered download package only; not committed, hosted or published",
+      "packagePath": "Social/Sekret_Bip_Social_Ad_4x5.png",
+      "width": 1080,
+      "height": 1350,
+      "aspectRatio": "4:5",
+      "sha256": {
+        "algorithm": "SHA-256",
+        "chunks": [
+          "cd2b7ee1",
+          "8583b633",
+          "a8946105",
+          "0b2b8a37",
+          "c0552723",
+          "8eb31b89",
+          "93599cd3",
+          "7bb9811d"
+        ]
+      },
+      "publicUrl": "https://media.publora.com/images/1795755731344-0-36523320-Sekret_Bip_Social_Ad_4x5.png",
+      "approval": "PENDING_FOUNDER_EXACT_MEDIA_REVIEW",
+      "mediaSourceReadback": "PUBLORA_READY_METADATA_ONLY"
+    },
+    "draftInputReady": false,
+    "providerDraft": {
+      "provider": "publora",
+      "platform": "instagram",
+      "businessChannel": "@jussnco",
+      "postGroupId": "6b090ed1f04b2c093e2464c1",
+      "mediaId": "6b090ed3f04b2c093e246504",
+      "editorUrl": "https://app.publora.com/dashboard/editor?id=6b090ed1f04b2c093e2464c1",
+      "state": "draft",
+      "mediaState": "ready",
+      "scheduled": false,
+      "published": false,
+      "verifiedSource": "Publora get_post metadata",
+      "assetByteParity": "UNVERIFIED"
+    }
+  },
+  "safety": "No private teen/family data, no sensitive conversations, no actual teen or companion likeness without approved canon. Target adults only."
+}

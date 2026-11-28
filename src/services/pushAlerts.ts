@@ -17,7 +17,7 @@ export async function sendBridgePushAlert(params: {
   });
 
   if (error) {
-    if (__DEV__) console.info('[push-alerts] send failed', error.message);
+    if (__DEV__) console.info('PUSH_ALERTS_SEND_FAILED');
     return false;
   }
 
