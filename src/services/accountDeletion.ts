@@ -51,7 +51,7 @@ export async function fetchAccountDeletionRequest(): Promise<AccountDeletionRequ
     .maybeSingle();
 
   if (error) {
-    if (__DEV__) console.info('[account-deletion] status lookup failed', error.message);
+    if (__DEV__) console.info('ACCOUNT_DELETION_STATUS_LOOKUP_FAILED');
     return null;
   }
 
@@ -67,7 +67,7 @@ export async function requestAccountDeletion(): Promise<AccountDeletionResult<Ac
   });
 
   if (error) {
-    if (__DEV__) console.info('[account-deletion] request failed', error.message);
+    if (__DEV__) console.info('ACCOUNT_DELETION_REQUEST_FAILED');
     return { ok: false, message: 'Could not schedule account deletion. Check your connection and try again.' };
   }
 
@@ -86,7 +86,7 @@ export async function cancelAccountDeletion(): Promise<AccountDeletionResult<Acc
   });
 
   if (error) {
-    if (__DEV__) console.info('[account-deletion] cancellation failed', error.message);
+    if (__DEV__) console.info('ACCOUNT_DELETION_CANCELLATION_FAILED');
     return { ok: false, message: 'Could not cancel the deletion request. Check your connection and try again.' };
   }
 
