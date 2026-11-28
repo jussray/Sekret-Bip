@@ -14,7 +14,7 @@ for (const [path, expected] of targets) {
     const logs = source.split('\n').filter((line) => line.includes('console.info('));
     assert.equal(logs.length, expected, 'preserve diagnostic events');
     for (const log of logs) {
-      assert.match(log, /^\s*(?:if \(__DEV__\) )?console\.info\('\[[a-z-]+\] [a-z ]+'\);\s*$/);
+      assert.match(log, /^\s*(?:if \(__DEV__\) )?console\.info\('[A-Z][A-Z0-9_]{2,100}'\);\s*$/);
     }
   });
 }
