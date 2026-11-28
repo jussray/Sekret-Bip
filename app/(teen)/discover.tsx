@@ -1,6 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
+  Image,
   Platform,
   ScrollView,
   StyleSheet,
@@ -12,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { PERSONALITY_CONFIG } from '@/services/ai';
 import { usePoints } from '@/features/activity/ledger';
+import { CANON_COMPANION_IMAGES } from '../../constants/companionVisualCanon';
 
 const COMPANION_UNLOCK_PTS: Record<string, number> = {
   raylene: 0, rylane: 50, cloud: 150, night: 350,
@@ -30,6 +32,7 @@ const TOOLS = [
 
 export default function DiscoverScreen() {
   const { total: totalPoints } = usePoints();
+  const [showJaPreview, setShowJaPreview] = useState(false);
   const fade = useRef(new Animated.Value(0)).current;
   const rise = useRef(new Animated.Value(18)).current;
 
@@ -74,7 +77,16 @@ export default function DiscoverScreen() {
                   activeOpacity={unlocked ? 0.8 : 1}
                 >
                   <View style={[styles.companionGlow, { backgroundColor: p.accentColor + '1a' }]} />
-                  <Text style={styles.companionEmoji}>{p.emoji}</Text>
+                  <View style={styles.canonPortraitFrame}>
+                    <Image
+                      testID={`discover-canon-portrait-${id}`}
+                      source={CANON_COMPANION_IMAGES[id]}
+                      style={styles.canonPortrait}
+                      resizeMode="cover"
+                      accessibilityLabel={`${p.name} canonical companion portrait`}
+                    />
+                  </View>
+                  <Text style={styles.companionEmoji} accessibilityElementsHidden>{p.emoji}</Text>
                   <Text style={[styles.companionName, { color: p.accentColor }]}>{p.name}</Text>
                   {unlocked ? (
                     <Text style={styles.companionTitle}>{p.title}</Text>
@@ -87,7 +99,29 @@ export default function DiscoverScreen() {
                 </TouchableOpacity>
               );
             })}
+            <TouchableOpacity
+              testID="discover-ja-preview"
+              style={[styles.companionCard, styles.jaPreviewCard]}
+              activeOpacity={0.8}
+              onPress={() => setShowJaPreview(value => !value)}
+              accessibilityRole="button"
+              accessibilityLabel="Meet Ja, the Oracle"
+              accessibilityState={{ expanded: showJaPreview }}
+            >
+              <View style={styles.canonPortraitFrame}>
+                <Image source={CANON_COMPANION_IMAGES.ja} style={styles.canonPortrait} resizeMode="cover" accessibilityLabel="Ja, the Oracle, approved portrait" />
+              </View>
+              <Text style={styles.jaName}>Ja</Text>
+              <Text style={styles.jaRole}>The Oracle</Text>
+              <Text style={styles.jaNote}>Meet Ja · preview</Text>
+            </TouchableOpacity>
           </ScrollView>
+          {showJaPreview ? (
+            <View testID="discover-ja-details" style={styles.jaDetails}>
+              <Text style={styles.jaDetailsName}>Ja · The Oracle</Text>
+              <Text style={styles.jaDetailsText}>Wise · Visionary · Guides the Journey. Ja’s interactive companion path is not yet enabled.</Text>
+            </View>
+          ) : null}
         </Animated.View>
 
         <Animated.View style={{ opacity: fade, transform: [{ translateY: rise }] }}>
@@ -120,7 +154,16 @@ const styles = StyleSheet.create({
   sectionLabel:       { color: '#4a3f6b', fontSize: 11, fontWeight: '900', letterSpacing: 2, marginBottom: 14, paddingHorizontal: 24 },
   sectionLabelSpaced: { marginTop: 32 },
   companionRow:       { paddingHorizontal: 20, gap: 12, paddingBottom: 4 },
-  companionCard:      { width: 148, borderRadius: 24, borderWidth: 1.5, backgroundColor: 'rgba(255,255,255,0.03)', padding: 16, overflow: 'hidden' },
+  companionCard:      { width: 176, borderRadius: 18, borderWidth: 1.5, backgroundColor: 'rgba(71,23,98,0.36)', padding: 10, overflow: 'hidden' },
+  canonPortraitFrame: { height: 206, width: '100%', backgroundColor: '#F4E1D0', borderColor: '#E5BC82', borderWidth: 3, borderRadius: 7, padding: 3, marginBottom: 8 },
+  canonPortrait: { height: '100%', width: '100%', borderRadius: 3, backgroundColor: '#291342' },
+  jaPreviewCard: { borderColor: 'rgba(252,212,153,0.7)' },
+  jaName: { color: '#FDF1E1', fontFamily: 'Georgia', fontWeight: '700', fontSize: 17, marginBottom: 3 },
+  jaRole: { color: '#EED4F8', fontSize: 12, fontWeight: '700' },
+  jaNote: { color: '#D3B6E4', fontSize: 11, marginTop: 10 },
+  jaDetails: { marginHorizontal: 20, marginTop: 10, padding: 14, borderRadius: 16, backgroundColor: '#251238', borderWidth: 1, borderColor: '#F3CC9F' },
+  jaDetailsName: { color: '#FFE6C6', fontFamily: 'Georgia', fontSize: 17 },
+  jaDetailsText: { color: '#EADDF6', fontSize: 13, lineHeight: 20, marginTop: 6 },
   companionGlow:      { position: 'absolute', top: -20, right: -20, width: 90, height: 90, borderRadius: 45 },
   companionEmoji:     { fontSize: 28, marginBottom: 10 },
   companionName:      { fontSize: 15, fontWeight: '900', marginBottom: 2 },

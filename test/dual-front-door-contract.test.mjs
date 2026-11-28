@@ -16,13 +16,11 @@ test('front door presents one audience world at a time', () => {
   assert.doesNotMatch(welcome, /I’m a Parent \/ Guardian/);
 });
 
-test('welcome keeps the family artwork primary and character names accessibility-only', () => {
-  assert.match(welcome, /TEEN_HERO = require\('\.\.\/assets\/brand\/sekret-bip-teen-family-v1\.jpg'\)/);
-  assert.match(welcome, /Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together/);
-  assert.doesNotMatch(welcome, />\s*Night\s*</);
-  assert.doesNotMatch(welcome, />\s*Suhana\s*</);
-  assert.doesNotMatch(welcome, />\s*Sy\s*</);
-  assert.doesNotMatch(welcome, /Night · Suhana · Sy/);
+test('public Teen front door uses approved full Family poster with real companion introductions', () => {
+  assert.match(welcome, /CANON_FAMILY_POSTER_IMAGE/);
+  assert.match(welcome, /<CanonCompanionShowcase/);
+  assert.match(welcome, /Sy, Night, Suhana, Ja, and Cloud in that order/);
+  assert.doesNotMatch(welcome, /TEEN_HERO = require/);
 });
 
 test('teen and Bip Jr keep truthful audience-specific action copy', () => {

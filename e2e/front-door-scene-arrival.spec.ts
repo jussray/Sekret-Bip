@@ -65,7 +65,7 @@ test('canonical teen front door enters as one scene, settles, and stays interact
   await expect(qualityWash).toBeVisible();
   await expect(qualityVignette).toBeVisible();
   await expect(qualityRim).toBeVisible();
-  await expect(page.getByText('YOUR PEOPLE. YOUR PEACE.', { exact: true })).toBeVisible();
+  await expect(page.getByText('Your Se’kret Bip Family', { exact: true })).toBeVisible();
   await expect(page.getByText('Night · Suhana · Sy', { exact: true })).toHaveCount(0);
   await expect(enter).toBeVisible();
 
@@ -187,20 +187,17 @@ test('canonical teen front door reveals family artwork and switches to Bip Jr wi
     window as typeof window & { __sekretAudienceMotionSamples?: AudienceMotionSample[] }
   ).__sekretAudienceMotionSamples ?? []);
 
-  const teen = (await read()).filter(sample => sample.audience === 'teen');
-  expect(teen.length).toBeGreaterThan(4);
-  expect(teen.some(sample => sample.copy < 0.95)).toBe(true);
-  expect(teen.some(sample => sample.hero < 0.95)).toBe(true);
-  expect(teen.some(sample => sample.cues < 0.95)).toBe(true);
-  for (const value of ['copy', 'hero'] as const) {
-    expect(teen.at(-1)![value]).toBeGreaterThanOrEqual(0.99);
-  }
-  expect(teen.at(-1)!.cues).toBeGreaterThanOrEqual(0.61);
-  expect(teen.at(-1)!.cues).toBeLessThanOrEqual(0.63);
-
+  // The mobile canvas uses readable portrait cards instead of shrinking the
+  // full landscape poster or animating an empty hero slot.
+  await expect(page.getByTestId('canon-companion-showcase')).toBeVisible();
+  await expect(page.getByTestId('family-composition').getByRole('button')).toHaveCount(10);
+  await expect(page.getByTestId('web-welcome-hero-safe-area')).toHaveCount(0);
   await page.getByTestId('web-welcome-audience-switch').click();
   await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible();
-  await page.waitForTimeout(1100);
+  await expect.poll(async () => {
+    const samples = (await read()).filter(sample => sample.audience === 'bip-jr');
+    return samples.at(-1)?.cues ?? 0;
+  }, { timeout: 15_000 }).toBeGreaterThanOrEqual(0.99);
   const jr = (await read()).filter(sample => sample.audience === 'bip-jr');
   expect(jr.length).toBeGreaterThan(4);
   expect(jr[0]!.hero).toBeLessThan(0.5);
@@ -229,7 +226,9 @@ test('reduced motion renders both audience scenes still with working family acce
     return node ? Number.parseFloat(getComputedStyle(node).opacity) : null;
   }));
   await expect(page.getByTestId('web-welcome-hero-teen')).toBeVisible({ timeout: 30_000 });
-  expect(await opacity()).toEqual([1, 1, 0.62]);
+  await expect(page.getByTestId('canon-companion-showcase')).toBeVisible();
+  await expect(page.getByTestId('family-composition').getByRole('button')).toHaveCount(10);
+  expect(await opacity()).toEqual([null, null, null]);
   await page.getByTestId('web-welcome-audience-switch').click();
   await expect(page.getByTestId('web-welcome-hero-bip-jr')).toBeVisible();
   expect(await opacity()).toEqual([1, 1, 1]);

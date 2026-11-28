@@ -29,6 +29,7 @@ import {
   ONBOARDING_SIDE_KEY,
 } from '@/services/auth/postAuthBootstrap';
 import { getSupabase } from '@/utils/supabase';
+import { trackAnalyticsEvent } from '@/utils/telemetry';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ─── Error helpers ────────────────────────────────────────────────────────
@@ -322,6 +323,11 @@ export default function SignupScreen() {
     const e = email.trim();
     const p = password;
     const metadata = buildSignupMetadata(preferredSide, username);
+
+    void trackAnalyticsEvent('signup_attempted', {
+      side: preferredSide,
+      age_band: null,
+    });
 
     setLoading(true);
     const sb = getSupabase();

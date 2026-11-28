@@ -75,9 +75,9 @@ test('Teen and Bip Jr artwork reveal in sequence without replacing character art
     'activeAudience, audienceCopyReveal, audienceHeroReveal, audienceCuesReveal, motionEnabled',
     'values.forEach(value => value.setValue(1))',
     "const BIP_JR_HERO = require('../assets/images/parent-space-splash.png')",
-    "const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg')",
+    'CANON_FAMILY_POSTER_IMAGE',
   ]) {
-    assert.ok(screen.includes(marker), `Missing original-art or reduced-motion guarantee: ${marker}`);
+    assert.ok(screen.includes(marker), `Missing approved Family-art or reduced-motion guarantee: ${marker}`);
   }
   assert.ok(contract.includes('audienceRevealDurationMs: 640'));
   assert.ok(contract.includes('audienceRevealStaggerMs: 130'));

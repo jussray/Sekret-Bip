@@ -17,8 +17,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { AccountSide } from '@/features/identity/accountProfile';
 import { FRONT_DOOR_THEME } from '@/constants/frontDoorTheme';
 import { FRONT_DOOR_MOTION } from '@/motion/frontDoorMotion';
+import { CANON_FAMILY_POSTER_IMAGE } from '../constants/companionVisualCanon';
+import { CanonCompanionShowcase } from '../components/companions/CanonCompanionShowcase';
 
-const TEEN_HERO = require('../assets/brand/sekret-bip-teen-family-v1.jpg');
 const BIP_JR_HERO = require('../assets/images/parent-space-splash.png');
 const TEEN_CUE_REST_OPACITY = 0.62;
 const GRID_POSITIONS = ['20%', '40%', '60%', '80%'] as const;
@@ -82,14 +83,19 @@ export function WebWelcomeScreen({
   const shellHeight = compact ? height : Math.min(height, 900);
   const entrySide = accountSideForWelcomeAudience(activeAudience);
   const isBipJr = activeAudience === 'bip-jr';
+  // All teen viewport sizes now share the same approved family composition.
   const heroContract = isBipJr
     ? FRONT_DOOR_THEME.heroSafeArea.bipJr
     : FRONT_DOOR_THEME.heroSafeArea.teen;
-  const heroHeight = shortViewport
-    ? heroContract.shortHeight
-    : compact
-      ? heroContract.compactHeight
-      : heroContract.desktopHeight;
+  const heroHeight = !isBipJr
+    ? compact
+      ? Math.min(300, Math.max(216, (width - 12) / 1.5))
+      : Math.min(620, (Math.min(width - 40, 1120) - 28) / 1.5)
+    : shortViewport
+      ? heroContract.shortHeight
+      : compact
+        ? heroContract.compactHeight
+        : heroContract.desktopHeight;
   const worldPulse = useRef(new Animated.Value(0)).current;
   const heroDrift = useRef(new Animated.Value(0)).current;
   // A first paint at full opacity would flash before the reveal effect starts.
@@ -346,8 +352,8 @@ export function WebWelcomeScreen({
         title: 'Your people.\nYour peace.',
         lead: 'A safe little world where kids, teens, and parents can stay close—without losing their own space.',
         subtitle: 'Come on in.',
-        hero: TEEN_HERO,
-        heroLabel: 'Night on the left, Suhana in the center, Sy on the right, Cloud, and their parents together',
+        hero: CANON_FAMILY_POSTER_IMAGE,
+        heroLabel: 'Approved Se’kret Bip Family scrapbook: Sy, Night, Suhana, Ja, and Cloud in that order',
         cues: [
           { symbol: '☾', label: 'start quiet' },
           { symbol: '♡', label: 'stay close' },
@@ -382,7 +388,7 @@ export function WebWelcomeScreen({
       <View
         testID="web-welcome-shell"
         accessibilityLabel={isBipJr ? 'Bip Jr welcome' : "Se'kret Bip teen welcome"}
-        style={[styles.shell, { height: shellHeight }, compact && styles.shellCompact]}
+        style={[styles.shell, !isBipJr && styles.shellTeen, { height: shellHeight }, compact && styles.shellCompact]}
       >
         <View
           pointerEvents="none"
@@ -456,7 +462,7 @@ export function WebWelcomeScreen({
 
           <Animated.View
             testID="web-welcome-copy-reveal"
-            style={[styles.copy, isBipJr && styles.copyBipJr, audienceRevealStyle(audienceCopyReveal)]}
+            style={[styles.copy, isBipJr && styles.copyBipJr, compact && !isBipJr && styles.copyTeenCompact, audienceRevealStyle(audienceCopyReveal)]}
           >
             <Text
               testID="web-welcome-eyebrow"
@@ -464,11 +470,12 @@ export function WebWelcomeScreen({
             >
               {copy.eyebrow}
             </Text>
-            <Text style={[styles.title, isBipJr && styles.titleBipJr]}>{copy.title}</Text>
+            <Text style={[styles.title, isBipJr && styles.titleBipJr, compact && !isBipJr && styles.titleTeenCompact]}>{copy.title}</Text>
             <Text style={[styles.lead, isBipJr && styles.leadBipJr]}>{copy.lead}</Text>
             <Text style={[styles.subtitle, isBipJr && styles.subtitleBipJr]}>{copy.subtitle}</Text>
           </Animated.View>
 
+          {isBipJr && (
           <View
             testID="web-welcome-hero-safe-area"
             style={{ paddingBottom: heroContract.bottomGap }}
@@ -496,7 +503,13 @@ export function WebWelcomeScreen({
               </Animated.View>
             </Animated.View>
           </View>
+          )}
 
+          {!isBipJr && (
+            <CanonCompanionShowcase motionEnabled={motionEnabled} onContinue={() => onEnter(entrySide)} />
+          )}
+
+          {isBipJr && (
           <Animated.View
             testID="web-welcome-world-cues"
             accessible
@@ -519,6 +532,7 @@ export function WebWelcomeScreen({
               </View>
             ))}
           </Animated.View>
+          )}
 
           <Text style={[styles.handNote, !isBipJr && styles.handNoteTeen]}>{copy.note}</Text>
 
@@ -553,6 +567,15 @@ export function WebWelcomeScreen({
             </Pressable>
           )}
 
+          <Pressable
+            testID="web-welcome-find-doorway"
+            accessibilityRole="button"
+            accessibilityLabel="Find your doorway helper"
+            onPress={() => router.push('/find-family' as never)}
+            style={({ pressed }) => [styles.findDoorwayButton, pressed && styles.controlPressed]}
+          >
+            <Text style={styles.findDoorwayText}>Not sure where to start? Find your doorway →</Text>
+          </Pressable>
           <Pressable
             testID="web-welcome-audience-switch"
             accessibilityRole="button"
@@ -657,6 +680,20 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.xxl + SPACE[2],
     backgroundColor: '#0D071E',
     boxShadow: FRONT_DOOR_THEME.shadow.shell as never,
+  },
+  shellTeen: {
+    maxWidth: 1120,
+    borderColor: 'rgba(213,154,255,0.34)',
+  },
+  copyTeenCompact: {
+    paddingTop: 4,
+    paddingBottom: 4,
+  },
+  titleTeenCompact: {
+    fontSize: 35,
+    lineHeight: 38,
+    letterSpacing: -1.3,
+    marginTop: 2,
   },
   shellCompact: {
     maxWidth: '100%',
@@ -881,6 +918,14 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     backgroundColor: color.heroGlow,
   },
+  heroPlaceholder: {
+    position: 'absolute',
+    top: SPACE[1],
+    left: 0,
+    right: 0,
+    width: '100%',
+    opacity: 0.94,
+  },
   hero: {
     width: '100%',
     height: '100%',
@@ -985,6 +1030,18 @@ const styles = StyleSheet.create({
     color: color.lilacLight,
     fontSize: TYPE.sm,
     fontWeight: '900',
+  },
+  findDoorwayButton: {
+    minHeight: 40,
+    marginHorizontal: SPACE[5],
+    marginTop: SPACE[2],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  findDoorwayText: {
+    color: color.textMid,
+    fontSize: TYPE.sm,
+    fontWeight: '600',
   },
   audienceSwitch: {
     minHeight: 48,
