@@ -708,7 +708,7 @@ export function Bippin2Screen({
                   <Text style={styles.sleepBig}>😴</Text>
                   <Text style={styles.sleepTime}>{sleepHours}</Text>
                   <Text style={styles.cardBodySmall}>last night</Text>
-                  <TouchableOpacity onPress={() => {}}>
+                  <TouchableOpacity onPress={() => setScreen('calm')}>
                     <Text style={[styles.linkText, { color: idAccent }]}>track sleep 💤</Text>
                   </TouchableOpacity>
                 </View>

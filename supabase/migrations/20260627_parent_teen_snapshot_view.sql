@@ -1,4 +1,4 @@
--- 20260626_parent_teen_snapshot_view.sql
+-- 20260627_parent_teen_snapshot_view.sql
 -- Creates a parent-safe view over teen_activity_summary.
 -- Exposes only the three non-sensitive columns; timestamps never reach the parent side.
 -- fetchTeenActivitySummary in src/utils/sync.ts reads from this view.
