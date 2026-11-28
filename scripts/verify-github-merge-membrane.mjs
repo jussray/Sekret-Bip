@@ -8,8 +8,10 @@ const DEFAULT_TIMEOUT_MS = 22 * 60 * 1000;
 const DEFAULT_POLL_MS = 10_000;
 const EXPECTED_APP = 'github-actions';
 
+// Bearer's job check (github-actions), not the similarly named SARIF upload result.
 export const ALWAYS_REQUIRED_CHECKS = Object.freeze([
   'deploy',
+  'bearer',
   'repository-truth',
   'PR Continuity Exact-Head Gate',
   'Verify test-ledger contract',
